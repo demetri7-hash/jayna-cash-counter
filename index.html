@@ -182,9 +182,19 @@
         
         <!-- AM Total Display -->
         <div id="amTotalDisplay" class="am-total-display">
-          <h4>Morning Starting Amount:</h4>
-          <div class="amount" id="pmAmTotal">Loading...</div>
-          <div id="amNotes" style="margin-top: 10px; font-style: italic; color: #666;"></div>
+          <h4>Morning Count Information:</h4>
+          <div style="display: flex; justify-content: space-between; margin: 10px 0; font-size: 14px;">
+            <span><strong>Counted by:</strong> <span id="amCounterName">Loading...</span></span>
+            <span><strong>Time:</strong> <span id="amCountTime">Loading...</span></span>
+          </div>
+          <div style="text-align: center; margin: 15px 0;">
+            <strong>Starting Amount:</strong>
+            <div class="amount" id="pmAmTotal" style="font-size: 28px; margin: 5px 0;">Loading...</div>
+          </div>
+          <div id="amNotesDisplay" style="background: #fff3cd; padding: 12px; border-radius: 6px; margin-top: 15px; border-left: 4px solid #ffc107; display: none;">
+            <strong style="color: #856404;">Morning Notes:</strong>
+            <div id="amNotes" style="margin-top: 5px; color: #856404;"></div>
+          </div>
         </div>
         
         <!-- Drawer 1 -->
@@ -292,8 +302,8 @@
 
 <script>
   // Configuration
-  const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
+  const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
+  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE';
   
   const EMAILJS_CONFIG = {
     PUBLIC_KEY: 'LHbq8j4mlt49O75eo',
@@ -389,6 +399,10 @@
     hideAllSections();
     document.getElementById('pmForm').classList.add('active');
     setupDenominations('pm');
+    
+    // Add event listener for date changes
+    document.getElementById('pmDate').addEventListener('change', loadAMData);
+    
     await loadAMData();
   }
   
@@ -470,26 +484,49 @@
   
   async function loadAMData() {
     const date = document.getElementById('pmDate').value;
-    if (!date) return;
+    console.log('Loading AM data for date:', date);
+    
+    if (!date) {
+      document.getElementById('pmAmTotal').textContent = 'Please select a date';
+      return;
+    }
+    
+    // Show loading state
+    document.getElementById('pmAmTotal').textContent = 'Loading...';
     
     try {
+      if (!supabase) {
+        throw new Error('Database not connected');
+      }
+      
+      console.log('Querying Supabase for AM data...');
       const amData = await getAMData(date);
-      if (amData) {
+      console.log('AM data result:', amData);
+      
+      if (amData && amData.total > 0) {
         currentAMData = amData;
-        document.getElementById('pmAmTotal').textContent = `$${amData.total.toFixed(2)}`;
+        document.getElementById('pmAmTotal').textContent = `${amData.total.toFixed(2)}`;
         
-        if (amData.notes) {
-          document.getElementById('amNotes').textContent = `Morning Notes: ${amData.notes}`;
+        const amNotesEl = document.getElementById('amNotes');
+        if (amData.notes && amNotesEl) {
+          amNotesEl.textContent = `Morning Notes: ${amData.notes}`;
+          amNotesEl.style.display = 'block';
+        } else if (amNotesEl) {
+          amNotesEl.style.display = 'none';
         }
         
-        showMessage('AM data loaded automatically!', 'success');
+        showMessage('AM data loaded successfully!', 'success');
       } else {
+        currentAMData = null;
         document.getElementById('pmAmTotal').textContent = 'No AM data found';
-        showMessage('No AM count found for this date', 'error');
+        const amNotesEl = document.getElementById('amNotes');
+        if (amNotesEl) amNotesEl.style.display = 'none';
+        showMessage(`No AM count found for ${date}`, 'error');
       }
     } catch (error) {
       console.error('Error loading AM data:', error);
       document.getElementById('pmAmTotal').textContent = 'Error loading AM data';
+      showMessage(`Error: ${error.message}`, 'error');
     }
   }
   
