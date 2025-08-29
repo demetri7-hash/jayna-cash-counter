@@ -3,15 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jayna Gyro Cash Counter - by DG 2025</title>
+  <title>Jayna Gyro Cash Counter</title>
   
-  
-  <!-- Web App Manifest for better mobile experience -->
+  <link rel="apple-touch-icon" href="https://static.spotapps.co/website_images/ab_websites/229800_website_v1/logo.png">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Jayna Gyro Counter">
-  <meta name="application-name" content="Jayna Gyro Counter">
   <meta name="theme-color" content="#667eea">
   
   <style>
@@ -22,63 +18,60 @@
     .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
     .header p { opacity: 0.9; font-size: 16px; }
     .content { padding: 30px; }
-    .shift-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
-    .shift-btn { padding: 20px; border: 3px solid #e0e0e0; border-radius: 15px; background: white; font-size: 18px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-align: center; }
-    .shift-btn:hover { border-color: #667eea; transform: translateY(-2px); }
-    .shift-btn.active { border-color: #667eea; background: #667eea; color: white; transform: translateY(-2px); }
+    .main-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
+    .main-menu.show-report { grid-template-columns: 1fr 1fr 1fr; }
+    .menu-btn { padding: 25px 20px; border: 3px solid #e0e0e0; border-radius: 15px; background: white; font-size: 18px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-align: center; }
+    .menu-btn:hover { border-color: #667eea; transform: translateY(-2px); }
+    .menu-btn.active { border-color: #667eea; background: #667eea; color: white; transform: translateY(-2px); }
+    .menu-btn.report { background: #28a745; color: white; border-color: #28a745; }
     .form-section { display: none; }
     .form-section.active { display: block; }
-    .drawer-section { margin-bottom: 30px; border: 2px solid #f0f0f0; border-radius: 15px; overflow: hidden; }
-    .drawer-header { background: #f8f9fa; padding: 15px 20px; font-weight: 600; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
+    .form-input, .form-select { width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; }
+    .form-input:focus, .form-select:focus { outline: none; border-color: #667eea; }
+    .drawer-section { margin: 25px 0; border: 2px solid #f0f0f0; border-radius: 12px; overflow: hidden; }
+    .drawer-header { background: #f8f9fa; padding: 15px 20px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
     .skip-toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #666; }
-    .skip-toggle input { width: 18px; height: 18px; }
     .drawer-content { padding: 20px; }
-    .denomination-row { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #f0f0f0; }
-    .denomination-row:last-child { border-bottom: none; }
-    .denom-info { display: flex; flex-direction: column; min-width: 80px; }
-    .denom-label { font-size: 16px; font-weight: 600; }
-    .denom-value { font-size: 12px; color: #666; }
-    .qty-input { width: 80px; height: 45px; border: 2px solid #e0e0e0; border-radius: 8px; text-align: center; font-size: 18px; font-weight: 600; }
+    .denom-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+    .denom-row:last-child { border-bottom: none; }
+    .denom-label { font-weight: 600; font-size: 16px; }
+    .denom-value { font-size: 14px; color: #666; margin-top: 2px; }
+    .qty-input { width: 80px; height: 40px; text-align: center; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 16px; font-weight: 600; }
     .qty-input:focus { outline: none; border-color: #667eea; }
-    .skip-reason { width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; }
-    .skip-reason:focus { outline: none; border-color: #667eea; }
-    .subtotal { margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center; font-size: 18px; font-weight: 600; }
-    .notes-section { margin-bottom: 30px; }
-    .notes-section label { display: block; margin-bottom: 10px; font-weight: 600; }
-    .notes-input { width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; min-height: 80px; resize: vertical; }
-    .notes-input:focus { outline: none; border-color: #667eea; }
-    .counter-info { margin-bottom: 30px; }
-    .counter-info label { display: block; margin-bottom: 10px; font-weight: 600; }
-    .counter-input { width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; }
-    .counter-input:focus { outline: none; border-color: #667eea; }
-    .am-total-input { margin-bottom: 30px; }
-    .am-total-input label { display: block; margin-bottom: 10px; font-weight: 600; }
-    .pm-tips { display: block; margin-bottom: 30px; font-weight: 600; }
-    .toast-sales { margin-bottom: 30px; }
-    .toast-sales label { display: block; margin-bottom: 10px; font-weight: 600; }
-    .tips-input { width: 100%; padding: 30px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; }
-    .tips-input:focus { outline: none; border-color: #667eea; }
-    .total-display { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 30px; }
-    .total-display h3 { font-size: 18px; margin-bottom: 5px; }
-    .total-display .amount { font-size: 32px; font-weight: 700; }
-    .submit-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 15px; font-size: 18px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+    .drawer-total { margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center; font-size: 18px; font-weight: 600; }
+    .grand-total { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; margin: 20px 0; }
+    .grand-total h3 { font-size: 18px; margin-bottom: 5px; }
+    .grand-total .amount { font-size: 32px; font-weight: 700; }
+    .notes-area { width: 100%; min-height: 80px; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; resize: vertical; }
+    .notes-area:focus { outline: none; border-color: #667eea; }
+    .submit-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; margin-top: 20px; }
     .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3); }
     .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .am-total-display { background: #e7f3ff; padding: 15px; border-radius: 8px; margin: 15px 0; }
+    .am-total-display h4 { margin-bottom: 5px; color: #1976d2; }
+    .am-total-display .amount { font-size: 24px; font-weight: bold; color: #1565c0; }
+    .currency-input { width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 18px; text-align: center; }
+    .currency-input:focus { outline: none; border-color: #667eea; }
+    .confirmation-screen { text-align: center; padding: 40px 20px; }
+    .confirmation-screen h2 { color: #28a745; margin-bottom: 30px; font-size: 28px; }
+    .deposit-instruction { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 25px; border-radius: 15px; margin: 20px 0; font-size: 22px; font-weight: bold; }
+    .return-instruction { background: linear-gradient(135deg, #fd7e14 0%, #e83e8c 100%); color: white; padding: 25px; border-radius: 15px; margin: 20px 0; font-size: 22px; font-weight: bold; }
+    .thank-you { font-size: 20px; color: #28a745; margin: 30px 0; font-weight: 600; }
+    .confirm-btn { background: #28a745; margin-top: 30px; }
+    .loading { text-align: center; padding: 40px; }
+    .loading-spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .message { padding: 15px; border-radius: 8px; margin: 15px 0; text-align: center; }
+    .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .message.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
     .hidden { display: none; }
-    .success-message { background: #d4edda; color: #155724; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 20px; border: 2px solid #c3e6cb; }
-    .error-message { background: #f8d7da; color: #721c24; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 20px; border: 2px solid #f5c6cb; }
-    .info-message { background: #d1ecf1; color: #0c5460; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 20px; border: 2px solid #bee5eb; }
-    .nav-buttons { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: none; gap: 10px; z-index: 1000; background: rgba(0, 0, 0, 0.9); padding: 12px 20px; border-radius: 30px; backdrop-filter: blur(15px); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
-    .nav-btn { background: #667eea; color: white; border: none; padding: 10px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; min-width: 70px; white-space: nowrap; }
-    .nav-btn:hover { background: #5a6fd8; transform: scale(1.05); }
-    .nav-btn:disabled { background: #888; cursor: not-allowed; transform: none; opacity: 0.6; }
-    .nav-btn:active { transform: scale(0.95); }
-    @media (max-width: 768px), (pointer: coarse) { .nav-buttons.show { display: flex; animation: slideUp 0.3s ease-out; } }
-    @keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+    .skip-content { padding: 20px; }
+    .skip-reason { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; }
   </style>
   
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -90,106 +83,217 @@
     </div>
     
     <div class="content">
-      <div id="successMessage" class="success-message hidden"></div>
-      <div id="errorMessage" class="error-message hidden"></div>
-      <div id="infoMessage" class="info-message hidden"></div>
+      <div id="messageArea"></div>
       
-      <div class="shift-selector">
-        <button class="shift-btn" id="amBtn" onclick="selectShift('am')">AM Count</button>
-        <button class="shift-btn" id="pmBtn" onclick="selectShift('pm')">PM Close</button>
-        <button class="shift-btn" id="reportBtn" onclick="showReportGenerator()" style="background: #28a745;">Generate Report PDF</button>
+      <!-- Main Menu -->
+      <div id="mainMenu" class="main-menu">
+        <button class="menu-btn" onclick="startAMCount()">AM Count</button>
+        <button class="menu-btn" onclick="startPMCount()">PM Close</button>
+        <button class="menu-btn report" onclick="showReports()">Generate Report</button>
       </div>
       
-      <div id="reportForm" class="form-section">
-        <div class="counter-info">
-          <label for="reportDate">Select Date for Report:</label>
-          <input type="date" id="reportDate" class="counter-input" required>
-        </div>
-        <div style="text-align: center; margin: 30px 0;">
-          <button class="submit-btn" onclick="generateReportPDF()" style="background: #28a745;">Generate Report PDF</button>
-          <button class="submit-btn" onclick="goBackToShiftSelector()" style="background: #6c757d; margin-left: 10px;">Back</button>
-        </div>
-        <div id="reportStatus" style="text-align: center; margin-top: 20px; font-style: italic; color: #666;"></div>
-      </div>
-      
+      <!-- AM Count Form -->
       <div id="amForm" class="form-section">
-        <div class="counter-info">
-          <label for="amCounter">Counted by (Full Name):</label>
-          <input type="text" id="amCounter" class="counter-input" placeholder="Enter your full name" required>
-        </div>
-        <div class="counter-info">
+        <h2 style="margin-bottom: 20px; color: #1e3c72;">Morning Cash Count</h2>
+        
+        <div class="form-group">
           <label for="amDate">Date:</label>
-          <input type="date" id="amDate" class="counter-input" required>
+          <input type="date" id="amDate" class="form-input" required>
         </div>
+        
+        <div class="form-group">
+          <label for="amCounter">Counted by:</label>
+          <select id="amCounter" class="form-select" required>
+            <option value="">Choose Name</option>
+            <option value="Demetri Gregorakis">Demetri Gregorakis</option>
+            <option value="Ahmet Can Guler">Ahmet Can Guler</option>
+            <option value="Bryan Cox">Bryan Cox</option>
+          </select>
+        </div>
+        
+        <!-- Drawer 1 -->
         <div class="drawer-section">
-          <div class="drawer-header">Drawer 1 <div class="skip-toggle"><input type="checkbox" id="amDrawer1Skip" onchange="toggleDrawerSkip('am', 1)"><label for="amDrawer1Skip">Skip Drawer</label></div></div>
-          <div class="drawer-content" id="amDrawer1Content"><div id="amDrawer1Denoms"></div><div class="subtotal" id="amDrawer1Total">$0.00</div></div>
-          <div class="drawer-content hidden" id="amDrawer1SkipContent"><input type="text" class="skip-reason" id="amDrawer1Reason" placeholder="Reason for skipping drawer 1"></div>
+          <div class="drawer-header">
+            <span>Drawer 1</span>
+            <label class="skip-toggle">
+              <input type="checkbox" id="amDrawer1Skip" onchange="toggleSkip('am', 1)">
+              Skip Drawer
+            </label>
+          </div>
+          <div id="amDrawer1Content" class="drawer-content">
+            <div id="amDrawer1Denoms"></div>
+            <div class="drawer-total" id="amDrawer1Total">$0.00</div>
+          </div>
+          <div id="amDrawer1SkipContent" class="skip-content hidden">
+            <input type="text" class="skip-reason" id="amDrawer1Reason" placeholder="Reason for skipping drawer 1">
+          </div>
         </div>
+        
+        <!-- Drawer 2 -->
         <div class="drawer-section">
-          <div class="drawer-header">Drawer 2 <div class="skip-toggle"><input type="checkbox" id="amDrawer2Skip" onchange="toggleDrawerSkip('am', 2)"><label for="amDrawer2Skip">Skip Drawer</label></div></div>
-          <div class="drawer-content" id="amDrawer2Content"><div id="amDrawer2Denoms"></div><div class="subtotal" id="amDrawer2Total">$0.00</div></div>
-          <div class="drawer-content hidden" id="amDrawer2SkipContent"><input type="text" class="skip-reason" id="amDrawer2Reason" placeholder="Reason for skipping drawer 2"></div>
+          <div class="drawer-header">
+            <span>Drawer 2</span>
+            <label class="skip-toggle">
+              <input type="checkbox" id="amDrawer2Skip" onchange="toggleSkip('am', 2)">
+              Skip Drawer
+            </label>
+          </div>
+          <div id="amDrawer2Content" class="drawer-content">
+            <div id="amDrawer2Denoms"></div>
+            <div class="drawer-total" id="amDrawer2Total">$0.00</div>
+          </div>
+          <div id="amDrawer2SkipContent" class="skip-content hidden">
+            <input type="text" class="skip-reason" id="amDrawer2Reason" placeholder="Reason for skipping drawer 2">
+          </div>
         </div>
-        <div class="notes-section">
-          <label for="amNotes">Notes (Optional):</label>
-          <textarea id="amNotes" class="notes-input" placeholder="Any notes for the PM shift..."></textarea>
-        </div>
-        <div class="total-display">
+        
+        <div class="grand-total">
           <h3>Total Cash Count</h3>
           <div class="amount" id="amGrandTotal">$0.00</div>
         </div>
-        <button class="submit-btn" onclick="submitCount('am')">Submit AM Count</button>
+        
+        <div class="form-group">
+          <label for="amNotes">Notes (Optional):</label>
+          <textarea id="amNotes" class="notes-area" placeholder="Any notes for the PM shift..."></textarea>
+        </div>
+        
+        <button class="submit-btn" onclick="submitAM()">Submit AM Count</button>
+        <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 10px;">Back to Menu</button>
       </div>
       
+      <!-- PM Count Form -->
       <div id="pmForm" class="form-section">
-        <div class="counter-info">
-          <label for="pmCounter">Counted by (Full Name):</label>
-          <input type="text" id="pmCounter" class="counter-input" placeholder="Enter your full name" required>
-        </div>
-        <div class="counter-info">
+        <h2 style="margin-bottom: 20px; color: #1e3c72;">Evening Cash Close</h2>
+        
+        <div class="form-group">
           <label for="pmDate">Date:</label>
-          <input type="date" id="pmDate" class="counter-input" required>
+          <input type="date" id="pmDate" class="form-input" required>
         </div>
-        <div class="am-total-input">
-          <label for="pmAmTotal">AM Starting Total (from morning report):</label>
-          <input type="number" id="pmAmTotal" class="tips-input" placeholder="0.00" step="0.01" min="0" onfocus="this.select()">
-          <div id="pmAmNotes"></div>
+        
+        <div class="form-group">
+          <label for="pmCounter">Counted by:</label>
+          <select id="pmCounter" class="form-select" required>
+            <option value="">Choose Name</option>
+            <option value="Demetri Gregorakis">Demetri Gregorakis</option>
+            <option value="Ahmet Can Guler">Ahmet Can Guler</option>
+            <option value="Bryan Cox">Bryan Cox</option>
+          </select>
         </div>
+        
+        <!-- AM Total Display -->
+        <div id="amTotalDisplay" class="am-total-display">
+          <h4>Morning Starting Amount:</h4>
+          <div class="amount" id="pmAmTotal">Loading...</div>
+          <div id="amNotes" style="margin-top: 10px; font-style: italic; color: #666;"></div>
+        </div>
+        
+        <!-- Drawer 1 -->
         <div class="drawer-section">
-          <div class="drawer-header">Drawer 1 <div class="skip-toggle"><input type="checkbox" id="pmDrawer1Skip" onchange="toggleDrawerSkip('pm', 1)"><label for="pmDrawer1Skip">Skip Drawer</label></div></div>
-          <div class="drawer-content" id="pmDrawer1Content"><div id="pmDrawer1Denoms"></div><div class="subtotal" id="pmDrawer1Total">$0.00</div></div>
-          <div class="drawer-content hidden" id="pmDrawer1SkipContent"><input type="text" class="skip-reason" id="pmDrawer1Reason" placeholder="Reason for skipping drawer 1"></div>
+          <div class="drawer-header">
+            <span>Drawer 1</span>
+            <label class="skip-toggle">
+              <input type="checkbox" id="pmDrawer1Skip" onchange="toggleSkip('pm', 1)">
+              Skip Drawer
+            </label>
+          </div>
+          <div id="pmDrawer1Content" class="drawer-content">
+            <div id="pmDrawer1Denoms"></div>
+            <div class="drawer-total" id="pmDrawer1Total">$0.00</div>
+          </div>
+          <div id="pmDrawer1SkipContent" class="skip-content hidden">
+            <input type="text" class="skip-reason" id="pmDrawer1Reason" placeholder="Reason for skipping drawer 1">
+          </div>
         </div>
+        
+        <!-- Drawer 2 -->
         <div class="drawer-section">
-          <div class="drawer-header">Drawer 2 <div class="skip-toggle"><input type="checkbox" id="pmDrawer2Skip" onchange="toggleDrawerSkip('pm', 2)"><label for="pmDrawer2Skip">Skip Drawer</label></div></div>
-          <div class="drawer-content" id="pmDrawer2Content"><div id="pmDrawer2Denoms"></div><div class="subtotal" id="pmDrawer2Total">$0.00</div></div>
-          <div class="drawer-content hidden" id="pmDrawer2SkipContent"><input type="text" class="skip-reason" id="pmDrawer2Reason" placeholder="Reason for skipping drawer 2"></div>
+          <div class="drawer-header">
+            <span>Drawer 2</span>
+            <label class="skip-toggle">
+              <input type="checkbox" id="pmDrawer2Skip" onchange="toggleSkip('pm', 2)">
+              Skip Drawer
+            </label>
+          </div>
+          <div id="pmDrawer2Content" class="drawer-content">
+            <div id="pmDrawer2Denoms"></div>
+            <div class="drawer-total" id="pmDrawer2Total">$0.00</div>
+          </div>
+          <div id="pmDrawer2SkipContent" class="skip-content hidden">
+            <input type="text" class="skip-reason" id="pmDrawer2Reason" placeholder="Reason for skipping drawer 2">
+          </div>
         </div>
-        <div class="pm-tips">
-          <label for="pmCashTips">Cash Tips:</label>
-          <input type="number" id="pmCashTips" class="tips-input" placeholder="0.00" step="0.01" min="0" onfocus="this.select()">
-        </div>
-        <div class="toast-sales">
-          <label for="pmToastSales">Cash Sales as Reported by Toast:</label>
-          <input type="number" id="pmToastSales" class="tips-input" placeholder="0.00" step="0.01" min="0" onfocus="this.select()" oninput="roundToastSales()">
-        </div>
-        <div class="notes-section">
-          <label for="pmNotes">Notes (Optional):</label>
-          <textarea id="pmNotes" class="notes-input" placeholder="Any notes about the day..."></textarea>
-        </div>
-        <div class="total-display">
+        
+        <div class="grand-total">
           <h3>Total Cash Count</h3>
           <div class="amount" id="pmGrandTotal">$0.00</div>
         </div>
-        <button class="submit-btn" onclick="submitCount('pm')">Submit PM Close</button>
+        
+        <div class="form-group">
+          <label for="toastSales">Toast Cash Sales (exact amount):</label>
+          <input type="number" id="toastSales" class="currency-input" placeholder="0.00" step="0.01" min="0" onfocus="this.select()">
+        </div>
+        
+        <div class="form-group">
+          <label for="cashTips">Cash Tips (whole number):</label>
+          <input type="number" id="cashTips" class="currency-input" placeholder="0" step="1" min="0" onfocus="this.select()">
+        </div>
+        
+        <div class="form-group">
+          <label for="pmNotes">Notes (Optional):</label>
+          <textarea id="pmNotes" class="notes-area" placeholder="Any notes about the day..."></textarea>
+        </div>
+        
+        <button class="submit-btn" onclick="submitPM()">Submit PM Close</button>
+        <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 10px;">Back to Menu</button>
+      </div>
+      
+      <!-- Loading Screen -->
+      <div id="loadingScreen" class="form-section">
+        <div class="loading">
+          <div class="loading-spinner"></div>
+          <h3>Processing your count...</h3>
+          <p>Calculating totals and sending report...</p>
+        </div>
+      </div>
+      
+      <!-- Confirmation Screen -->
+      <div id="confirmationScreen" class="form-section">
+        <div class="confirmation-screen">
+          <h2>Count Submitted Successfully!</h2>
+          
+          <div class="deposit-instruction">
+            DEPOSIT <span id="depositAmount">$0</span> INTO ENVELOPE
+          </div>
+          
+          <div class="return-instruction">
+            RETURN <span id="returnAmount">$0.00</span> TO CASH BOX AND LOCK IN SAFE FOR THE NIGHT
+          </div>
+          
+          <div class="thank-you">THANK YOU!</div>
+          
+          <button class="submit-btn confirm-btn" onclick="goHome()">Confirm and Close</button>
+        </div>
+      </div>
+      
+      <!-- Reports Section -->
+      <div id="reportsForm" class="form-section">
+        <h2 style="margin-bottom: 20px; color: #1e3c72;">Generate Report</h2>
+        
+        <div class="form-group">
+          <label for="reportDate">Select Date:</label>
+          <input type="date" id="reportDate" class="form-input" required>
+        </div>
+        
+        <button class="submit-btn" onclick="generateReport()" style="background: #28a745;">Generate Email Report</button>
+        <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 10px;">Back to Menu</button>
       </div>
     </div>
   </div>
 
 <script>
-  const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
+  // Configuration
+  const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
+  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE';
   
   const EMAILJS_CONFIG = {
     PUBLIC_KEY: 'LHbq8j4mlt49O75eo',
@@ -199,56 +303,54 @@
   };
   
   const DENOMINATIONS = [
-    { label: '$100', value: 100.00 }, { label: '$50', value: 50.00 }, { label: '$20', value: 20.00 }, { label: '$10', value: 10.00 }, { label: '$5', value: 5.00 },
-    { label: '$1', value: 1.00 }, { label: '$0.25', value: 0.25 }, { label: '$0.10', value: 0.10 }, { label: '$0.05', value: 0.05 }, { label: '$0.01', value: 0.01 }
+    { label: '$100', value: 100.00 },
+    { label: '$50', value: 50.00 },
+    { label: '$20', value: 20.00 },
+    { label: '$10', value: 10.00 },
+    { label: '$5', value: 5.00 },
+    { label: '$1', value: 1.00 },
+    { label: '$0.25', value: 0.25 },
+    { label: '$0.10', value: 0.10 },
+    { label: '$0.05', value: 0.05 },
+    { label: '$0.01', value: 0.01 }
   ];
   
   let supabase = null;
-  let currentShift = null;
-  let retrievedAMData = null;
+  let currentAMData = null;
   
+  // Initialize app
   document.addEventListener('DOMContentLoaded', function() {
     initializeSupabase();
-    initializeDenominations();
     initializeEmailJS();
-    initializeDatePickers();
-    showMessage('App is now ready to count! Have a great shift!', 'info');
+    setTodayDate();
+    showMessage('App ready! Select AM Count, PM Close, or Generate Report.', 'info');
   });
   
   function initializeSupabase() {
     if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
-      showMessage('Please configure Supabase credentials in the code', 'error');
+      showMessage('Please configure Supabase credentials', 'error');
       return;
     }
     try {
       supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      console.log('Supabase initialized successfully');
-      showMessage('Database connected successfully!', 'success');
+      console.log('Supabase initialized');
     } catch (error) {
-      console.error('Supabase initialization failed:', error);
-      showMessage('Database connection failed. Please check configuration.', 'error');
+      console.error('Supabase init failed:', error);
+      showMessage('Database connection failed', 'error');
     }
   }
   
   function initializeEmailJS() {
     if (typeof emailjs !== 'undefined') {
       emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
-      console.log('EmailJS initialized successfully');
     }
   }
   
-  function initializeDatePickers() {
+  function setTodayDate() {
     const today = getPacificDate();
-    const amDateInput = document.getElementById('amDate');
-    const pmDateInput = document.getElementById('pmDate');
-    if (amDateInput) amDateInput.value = today;
-    if (pmDateInput) {
-      pmDateInput.value = today;
-      pmDateInput.addEventListener('change', function() {
-        if (currentShift === 'pm') updatePMFormWithAMTotal();
-      });
-    }
-    console.log('Date pickers initialized to:', today);
+    document.getElementById('amDate').value = today;
+    document.getElementById('pmDate').value = today;
+    document.getElementById('reportDate').value = today;
   }
   
   function getPacificDate() {
@@ -260,593 +362,496 @@
     return `${year}-${month}-${day}`;
   }
   
-  async function storeAMData(formData) {
-    console.log('Storing AM data to Supabase...');
-    if (!supabase) throw new Error('Database not connected');
-    const amTotal = formData.drawer1.total + formData.drawer2.total;
-    const dataToStore = {
-      date: formData.date, am_counter: formData.counter, am_timestamp: formData.timestamp, am_total: amTotal,
-      am_drawer1_total: formData.drawer1.total, am_drawer1_skip: formData.drawer1.skipped, am_drawer1_skip_reason: formData.drawer1.skipReason || null, am_drawer1_data: formData.drawer1.counts,
-      am_drawer2_total: formData.drawer2.total, am_drawer2_skip: formData.drawer2.skipped, am_drawer2_skip_reason: formData.drawer2.skipReason || null, am_drawer2_data: formData.drawer2.counts,
-      am_notes: formData.notes || null
-    };
-    const { data, error } = await supabase.from('cash_counts').upsert(dataToStore, {onConflict: 'date'});
-    if (error) throw new Error(`Database error: ${error.message}`);
-    console.log('AM data stored successfully');
-    return { success: true, data: dataToStore };
+  function showMessage(text, type) {
+    const messageArea = document.getElementById('messageArea');
+    messageArea.innerHTML = `<div class="message ${type}">${text}</div>`;
+    setTimeout(() => { messageArea.innerHTML = ''; }, 5000);
   }
   
-  async function getAMData(date) {
-    console.log('Getting AM data from Supabase for date:', date);
-    if (!supabase) throw new Error('Database not connected');
-    const { data, error } = await supabase.from('cash_counts').select('*').eq('date', date).single();
-    if (error) {
-      if (error.code === 'PGRST116') { console.log('No AM data found for date:', date); return null; }
-      throw new Error(`Database error: ${error.message}`);
-    }
-    if (!data || !data.am_total) return null;
-    const amData = {
-      date: data.date, counter: data.am_counter, timestamp: data.am_timestamp, total: data.am_total,
-      drawer1: { total: data.am_drawer1_total, skipped: data.am_drawer1_skip, skipReason: data.am_drawer1_skip_reason, counts: data.am_drawer1_data },
-      drawer2: { total: data.am_drawer2_total, skipped: data.am_drawer2_skip, skipReason: data.am_drawer2_skip_reason, counts: data.am_drawer2_data },
-      notes: data.am_notes
-    };
-    console.log('AM data retrieved successfully');
-    return amData;
+  function hideAllSections() {
+    document.querySelectorAll('.form-section').forEach(section => section.classList.remove('active'));
   }
   
-  async function storePMData(formData, calculations) {
-    console.log('Storing PM data to Supabase...');
-    if (!supabase) throw new Error('Database not connected');
-    const pmTotal = formData.drawer1.total + formData.drawer2.total;
-    const dataToStore = {
-      pm_counter: formData.counter, pm_timestamp: formData.timestamp, pm_total: pmTotal, pm_cash_tips: formData.cashTips, pm_toast_sales: formData.toastSales,
-      pm_drawer1_total: formData.drawer1.total, pm_drawer1_skip: formData.drawer1.skipped, pm_drawer1_skip_reason: formData.drawer1.skipReason || null, pm_drawer1_data: formData.drawer1.counts,
-      pm_drawer2_total: formData.drawer2.total, pm_drawer2_skip: formData.drawer2.skipped, pm_drawer2_skip_reason: formData.drawer2.skipReason || null, pm_drawer2_data: formData.drawer2.counts,
-      pm_notes: formData.notes || null, pm_discrepancy: calculations.discrepancy, pm_adjusted_tips: calculations.adjustedCashTips, pm_drawer_over_amount: calculations.drawerOverAmount, pm_deposit_amount: calculations.depositAmount, pm_amount_to_keep: calculations.amountToKeep
-    };
-    const { data, error } = await supabase.from('cash_counts').update(dataToStore).eq('date', formData.date);
-    if (error) throw new Error(`Database error: ${error.message}`);
-    console.log('PM data stored successfully');
-    return { success: true, data: dataToStore };
+  function goHome() {
+    hideAllSections();
+    document.getElementById('mainMenu').style.display = 'grid';
   }
   
-  async function getPMData(date) {
-    console.log('Getting PM data from Supabase for date:', date);
-    if (!supabase) throw new Error('Database not connected');
-    const { data, error } = await supabase.from('cash_counts').select('*').eq('date', date).single();
-    if (error) {
-      if (error.code === 'PGRST116') { console.log('No PM data found for date:', date); return null; }
-      throw new Error(`Database error: ${error.message}`);
-    }
-    if (!data || !data.pm_total) return null;
-    const pmData = {
-      date: data.date, counter: data.pm_counter, timestamp: data.pm_timestamp, total: data.pm_total, cashTips: data.pm_cash_tips, toastSales: data.pm_toast_sales,
-      drawer1: { total: data.pm_drawer1_total, skipped: data.pm_drawer1_skip, skipReason: data.pm_drawer1_skip_reason, counts: data.pm_drawer1_data },
-      drawer2: { total: data.pm_drawer2_total, skipped: data.pm_drawer2_skip, skipReason: data.pm_drawer2_skip_reason, counts: data.pm_drawer2_data },
-      notes: data.pm_notes, discrepancy: data.pm_discrepancy, adjustedTips: data.pm_adjusted_tips, drawerOverAmount: data.pm_drawer_over_amount, depositAmount: data.pm_deposit_amount, amountToKeep: data.pm_amount_to_keep
-    };
-    console.log('PM data retrieved successfully');
-    return pmData;
+  function startAMCount() {
+    document.getElementById('mainMenu').style.display = 'none';
+    hideAllSections();
+    document.getElementById('amForm').classList.add('active');
+    setupDenominations('am');
   }
   
-  async function updatePMFormWithAMTotal() {
-    console.log('Updating PM form with AM data...');
-    if (currentShift !== 'pm') return;
-    const amInput = document.getElementById('pmAmTotal');
-    const amNotesDiv = document.getElementById('pmAmNotes');
-    if (!amInput) return;
-    try {
-      const pmDateInput = document.getElementById('pmDate');
-      const selectedDate = pmDateInput ? pmDateInput.value : getPacificDate();
-      console.log('Looking for AM data for date:', selectedDate);
-      const amData = await getAMData(selectedDate);
-      if (amData && amData.total > 0) {
-        console.log('AM data retrieved successfully:', amData);
-        window.retrievedAMData = amData;
-        amInput.value = amData.total.toFixed(2);
-        amInput.readOnly = true;
-        amInput.style.backgroundColor = '#d4edda';
-        amInput.style.fontWeight = 'bold';
-        if (amNotesDiv && amData.notes) {
-          const decodedNotes = decodeNotes(amData.notes);
-          amNotesDiv.innerHTML = `<div style="background: #e7f3ff; padding: 10px; border-radius: 5px; margin-top: 10px;"><strong>Morning Notes:</strong><br>${decodedNotes}</div>`;
-        }
-        const existingIndicator = document.querySelector('.am-auto-loaded');
-        if (!existingIndicator) {
-          const indicator = document.createElement('small');
-          indicator.className = 'am-auto-loaded';
-          indicator.style.color = '#155724';
-          indicator.style.fontWeight = 'bold';
-          indicator.style.display = 'block';
-          indicator.style.marginTop = '5px';
-          indicator.textContent = '✅ AM total automatically loaded from morning count';
-          amInput.parentNode.appendChild(indicator);
-        }
-        console.log('PM form configured with automatic AM data');
-        showMessage('AM total automatically loaded from morning count!', 'success');
-      } else {
-        throw new Error('No AM data found for today');
-      }
-    } catch (error) {
-      console.log('Automatic AM retrieval failed, falling back to manual entry:', error.message);
-      window.retrievedAMData = null;
-      amInput.placeholder = 'Enter AM total manually';
-      amInput.style.backgroundColor = '#fff3cd';
-      amInput.readOnly = false;
-      amInput.value = '';
-      if (amNotesDiv) amNotesDiv.innerHTML = '';
-      const existingIndicator = document.querySelector('.am-manual-entry');
-      if (!existingIndicator) {
-        const indicator = document.createElement('small');
-        indicator.className = 'am-manual-entry';
-        indicator.style.color = '#856404';
-        indicator.style.fontWeight = 'bold';
-        indicator.style.display = 'block';
-        indicator.style.marginTop = '5px';
-        indicator.textContent = 'ℹ Please enter the AM total from your morning count report';
-        amInput.parentNode.appendChild(indicator);
-      }
-      console.log('PM form configured for manual AM entry');
-      showMessage('Please enter AM total manually - automatic loading not available', 'info');
-    }
+  async function startPMCount() {
+    document.getElementById('mainMenu').style.display = 'none';
+    hideAllSections();
+    document.getElementById('pmForm').classList.add('active');
+    setupDenominations('pm');
+    await loadAMData();
   }
   
-  function selectShift(shift) {
-    currentShift = shift;
-    document.getElementById('amBtn').classList.toggle('active', shift === 'am');
-    document.getElementById('pmBtn').classList.toggle('active', shift === 'pm');
-    document.getElementById('reportBtn').classList.remove('active');
-    document.getElementById('amForm').classList.toggle('active', shift === 'am');
-    document.getElementById('pmForm').classList.toggle('active', shift === 'pm');
-    document.getElementById('reportForm').classList.remove('active');
-    hideMessages();
-    if (shift === 'pm') setTimeout(updatePMFormWithAMTotal, 500);
+  function showReports() {
+    document.getElementById('mainMenu').style.display = 'none';
+    hideAllSections();
+    document.getElementById('reportsForm').classList.add('active');
   }
   
-  function showReportGenerator() {
-    currentShift = 'report';
-    document.getElementById('amBtn').classList.remove('active');
-    document.getElementById('pmBtn').classList.remove('active');
-    document.getElementById('reportBtn').classList.add('active');
-    document.getElementById('amForm').classList.remove('active');
-    document.getElementById('pmForm').classList.remove('active');
-    document.getElementById('reportForm').classList.add('active');
-    const reportDateInput = document.getElementById('reportDate');
-    if (reportDateInput) reportDateInput.value = getPacificDate();
-    hideMessages();
-    document.getElementById('reportStatus').textContent = '';
-  }
-  
-  function goBackToShiftSelector() {
-    currentShift = null;
-    document.getElementById('amBtn').classList.remove('active');
-    document.getElementById('pmBtn').classList.remove('active');
-    document.getElementById('reportBtn').classList.remove('active');
-    document.getElementById('amForm').classList.remove('active');
-    document.getElementById('pmForm').classList.remove('active');
-    document.getElementById('reportForm').classList.remove('active');
-    hideMessages();
-  }
-  
-  function initializeDenominations() {
-    createDenominationInputs('am', 1); createDenominationInputs('am', 2);
-    createDenominationInputs('pm', 1); createDenominationInputs('pm', 2);
-  }
-  
-  function createDenominationInputs(shift, drawer) {
-    const container = document.getElementById(`${shift}Drawer${drawer}Denoms`);
-    container.innerHTML = '';
-    DENOMINATIONS.forEach((denom, index) => {
-      const row = document.createElement('div');
-      row.className = 'denomination-row';
-      row.innerHTML = `<div class="denom-info"><div class="denom-label">${denom.label}</div><div class="denom-value" id="${shift}Drawer${drawer}Value${index}">= $0.00</div></div><input type="tel" class="qty-input" id="${shift}Drawer${drawer}Qty${index}" min="0" step="1" value="0" pattern="[0-9]*" inputmode="numeric" onchange="updateCalculations('${shift}', ${drawer})" oninput="updateCalculations('${shift}', ${drawer})" onfocus="this.select(); setupNavigationButtons(this)" onblur="hideNavigationButtons()">`;
-      container.appendChild(row);
+  function setupDenominations(shift) {
+    [1, 2].forEach(drawer => {
+      const container = document.getElementById(`${shift}Drawer${drawer}Denoms`);
+      container.innerHTML = '';
+      
+      DENOMINATIONS.forEach((denom, index) => {
+        const row = document.createElement('div');
+        row.className = 'denom-row';
+        row.innerHTML = `
+          <div>
+            <div class="denom-label">${denom.label}</div>
+            <div class="denom-value" id="${shift}D${drawer}V${index}">0 × $${denom.value.toFixed(2)} = $0.00</div>
+          </div>
+          <input type="number" class="qty-input" id="${shift}D${drawer}Q${index}" 
+                 min="0" step="1" value="0" 
+                 oninput="updateCalculations('${shift}', ${drawer})" 
+                 onfocus="this.select()">
+        `;
+        container.appendChild(row);
+      });
     });
   }
   
-  function toggleDrawerSkip(shift, drawer) {
-    const skipCheckbox = document.getElementById(`${shift}Drawer${drawer}Skip`);
-    const denomContent = document.getElementById(`${shift}Drawer${drawer}Content`);
+  function toggleSkip(shift, drawer) {
+    const skipBox = document.getElementById(`${shift}Drawer${drawer}Skip`);
+    const content = document.getElementById(`${shift}Drawer${drawer}Content`);
     const skipContent = document.getElementById(`${shift}Drawer${drawer}SkipContent`);
-    if (skipCheckbox.checked) { denomContent.classList.add('hidden'); skipContent.classList.remove('hidden'); }
-    else { denomContent.classList.remove('hidden'); skipContent.classList.add('hidden'); }
+    
+    if (skipBox.checked) {
+      content.classList.add('hidden');
+      skipContent.classList.remove('hidden');
+    } else {
+      content.classList.remove('hidden');
+      skipContent.classList.add('hidden');
+    }
     updateCalculations(shift, drawer);
   }
   
   function updateCalculations(shift, drawer) {
-    const skipCheckbox = document.getElementById(`${shift}Drawer${drawer}Skip`);
+    const skipBox = document.getElementById(`${shift}Drawer${drawer}Skip`);
     let drawerTotal = 0;
-    if (!skipCheckbox.checked) {
+    
+    if (!skipBox.checked) {
       DENOMINATIONS.forEach((denom, index) => {
-        const qtyInput = document.getElementById(`${shift}Drawer${drawer}Qty${index}`);
+        const qtyInput = document.getElementById(`${shift}D${drawer}Q${index}`);
         const qty = parseInt(qtyInput.value) || 0;
         const value = qty * denom.value;
-        document.getElementById(`${shift}Drawer${drawer}Value${index}`).textContent = `= $${value.toFixed(2)}`;
+        
+        document.getElementById(`${shift}D${drawer}V${index}`).textContent = 
+          `${qty} × $${denom.value.toFixed(2)} = $${value.toFixed(2)}`;
+        
         drawerTotal += value;
       });
     }
+    
     document.getElementById(`${shift}Drawer${drawer}Total`).textContent = `$${drawerTotal.toFixed(2)}`;
     updateGrandTotal(shift);
   }
   
   function updateGrandTotal(shift) {
-    const drawer1Total = parseFloat(document.getElementById(`${shift}Drawer1Total`).textContent.replace('$', '')) || 0;
-    const drawer2Total = parseFloat(document.getElementById(`${shift}Drawer2Total`).textContent.replace('$', '')) || 0;
+    const drawer1Skip = document.getElementById(`${shift}Drawer1Skip`).checked;
+    const drawer2Skip = document.getElementById(`${shift}Drawer2Skip`).checked;
+    
+    const drawer1Total = drawer1Skip ? 0 : parseFloat(document.getElementById(`${shift}Drawer1Total`).textContent.replace('$', ''));
+    const drawer2Total = drawer2Skip ? 0 : parseFloat(document.getElementById(`${shift}Drawer2Total`).textContent.replace('$', ''));
+    
     const grandTotal = drawer1Total + drawer2Total;
     document.getElementById(`${shift}GrandTotal`).textContent = `$${grandTotal.toFixed(2)}`;
   }
   
-  function collectFormData(shift) {
-    const counter = document.getElementById(`${shift}Counter`).value.trim();
-    if (!counter) throw new Error('Please enter your full name before submitting');
-    if (counter.length < 2) throw new Error('Please enter your complete full name');
-    const dateInput = document.getElementById(`${shift}Date`);
-    const selectedDate = dateInput ? dateInput.value : getPacificDate();
-    if (!selectedDate) throw new Error('Please select a date');
-    const data = { shift: shift, counter: counter, date: selectedDate, timestamp: new Date().toISOString(), drawer1: collectDrawerData(shift, 1), drawer2: collectDrawerData(shift, 2), notes: document.getElementById(`${shift}Notes`).value.trim() || null };
-    if (shift === 'pm') {
-      const cashTips = parseFloat(document.getElementById('pmCashTips').value) || 0;
-      const toastSales = parseFloat(document.getElementById('pmToastSales').value) || 0;
-      const amTotal = parseFloat(document.getElementById('pmAmTotal').value) || 0;
-      if (cashTips < 0) throw new Error('Cash tips cannot be negative');
-      if (toastSales < 0) throw new Error('Toast sales cannot be negative');
-      if (amTotal < 0) throw new Error('AM total cannot be negative');
-      data.cashTips = cashTips; data.toastSales = Math.ceil(toastSales); data.amTotal = amTotal;
+  async function loadAMData() {
+    const date = document.getElementById('pmDate').value;
+    if (!date) return;
+    
+    try {
+      const amData = await getAMData(date);
+      if (amData) {
+        currentAMData = amData;
+        document.getElementById('pmAmTotal').textContent = `$${amData.total.toFixed(2)}`;
+        
+        if (amData.notes) {
+          document.getElementById('amNotes').textContent = `Morning Notes: ${amData.notes}`;
+        }
+        
+        showMessage('AM data loaded automatically!', 'success');
+      } else {
+        document.getElementById('pmAmTotal').textContent = 'No AM data found';
+        showMessage('No AM count found for this date', 'error');
+      }
+    } catch (error) {
+      console.error('Error loading AM data:', error);
+      document.getElementById('pmAmTotal').textContent = 'Error loading AM data';
     }
+  }
+  
+  function collectFormData(shift) {
+    const counter = document.getElementById(`${shift}Counter`).value;
+    const date = document.getElementById(`${shift}Date`).value;
+    const notes = document.getElementById(`${shift}Notes`).value.trim();
+    
+    if (!counter) throw new Error('Please select a name');
+    if (!date) throw new Error('Please select a date');
+    
+    const drawer1Skip = document.getElementById(`${shift}Drawer1Skip`).checked;
+    const drawer2Skip = document.getElementById(`${shift}Drawer2Skip`).checked;
+    
+    const drawer1Data = collectDrawerData(shift, 1, drawer1Skip);
+    const drawer2Data = collectDrawerData(shift, 2, drawer2Skip);
+    
+    const data = {
+      shift: shift,
+      counter: counter,
+      date: date,
+      timestamp: new Date().toISOString(),
+      drawer1: drawer1Data,
+      drawer2: drawer2Data,
+      notes: notes || null,
+      total: drawer1Data.total + drawer2Data.total
+    };
+    
+    if (shift === 'pm') {
+      const toastSales = parseFloat(document.getElementById('toastSales').value) || 0;
+      const cashTips = parseInt(document.getElementById('cashTips').value) || 0;
+      
+      data.toastSales = toastSales;
+      data.cashTips = cashTips;
+      data.amTotal = currentAMData ? currentAMData.total : 0;
+    }
+    
     return data;
   }
   
-  function collectDrawerData(shift, drawer) {
-    const skipCheckbox = document.getElementById(`${shift}Drawer${drawer}Skip`);
-    if (skipCheckbox.checked) {
+  function collectDrawerData(shift, drawer, skipped) {
+    if (skipped) {
       const reason = document.getElementById(`${shift}Drawer${drawer}Reason`).value.trim();
-      return { skipped: true, skipReason: reason || 'No reason provided', counts: {}, total: 0 };
-    }
-    const counts = {}; let total = 0;
-    DENOMINATIONS.forEach((denom, index) => {
-      const qty = parseInt(document.getElementById(`${shift}Drawer${drawer}Qty${index}`).value) || 0;
-      counts[denom.label] = qty; total += qty * denom.value;
-    });
-    return { skipped: false, skipReason: null, counts: counts, total: total };
-  }
-  
-  function calculateDepositAmounts(data) {
-    if (data.shift !== 'pm') return null;
-    let amTotal = 0;
-    if (window.retrievedAMData) { amTotal = window.retrievedAMData.total; console.log('Using retrieved AM data total:', amTotal); }
-    else { amTotal = data.amTotal || 0; console.log('Using manual AM total:', amTotal); }
-    const pmTotal = data.drawer1.total + data.drawer2.total;
-    const toastSales = data.toastSales;
-    const reportedCashTips = data.cashTips;
-    const drawerChange = pmTotal - amTotal;
-    const discrepancy = drawerChange - toastSales;
-    const depositAmount = toastSales + reportedCashTips;
-    let adjustedCashTips = reportedCashTips; let allocationNote = ''; let drawerOverAmount = 0; let hasLargeDiscrepancy = false;
-    if (discrepancy < -10) hasLargeDiscrepancy = true;
-    if (discrepancy > 0) { drawerOverAmount = discrepancy; adjustedCashTips = reportedCashTips; allocationNote = `Drawer count over by $${discrepancy.toFixed(2)} - tracked separately`; }
-    else if (discrepancy < 0) {
-      const shortage = Math.abs(discrepancy);
-      if (shortage <= 0.99) { adjustedCashTips = reportedCashTips; allocationNote = `Small shortage of $${shortage.toFixed(2)} - no tip reallocation`; }
-      else { adjustedCashTips = Math.max(0, reportedCashTips - shortage); allocationNote = `Covered $${shortage.toFixed(2)} drawer shortage from tips`; }
-    } else { allocationNote = 'No drawer discrepancy - tips unchanged'; }
-    const amountToKeep = amTotal;
-    const totalAccountedFor = depositAmount + amountToKeep;
-    const actualMoney = pmTotal + reportedCashTips;
-    const mathCheck = Math.abs(totalAccountedFor - actualMoney) < 0.01;
-    return { amTotal: amTotal, pmTotal: pmTotal, toastSales: toastSales, reportedCashTips: reportedCashTips, drawerChange: drawerChange, discrepancy: discrepancy, adjustedCashTips: adjustedCashTips, drawerOverAmount: drawerOverAmount, allocationNote: allocationNote, depositAmount: depositAmount, amountToKeep: amountToKeep, mathCheck: mathCheck, hasLargeDiscrepancy: hasLargeDiscrepancy };
-  }
-  
-  async function submitCount(shift) {
-    try {
-      showMessage('Processing...', 'info');
-      const formData = collectFormData(shift);
-      if (shift === 'am') {
-        await storeAMData(formData);
-        console.log(`Stored complete AM data for ${formData.date}`);
-        showMessage('AM count completed successfully! Data saved to database.', 'success');
-        setTimeout(() => { resetForm(shift); }, 3000);
-        return;
-      }
-      if (shift === 'pm') {
-        const tempCalculations = calculateDepositAmounts(formData);
-        if (tempCalculations && tempCalculations.hasLargeDiscrepancy) {
-          const shortage = Math.abs(tempCalculations.discrepancy);
-          const counterName = formData.counter;
-          const confirmation = prompt(`⚠️ LARGE DISCREPANCY WARNING ⚠️\n\nCount is SHORT by $${shortage.toFixed(2)}!\nThis is over the $10 threshold and requires verification.\n\nPlease enter your FULL NAME to confirm this count:\n(Must match exactly: "${counterName}")`);
-          if (confirmation !== counterName) { showMessage('Large discrepancy verification failed. Please double-check your count or contact a manager.', 'error'); return; }
-          formData.largeDiscrepancyVerified = true;
-          formData.notes = (formData.notes || '') + ` [VERIFIED LARGE DISCREPANCY: $${shortage.toFixed(2)} shortage confirmed by ${counterName}]`;
-        }
-      }
-      const pdfData = await generatePDF(formData, false);
-      const calculations = pdfData.calculations || {};
-      await storePMData(formData, calculations);
-      console.log(`Stored complete PM data for ${formData.date}`);
-      let emailSuccess = false;
-      try { await sendEmailReport(formData, pdfData); emailSuccess = true; }
-      catch (emailError) { console.warn('Email send failed:', emailError); showMessage(`${shift.toUpperCase()} count completed! PDF downloaded. Email delivery failed - please check internet connection or contact support.`, 'success'); return; }
-      showMessage('PM count completed successfully! Report automatically emailed to manager and printer. Complete day data saved to database.', 'success');
-      setTimeout(() => { resetForm(shift); }, 3000);
-    } catch (error) { console.error('Submission error:', error); showMessage(`Error: ${error.message}`, 'error'); }
-  }
-  
-  function roundToastSales() {
-    const toastInput = document.getElementById('pmToastSales');
-    if (toastInput && toastInput.value) {
-      const value = parseFloat(toastInput.value);
-      if (!isNaN(value) && value > 0) { const rounded = Math.ceil(value); toastInput.value = rounded.toString(); }
-    }
-  }
-  
-  function setupNavigationButtons(currentInput) {
-    const existingNav = document.querySelector('.nav-buttons');
-    if (existingNav) existingNav.remove();
-    if (window.innerWidth > 768) return;
-    const quantityInputs = Array.from(document.querySelectorAll('.qty-input'));
-    const currentIndex = quantityInputs.indexOf(currentInput);
-    if (currentIndex === -1) return;
-    const navContainer = document.createElement('div'); navContainer.className = 'nav-buttons show';
-    const prevBtn = document.createElement('button'); prevBtn.className = 'nav-btn'; prevBtn.textContent = '← Previous'; prevBtn.disabled = currentIndex === 0;
-    prevBtn.onclick = () => { if (currentIndex > 0) { quantityInputs[currentIndex - 1].focus(); quantityInputs[currentIndex - 1].select(); } };
-    const nextBtn = document.createElement('button'); nextBtn.className = 'nav-btn'; nextBtn.textContent = 'Next →'; nextBtn.disabled = currentIndex === quantityInputs.length - 1;
-    nextBtn.onclick = () => { if (currentIndex < quantityInputs.length - 1) { quantityInputs[currentIndex + 1].focus(); quantityInputs[currentIndex + 1].select(); } };
-    const doneBtn = document.createElement('button'); doneBtn.className = 'nav-btn'; doneBtn.textContent = 'Done';
-    doneBtn.onclick = () => { currentInput.blur(); hideNavigationButtons(); };
-    if (!prevBtn.disabled) navContainer.appendChild(prevBtn);
-    if (!nextBtn.disabled) navContainer.appendChild(nextBtn);
-    navContainer.appendChild(doneBtn);
-    document.body.appendChild(navContainer);
-  }
-  
-  function hideNavigationButtons() {
-    const navButtons = document.querySelector('.nav-buttons');
-    if (navButtons) navButtons.remove();
-  }
-  
-  async function generatePDF(data, autoDownload = true) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 40;
-    const calculations = calculateDepositAmounts(data);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.text('JAYNA GYRO CASH COUNT REPORT', margin, 50);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.text(`${data.date}`, margin, 85);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-    doc.text(`AM Counter: ${decodeNotes(window.retrievedAMData ? window.retrievedAMData.counter : 'N/A')} | PM Counter: ${decodeNotes(data.counter)}`, margin, 105);
-    doc.text(`AM Time: ${window.retrievedAMData ? new Date(window.retrievedAMData.timestamp).toLocaleString() : 'N/A'} | PM Time: ${new Date(data.timestamp).toLocaleString()}`, margin, 115);
-    doc.setLineWidth(0.5); doc.line(margin, 125, pageWidth - margin, 125);
-    let yPos = 145;
-    if (data.shift === 'pm' && window.retrievedAMData) {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('DRAWER COMPARISON (AM vs PM)', margin, yPos); yPos += 25;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-      doc.text('AM START', margin + 50, yPos); doc.text('PM END', margin + 300, yPos); yPos += 20;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('DRAWER 1:', margin, yPos); yPos += 15;
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-      if (window.retrievedAMData.drawer1.skipped) doc.text('Skipped', margin + 50, yPos);
-      else doc.text(`$${window.retrievedAMData.drawer1.total.toFixed(2)}`, margin + 50, yPos);
-      if (data.drawer1.skipped) doc.text('Skipped', margin + 300, yPos);
-      else doc.text(`$${data.drawer1.total.toFixed(2)}`, margin + 300, yPos);
-      yPos += 20;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('DRAWER 2:', margin, yPos); yPos += 15;
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-      if (window.retrievedAMData.drawer2.skipped) doc.text('Skipped', margin + 50, yPos);
-      else doc.text(`$${window.retrievedAMData.drawer2.total.toFixed(2)}`, margin + 50, yPos);
-      if (data.drawer2.skipped) doc.text('Skipped', margin + 300, yPos);
-      else doc.text(`$${data.drawer2.total.toFixed(2)}`, margin + 300, yPos);
-      yPos += 25;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('TOTALS:', margin, yPos);
-      doc.text(`$${window.retrievedAMData.total.toFixed(2)}`, margin + 50, yPos);
-      doc.text(`$${(data.drawer1.total + data.drawer2.total).toFixed(2)}`, margin + 300, yPos);
-      yPos += 30;
-    } else {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('DRAWER 1', margin, yPos); yPos += 20;
-      if (data.drawer1.skipped) { doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(`Skipped - Reason: ${data.drawer1.skipReason}`, margin + 15, yPos); yPos += 25; }
-      else yPos = addDrawerDetails(doc, data.drawer1, yPos);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('DRAWER 2', margin, yPos); yPos += 20;
-      if (data.drawer2.skipped) { doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(`Skipped - Reason: ${data.drawer2.skipReason}`, margin + 15, yPos); yPos += 25; }
-      else yPos = addDrawerDetails(doc, data.drawer2, yPos);
-    }
-    if (data.shift === 'pm') {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('PM DETAILED COUNT', margin, yPos); yPos += 20;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('DRAWER 1', margin, yPos); yPos += 15;
-      if (data.drawer1.skipped) { doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(`Skipped - Reason: ${data.drawer1.skipReason}`, margin + 15, yPos); yPos += 20; }
-      else yPos = addDrawerDetails(doc, data.drawer1, yPos);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('DRAWER 2', margin, yPos); yPos += 15;
-      if (data.drawer2.skipped) { doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(`Skipped - Reason: ${data.drawer2.skipReason}`, margin + 15, yPos); yPos += 20; }
-      else yPos = addDrawerDetails(doc, data.drawer2, yPos);
-    }
-    const grandTotal = data.drawer1.total + data.drawer2.total;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text(`TOTAL CASH COUNTED: $${grandTotal.toFixed(2)}`, margin, yPos); yPos += 30;
-    if (data.shift === 'pm' && calculations) {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('CASH RECONCILIATION', margin, yPos); yPos += 20;
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(12);
-      doc.text(`AM Starting Total: $${calculations.amTotal.toFixed(2)}`, margin, yPos); yPos += 15;
-      doc.text(`PM Ending Total: $${calculations.pmTotal.toFixed(2)}`, margin, yPos); yPos += 15;
-      doc.setFont('helvetica', 'bold'); doc.text(`Drawer Cash Change: $${calculations.drawerChange.toFixed(2)}`, margin, yPos);
-      doc.setFont('helvetica', 'normal'); doc.text(`(PM $${calculations.pmTotal.toFixed(2)} - AM $${calculations.amTotal.toFixed(2)})`, margin + 20, yPos + 12); yPos += 30;
-      doc.text(`Toast Reported Sales: $${calculations.toastSales.toFixed(2)}`, margin, yPos); yPos += 15;
-      doc.text(`Staff Reported Cash Tips: $${calculations.reportedCashTips.toFixed(2)} (separate from drawers)`, margin, yPos); yPos += 20;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-      if (calculations.discrepancy === 0) doc.text(`DRAWER RECONCILIATION: PERFECT MATCH`, margin, yPos);
-      else {
-        const discrepancyText = calculations.discrepancy >= 0 ? 'OVER' : 'SHORT';
-        let discrepancyLine = `DRAWER DISCREPANCY: $${Math.abs(calculations.discrepancy).toFixed(2)} ${discrepancyText}`;
-        if (calculations.hasLargeDiscrepancy) discrepancyLine += ' ⚠️ LARGE DISCREPANCY ALERT ⚠️';
-        doc.text(discrepancyLine, margin, yPos);
-      }
-      yPos += 15; doc.setFont('helvetica', 'normal');
-      doc.text(`${calculations.allocationNote}`, margin, yPos); yPos += 15;
-      doc.text(`Final Adjusted Tips: $${calculations.adjustedCashTips.toFixed(2)}`, margin, yPos); yPos += 15;
-      if (calculations.drawerOverAmount > 0) { doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(`Drawer count over by: $${calculations.drawerOverAmount.toFixed(2)}`, margin, yPos); yPos += 15; doc.setFont('helvetica', 'normal'); }
-      yPos += 15;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(24); doc.text(`DEPOSIT IN ENVELOPE - $${Math.round(calculations.depositAmount)}`, margin, yPos); yPos += 25;
-      doc.setFontSize(12); doc.text(`(Toast Cash Sales $${calculations.toastSales.toFixed(2)} + Reported Cash Tips $${calculations.reportedCashTips.toFixed(2)})`, margin, yPos); yPos += 30;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.text(`Amount to Keep in Safe: $${calculations.amountToKeep.toFixed(2)}`, margin, yPos); yPos += 15;
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(0, 100, 0); doc.text(`✓ Always equals AM Starting Amount`, margin, yPos); doc.setTextColor(0, 0, 0); yPos += 25;
-      doc.text(`Amount to Keep in Safe: $${calculations.amountToKeep.toFixed(2)}`, margin, yPos); yPos += 25;
-    } else if (data.shift === 'pm') { doc.setFontSize(14); doc.text(`Cash Tips Reported: $${data.cashTips.toFixed(2)}`, margin, yPos); yPos += 25; }
-    if (data.notes) {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('NOTES:', margin, yPos); yPos += 15;
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-      const decodedNotes = decodeNotes(data.notes);
-      const splitNotes = doc.splitTextToSize(decodedNotes, pageWidth - (margin * 2));
-      splitNotes.forEach((line, index) => { doc.text(line, margin, yPos + (index * 12)); });
-    }
-    const filename = `jayna-${data.shift}-count-${data.date}.pdf`;
-    if (autoDownload) doc.save(filename);
-    return { filename: filename, pdfData: doc.output('datauristring'), doc: doc, calculations: calculations };
-  }
-  
-  function addDrawerDetails(doc, drawer, startY) {
-    let yPos = startY; doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-    DENOMINATIONS.forEach(denom => {
-      const qty = drawer.counts[denom.label] || 0; const value = qty * denom.value;
-      if (qty > 0) { doc.text(`${denom.label}: ${qty} × ${denom.value.toFixed(2)} = $${value.toFixed(2)}`, 55, yPos); yPos += 12; }
-    });
-    doc.setFont('helvetica', 'bold'); doc.text(`Subtotal: $${drawer.total.toFixed(2)}`, 55, yPos + 5); yPos += 25; return yPos;
-  }
-  
-  function formatDrawerBreakdown(drawer) {
-    if (drawer.skipped) return `DRAWER SKIPPED\nReason: ${drawer.skipReason}`;
-    let breakdown = '';
-    DENOMINATIONS.forEach(denom => {
-      const qty = drawer.counts[denom.label] || 0;
-      if (qty > 0) { const value = qty * denom.value; breakdown += `${denom.label}: ${qty} × $${denom.value.toFixed(2)} = $${value.toFixed(2)}\n`; }
-    });
-    if (breakdown === '') breakdown = 'No cash counted';
-    return breakdown.trim();
-  }
-  
-  function formatSummarySection(data) {
-    const grandTotal = data.drawer1.total + data.drawer2.total;
-    let summary = `Drawer 1 Total: $${data.drawer1.total.toFixed(2)}\nDrawer 2 Total: $${data.drawer2.total.toFixed(2)}\n─────────────────────────────────────\nTOTAL CASH COUNTED: $${grandTotal.toFixed(2)}`;
-    if (data.shift === 'pm') {
-      const calculations = calculateDepositAmounts(data);
-      if (calculations) {
-        summary += `\n\nCALCULATION BREAKDOWN:\nAM Starting Total: $${calculations.amTotal.toFixed(2)}\nCash Sales by Toast: $${calculations.toastSales.toFixed(2)}\nOriginal Cash Tips: $${calculations.reportedCashTips.toFixed(2)}\nCash Count Discrepancy: $${calculations.discrepancy.toFixed(2)} ${calculations.discrepancy >= 0 ? '(Over)' : '(Short)'}\nAdjusted Cash Tips: $${calculations.adjustedCashTips.toFixed(2)}${calculations.drawerOverAmount > 0 ? `\nDrawer count over by: $${calculations.drawerOverAmount.toFixed(2)}` : ''}\n\n╔═══════════════════════════════════╗\n🏦 DEPOSIT IN ENVELOPE: $${calculations.depositAmount.toFixed(0)}\n🏦 AMOUNT TO KEEP IN SAFE: $${calculations.amountToKeep.toFixed(2)}\n╚═══════════════════════════════════╝`;
-      } else { summary += `\n\nCash Tips Reported: $${data.cashTips.toFixed(2)}`; }
-    }
-    return summary;
-  }
-  
-  async function sendEmailReport(data, pdfData) { await sendEmailJSReport(data, pdfData); }
-  
-  async function sendEmailJSReport(data, pdfData) {
-    console.log('Starting EmailJS send process...');
-    const publicKey = EMAILJS_CONFIG.PUBLIC_KEY; const templateId = EMAILJS_CONFIG.TEMPLATE_ID; const serviceId = EMAILJS_CONFIG.SERVICE_ID;
-    console.log('EmailJS Config:', { publicKey, templateId, serviceId });
-    const recipients = [EMAILJS_CONFIG.MANAGER_EMAIL];
-    if (typeof emailjs === 'undefined') { console.error('EmailJS library not loaded!'); throw new Error('EmailJS library not loaded - check internet connection'); }
-    try { emailjs.init(publicKey); console.log('EmailJS initialized successfully'); } catch (initError) { console.error('EmailJS init error:', initError); throw new Error('EmailJS initialization failed'); }
-    const templateParams = {
-      to_email: recipients[0], from_name: 'Jayna Gyro Cash Counter', shift: data.shift.toUpperCase(), date: data.date, counter: decodeNotes(data.counter), total_cash: (data.drawer1.total + data.drawer2.total).toFixed(2),
-      drawer1_total: data.drawer1.total.toFixed(2), drawer2_total: data.drawer2.total.toFixed(2), cash_tips: data.shift === 'pm' ? data.cashTips.toFixed(2) : '0.00', notes: decodeNotes(data.notes) || 'No notes provided',
-      timestamp: new Date(data.timestamp).toLocaleString(), pm_timestamp: new Date(data.timestamp).toLocaleString(), am_counter: decodeNotes(window.retrievedAMData ? window.retrievedAMData.counter : 'N/A'),
-      am_timestamp: window.retrievedAMData ? new Date(window.retrievedAMData.timestamp).toLocaleString() : 'N/A', am_notes: decodeNotes(window.retrievedAMData ? (window.retrievedAMData.notes || '') : ''),
-      drawer1_breakdown: formatDrawerBreakdown(data.drawer1), drawer2_breakdown: formatDrawerBreakdown(data.drawer2), summary_section: formatSummarySection(data),
-      drawer1_skipped: data.drawer1.skipped ? 'YES' : 'NO', drawer2_skipped: data.drawer2.skipped ? 'YES' : 'NO', drawer1_skip_reason: data.drawer1.skipReason || 'N/A', drawer2_skip_reason: data.drawer2.skipReason || 'N/A'
-    };
-    if (data.shift === 'pm' && pdfData.calculations) {
-      const calc = pdfData.calculations;
-      templateParams.am_total = calc.amTotal.toFixed(2); templateParams.toast_sales = calc.toastSales.toFixed(2); templateParams.original_tips = calc.reportedCashTips.toFixed(2);
-      templateParams.discrepancy = calc.discrepancy.toFixed(2); templateParams.discrepancy_direction = calc.discrepancy >= 0 ? 'Over' : 'Short'; templateParams.has_large_discrepancy = calc.hasLargeDiscrepancy ? 'true' : 'false';
-      templateParams.large_discrepancy_flag = calc.hasLargeDiscrepancy ? ' 🚨⚠️ LARGE DISCREPANCY ALERT ⚠️🚨' : ''; templateParams.adjusted_tips = calc.adjustedCashTips.toFixed(2);
-      templateParams.drawer_over_amount = calc.drawerOverAmount.toFixed(2); templateParams.has_overage = calc.drawerOverAmount > 0 ? 'true' : 'false'; templateParams.deposit_amount = calc.depositAmount.toFixed(0);
-      templateParams.amount_to_keep = calc.amountToKeep.toFixed(2);
-      if (window.retrievedAMData) {
-        templateParams.has_am_comparison = 'true'; templateParams.am_drawer1_total = window.retrievedAMData.drawer1.total.toFixed(2); templateParams.am_drawer2_total = window.retrievedAMData.drawer2.total.toFixed(2);
-        templateParams.am_grand_total = window.retrievedAMData.total.toFixed(2); templateParams.pm_drawer1_total = data.drawer1.total.toFixed(2); templateParams.pm_drawer2_total = data.drawer2.total.toFixed(2);
-        templateParams.pm_grand_total = (data.drawer1.total + data.drawer2.total).toFixed(2); templateParams.drawer_change = calc.drawerChange.toFixed(2);
-      } else { templateParams.has_am_comparison = 'false'; }
-    }
-    console.log('Template params prepared:', { to_email: templateParams.to_email, shift: templateParams.shift, date: templateParams.date, counter: templateParams.counter, total_cash: templateParams.total_cash });
-    try {
-      console.log('Sending email with service:', serviceId, 'template:', templateId);
-      const response = await emailjs.send(serviceId, templateId, templateParams); console.log('Email sent successfully:', response); return response;
-    } catch (error) {
-      console.error('EmailJS send error details:', { message: error.message, text: error.text, status: error.status, serviceId: serviceId, templateId: templateId });
-      if (error.status === 400) throw new Error('Email template or service not found - check EmailJS dashboard configuration');
-      else if (error.status === 401) throw new Error('EmailJS authentication failed - check public key');
-      else if (error.status === 402) throw new Error('EmailJS quota exceeded - check your EmailJS plan');
-      else throw new Error(`Email send failed: ${error.text || error.message || 'Unknown error'}`);
-    }
-  }
-  
-  function getEmailRecipients() { return [EMAILJS_CONFIG.MANAGER_EMAIL]; }
-  
-  function dataURItoBlob(dataURI) {
-    const byteString = atob(dataURI.split(',')[1]); const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0]; const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab); for (let i = 0; i < byteString.length; i++) { ia[i] = byteString.charCodeAt(i); } return new Blob([ab], {type: mimeString});
-  }
-  
-  function showMessage(text, type) {
-    hideMessages(); let elementId = 'infoMessage'; if (type === 'error') elementId = 'errorMessage'; if (type === 'success') elementId = 'successMessage';
-    const element = document.getElementById(elementId); element.textContent = text; element.classList.remove('hidden');
-    setTimeout(() => { element.classList.add('hidden'); }, type === 'error' ? 1000 : 1000);
-  }
-  
-  function hideMessages() {
-    document.getElementById('successMessage').classList.add('hidden');
-    document.getElementById('errorMessage').classList.add('hidden');
-    document.getElementById('infoMessage').classList.add('hidden');
-  }
-  
-  function decodeNotes(notes) {
-    if (!notes) return '';
-    try { return decodeURIComponent(notes.replace(/\+/g, ' ')); } catch (error) { console.warn('Failed to decode notes:', error); return notes; }
-  }
-  
-  async function generateReportPDF() {
-    try {
-      const reportDateInput = document.getElementById('reportDate'); const selectedDate = reportDateInput.value;
-      if (!selectedDate) throw new Error('Please select a date for the report');
-      document.getElementById('reportStatus').textContent = 'Loading data from database...'; showMessage('Generating report...', 'info');
-      const reportData = await getCompleteReportData(selectedDate);
-      if (!reportData.amData) throw new Error(`No AM data found for ${selectedDate}. Please ensure AM count was completed for this date.`);
-      document.getElementById('reportStatus').textContent = 'Generating PDF and sending email...';
-      const combinedData = {
-        shift: 'pm', date: selectedDate, counter: decodeNotes(reportData.pmData ? reportData.pmData.counter : reportData.amData.counter), timestamp: new Date().toISOString(),
-        drawer1: reportData.pmData ? reportData.pmData.drawer1 : reportData.amData.drawer1, drawer2: reportData.pmData ? reportData.pmData.drawer2 : reportData.amData.drawer2,
-        notes: decodeNotes(reportData.pmData ? reportData.pmData.notes : reportData.amData.notes), cashTips: reportData.pmData ? reportData.pmData.cashTips : 0,
-        toastSales: reportData.pmData ? reportData.pmData.toastSales : 0, amTotal: reportData.amData.total, amData: reportData.amData, pmData: reportData.pmData
+      return {
+        skipped: true,
+        skipReason: reason || 'No reason provided',
+        counts: {},
+        total: 0
       };
-      console.log('Report Data Retrieved:', { 'AM Data exists': !!reportData.amData, 'PM Data exists': !!reportData.pmData, 'AM Total': reportData.amData ? reportData.amData.total : 'N/A', 'PM Total': reportData.pmData ? reportData.pmData.total : 'N/A', 'PM Drawer1': reportData.pmData ? reportData.pmData.drawer1.total : 'N/A', 'PM Drawer2': reportData.pmData ? reportData.pmData.drawer2.total : 'N/A', 'Combined Drawer1': combinedData.drawer1.total, 'Combined Drawer2': combinedData.drawer2.total });
-      window.retrievedAMData = reportData.amData;
-      const pdfData = await generatePDF(combinedData, false);
-      await sendEmailReport(combinedData, pdfData);
-      document.getElementById('reportStatus').textContent = 'Downloading PDF...'; pdfData.doc.save(pdfData.filename);
-      showMessage('Report generated successfully! Email sent and PDF downloaded.', 'success'); document.getElementById('reportStatus').textContent = 'Report completed successfully!';
-    } catch (error) { console.error('Report generation error:', error); showMessage(`Error: ${error.message}`, 'error'); document.getElementById('reportStatus').textContent = ''; }
+    }
+    
+    const counts = {};
+    let total = 0;
+    
+    DENOMINATIONS.forEach((denom, index) => {
+      const qty = parseInt(document.getElementById(`${shift}D${drawer}Q${index}`).value) || 0;
+      counts[denom.label] = qty;
+      total += qty * denom.value;
+    });
+    
+    return {
+      skipped: false,
+      skipReason: null,
+      counts: counts,
+      total: Math.round(total * 100) / 100
+    };
   }
   
-  async function getCompleteReportData(date) {
-    console.log('Getting complete report data for date:', date);
-    if (!supabase) throw new Error('Database connection not available');
+  async function submitAM() {
     try {
-      const amData = await getAMData(date); console.log('AM Data retrieved:', amData);
-      let pmData = null;
-      try { pmData = await getPMData(date); console.log('PM Data retrieved:', pmData); } catch (pmError) { console.log('No PM data found for this date:', pmError.message); }
-      return { amData: amData, pmData: pmData };
-    } catch (error) { console.error('Error getting report data:', error); throw error; }
+      const data = collectFormData('am');
+      await storeAMData(data);
+      showMessage('AM count submitted successfully!', 'success');
+      
+      setTimeout(() => {
+        resetForm('am');
+        goHome();
+      }, 2000);
+      
+    } catch (error) {
+      console.error('AM submission error:', error);
+      showMessage(`Error: ${error.message}`, 'error');
+    }
+  }
+  
+  async function submitPM() {
+    try {
+      hideAllSections();
+      document.getElementById('loadingScreen').classList.add('active');
+      
+      const data = collectFormData('pm');
+      const calculations = calculatePMAmounts(data);
+      
+      await storePMData(data, calculations);
+      await sendEmailReport(data, calculations);
+      
+      // Show confirmation screen
+      hideAllSections();
+      document.getElementById('confirmationScreen').classList.add('active');
+      
+      // Display amounts
+      document.getElementById('depositAmount').textContent = `$${Math.round(calculations.depositAmount)}`;
+      document.getElementById('returnAmount').textContent = `$${calculations.returnAmount.toFixed(2)}`;
+      
+    } catch (error) {
+      console.error('PM submission error:', error);
+      showMessage(`Error: ${error.message}`, 'error');
+      goHome();
+    }
+  }
+  
+  function calculatePMAmounts(data) {
+    const amTotal = data.amTotal;
+    const pmTotal = data.total;
+    const toastSales = data.toastSales;
+    const cashTips = data.cashTips;
+    
+    // Drawer change = PM - AM
+    const drawerChange = pmTotal - amTotal;
+    
+    // Discrepancy = actual change vs expected (Toast sales)
+    const discrepancy = drawerChange - toastSales;
+    
+    // Staff see: Deposit = Toast + Tips (always whole number)
+    const depositAmount = toastSales + cashTips;
+    
+    // Manager calculations for email
+    let adjustedTips = cashTips;
+    let returnAmount = amTotal;
+    
+    if (discrepancy > 0) {
+      // Over: add excess to return amount
+      returnAmount += discrepancy;
+    } else if (discrepancy < 0) {
+      // Short: reduce tips to cover shortage
+      const shortage = Math.abs(discrepancy);
+      adjustedTips = Math.max(0, cashTips - shortage);
+    }
+    
+    return {
+      amTotal,
+      pmTotal,
+      drawerChange,
+      toastSales,
+      cashTips,
+      discrepancy,
+      adjustedTips,
+      depositAmount,
+      returnAmount,
+      drawerOver: discrepancy > 0 ? discrepancy : 0,
+      drawerShort: discrepancy < 0 ? Math.abs(discrepancy) : 0
+    };
+  }
+  
+  async function storeAMData(data) {
+    if (!supabase) throw new Error('Database not connected');
+    
+    const { error } = await supabase
+      .from('cash_counts')
+      .upsert({
+        date: data.date,
+        am_counter: data.counter,
+        am_timestamp: data.timestamp,
+        am_total: data.total,
+        am_drawer1_total: data.drawer1.total,
+        am_drawer1_skip: data.drawer1.skipped,
+        am_drawer1_skip_reason: data.drawer1.skipReason,
+        am_drawer1_data: data.drawer1.counts,
+        am_drawer2_total: data.drawer2.total,
+        am_drawer2_skip: data.drawer2.skipped,
+        am_drawer2_skip_reason: data.drawer2.skipReason,
+        am_drawer2_data: data.drawer2.counts,
+        am_notes: data.notes
+      });
+    
+    if (error) throw new Error(`Database error: ${error.message}`);
+  }
+  
+  async function storePMData(data, calculations) {
+    if (!supabase) throw new Error('Database not connected');
+    
+    const { error } = await supabase
+      .from('cash_counts')
+      .update({
+        pm_counter: data.counter,
+        pm_timestamp: data.timestamp,
+        pm_total: data.total,
+        pm_cash_tips: data.cashTips,
+        pm_toast_sales: data.toastSales,
+        pm_drawer1_total: data.drawer1.total,
+        pm_drawer1_skip: data.drawer1.skipped,
+        pm_drawer1_skip_reason: data.drawer1.skipReason,
+        pm_drawer1_data: data.drawer1.counts,
+        pm_drawer2_total: data.drawer2.total,
+        pm_drawer2_skip: data.drawer2.skipped,
+        pm_drawer2_skip_reason: data.drawer2.skipReason,
+        pm_drawer2_data: data.drawer2.counts,
+        pm_notes: data.notes,
+        pm_discrepancy: calculations.discrepancy,
+        pm_adjusted_tips: calculations.adjustedTips,
+        pm_drawer_over_amount: calculations.drawerOver,
+        pm_deposit_amount: calculations.depositAmount,
+        pm_amount_to_keep: calculations.returnAmount
+      })
+      .eq('date', data.date);
+    
+    if (error) throw new Error(`Database error: ${error.message}`);
+  }
+  
+  async function getAMData(date) {
+    if (!supabase) return null;
+    
+    const { data, error } = await supabase
+      .from('cash_counts')
+      .select('*')
+      .eq('date', date)
+      .single();
+    
+    if (error || !data || !data.am_total) return null;
+    
+    return {
+      date: data.date,
+      counter: data.am_counter,
+      timestamp: data.am_timestamp,
+      total: data.am_total,
+      drawer1: {
+        total: data.am_drawer1_total,
+        skipped: data.am_drawer1_skip,
+        skipReason: data.am_drawer1_skip_reason,
+        counts: data.am_drawer1_data
+      },
+      drawer2: {
+        total: data.am_drawer2_total,
+        skipped: data.am_drawer2_skip,
+        skipReason: data.am_drawer2_skip_reason,
+        counts: data.am_drawer2_data
+      },
+      notes: data.am_notes
+    };
+  }
+  
+  async function sendEmailReport(data, calculations) {
+    const templateParams = {
+      to_email: EMAILJS_CONFIG.MANAGER_EMAIL,
+      date: data.date,
+      am_counter: currentAMData ? currentAMData.counter : 'N/A',
+      pm_counter: data.counter,
+      am_timestamp: currentAMData ? new Date(currentAMData.timestamp).toLocaleString() : 'N/A',
+      pm_timestamp: new Date(data.timestamp).toLocaleString(),
+      am_total: calculations.amTotal.toFixed(2),
+      pm_total: calculations.pmTotal.toFixed(2),
+      drawer_change: calculations.drawerChange.toFixed(2),
+      toast_sales: calculations.toastSales.toFixed(2),
+      original_tips: calculations.cashTips.toFixed(2),
+      discrepancy: calculations.discrepancy.toFixed(2),
+      discrepancy_direction: calculations.discrepancy >= 0 ? 'Over' : 'Short',
+      adjusted_tips: calculations.adjustedTips.toFixed(2),
+      deposit_amount: Math.round(calculations.depositAmount).toString(),
+      return_amount: calculations.returnAmount.toFixed(2),
+      drawer_over: calculations.drawerOver.toFixed(2),
+      drawer_short: calculations.drawerShort.toFixed(2),
+      am_notes: currentAMData ? (currentAMData.notes || '') : '',
+      pm_notes: data.notes || '',
+      has_discrepancy: calculations.discrepancy !== 0 ? 'true' : 'false'
+    };
+    
+    const response = await emailjs.send(
+      EMAILJS_CONFIG.SERVICE_ID,
+      EMAILJS_CONFIG.TEMPLATE_ID,
+      templateParams
+    );
+    
+    if (!response.status === 200) {
+      throw new Error('Email send failed');
+    }
+  }
+  
+  async function generateReport() {
+    const date = document.getElementById('reportDate').value;
+    if (!date) {
+      showMessage('Please select a date', 'error');
+      return;
+    }
+    
+    try {
+      showMessage('Generating report...', 'info');
+      
+      const amData = await getAMData(date);
+      if (!amData) {
+        throw new Error('No data found for this date');
+      }
+      
+      // For report generation, we'll use stored PM data or create a basic report
+      const { data: fullData } = await supabase
+        .from('cash_counts')
+        .select('*')
+        .eq('date', date)
+        .single();
+      
+      if (fullData && fullData.pm_total) {
+        // Full day report
+        const reportData = {
+          date: date,
+          counter: fullData.pm_counter,
+          total: fullData.pm_total,
+          toastSales: fullData.pm_toast_sales,
+          cashTips: fullData.pm_cash_tips,
+          amTotal: fullData.am_total,
+          notes: fullData.pm_notes
+        };
+        
+        const calculations = {
+          amTotal: fullData.am_total,
+          pmTotal: fullData.pm_total,
+          drawerChange: fullData.pm_total - fullData.am_total,
+          toastSales: fullData.pm_toast_sales,
+          cashTips: fullData.pm_cash_tips,
+          discrepancy: fullData.pm_discrepancy,
+          adjustedTips: fullData.pm_adjusted_tips,
+          depositAmount: fullData.pm_deposit_amount,
+          returnAmount: fullData.pm_amount_to_keep,
+          drawerOver: fullData.pm_drawer_over_amount || 0,
+          drawerShort: fullData.pm_discrepancy < 0 ? Math.abs(fullData.pm_discrepancy) : 0
+        };
+        
+        currentAMData = amData;
+        await sendEmailReport(reportData, calculations);
+      } else {
+        throw new Error('Incomplete data for this date');
+      }
+      
+      showMessage('Report sent successfully!', 'success');
+      
+    } catch (error) {
+      console.error('Report generation error:', error);
+      showMessage(`Error: ${error.message}`, 'error');
+    }
   }
   
   function resetForm(shift) {
     document.getElementById(`${shift}Counter`).value = '';
-    const dateInput = document.getElementById(`${shift}Date`); if (dateInput) dateInput.value = getPacificDate();
-    document.getElementById(`${shift}Drawer1Skip`).checked = false; document.getElementById(`${shift}Drawer2Skip`).checked = false;
-    toggleDrawerSkip(shift, 1); toggleDrawerSkip(shift, 2);
-    DENOMINATIONS.forEach((denom, index) => { document.getElementById(`${shift}Drawer1Qty${index}`).value = '0'; document.getElementById(`${shift}Drawer2Qty${index}`).value = '0'; });
-    document.getElementById(`${shift}Drawer1Reason`).value = ''; document.getElementById(`${shift}Drawer2Reason`).value = ''; document.getElementById(`${shift}Notes`).value = '';
+    document.getElementById(`${shift}Notes`).value = '';
+    
+    // Reset drawer skips
+    document.getElementById(`${shift}Drawer1Skip`).checked = false;
+    document.getElementById(`${shift}Drawer2Skip`).checked = false;
+    toggleSkip(shift, 1);
+    toggleSkip(shift, 2);
+    
+    // Reset all denomination inputs
+    DENOMINATIONS.forEach((denom, index) => {
+      document.getElementById(`${shift}D1Q${index}`).value = '0';
+      document.getElementById(`${shift}D2Q${index}`).value = '0';
+    });
+    
     if (shift === 'pm') {
-      document.getElementById('pmCashTips').value = ''; document.getElementById('pmToastSales').value = '';
-      const amInput = document.getElementById('pmAmTotal');
-      if (amInput) { amInput.value = ''; amInput.readOnly = false; amInput.style.backgroundColor = ''; amInput.placeholder = '0.00'; }
-      const indicators = document.querySelectorAll('.am-auto-loaded, .am-manual-entry, .am-required-error'); indicators.forEach(indicator => indicator.remove());
-      const submitBtn = document.querySelector('#pmForm .submit-btn'); if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit PM Close'; }
-      window.loadedAMData = null;
+      document.getElementById('toastSales').value = '';
+      document.getElementById('cashTips').value = '';
     }
-    updateCalculations(shift, 1); updateCalculations(shift, 2); goBackToShiftSelector();
+    
+    updateCalculations(shift, 1);
+    updateCalculations(shift, 2);
   }
 </script>
 </body>
