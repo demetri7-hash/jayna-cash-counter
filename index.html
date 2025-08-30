@@ -731,7 +731,6 @@
     initializeSupabase();
     initializeEmailJS();
     setTodayDate();
-    initializeDenominationInputs();
     // Removed "App ready" message to prevent page bouncing
   });
   
@@ -801,13 +800,6 @@
     const month = String(pacific.getMonth() + 1).padStart(2, '0');
     const day = String(pacific.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-  }
-  
-  function initializeDenominationInputs() {
-    // Disable all denomination inputs until a name is selected
-    ['am', 'pm'].forEach(shift => {
-      toggleDenominationInputs(shift);
-    });
   }
   
   function showMessage(text, type) {
@@ -1054,6 +1046,9 @@
         container.appendChild(row);
       });
     });
+    
+    // Apply disabled state based on current name selection
+    toggleDenominationInputs(shift);
   }
   
   function toggleSkip(shift, drawer) {
@@ -1073,13 +1068,18 @@
   
   function toggleDenominationInputs(shift) {
     const counterSelect = document.getElementById(`${shift}Counter`);
+    if (!counterSelect) return; // Safety check
+    
     const hasName = counterSelect.value.trim() !== '';
     
     // Toggle denomination inputs for both drawers
     for (let drawer = 1; drawer <= 2; drawer++) {
       DENOMINATIONS.forEach((denom, index) => {
         const qtyInput = document.getElementById(`${shift}D${drawer}Q${index}`);
+        if (!qtyInput) return; // Safety check
+        
         const denomRow = qtyInput.closest('.denom-row');
+        if (!denomRow) return; // Safety check
         
         if (hasName) {
           qtyInput.disabled = false;
