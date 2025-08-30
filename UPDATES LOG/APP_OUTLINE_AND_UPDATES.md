@@ -143,6 +143,10 @@ The Jayna Gyro Cash Counter is a digital cash management system designed to stre
   - Formatted 9 AM counts and 7 PM counts from 2025-08-21 to 2025-08-29
   - Properly structured JSONB format for drawer denomination data
   - Included verification queries for data integrity checking
+  - **Fixed:** Updated SQL structure to match actual Supabase table schema
+    - Uses prefixed columns (`am_counter`, `pm_counter`, etc.)
+    - Stores AM and PM data in same row per date
+    - Direct JSONB storage for drawer denomination counts
 
 ### [Previous Changes]
 - AM and PM cash count flows implemented with dual-drawer support
