@@ -133,6 +133,18 @@
       margin: 0;
     }
     
+    /* Disabled denomination inputs */
+    .qty-input:disabled {
+      background-color: #f5f5f5;
+      color: #999;
+      border-color: #d0d0d0;
+      cursor: not-allowed;
+    }
+    
+    .denom-row.disabled {
+      opacity: 0.6;
+    }
+    
     .drawer-total { margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 12px; text-align: center; font-size: 20px; font-weight: 600; } /* Reduced margins and padding */
     .grand-total { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; } /* Reduced margin */
     .grand-total h3 { font-size: 20px; margin-bottom: 8px; }
@@ -410,7 +422,7 @@
         
         <div class="form-group">
           <label for="amCounter">Counted by:</label>
-          <select id="amCounter" class="form-select" required>
+          <select id="amCounter" class="form-select" onchange="toggleDenominationInputs('am')" required>
             <option value="">Choose Name</option>
             <option value="Demetri Gregorakis">Demetri Gregorakis</option>
             <option value="Ahmet Can Guler">Ahmet Can Guler</option>
@@ -479,7 +491,7 @@
         
         <div class="form-group">
           <label for="pmCounter">Counted by:</label>
-          <select id="pmCounter" class="form-select" required>
+          <select id="pmCounter" class="form-select" onchange="toggleDenominationInputs('pm')" required>
             <option value="">Choose Name</option>
             <option value="Demetri Gregorakis">Demetri Gregorakis</option>
             <option value="Ahmet Can Guler">Ahmet Can Guler</option>
@@ -719,6 +731,7 @@
     initializeSupabase();
     initializeEmailJS();
     setTodayDate();
+    initializeDenominationInputs();
     // Removed "App ready" message to prevent page bouncing
   });
   
@@ -788,6 +801,13 @@
     const month = String(pacific.getMonth() + 1).padStart(2, '0');
     const day = String(pacific.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+  
+  function initializeDenominationInputs() {
+    // Disable all denomination inputs until a name is selected
+    ['am', 'pm'].forEach(shift => {
+      toggleDenominationInputs(shift);
+    });
   }
   
   function showMessage(text, type) {
@@ -1051,6 +1071,31 @@
     updateCalculations(shift, drawer);
   }
   
+  function toggleDenominationInputs(shift) {
+    const counterSelect = document.getElementById(`${shift}Counter`);
+    const hasName = counterSelect.value.trim() !== '';
+    
+    // Toggle denomination inputs for both drawers
+    for (let drawer = 1; drawer <= 2; drawer++) {
+      DENOMINATIONS.forEach((denom, index) => {
+        const qtyInput = document.getElementById(`${shift}D${drawer}Q${index}`);
+        const denomRow = qtyInput.closest('.denom-row');
+        
+        if (hasName) {
+          qtyInput.disabled = false;
+          denomRow.classList.remove('disabled');
+        } else {
+          qtyInput.disabled = true;
+          qtyInput.value = ''; // Clear any existing values
+          denomRow.classList.add('disabled');
+        }
+      });
+      
+      // Update calculations after enabling/disabling
+      updateCalculations(shift, drawer);
+    }
+  }
+  
   function updateCalculations(shift, drawer) {
     const skipBox = document.getElementById(`${shift}Drawer${drawer}Skip`);
     let drawerTotal = 0;
@@ -1262,8 +1307,19 @@
     } catch (error) {
       hideLoading();
       console.error('PM submission error:', error);
+      
+      // Check if it's a validation error (these shouldn't reset the form)
+      const isValidationError = error.message.includes('Please select') || 
+                               error.message.includes('required') ||
+                               error.message.includes('name') ||
+                               error.message.includes('date');
+      
       showMessage(`Error: ${error.message}`, 'error');
-      goHome();
+      
+      // Only redirect home for non-validation errors (like network issues)
+      if (!isValidationError) {
+        goHome();
+      }
     }
   }
   
