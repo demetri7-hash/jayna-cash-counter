@@ -153,10 +153,14 @@ The Jayna Gyro Cash Counter is a digital cash management system designed to stre
   - **Fixed:** Replaced browser prompt() with custom modal dialog to prevent z-index issues
   - Custom modal with z-index: 10000 ensures visibility above calendar pickers
   - Improved user experience with styled password input and clear messaging
-  - Admin password required when changing date from current date
-  - Automatic reset to current date if wrong password entered
-  - Clear warning messages about data overwrite risks
-  - Seamless operation for current date usage (no password needed)
+- **Fixed:** Email template compatibility issues with PM email functionality
+  - Updated `sendEmailReport()` to match all template variables exactly
+  - Fixed variable naming: `pm_counter` → `counter`, `pm_notes` → `notes`, `return_amount` → `amount_to_keep`
+  - Added missing variables: `total_cash`, `large_discrepancy_flag`, `has_am_comparison`
+  - Added drawer breakdown variables: `am_drawer1_total`, `pm_drawer1_total`, etc.
+  - Enhanced `collectFormData()` to include individual drawer totals for email reporting
+  - Large discrepancy flag now appears for discrepancies over $10
+  - Drawer comparison table now properly displays with AM vs PM breakdown
 
 ### [Previous Changes]
 - AM and PM cash count flows implemented with dual-drawer support

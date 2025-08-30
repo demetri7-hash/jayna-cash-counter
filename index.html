@@ -723,6 +723,8 @@
       timestamp: new Date().toISOString(),
       drawer1: drawer1Data,
       drawer2: drawer2Data,
+      drawer1Total: drawer1Data.total, // Add individual drawer totals for email template
+      drawer2Total: drawer2Data.total,
       notes: notes || null,
       total: drawer1Data.total + drawer2Data.total
     };
@@ -945,24 +947,34 @@
       to_email: EMAILJS_CONFIG.MANAGER_EMAIL,
       date: data.date,
       am_counter: currentAMData ? currentAMData.counter : 'N/A',
-      pm_counter: data.counter,
+      counter: data.counter, // PM counter (was pm_counter)
       am_timestamp: currentAMData ? new Date(currentAMData.timestamp).toLocaleString() : 'N/A',
       pm_timestamp: new Date(data.timestamp).toLocaleString(),
       am_total: calculations.amTotal.toFixed(2),
       pm_total: calculations.pmTotal.toFixed(2),
+      total_cash: calculations.pmTotal.toFixed(2), // Template expects total_cash
       drawer_change: calculations.drawerChange.toFixed(2),
       toast_sales: calculations.toastSales.toFixed(2),
       original_tips: calculations.cashTips.toFixed(2),
-      discrepancy: calculations.discrepancy.toFixed(2),
+      discrepancy: Math.abs(calculations.discrepancy).toFixed(2),
       discrepancy_direction: calculations.discrepancy >= 0 ? 'Over' : 'Short',
+      large_discrepancy_flag: Math.abs(calculations.discrepancy) > 10 ? ' ⚠️ LARGE DISCREPANCY!' : '',
       adjusted_tips: calculations.adjustedTips.toFixed(2),
       deposit_amount: Math.round(calculations.depositAmount).toString(),
-      return_amount: calculations.returnAmount.toFixed(2),
+      amount_to_keep: calculations.returnAmount.toFixed(2), // Template expects amount_to_keep
       drawer_over: calculations.drawerOver.toFixed(2),
       drawer_short: calculations.drawerShort.toFixed(2),
       am_notes: currentAMData ? (currentAMData.notes || '') : '',
-      pm_notes: data.notes || '',
-      has_discrepancy: calculations.discrepancy !== 0 ? 'true' : 'false'
+      notes: data.notes || '', // Template expects notes (not pm_notes)
+      has_discrepancy: calculations.discrepancy !== 0 ? 'true' : 'false',
+      // Add drawer breakdown for comparison table
+      has_am_comparison: currentAMData ? 'true' : 'false',
+      am_drawer1_total: currentAMData ? currentAMData.drawer1.total.toFixed(2) : '0.00',
+      am_drawer2_total: currentAMData ? currentAMData.drawer2.total.toFixed(2) : '0.00',
+      pm_drawer1_total: data.drawer1Total.toFixed(2),
+      pm_drawer2_total: data.drawer2Total.toFixed(2),
+      am_grand_total: calculations.amTotal.toFixed(2),
+      pm_grand_total: calculations.pmTotal.toFixed(2)
     };
     
     const response = await emailjs.send(
