@@ -1268,37 +1268,56 @@
     // Drawer change = PM - AM
     const drawerChange = pmTotal - amTotal;
     
-    // Discrepancy = actual change vs expected (Toast sales)
-    const discrepancy = drawerChange - toastSales;
+    // Actual cash in
+    const actualCashIn = drawerChange;
     
-    // Staff see: Deposit = Toast + Tips (always whole number)
+    // Expected vs actual (Toast sales vs actual cash in)
+    const discrepancy = actualCashIn - toastSales;
+    
+    // Calculate tip adjustments
+    let tipAdjustment = 0;
+    let finalCashTips = cashTips;
+    
+    if (discrepancy < 0) {
+      // SHORTAGE: Remove from tips to cover exact restaurant amount
+      tipAdjustment = Math.abs(discrepancy);
+      finalCashTips = cashTips - tipAdjustment;
+    }
+    // If overage (discrepancy > 0), tips stay the same, overage goes to cashbox
+    
+    // Final tips are always whole dollars (floor)
+    const adjustedTips = Math.floor(finalCashTips);
+    
+    // Deposit amount = Toast + Original Tips (what staff sees)
     const depositAmount = toastSales + cashTips;
     
-    // Manager calculations for email
-    let adjustedTips = cashTips;
+    // Return to cashbox = AM Total + any overage + any tip decimal remainder
     let returnAmount = amTotal;
-    
     if (discrepancy > 0) {
-      // Over: add excess to return amount
+      // Add overage to cashbox
       returnAmount += discrepancy;
     } else if (discrepancy < 0) {
-      // Short: reduce tips to cover shortage
-      const shortage = Math.abs(discrepancy);
-      adjustedTips = Math.max(0, cashTips - shortage);
+      // Add any decimal remainder from tip adjustment back to cashbox
+      const tipRemainder = finalCashTips - adjustedTips;
+      returnAmount += tipRemainder;
     }
     
     return {
       amTotal,
       pmTotal,
       drawerChange,
+      actualCashIn,
       toastSales,
-      cashTips,
+      cashTips, // Original tips reported
       discrepancy,
-      adjustedTips,
-      depositAmount,
-      returnAmount,
+      tipAdjustment: discrepancy < 0 ? tipAdjustment : 0,
+      adjustedTips, // Final whole dollar tips
+      depositAmount, // Toast + Original Tips (what staff deposits)
+      returnAmount, // What goes back to cashbox
       drawerOver: discrepancy > 0 ? discrepancy : 0,
-      drawerShort: discrepancy < 0 ? Math.abs(discrepancy) : 0
+      drawerShort: discrepancy < 0 ? Math.abs(discrepancy) : 0,
+      restaurantOwed: toastSales, // Exact Toast sales amount
+      staffOwed: adjustedTips // Final tips after adjustment
     };
   }
   
@@ -1401,14 +1420,18 @@
       pm_total: calculations.pmTotal.toFixed(2),
       total_cash: calculations.pmTotal.toFixed(2), // Template expects total_cash
       drawer_change: calculations.drawerChange.toFixed(2),
+      actual_cash_in: calculations.actualCashIn.toFixed(2),
       toast_sales: calculations.toastSales.toFixed(2),
       original_tips: calculations.cashTips.toFixed(2),
       discrepancy: Math.abs(calculations.discrepancy).toFixed(2),
       discrepancy_direction: calculations.discrepancy >= 0 ? 'Over' : 'Short',
+      discrepancy_sign: calculations.discrepancy >= 0 ? '+' : '-',
       large_discrepancy_flag: Math.abs(calculations.discrepancy) > 10 ? ' ⚠️ LARGE DISCREPANCY!' : '',
+      tip_adjustment: calculations.tipAdjustment > 0 ? calculations.tipAdjustment.toFixed(2) : null,
       adjusted_tips: calculations.adjustedTips.toFixed(2),
       deposit_amount: Math.round(calculations.depositAmount).toString(),
       amount_to_keep: calculations.returnAmount.toFixed(2), // Template expects amount_to_keep
+      return_breakdown: (calculations.returnAmount - calculations.amTotal).toFixed(2),
       drawer_over: calculations.drawerOver.toFixed(2),
       drawer_short: calculations.drawerShort.toFixed(2),
       am_notes: currentAMData ? (currentAMData.notes || '') : '',
@@ -1421,7 +1444,11 @@
       pm_drawer1_total: data.drawer1Total.toFixed(2),
       pm_drawer2_total: data.drawer2Total.toFixed(2),
       am_grand_total: calculations.amTotal.toFixed(2),
-      pm_grand_total: calculations.pmTotal.toFixed(2)
+      pm_grand_total: calculations.pmTotal.toFixed(2),
+      // Manager breakdown fields
+      restaurant_owed: calculations.toastSales.toFixed(2),
+      staff_owed: calculations.adjustedTips.toString(), // Whole dollars only
+      total_accounted: (calculations.toastSales + calculations.adjustedTips).toFixed(2)
     };
     
     const response = await emailjs.send(
