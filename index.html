@@ -646,14 +646,42 @@
       
       <!-- Reports Section -->
       <div id="reportsForm" class="form-section">
-        <h2 style="margin-bottom: 20px; color: #1e3c72;">Generate Report</h2>
+        <h2 style="margin-bottom: 20px; color: #1e3c72;">View Reports</h2>
         
         <div class="form-group">
+          <label>Report Type:</label>
+          <div style="display: flex; gap: 15px; margin: 10px 0;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="radio" name="reportType" value="single" checked onchange="toggleReportType()">
+              <span>Single Day</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="radio" name="reportType" value="range" onchange="toggleReportType()">
+              <span>Date Range</span>
+            </label>
+          </div>
+        </div>
+        
+        <div id="singleDateGroup" class="form-group">
           <label for="reportDate">Select Date:</label>
           <input type="date" id="reportDate" class="form-input" required>
         </div>
         
-        <button class="submit-btn" onclick="generateReport()" style="background: #28a745;">Generate Email Report</button>
+        <div id="dateRangeGroup" class="form-group" style="display: none;">
+          <label for="reportStartDate">Start Date:</label>
+          <input type="date" id="reportStartDate" class="form-input" required>
+          <label for="reportEndDate" style="margin-top: 10px;">End Date:</label>
+          <input type="date" id="reportEndDate" class="form-input" required>
+        </div>
+        
+        <button class="submit-btn" onclick="viewReport()" style="background: #007bff;">View Report</button>
+        
+        <!-- On-Screen Report Display -->
+        <div id="reportDisplay" style="display: none; margin-top: 30px; padding: 20px; border: 2px solid #e0e0e0; border-radius: 12px; background: #f8f9fa;">
+          <div id="reportContent"></div>
+          <button id="emailReportBtn" class="submit-btn" onclick="emailCurrentReport()" style="background: #28a745; margin-top: 20px;">Send Email Report</button>
+        </div>
+        
         <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 10px;">Back to Menu</button>
       </div>
     </div>
@@ -1686,6 +1714,274 @@
       hideLoading();
       console.error('Report generation error:', error);
       showMessage(`Error: ${error.message}`, 'error');
+    }
+  }
+  
+  // New Report Functions
+  function toggleReportType() {
+    const reportType = document.querySelector('input[name="reportType"]:checked').value;
+    const singleGroup = document.getElementById('singleDateGroup');
+    const rangeGroup = document.getElementById('dateRangeGroup');
+    
+    if (reportType === 'single') {
+      singleGroup.style.display = 'block';
+      rangeGroup.style.display = 'none';
+    } else {
+      singleGroup.style.display = 'none';
+      rangeGroup.style.display = 'block';
+    }
+    
+    // Hide any existing report
+    document.getElementById('reportDisplay').style.display = 'none';
+  }
+  
+  async function viewReport() {
+    const reportType = document.querySelector('input[name="reportType"]:checked').value;
+    
+    try {
+      showLoading('Loading Report', 'Retrieving data...');
+      
+      if (reportType === 'single') {
+        await viewSingleDayReport();
+      } else {
+        await viewDateRangeReport();
+      }
+      
+      hideLoading();
+      document.getElementById('reportDisplay').style.display = 'block';
+      
+    } catch (error) {
+      hideLoading();
+      console.error('Report viewing error:', error);
+      showMessage(`Error: ${error.message}`, 'error');
+    }
+  }
+  
+  async function viewSingleDayReport() {
+    const date = document.getElementById('reportDate').value;
+    if (!date) {
+      throw new Error('Please select a date');
+    }
+    
+    const amData = await getAMData(date);
+    if (!amData) {
+      throw new Error('No data found for this date');
+    }
+    
+    const { data: fullData } = await supabase
+      .from('cash_counts')
+      .select('*')
+      .eq('date', date)
+      .single();
+    
+    if (!fullData || !fullData.pm_total) {
+      throw new Error('Incomplete data for this date');
+    }
+    
+    // Store current data for email functionality
+    window.currentReportData = {
+      type: 'single',
+      date: date,
+      amData: amData,
+      pmData: fullData
+    };
+    
+    // Generate full single day report (same format as email)
+    const reportHtml = generateSingleDayReportHtml(date, amData, fullData);
+    document.getElementById('reportContent').innerHTML = reportHtml;
+  }
+  
+  async function viewDateRangeReport() {
+    const startDate = document.getElementById('reportStartDate').value;
+    const endDate = document.getElementById('reportEndDate').value;
+    
+    if (!startDate || !endDate) {
+      throw new Error('Please select both start and end dates');
+    }
+    
+    if (new Date(startDate) > new Date(endDate)) {
+      throw new Error('Start date must be before end date');
+    }
+    
+    const { data: rangeData } = await supabase
+      .from('cash_counts')
+      .select('*')
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .not('pm_total', 'is', null)
+      .order('date', { ascending: true });
+    
+    if (!rangeData || rangeData.length === 0) {
+      throw new Error('No data found for this date range');
+    }
+    
+    // Store current data for email functionality
+    window.currentReportData = {
+      type: 'range',
+      startDate: startDate,
+      endDate: endDate,
+      data: rangeData
+    };
+    
+    // Generate date range summary report
+    const reportHtml = generateDateRangeReportHtml(startDate, endDate, rangeData);
+    document.getElementById('reportContent').innerHTML = reportHtml;
+  }
+  
+  function generateSingleDayReportHtml(date, amData, pmData) {
+    const dayOfWeek = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+    
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
+        <div style="text-align: center; margin-bottom: 20px; padding: 15px; background: #f0f0f0; border-radius: 8px;">
+          <h2 style="margin: 0; color: #333;">Jayna Gyro Daily Cash Report</h2>
+          <p style="margin: 5px 0; font-size: 16px; color: #666;">${dayOfWeek}, ${new Date(date).toLocaleDateString()}</p>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            <h3 style="margin-top: 0; color: #28a745;">Morning Count: $${amData.total.toFixed(2)}</h3>
+            <p><strong>Counted by:</strong> ${amData.counter}</p>
+            <p><strong>Time:</strong> ${new Date(amData.timestamp).toLocaleString()}</p>
+          </div>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            <h3 style="margin-top: 0; color: #dc3545;">Evening Count: $${pmData.pm_total.toFixed(2)}</h3>
+            <p><strong>Counted by:</strong> ${pmData.pm_counter}</p>
+            <p><strong>Time:</strong> ${new Date(pmData.pm_timestamp).toLocaleString()}</p>
+          </div>
+        </div>
+        
+        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; color: #856404;">Summary</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div>
+              <p><strong>Total Envelope Deposits:</strong> $${pmData.pm_deposit_amount.toFixed(2)}</p>
+              <p><strong>Total Cash Box Return:</strong> $${pmData.pm_amount_to_keep.toFixed(2)}</p>
+            </div>
+            <div>
+              <p><strong>Total Discrepancies:</strong> $${pmData.pm_discrepancy.toFixed(2)}</p>
+              <p><strong>Total Adjusted Cash Tips:</strong> $${pmData.pm_adjusted_tips.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+        
+        ${pmData.pm_notes ? `<div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <h4 style="margin-top: 0;">Notes:</h4>
+          <p style="white-space: pre-wrap;">${pmData.pm_notes}</p>
+        </div>` : ''}
+      </div>
+    `;
+  }
+  
+  function generateDateRangeReportHtml(startDate, endDate, data) {
+    // Calculate totals
+    let totalDeposits = 0;
+    let totalReturns = 0;
+    let totalDiscrepancies = 0;
+    let totalAdjustedTips = 0;
+    
+    data.forEach(day => {
+      totalDeposits += day.pm_deposit_amount || 0;
+      totalReturns += day.pm_amount_to_keep || 0;
+      totalDiscrepancies += day.pm_discrepancy || 0;
+      totalAdjustedTips += day.pm_adjusted_tips || 0;
+    });
+    
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
+        <div style="text-align: center; margin-bottom: 20px; padding: 15px; background: #f0f0f0; border-radius: 8px;">
+          <h2 style="margin: 0; color: #333;">Jayna Gyro Date Range Summary</h2>
+          <p style="margin: 5px 0; font-size: 16px; color: #666;">${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}</p>
+          <p style="margin: 5px 0; font-size: 14px; color: #888;">${data.length} days included</p>
+        </div>
+        
+        <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; color: #856404; text-align: center;">Summary Totals</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <h4 style="margin: 0 0 10px 0; color: #28a745;">Total Envelope Deposits</h4>
+              <p style="font-size: 24px; font-weight: bold; margin: 0; color: #28a745;">$${totalDeposits.toFixed(2)}</p>
+            </div>
+            <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <h4 style="margin: 0 0 10px 0; color: #007bff;">Total Cash Box Return</h4>
+              <p style="font-size: 24px; font-weight: bold; margin: 0; color: #007bff;">$${totalReturns.toFixed(2)}</p>
+            </div>
+            <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <h4 style="margin: 0 0 10px 0; color: #dc3545;">Total Discrepancies</h4>
+              <p style="font-size: 24px; font-weight: bold; margin: 0; color: #dc3545;">$${totalDiscrepancies.toFixed(2)}</p>
+            </div>
+            <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <h4 style="margin: 0 0 10px 0; color: #6f42c1;">Total Adjusted Cash Tips</h4>
+              <p style="font-size: 24px; font-weight: bold; margin: 0; color: #6f42c1;">$${totalAdjustedTips.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+          <h4 style="margin-top: 0;">Daily Breakdown:</h4>
+          ${data.map(day => `
+            <div style="padding: 8px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between;">
+              <span><strong>${new Date(day.date).toLocaleDateString()}</strong> (${day.pm_counter})</span>
+              <span>Deposits: $${(day.pm_deposit_amount || 0).toFixed(2)} | Returns: $${(day.pm_amount_to_keep || 0).toFixed(2)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  async function emailCurrentReport() {
+    if (!window.currentReportData) {
+      showMessage('No report data available', 'error');
+      return;
+    }
+    
+    try {
+      showLoading('Sending Email', 'Generating and sending email report...');
+      
+      if (window.currentReportData.type === 'single') {
+        // Send single day email report using existing function
+        const data = {
+          date: window.currentReportData.date,
+          counter: window.currentReportData.pmData.pm_counter,
+          total: window.currentReportData.pmData.pm_total,
+          toastSales: window.currentReportData.pmData.pm_toast_sales,
+          cashTips: window.currentReportData.pmData.pm_cash_tips,
+          amTotal: window.currentReportData.pmData.am_total,
+          notes: window.currentReportData.pmData.pm_notes
+        };
+        
+        const calculations = {
+          amTotal: window.currentReportData.pmData.am_total,
+          pmTotal: window.currentReportData.pmData.pm_total,
+          drawerChange: window.currentReportData.pmData.pm_total - window.currentReportData.pmData.am_total,
+          toastSales: window.currentReportData.pmData.pm_toast_sales,
+          cashTips: window.currentReportData.pmData.pm_cash_tips,
+          discrepancy: window.currentReportData.pmData.pm_discrepancy,
+          adjustedTips: window.currentReportData.pmData.pm_adjusted_tips,
+          depositAmount: window.currentReportData.pmData.pm_deposit_amount,
+          returnAmount: window.currentReportData.pmData.pm_amount_to_keep,
+          drawerOver: window.currentReportData.pmData.pm_drawer_over_amount || 0,
+          drawerShort: window.currentReportData.pmData.pm_discrepancy < 0 ? Math.abs(window.currentReportData.pmData.pm_discrepancy) : 0
+        };
+        
+        currentAMData = window.currentReportData.amData;
+        await sendEmailReport(data, calculations);
+        
+      } else {
+        // For date range reports, we'd need a new email template or send as attachment
+        showMessage('Date range email reports coming soon!', 'info');
+        hideLoading();
+        return;
+      }
+      
+      hideLoading();
+      showMessage('Email report sent successfully!', 'success');
+      
+    } catch (error) {
+      hideLoading();
+      console.error('Email report error:', error);
+      showMessage(`Error sending email: ${error.message}`, 'error');
     }
   }
   
