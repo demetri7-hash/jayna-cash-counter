@@ -185,6 +185,13 @@ The Jayna Gyro Cash Counter is a digital cash management system designed to stre
   - Detailed confirmation information (totals, timestamps, instructions)
   - Smooth transitions between loading and success states
   - Professional glass-morphism design with backdrop blur effects
+- **Fixed:** Google Sites full page embed scrolling and viewport issues
+  - Added Google Sites specific CSS with `!important` overrides
+  - Enhanced viewport meta tag with `user-scalable=yes` and `viewport-fit=cover`
+  - Fixed container overflow from `hidden` to `visible` for proper scrolling
+  - Added forced bottom padding and margins to ensure submit buttons are accessible
+  - Optimized body and html scroll behavior for iframe embedding
+  - Added z-index positioning to prevent element cutoff in Google Sites
 
 ### [Previous Changes]
 - AM and PM cash count flows implemented with dual-drawer support
