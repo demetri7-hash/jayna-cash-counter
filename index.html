@@ -487,11 +487,15 @@
     
     if (!date) {
       document.getElementById('pmAmTotal').textContent = 'Please select a date';
+      document.getElementById('amCounterName').textContent = 'Please select a date';
+      document.getElementById('amCountTime').textContent = 'Please select a date';
       return;
     }
     
     // Show loading state
     document.getElementById('pmAmTotal').textContent = 'Loading...';
+    document.getElementById('amCounterName').textContent = 'Loading...';
+    document.getElementById('amCountTime').textContent = 'Loading...';
     
     try {
       if (!supabase) {
@@ -504,27 +508,37 @@
       
       if (amData && amData.total > 0) {
         currentAMData = amData;
-        document.getElementById('pmAmTotal').textContent = `${amData.total.toFixed(2)}`;
+        document.getElementById('pmAmTotal').textContent = `$${amData.total.toFixed(2)}`;
         
+        // FIX: Set AM counter name and timestamp
+        document.getElementById('amCounterName').textContent = amData.counter || 'N/A';
+        document.getElementById('amCountTime').textContent = amData.timestamp ? new Date(amData.timestamp).toLocaleString() : 'N/A';
+        
+        // Handle AM notes display
+        const amNotesDisplay = document.getElementById('amNotesDisplay');
         const amNotesEl = document.getElementById('amNotes');
-        if (amData.notes && amNotesEl) {
-          amNotesEl.textContent = `Morning Notes: ${amData.notes}`;
-          amNotesEl.style.display = 'block';
-        } else if (amNotesEl) {
-          amNotesEl.style.display = 'none';
+        if (amData.notes && amData.notes.trim()) {
+          amNotesEl.textContent = amData.notes;
+          amNotesDisplay.style.display = 'block';
+        } else {
+          amNotesDisplay.style.display = 'none';
         }
         
         showMessage('AM data loaded successfully!', 'success');
       } else {
         currentAMData = null;
         document.getElementById('pmAmTotal').textContent = 'No AM data found';
-        const amNotesEl = document.getElementById('amNotes');
-        if (amNotesEl) amNotesEl.style.display = 'none';
+        document.getElementById('amCounterName').textContent = 'No AM data found';
+        document.getElementById('amCountTime').textContent = 'No AM data found';
+        const amNotesDisplay = document.getElementById('amNotesDisplay');
+        if (amNotesDisplay) amNotesDisplay.style.display = 'none';
         showMessage(`No AM count found for ${date}`, 'error');
       }
     } catch (error) {
       console.error('Error loading AM data:', error);
       document.getElementById('pmAmTotal').textContent = 'Error loading AM data';
+      document.getElementById('amCounterName').textContent = 'Error loading AM data';
+      document.getElementById('amCountTime').textContent = 'Error loading AM data';
       showMessage(`Error: ${error.message}`, 'error');
     }
   }
