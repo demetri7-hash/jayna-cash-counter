@@ -366,18 +366,34 @@
     
     // Add password protection to date inputs
     document.getElementById('amDate').addEventListener('change', function() {
-      validateDateChange(this);
+      const result = validateDateChange(this);
+      if (result instanceof Promise) {
+        // Handle async validation - input value already reset if needed
+        return;
+      }
     });
     
     document.getElementById('pmDate').addEventListener('change', function() {
-      if (validateDateChange(this)) {
-        // Only load AM data if date change was authorized
+      const result = validateDateChange(this);
+      if (result instanceof Promise) {
+        result.then((success) => {
+          if (success) {
+            // Only load AM data if date change was authorized
+            loadAMData();
+          }
+        });
+      } else if (result) {
+        // Synchronous case (current date selected)
         loadAMData();
       }
     });
     
     document.getElementById('reportDate').addEventListener('change', function() {
-      validateDateChange(this);
+      const result = validateDateChange(this);
+      if (result instanceof Promise) {
+        // Handle async validation - input value already reset if needed
+        return;
+      }
     });
   }
   
@@ -405,17 +421,122 @@
       return true;
     }
     
-    // If user selects different date, require password
-    const password = prompt(`You are trying to change the date from today (${currentDate}) to ${selectedDate}.\n\nThis could overwrite existing data. Please enter the admin password to continue:`);
+    // If user selects different date, require password using custom modal
+    return new Promise((resolve) => {
+      showPasswordModal(selectedDate, currentDate, (success) => {
+        if (!success) {
+          inputElement.value = currentDate;
+        }
+        resolve(success);
+      });
+    });
+  }
+  
+  function showPasswordModal(selectedDate, currentDate, callback) {
+    // Create modal HTML
+    const modalHTML = `
+      <div id="passwordModal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      ">
+        <div style="
+          background: white;
+          padding: 30px;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+        ">
+          <h3 style="margin: 0 0 20px 0; color: #d32f2f;">⚠️ Date Change Warning</h3>
+          <p style="margin: 0 0 15px 0; line-height: 1.4;">
+            You are trying to change the date from<br>
+            <strong>TODAY (${currentDate})</strong> to <strong>${selectedDate}</strong>
+          </p>
+          <p style="margin: 0 0 20px 0; color: #d32f2f; font-weight: bold;">
+            This could overwrite existing data!
+          </p>
+          <p style="margin: 0 0 15px 0;">Enter admin password to continue:</p>
+          <input type="password" id="passwordInput" style="
+            width: 80%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 20px;
+          " placeholder="Password">
+          <div>
+            <button onclick="submitPassword()" style="
+              background: #4CAF50;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 6px;
+              margin: 0 10px;
+              cursor: pointer;
+              font-size: 16px;
+            ">Continue</button>
+            <button onclick="cancelPassword()" style="
+              background: #f44336;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 6px;
+              margin: 0 10px;
+              cursor: pointer;
+              font-size: 16px;
+            ">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
     
-    if (password !== ADMIN_PASSWORD) {
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Focus password input
+    document.getElementById('passwordInput').focus();
+    
+    // Store callback for button handlers
+    window.passwordModalCallback = callback;
+    
+    // Add enter key support
+    document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        submitPassword();
+      }
+    });
+  }
+  
+  function submitPassword() {
+    const password = document.getElementById('passwordInput').value;
+    const modal = document.getElementById('passwordModal');
+    
+    if (password === ADMIN_PASSWORD) {
+      showMessage('Date change authorized. BE CAREFUL not to overwrite existing data!', 'info');
+      modal.remove();
+      window.passwordModalCallback(true);
+    } else {
       showMessage('Incorrect password. Date has been reset to today for safety.', 'error');
-      inputElement.value = currentDate;
-      return false;
+      modal.remove();
+      window.passwordModalCallback(false);
     }
-    
-    showMessage(`Date change authorized. BE CAREFUL not to overwrite existing data!`, 'info');
-    return true;
+  }
+  
+  function cancelPassword() {
+    const modal = document.getElementById('passwordModal');
+    modal.remove();
+    window.passwordModalCallback(false);
   }
   
   function hideAllSections() {

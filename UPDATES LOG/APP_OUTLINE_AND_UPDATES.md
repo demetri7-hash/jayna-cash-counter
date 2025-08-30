@@ -148,6 +148,11 @@ The Jayna Gyro Cash Counter is a digital cash management system designed to stre
     - Stores AM and PM data in same row per date
     - Direct JSONB storage for drawer denomination counts
 - **Added:** Password protection for date changes to prevent data overwrites
+  - Admin password "JaynaGyro2025!" required for non-current date selection
+  - Automatic date reset on incorrect password
+  - **Fixed:** Replaced browser prompt() with custom modal dialog to prevent z-index issues
+  - Custom modal with z-index: 10000 ensures visibility above calendar pickers
+  - Improved user experience with styled password input and clear messaging
   - Admin password required when changing date from current date
   - Automatic reset to current date if wrong password entered
   - Clear warning messages about data overwrite risks
