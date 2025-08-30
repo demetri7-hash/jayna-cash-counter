@@ -1401,9 +1401,20 @@
   }
   
   async function sendEmailReport(data, calculations) {
+    // Format date with day of the week
+    const dateObj = new Date(data.date + 'T00:00:00');
+    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    const formattedDate = dateObj.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }).toUpperCase();
+    
     const templateParams = {
       to_email: EMAILJS_CONFIG.MANAGER_EMAIL,
       date: data.date,
+      day_of_week: dayOfWeek,
+      formatted_date: formattedDate,
       am_counter: currentAMData ? currentAMData.counter : 'N/A',
       counter: data.counter, // PM counter (was pm_counter)
       am_timestamp: currentAMData ? new Date(currentAMData.timestamp).toLocaleString() : 'N/A',
