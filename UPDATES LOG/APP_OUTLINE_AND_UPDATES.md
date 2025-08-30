@@ -139,6 +139,10 @@ The Jayna Gyro Cash Counter is a digital cash management system designed to stre
   - Added comprehensive error handling for missing AM data scenarios
 - **Added:** Created comprehensive app documentation and outline
 - **Added:** Renamed documentation file to `APP_OUTLINE_AND_UPDATES.md` for better organization
+- **Added:** Created `historical_data_import.sql` for importing legacy cash count data
+  - Formatted 9 AM counts and 7 PM counts from 2025-08-21 to 2025-08-29
+  - Properly structured JSONB format for drawer denomination data
+  - Included verification queries for data integrity checking
 
 ### [Previous Changes]
 - AM and PM cash count flows implemented with dual-drawer support
