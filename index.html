@@ -324,6 +324,9 @@
     { label: '$0.01', value: 0.01 }
   ];
   
+  // Password protection for date changes (only Demetri knows this)
+  const ADMIN_PASSWORD = 'JaynaGyro2025!';
+  
   let supabase = null;
   let currentAMData = null;
   
@@ -360,6 +363,22 @@
     document.getElementById('amDate').value = today;
     document.getElementById('pmDate').value = today;
     document.getElementById('reportDate').value = today;
+    
+    // Add password protection to date inputs
+    document.getElementById('amDate').addEventListener('change', function() {
+      validateDateChange(this);
+    });
+    
+    document.getElementById('pmDate').addEventListener('change', function() {
+      if (validateDateChange(this)) {
+        // Only load AM data if date change was authorized
+        loadAMData();
+      }
+    });
+    
+    document.getElementById('reportDate').addEventListener('change', function() {
+      validateDateChange(this);
+    });
   }
   
   function getPacificDate() {
@@ -375,6 +394,28 @@
     const messageArea = document.getElementById('messageArea');
     messageArea.innerHTML = `<div class="message ${type}">${text}</div>`;
     setTimeout(() => { messageArea.innerHTML = ''; }, 5000);
+  }
+  
+  function validateDateChange(inputElement) {
+    const selectedDate = inputElement.value;
+    const currentDate = getPacificDate();
+    
+    // If user selects current date, allow it
+    if (selectedDate === currentDate) {
+      return true;
+    }
+    
+    // If user selects different date, require password
+    const password = prompt(`You are trying to change the date from today (${currentDate}) to ${selectedDate}.\n\nThis could overwrite existing data. Please enter the admin password to continue:`);
+    
+    if (password !== ADMIN_PASSWORD) {
+      showMessage('Incorrect password. Date has been reset to today for safety.', 'error');
+      inputElement.value = currentDate;
+      return false;
+    }
+    
+    showMessage(`Date change authorized. BE CAREFUL not to overwrite existing data!`, 'info');
+    return true;
   }
   
   function hideAllSections() {
@@ -398,9 +439,6 @@
     hideAllSections();
     document.getElementById('pmForm').classList.add('active');
     setupDenominations('pm');
-    
-    // Add event listener for date changes
-    document.getElementById('pmDate').addEventListener('change', loadAMData);
     
     await loadAMData();
   }

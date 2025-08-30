@@ -147,6 +147,11 @@ The Jayna Gyro Cash Counter is a digital cash management system designed to stre
     - Uses prefixed columns (`am_counter`, `pm_counter`, etc.)
     - Stores AM and PM data in same row per date
     - Direct JSONB storage for drawer denomination counts
+- **Added:** Password protection for date changes to prevent data overwrites
+  - Admin password required when changing date from current date
+  - Automatic reset to current date if wrong password entered
+  - Clear warning messages about data overwrite risks
+  - Seamless operation for current date usage (no password needed)
 
 ### [Previous Changes]
 - AM and PM cash count flows implemented with dual-drawer support
