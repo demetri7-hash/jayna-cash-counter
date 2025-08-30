@@ -170,6 +170,21 @@ The Jayna Gyro Cash Counter is a digital cash management system designed to stre
   - Improved font sizes: 18px+ for better mobile readability
   - Added focus states with blue glow for better accessibility
   - Larger padding and margins throughout for finger-friendly interface
+- **Fixed:** Eliminated bouncing page behavior from auto-disappearing messages
+  - Removed "App ready" startup message that caused initial page jump
+  - Replaced success/info messages with silent operation for smoother UX
+  - Converted critical error messages to modal popups (like password dialog)
+  - Modal popups appear above content without affecting page height
+  - Only important errors now show popups - routine operations are silent
+  - Report success confirmation uses popup instead of bouncing banner
+- **Enhanced:** Elegant loading states and success confirmation screens
+  - Soft loading overlay with blur effect and elegant spinner animation
+  - No way out during processing - prevents accidental interruption
+  - Custom success screens for AM, PM, and Report workflows
+  - Animated success icons with bounce effect for satisfying feedback
+  - Detailed confirmation information (totals, timestamps, instructions)
+  - Smooth transitions between loading and success states
+  - Professional glass-morphism design with backdrop blur effects
 
 ### [Previous Changes]
 - AM and PM cash count flows implemented with dual-drawer support

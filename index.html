@@ -181,6 +181,126 @@
       .grand-total .amount { font-size: 28px; }
       .deposit-instruction, .return-instruction { font-size: 18px; padding: 20px; }
     }
+    
+    /* Elegant Loading Overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.3s ease;
+    }
+    .loading-overlay.hidden {
+      display: none;
+    }
+    .loading-content {
+      text-align: center;
+      padding: 40px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .loading-spinner-elegant {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(102, 126, 234, 0.1);
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin-elegant 1.2s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin-elegant {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-content h3 {
+      margin: 0 0 10px 0;
+      font-size: 24px;
+      color: #333;
+      font-weight: 600;
+    }
+    .loading-content p {
+      margin: 0;
+      font-size: 16px;
+      color: #666;
+      opacity: 0.8;
+    }
+    
+    /* Success Screens */
+    .success-screen {
+      text-align: center;
+      padding: 40px 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .success-icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: success-bounce 0.6s ease;
+    }
+    @keyframes success-bounce {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .success-screen h2 {
+      color: #28a745;
+      margin-bottom: 15px;
+      font-size: 32px;
+      font-weight: 700;
+    }
+    .success-message {
+      font-size: 18px;
+      color: #666;
+      margin-bottom: 30px;
+      line-height: 1.5;
+    }
+    .success-details {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 25px;
+      margin: 25px 0;
+      border-left: 4px solid #28a745;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 16px;
+    }
+    .detail-row:not(:last-child) {
+      border-bottom: 1px solid #e9ecef;
+    }
+    .detail-row span:first-child {
+      color: #666;
+      font-weight: 500;
+    }
+    .detail-row span:last-child {
+      color: #333;
+      font-weight: 600;
+    }
+    .success-btn {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+      margin-top: 30px;
+      font-size: 18px;
+      padding: 20px 40px;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+    .success-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(40, 167, 69, 0.3);
+    }
   </style>
   
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
@@ -368,31 +488,78 @@
         <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 10px;">Back to Menu</button>
       </div>
       
-      <!-- Loading Screen -->
-      <div id="loadingScreen" class="form-section">
-        <div class="loading">
-          <div class="loading-spinner"></div>
-          <h3>Processing your count...</h3>
-          <p>Calculating totals and sending report...</p>
+      <!-- Elegant Loading Overlay -->
+      <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-content">
+          <div class="loading-spinner-elegant"></div>
+          <h3 id="loadingTitle">Processing...</h3>
+          <p id="loadingMessage">Please wait while we process your request</p>
         </div>
       </div>
       
-      <!-- Confirmation Screen -->
-      <div id="confirmationScreen" class="form-section">
-        <div class="confirmation-screen">
-          <h2>Count Submitted Successfully!</h2>
+      <!-- AM Success Screen -->
+      <div id="amSuccessScreen" class="form-section">
+        <div class="success-screen">
+          <div class="success-icon">✅</div>
+          <h2>AM Count Submitted!</h2>
+          <p class="success-message">Your morning cash count has been successfully recorded and stored.</p>
+          <div class="success-details">
+            <div class="detail-row">
+              <span>Total Counted:</span>
+              <span id="amSuccessTotal">$0.00</span>
+            </div>
+            <div class="detail-row">
+              <span>Time Submitted:</span>
+              <span id="amSuccessTime">--</span>
+            </div>
+          </div>
+          <button class="submit-btn success-btn" onclick="goHome()">Return to Menu</button>
+        </div>
+      </div>
+
+      <!-- PM Success Screen -->
+      <div id="pmSuccessScreen" class="form-section">
+        <div class="success-screen">
+          <div class="success-icon">✅</div>
+          <h2>PM Close Completed!</h2>
+          <p class="success-message">Evening close successful! Report sent to management.</p>
           
           <div class="deposit-instruction">
             DEPOSIT <span id="depositAmount">$0</span> INTO ENVELOPE
           </div>
           
           <div class="return-instruction">
-            RETURN <span id="returnAmount">$0.00</span> TO CASH BOX AND LOCK IN SAFE FOR THE NIGHT
+            RETURN <span id="returnAmount">$0.00</span> TO CASH BOX AND LOCK IN SAFE
           </div>
           
-          <div class="thank-you">THANK YOU!</div>
+          <div class="success-details">
+            <div class="detail-row">
+              <span>Cash Discrepancy:</span>
+              <span id="pmDiscrepancyAmount">$0.00</span>
+            </div>
+          </div>
           
-          <button class="submit-btn confirm-btn" onclick="goHome()">Confirm and Close</button>
+          <button class="submit-btn success-btn" onclick="goHome()">Confirm and Close</button>
+        </div>
+      </div>
+
+      <!-- Report Success Screen -->
+      <div id="reportSuccessScreen" class="form-section">
+        <div class="success-screen">
+          <div class="success-icon">📧</div>
+          <h2>Report Sent Successfully!</h2>
+          <p class="success-message">Daily cash report has been emailed to management.</p>
+          <div class="success-details">
+            <div class="detail-row">
+              <span>Report Date:</span>
+              <span id="reportSuccessDate">--</span>
+            </div>
+            <div class="detail-row">
+              <span>Sent At:</span>
+              <span id="reportSuccessTime">--</span>
+            </div>
+          </div>
+          <button class="submit-btn success-btn" onclick="goHome()">Return to Menu</button>
         </div>
       </div>
       
@@ -421,6 +588,44 @@
     TEMPLATE_ID: 'template_cash_report',
     MANAGER_EMAIL: 'smanager@jaynagyro.com, GSS4168CTJJA73@PRINT.EPSONCONNECT.COM'
   };
+
+  // Elegant Loading and Success Functions
+  function showLoading(title, message) {
+    const overlay = document.getElementById('loadingOverlay');
+    document.getElementById('loadingTitle').textContent = title;
+    document.getElementById('loadingMessage').textContent = message;
+    overlay.classList.remove('hidden');
+    hideAllSections();
+  }
+
+  function hideLoading() {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+  }
+
+  function showAMSuccess(total) {
+    hideLoading();
+    hideAllSections();
+    document.getElementById('amSuccessTotal').textContent = `$${total.toFixed(2)}`;
+    document.getElementById('amSuccessTime').textContent = new Date().toLocaleString();
+    document.getElementById('amSuccessScreen').classList.add('active');
+  }
+
+  function showPMSuccess(depositAmount, returnAmount, discrepancy) {
+    hideLoading();
+    hideAllSections();
+    document.getElementById('depositAmount').textContent = `$${Math.round(depositAmount)}`;
+    document.getElementById('returnAmount').textContent = `$${returnAmount.toFixed(2)}`;
+    document.getElementById('pmDiscrepancyAmount').textContent = `$${Math.abs(discrepancy).toFixed(2)}`;
+    document.getElementById('pmSuccessScreen').classList.add('active');
+  }
+
+  function showReportSuccess(date) {
+    hideLoading();
+    hideAllSections();
+    document.getElementById('reportSuccessDate').textContent = date;
+    document.getElementById('reportSuccessTime').textContent = new Date().toLocaleString();
+    document.getElementById('reportSuccessScreen').classList.add('active');
+  }
   
   const DENOMINATIONS = [
     { label: '$100', value: 100.00 },
@@ -446,7 +651,7 @@
     initializeSupabase();
     initializeEmailJS();
     setTodayDate();
-    showMessage('App ready! Select AM Count, PM Close, or Generate Report.', 'info');
+    // Removed "App ready" message to prevent page bouncing
   });
   
   function initializeSupabase() {
@@ -518,9 +723,67 @@
   }
   
   function showMessage(text, type) {
-    const messageArea = document.getElementById('messageArea');
-    messageArea.innerHTML = `<div class="message ${type}">${text}</div>`;
-    setTimeout(() => { messageArea.innerHTML = ''; }, 5000);
+    // Only show popups for important messages (errors), ignore info/success
+    if (type === 'error') {
+      showPopupMessage(text, type);
+    }
+    // Silently ignore info and success messages to prevent bouncing
+  }
+  
+  function showPopupMessage(text, type) {
+    const messageType = type === 'error' ? 'Error' : type === 'success' ? 'Success' : 'Notice';
+    const backgroundColor = type === 'error' ? '#f44336' : '#4CAF50';
+    const iconEmoji = type === 'error' ? '❌' : '✅';
+    
+    const modalHTML = `
+      <div id="messageModal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      ">
+        <div style="
+          background: white;
+          padding: 30px;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+        ">
+          <h3 style="margin: 0 0 20px 0; color: ${backgroundColor};">${iconEmoji} ${messageType}</h3>
+          <p style="margin: 0 0 25px 0; line-height: 1.4; font-size: 16px;">
+            ${text}
+          </p>
+          <button onclick="closeMessageModal()" style="
+            background: ${backgroundColor};
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+          ">OK</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+  }
+  
+  function closeMessageModal() {
+    const modal = document.getElementById('messageModal');
+    if (modal) {
+      modal.remove();
+    }
   }
   
   function validateDateChange(inputElement) {
@@ -634,7 +897,7 @@
     const modal = document.getElementById('passwordModal');
     
     if (password === ADMIN_PASSWORD) {
-      showMessage('Date change authorized. BE CAREFUL not to overwrite existing data!', 'info');
+      // Silent success - no bouncing message
       modal.remove();
       window.passwordModalCallback(true);
     } else {
@@ -795,7 +1058,7 @@
           amNotesDisplay.style.display = 'none';
         }
         
-        showMessage('AM data loaded successfully!', 'success');
+        // Removed "AM data loaded successfully" message to prevent bouncing
       } else {
         currentAMData = null;
         document.getElementById('pmAmTotal').textContent = 'No AM data found';
@@ -883,16 +1146,17 @@
   
   async function submitAM() {
     try {
+      showLoading('Submitting AM Count', 'Recording your morning cash count...');
+      
       const data = collectFormData('am');
       await storeAMData(data);
-      showMessage('AM count submitted successfully!', 'success');
       
-      setTimeout(() => {
-        resetForm('am');
-        goHome();
-      }, 2000);
+      // Show elegant success screen
+      showAMSuccess(data.total);
+      resetForm('am');
       
     } catch (error) {
+      hideLoading();
       console.error('AM submission error:', error);
       showMessage(`Error: ${error.message}`, 'error');
     }
@@ -900,8 +1164,7 @@
   
   async function submitPM() {
     try {
-      hideAllSections();
-      document.getElementById('loadingScreen').classList.add('active');
+      showLoading('Processing PM Close', 'Calculating totals and sending report to management...');
       
       const data = collectFormData('pm');
       const calculations = calculatePMAmounts(data);
@@ -909,15 +1172,11 @@
       await storePMData(data, calculations);
       await sendEmailReport(data, calculations);
       
-      // Show confirmation screen
-      hideAllSections();
-      document.getElementById('confirmationScreen').classList.add('active');
-      
-      // Display amounts
-      document.getElementById('depositAmount').textContent = `$${Math.round(calculations.depositAmount)}`;
-      document.getElementById('returnAmount').textContent = `$${calculations.returnAmount.toFixed(2)}`;
+      // Show elegant success screen with deposit/return instructions
+      showPMSuccess(calculations.depositAmount, calculations.returnAmount, calculations.discrepancy);
       
     } catch (error) {
+      hideLoading();
       console.error('PM submission error:', error);
       showMessage(`Error: ${error.message}`, 'error');
       goHome();
@@ -1106,9 +1365,9 @@
       showMessage('Please select a date', 'error');
       return;
     }
-    
+
     try {
-      showMessage('Generating report...', 'info');
+      showLoading('Generating Report', 'Creating email report for management...');
       
       const amData = await getAMData(date);
       if (!amData) {
@@ -1154,9 +1413,11 @@
         throw new Error('Incomplete data for this date');
       }
       
-      showMessage('Report sent successfully!', 'success');
+      // Show elegant success screen
+      showReportSuccess(date);
       
     } catch (error) {
+      hideLoading();
       console.error('Report generation error:', error);
       showMessage(`Error: ${error.message}`, 'error');
     }
