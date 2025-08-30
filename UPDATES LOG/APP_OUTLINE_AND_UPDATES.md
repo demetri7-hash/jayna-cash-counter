@@ -161,6 +161,15 @@ The Jayna Gyro Cash Counter is a digital cash management system designed to stre
   - Enhanced `collectFormData()` to include individual drawer totals for email reporting
   - Large discrepancy flag now appears for discrepancies over $10
   - Drawer comparison table now properly displays with AM vs PM breakdown
+- **Enhanced:** Major mobile UI improvements for better touch experience
+  - Increased input field sizes: 56px minimum height for all form inputs
+  - Larger touch targets: 100px quantity inputs, 30px taller menu buttons
+  - Removed number input spinner arrows for modern, clean appearance
+  - Added mobile keyboard optimization: `inputmode="numeric"` for number inputs
+  - Enhanced responsive design with breakpoints for tablet (768px) and mobile (480px)
+  - Improved font sizes: 18px+ for better mobile readability
+  - Added focus states with blue glow for better accessibility
+  - Larger padding and margins throughout for finger-friendly interface
 
 ### [Previous Changes]
 - AM and PM cash count flows implemented with dual-drawer support
