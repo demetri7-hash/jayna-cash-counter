@@ -1825,8 +1825,9 @@
       throw new Error('Please select both start and end dates');
     }
     
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // Handle dates properly with timezone-safe parsing (like AM/PM flows)
+    const start = new Date(startDate + 'T12:00:00');
+    const end = new Date(endDate + 'T12:00:00');
     
     if (start > end) {
       throw new Error('Start date must be before end date');
@@ -1837,6 +1838,8 @@
     if (daysDiff > 7) {
       throw new Error('Date range cannot exceed 7 days');
     }
+    
+    console.log('Date range query:', { startDate, endDate, daysDiff });
     
     const { data: rangeData } = await supabase
       .from('cash_counts')
@@ -2336,7 +2339,7 @@
           <h2 style="margin: 0; color: #333; font-size: 18px; font-weight: bold;">**CONFIDENTIAL**</h2>
           <h2 style="margin: 5px 0; color: #333; font-size: 16px;">JAYNA GYRO MULTI-DAY CASH REPORT</h2>
           <p style="margin: 5px 0; font-size: 14px; color: #666; font-weight: bold;">
-            ${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}
+            ${new Date(startDate + 'T12:00:00').toLocaleDateString()} - ${new Date(endDate + 'T12:00:00').toLocaleDateString()}
           </p>
           <p style="margin: 5px 0; font-size: 12px; color: #888;">${data.length} days included</p>
         </div>
@@ -2412,7 +2415,7 @@
                   return `
                     <tr>
                       <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">
-                        ${new Date(day.date).toLocaleDateString()}
+                        ${new Date(day.date + 'T12:00:00').toLocaleDateString()}
                       </td>
                       <td style="border: 1px solid #000; padding: 6px; text-align: center;">
                         ${day.pm_counter || 'N/A'}
