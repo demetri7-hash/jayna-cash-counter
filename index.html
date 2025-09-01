@@ -666,6 +666,9 @@
         <div id="singleDateGroup" class="form-group">
           <label for="reportDate">Select Date:</label>
           <input type="date" id="reportDate" class="form-input" required>
+          <div style="margin-top: 5px; font-size: 12px; color: #666;">
+            Note: For 8/31/25, enter as 2025-08-31
+          </div>
         </div>
         
         <div id="dateRangeGroup" class="form-group" style="display: none;">
@@ -1754,7 +1757,15 @@
       }
       
       hideLoading();
-      document.getElementById('reportDisplay').style.display = 'block';
+      
+      // Make sure the report display is visible
+      const reportDisplay = document.getElementById('reportDisplay');
+      if (reportDisplay) {
+        reportDisplay.style.display = 'block';
+        console.log('Report display made visible');
+      } else {
+        console.error('Report display element not found');
+      }
       
     } catch (error) {
       hideLoading();
@@ -1765,23 +1776,31 @@
   
   async function viewSingleDayReport() {
     const date = document.getElementById('reportDate').value;
+    console.log('viewSingleDayReport called with date:', date);
+    
     if (!date) {
       throw new Error('Please select a date');
     }
     
+    console.log('Getting AM data for date:', date);
     const amData = await getAMData(date);
+    console.log('AM data retrieved:', amData);
+    
     if (!amData) {
-      throw new Error('No data found for this date');
+      throw new Error('No AM data found for this date');
     }
     
-    const { data: fullData } = await supabase
+    console.log('Getting PM data for date:', date);
+    const { data: fullData, error } = await supabase
       .from('cash_counts')
       .select('*')
       .eq('date', date)
       .single();
     
+    console.log('PM data retrieved:', fullData, 'Error:', error);
+    
     if (!fullData || !fullData.pm_total) {
-      throw new Error('Incomplete data for this date');
+      throw new Error('No PM data found for this date');
     }
     
     // Store current data for PDF functionality  
@@ -1792,9 +1811,18 @@
       pmData: fullData
     };
     
+    console.log('Generating report HTML...');
     // Generate full single day report (same format as email)
     const reportHtml = generateSingleDayReportHtml(date, amData, fullData);
-    document.getElementById('reportContent').innerHTML = reportHtml;
+    console.log('Report HTML generated, setting content...');
+    
+    const reportContent = document.getElementById('reportContent');
+    if (reportContent) {
+      reportContent.innerHTML = reportHtml;
+      console.log('Report content set successfully');
+    } else {
+      console.error('reportContent element not found');
+    }
   }
   
   async function viewDateRangeReport() {
