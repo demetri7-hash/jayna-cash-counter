@@ -1,0 +1,2741 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>Jayna Gyro Cash Counter</title>
+  
+  <link rel="apple-touch-icon" href="https://static.spotapps.co/website_images/ab_websites/229800_website_v1/logo.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#667eea">
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+      min-height: 100vh; 
+      padding: 5px;
+      /* Google Sites full page embed optimizations */
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .container { 
+      max-width: 600px; 
+      margin: 0 auto; 
+      background: white; 
+      border-radius: 20px; 
+      overflow: visible; /* Changed from hidden to allow scrolling */
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      /* Ensure container doesn't get cut off in Google Sites */
+      min-height: auto;
+      max-height: none;
+    }
+    .header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; text-align: center; padding: 20px; } /* Reduced from 30px 20px */
+    .header h1 { font-size: 24px; font-weight: 700; margin-bottom: 5px; } /* Reduced font size and margin */
+    .header p { opacity: 0.9; font-size: 14px; } /* Reduced font size */
+    /* Mobile-First Responsive Design */
+    .content { 
+      padding: 15px; 
+      /* Google Sites full page embed optimization */
+      max-height: none;
+      overflow: visible;
+    }
+    .main-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; } /* Reduced gaps */
+    .main-menu.show-report { grid-template-columns: 1fr 1fr 1fr; }
+    .menu-btn { padding: 25px 20px; border: 3px solid #e0e0e0; border-radius: 15px; background: white; font-size: 18px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-align: center; min-height: 70px; display: flex; align-items: center; justify-content: center; } /* Reduced from 80px */
+    .menu-btn:hover { border-color: #667eea; transform: translateY(-2px); }
+    .menu-btn.active { border-color: #667eea; background: #667eea; color: white; transform: translateY(-2px); }
+    .menu-btn.report { background: #28a745; color: white; border-color: #28a745; }
+    .form-section { 
+      display: none; 
+      /* Ensure sections don't get cut off */
+      min-height: auto;
+      overflow: visible;
+    }
+    .form-section.active { 
+      display: block; 
+      /* Force visibility in Google Sites */
+      position: relative;
+      z-index: 1;
+    }
+    .form-group { margin-bottom: 20px; } /* Reduced from 25px */
+    .form-group label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 16px; color: #333; } /* Reduced margin */
+    
+    /* Enhanced Mobile-Friendly Inputs */
+    .form-input, .form-select { 
+      width: 100%; 
+      padding: 18px 20px; 
+      border: 2px solid #e0e0e0; 
+      border-radius: 12px; 
+      font-size: 18px; 
+      min-height: 56px;
+      box-sizing: border-box;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .form-input:focus, .form-select:focus { 
+      outline: none; 
+      border-color: #667eea; 
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    /* Number inputs with mobile optimization */
+    input[type="number"] {
+      -webkit-appearance: none;
+      -moz-appearance: textfield;
+      appearance: none;
+      /* Remove number input arrows */
+    }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    
+    .drawer-section { margin: 20px 0; border: 2px solid #f0f0f0; border-radius: 15px; overflow: hidden; } /* Reduced margin */
+    .drawer-header { background: #f8f9fa; padding: 15px 20px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; font-size: 16px; } /* Reduced padding */
+    .skip-toggle { display: flex; align-items: center; gap: 12px; font-size: 16px; color: #666; }
+    .skip-toggle input[type="checkbox"] { width: 20px; height: 20px; }
+    .drawer-content { padding: 20px; } /* Reduced from 25px */
+    .denom-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #f0f0f0; } /* Reduced padding */
+    .denom-row:last-child { border-bottom: none; }
+    .denom-label { font-weight: 600; font-size: 18px; color: #333; }
+    .denom-value { font-size: 16px; color: #666; margin-top: 4px; }
+    
+    /* Mobile-Optimized Quantity Inputs */
+    .qty-input { 
+      width: 100px; 
+      height: 56px; 
+      text-align: center; 
+      border: 2px solid #e0e0e0; 
+      border-radius: 12px; 
+      font-size: 20px; 
+      font-weight: 600;
+      -webkit-appearance: none;
+      -moz-appearance: textfield;
+      appearance: none;
+      /* Force numeric keyboard on mobile */
+      inputmode: numeric;
+      pattern: "[0-9]*";
+    }
+    .qty-input:focus { 
+      outline: none; 
+      border-color: #667eea; 
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    /* Remove number arrows */
+    .qty-input::-webkit-outer-spin-button,
+    .qty-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    
+    /* Disabled denomination inputs */
+    .qty-input:disabled {
+      background-color: #f5f5f5;
+      color: #999;
+      border-color: #d0d0d0;
+      cursor: not-allowed;
+    }
+    
+    .denom-row.disabled {
+      opacity: 0.6;
+    }
+    
+    .drawer-total { margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 12px; text-align: center; font-size: 20px; font-weight: 600; } /* Reduced margins and padding */
+    .grand-total { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; } /* Reduced margin */
+    .grand-total h3 { font-size: 20px; margin-bottom: 8px; }
+    .grand-total .amount { font-size: 36px; font-weight: 700; }
+    .notes-area { width: 100%; min-height: 100px; padding: 18px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 16px; resize: vertical; box-sizing: border-box; } /* Reduced min-height */
+    .notes-area:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+    .submit-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 15px; font-size: 20px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; margin-top: 20px; min-height: 56px; } /* Reduced padding and margin */
+    .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3); }
+    .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .am-total-display { background: #e7f3ff; padding: 20px; border-radius: 12px; margin: 20px 0; }
+    .am-total-display h4 { margin-bottom: 8px; color: #1976d2; font-size: 16px; }
+    .am-total-display .amount { font-size: 28px; font-weight: bold; color: #1565c0; }
+    
+    /* Enhanced Currency Inputs */
+    .currency-input { 
+      width: 100%; 
+      padding: 20px; 
+      border: 2px solid #e0e0e0; 
+      border-radius: 12px; 
+      font-size: 22px; 
+      text-align: center; 
+      min-height: 60px;
+      box-sizing: border-box;
+      -webkit-appearance: none;
+      -moz-appearance: textfield;
+      appearance: none;
+      inputmode: decimal;
+    }
+    .currency-input:focus { 
+      outline: none; 
+      border-color: #667eea; 
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    /* Remove number arrows from currency inputs */
+    .currency-input::-webkit-outer-spin-button,
+    .currency-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    
+    .confirmation-screen { text-align: center; padding: 40px 20px; }
+    .confirmation-screen h2 { color: #28a745; margin-bottom: 30px; font-size: 32px; }
+    .deposit-instruction { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 30px; border-radius: 15px; margin: 25px 0; font-size: 24px; font-weight: bold; }
+    .return-instruction { background: linear-gradient(135deg, #fd7e14 0%, #e83e8c 100%); color: white; padding: 30px; border-radius: 15px; margin: 25px 0; font-size: 24px; font-weight: bold; }
+    .thank-you { font-size: 22px; color: #28a745; margin: 30px 0; font-weight: 600; }
+    .confirm-btn { background: #28a745; margin-top: 30px; }
+    .loading { text-align: center; padding: 40px; }
+    .loading-spinner { width: 60px; height: 60px; border: 6px solid #f3f3f3; border-top: 6px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .message { padding: 18px; border-radius: 12px; margin: 20px 0; text-align: center; font-size: 16px; }
+    .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .message.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    .hidden { display: none; }
+    .skip-content { padding: 25px; }
+    .skip-reason { width: 100%; padding: 18px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 16px; min-height: 56px; box-sizing: border-box; }
+    
+    /* Mobile responsive adjustments */
+    @media (max-width: 768px) {
+      .container { margin: 0; border-radius: 0; }
+      .header { padding: 20px; }
+      .header h1 { font-size: 24px; }
+      .content { padding: 15px; }
+      .main-menu { gap: 12px; }
+      .menu-btn { padding: 25px 15px; font-size: 16px; min-height: 70px; }
+      .denom-row { flex-direction: column; align-items: flex-start; gap: 12px; padding: 20px 0; }
+      .qty-input { width: 120px; margin-top: 8px; }
+      .grand-total .amount { font-size: 32px; }
+      .confirmation-screen h2 { font-size: 28px; }
+      .deposit-instruction, .return-instruction { font-size: 20px; padding: 25px; }
+    }
+    
+    @media (max-width: 480px) {
+      .header h1 { font-size: 20px; }
+      .main-menu { grid-template-columns: 1fr; }
+      .main-menu.show-report { grid-template-columns: 1fr; }
+      .menu-btn { padding: 20px 15px; min-height: 60px; }
+      .denom-label { font-size: 16px; }
+      .qty-input { width: 100px; height: 50px; font-size: 18px; }
+      .grand-total .amount { font-size: 28px; }
+      .deposit-instruction, .return-instruction { font-size: 18px; padding: 20px; }
+    }
+    
+    /* Google Sites Full Page Embed Optimizations */
+    @media screen {
+      html {
+        /* Force proper viewport handling in Google Sites */
+        height: auto !important;
+        min-height: 100% !important;
+        overflow-y: auto !important;
+      }
+      
+      body {
+        /* Ensure body can scroll properly in Google Sites iframe */
+        height: auto !important;
+        min-height: 100% !important;
+        position: relative !important;
+        overflow-y: auto !important;
+        padding-bottom: 50px !important; /* Extra space at bottom */
+      }
+      
+      .container {
+        /* Ensure container doesn't get viewport-locked */
+        position: relative !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        margin-bottom: 50px !important; /* Extra bottom margin */
+      }
+      
+      .submit-btn {
+        /* Ensure submit buttons are always accessible */
+        position: relative !important;
+        z-index: 10 !important;
+        margin-bottom: 30px !important;
+      }
+      
+      /* Force visibility of bottom elements in Google Sites */
+      .form-section:last-child,
+      .form-section .submit-btn:last-child {
+        margin-bottom: 100px !important;
+      }
+    }
+    
+    /* Elegant Loading Overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.3s ease;
+    }
+    .loading-overlay.hidden {
+      display: none;
+    }
+    .loading-content {
+      text-align: center;
+      padding: 40px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .loading-spinner-elegant {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(102, 126, 234, 0.1);
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin-elegant 1.2s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin-elegant {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-content h3 {
+      margin: 0 0 10px 0;
+      font-size: 24px;
+      color: #333;
+      font-weight: 600;
+    }
+    .loading-content p {
+      margin: 0;
+      font-size: 16px;
+      color: #666;
+      opacity: 0.8;
+    }
+    
+    /* Success Screens */
+    .success-screen {
+      text-align: center;
+      padding: 40px 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .success-icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: success-bounce 0.6s ease;
+    }
+    @keyframes success-bounce {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .success-screen h2 {
+      color: #28a745;
+      margin-bottom: 15px;
+      font-size: 32px;
+      font-weight: 700;
+    }
+    .success-message {
+      font-size: 18px;
+      color: #666;
+      margin-bottom: 30px;
+      line-height: 1.5;
+    }
+    .success-details {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 25px;
+      margin: 25px 0;
+      border-left: 4px solid #28a745;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 16px;
+    }
+    .detail-row:not(:last-child) {
+      border-bottom: 1px solid #e9ecef;
+    }
+    .detail-row span:first-child {
+      color: #666;
+      font-weight: 500;
+    }
+    .detail-row span:last-child {
+      color: #333;
+      font-weight: 600;
+    }
+    .success-btn {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+      margin-top: 30px;
+      font-size: 18px;
+      padding: 20px 40px;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+    .success-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(40, 167, 69, 0.3);
+    }
+  </style>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>JAYNA GYRO CASH COUNTER</h1>
+      <p>App created by Demetri Gregorakis</p>
+    </div>
+    
+    <div class="content">
+      <div id="messageArea"></div>
+      
+      <!-- Main Menu -->
+      <div id="mainMenu" class="main-menu">
+        <button class="menu-btn" onclick="startAMCount()">AM Count</button>
+        <button class="menu-btn" onclick="startPMCount()">PM Close</button>
+        <button class="menu-btn report" onclick="showReports()">Generate Report</button>
+      </div>
+      
+      <!-- AM Count Form -->
+      <div id="amForm" class="form-section">
+        <h2 style="margin-bottom: 20px; color: #1e3c72;">Morning Cash Count</h2>
+        
+        <div class="form-group">
+          <label for="amDate">Date:</label>
+          <input type="date" id="amDate" class="form-input" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="amCounter">Counted by:</label>
+          <select id="amCounter" class="form-select" onchange="toggleDenominationInputs('am')" required>
+            <option value="">Choose Name</option>
+            <option value="Demetri Gregorakis">Demetri Gregorakis</option>
+            <option value="Ahmet Can Guler">Ahmet Can Guler</option>
+            <option value="Bryan Cox">Bryan Cox</option>
+          </select>
+        </div>
+        
+        <!-- Drawer 1 -->
+        <div class="drawer-section">
+          <div class="drawer-header">
+            <span>Drawer 1</span>
+            <label class="skip-toggle">
+              <input type="checkbox" id="amDrawer1Skip" onchange="toggleSkip('am', 1)">
+              Skip Drawer
+            </label>
+          </div>
+          <div id="amDrawer1Content" class="drawer-content">
+            <div id="amDrawer1Denoms"></div>
+            <div class="drawer-total" id="amDrawer1Total">$0.00</div>
+          </div>
+          <div id="amDrawer1SkipContent" class="skip-content hidden">
+            <input type="text" class="skip-reason" id="amDrawer1Reason" placeholder="Reason for skipping drawer 1">
+          </div>
+        </div>
+        
+        <!-- Drawer 2 -->
+        <div class="drawer-section">
+          <div class="drawer-header">
+            <span>Drawer 2</span>
+            <label class="skip-toggle">
+              <input type="checkbox" id="amDrawer2Skip" onchange="toggleSkip('am', 2)">
+              Skip Drawer
+            </label>
+          </div>
+          <div id="amDrawer2Content" class="drawer-content">
+            <div id="amDrawer2Denoms"></div>
+            <div class="drawer-total" id="amDrawer2Total">$0.00</div>
+          </div>
+          <div id="amDrawer2SkipContent" class="skip-content hidden">
+            <input type="text" class="skip-reason" id="amDrawer2Reason" placeholder="Reason for skipping drawer 2">
+          </div>
+        </div>
+        
+        <div class="grand-total">
+          <h3>Total Cash Count</h3>
+          <div class="amount" id="amGrandTotal">$0.00</div>
+        </div>
+        
+        <div class="form-group">
+          <label for="amNotes">Notes (Optional):</label>
+          <textarea id="amNotes" class="notes-area" placeholder="Any notes for the PM shift..."></textarea>
+        </div>
+        
+        <button class="submit-btn" onclick="submitAM()">Submit AM Count</button>
+        <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 10px;">Back to Menu</button>
+      </div>
+      
+      <!-- PM Count Form -->
+      <div id="pmForm" class="form-section">
+        <h2 style="margin-bottom: 20px; color: #1e3c72;">Evening Cash Close</h2>
+        
+        <div class="form-group">
+          <label for="pmDate">Date:</label>
+          <input type="date" id="pmDate" class="form-input" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="pmCounter">Counted by:</label>
+          <select id="pmCounter" class="form-select" onchange="toggleDenominationInputs('pm')" required>
+            <option value="">Choose Name</option>
+            <option value="Demetri Gregorakis">Demetri Gregorakis</option>
+            <option value="Ahmet Can Guler">Ahmet Can Guler</option>
+            <option value="Bryan Cox">Bryan Cox</option>
+          </select>
+        </div>
+        
+        <!-- AM Total Display -->
+        <div id="amTotalDisplay" class="am-total-display">
+          <h4>Morning Count Information:</h4>
+          <div style="display: flex; justify-content: space-between; margin: 10px 0; font-size: 14px;">
+            <span><strong>Counted by:</strong> <span id="amCounterName">Loading...</span></span>
+            <span><strong>Time:</strong> <span id="amCountTime">Loading...</span></span>
+          </div>
+          <div style="text-align: center; margin: 15px 0;">
+            <strong>Starting Amount:</strong>
+            <div class="amount" id="pmAmTotal" style="font-size: 28px; margin: 5px 0;">Loading...</div>
+          </div>
+          <div id="amNotesDisplay" style="background: #fff3cd; padding: 12px; border-radius: 6px; margin-top: 15px; border-left: 4px solid #ffc107; display: none;">
+            <strong style="color: #856404;">Morning Notes:</strong>
+            <div id="amNotes" style="margin-top: 5px; color: #856404;"></div>
+          </div>
+        </div>
+        
+        <!-- Drawer 1 -->
+        <div class="drawer-section">
+          <div class="drawer-header">
+            <span>Drawer 1</span>
+            <label class="skip-toggle">
+              <input type="checkbox" id="pmDrawer1Skip" onchange="toggleSkip('pm', 1)">
+              Skip Drawer
+            </label>
+          </div>
+          <div id="pmDrawer1Content" class="drawer-content">
+            <div id="pmDrawer1Denoms"></div>
+            <div class="drawer-total" id="pmDrawer1Total">$0.00</div>
+          </div>
+          <div id="pmDrawer1SkipContent" class="skip-content hidden">
+            <input type="text" class="skip-reason" id="pmDrawer1Reason" placeholder="Reason for skipping drawer 1">
+          </div>
+        </div>
+        
+        <!-- Drawer 2 -->
+        <div class="drawer-section">
+          <div class="drawer-header">
+            <span>Drawer 2</span>
+            <label class="skip-toggle">
+              <input type="checkbox" id="pmDrawer2Skip" onchange="toggleSkip('pm', 2)">
+              Skip Drawer
+            </label>
+          </div>
+          <div id="pmDrawer2Content" class="drawer-content">
+            <div id="pmDrawer2Denoms"></div>
+            <div class="drawer-total" id="pmDrawer2Total">$0.00</div>
+          </div>
+          <div id="pmDrawer2SkipContent" class="skip-content hidden">
+            <input type="text" class="skip-reason" id="pmDrawer2Reason" placeholder="Reason for skipping drawer 2">
+          </div>
+        </div>
+        
+        <div class="grand-total">
+          <h3>Total Cash Count</h3>
+          <div class="amount" id="pmGrandTotal">$0.00</div>
+        </div>
+        
+        <div class="form-group">
+          <label for="toastSales">Toast Cash Sales (exact amount):</label>
+          <input type="number" id="toastSales" class="currency-input" placeholder="0.00" step="0.01" min="0" inputmode="decimal" onfocus="this.select()">
+        </div>
+        
+        <div class="form-group">
+          <label for="cashTips">Cash Tips (whole number):</label>
+          <input type="number" id="cashTips" class="currency-input" placeholder="0" step="1" min="0" inputmode="numeric" pattern="[0-9]*" onfocus="this.select()">
+        </div>
+        
+        <div class="form-group">
+          <label for="pmNotes">Notes (Optional):</label>
+          <textarea id="pmNotes" class="notes-area" placeholder="Any notes about the day..."></textarea>
+        </div>
+        
+        <button class="submit-btn" onclick="submitPM()">Submit PM Close</button>
+        <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 10px;">Back to Menu</button>
+      </div>
+      
+      <!-- Elegant Loading Overlay -->
+      <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-content">
+          <div class="loading-spinner-elegant"></div>
+          <h3 id="loadingTitle">Processing...</h3>
+          <p id="loadingMessage">Please wait while we process your request</p>
+        </div>
+      </div>
+      
+      <!-- AM Success Screen -->
+      <div id="amSuccessScreen" class="form-section">
+        <div class="success-screen">
+          <div class="success-icon">✅</div>
+          <h2>AM Count Submitted!</h2>
+          <p class="success-message">Your morning cash count has been successfully recorded and stored.</p>
+          <div class="success-details">
+            <div class="detail-row">
+              <span>Total Counted:</span>
+              <span id="amSuccessTotal">$0.00</span>
+            </div>
+            <div class="detail-row">
+              <span>Time Submitted:</span>
+              <span id="amSuccessTime">--</span>
+            </div>
+          </div>
+          <button class="submit-btn success-btn" onclick="goHome()">Return to Menu</button>
+        </div>
+      </div>
+
+      <!-- PM Success Screen -->
+      <div id="pmSuccessScreen" class="form-section">
+        <div class="success-screen">
+          <div class="success-icon">✅</div>
+          <h2>PM Close Completed!</h2>
+          <p class="success-message">Evening close successful! Report sent to management.</p>
+          
+          <div class="deposit-instruction">
+            DEPOSIT <span id="depositAmount">$0</span> INTO ENVELOPE
+          </div>
+          
+          <div class="return-instruction">
+            RETURN <span id="returnAmount">$0.00</span> TO CASH BOX AND LOCK IN SAFE
+          </div>
+          
+          <button class="submit-btn success-btn" onclick="goHome()">Confirm and Close</button>
+        </div>
+      </div>
+
+      <!-- Report Success Screen -->
+      <div id="reportSuccessScreen" class="form-section">
+        <div class="success-screen">
+          <div class="success-icon">📧</div>
+          <h2>Report Sent Successfully!</h2>
+          <p class="success-message">Daily cash report has been emailed to management.</p>
+          <div class="success-details">
+            <div class="detail-row">
+              <span>Report Date:</span>
+              <span id="reportSuccessDate">--</span>
+            </div>
+            <div class="detail-row">
+              <span>Sent At:</span>
+              <span id="reportSuccessTime">--</span>
+            </div>
+          </div>
+          <button class="submit-btn success-btn" onclick="goHome()">Return to Menu</button>
+        </div>
+      </div>
+      
+      <!-- Reports Section -->
+      <div id="reportsForm" class="form-section">
+        <h2 style="margin-bottom: 20px; color: #1e3c72;">View Reports</h2>
+        
+        <div class="form-group">
+          <label>Report Type:</label>
+          <div style="display: flex; gap: 15px; margin: 10px 0;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="radio" name="reportType" value="single" checked onchange="toggleReportType()">
+              <span>Single Day</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="radio" name="reportType" value="range" onchange="toggleReportType()">
+              <span>Date Range</span>
+            </label>
+          </div>
+        </div>
+        
+        <div id="singleDateGroup" class="form-group">
+          <label for="reportDate">Select Date:</label>
+          <input type="date" id="reportDate" class="form-input" required>
+          <div style="margin-top: 5px; font-size: 12px; color: #666;">
+            Note: For 8/31/25, enter as 2025-08-31
+          </div>
+        </div>
+        
+        <div id="dateRangeGroup" class="form-group" style="display: none;">
+          <label for="reportStartDate">Start Date:</label>
+          <input type="date" id="reportStartDate" class="form-input" required>
+          <label for="reportEndDate" style="margin-top: 10px;">End Date:</label>
+          <input type="date" id="reportEndDate" class="form-input" required>
+          <div style="margin-top: 10px; font-size: 14px; color: #666;">
+            <strong>Note:</strong> Maximum 7 days allowed
+          </div>
+        </div>
+        
+        <button class="submit-btn" onclick="generateAndDownloadReport()" style="background: #007bff;">Generate & Download PDF Report</button>
+        
+        <!-- Hidden Report Display for PDF generation -->
+        <div id="reportDisplay" style="display: none; position: fixed; top: 0; left: 0; width: 800px; background: white; z-index: 9999; opacity: 0; pointer-events: none;">
+          <div id="reportContent"></div>
+        </div>
+        
+        <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 10px;">Back to Menu</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Configuration
+   const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';  
+  const EMAILJS_CONFIG = {
+    PUBLIC_KEY: 'LHbq8j4mlt49O75eo',
+    SERVICE_ID: 'service_xm62z73',
+    TEMPLATE_ID: 'template_cash_report',
+    MANAGER_EMAIL: 'smanager@jaynagyro.com, GSS4168CTJJA73@PRINT.EPSONCONNECT.COM'
+  };
+
+  // Elegant Loading and Success Functions
+  function showLoading(title, message) {
+    const overlay = document.getElementById('loadingOverlay');
+    document.getElementById('loadingTitle').textContent = title;
+    document.getElementById('loadingMessage').textContent = message;
+    overlay.classList.remove('hidden');
+    hideAllSections();
+  }
+
+  function hideLoading() {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+  }
+
+  function showAMSuccess(total) {
+    hideLoading();
+    hideAllSections();
+    document.getElementById('amSuccessTotal').textContent = `$${total.toFixed(2)}`;
+    document.getElementById('amSuccessTime').textContent = new Date().toLocaleString();
+    document.getElementById('amSuccessScreen').classList.add('active');
+  }
+
+  function showPMSuccess(depositAmount, returnAmount, discrepancy) {
+    hideLoading();
+    hideAllSections();
+    document.getElementById('depositAmount').textContent = `$${depositAmount}`;
+    document.getElementById('returnAmount').textContent = `$${returnAmount.toFixed(2)}`;
+    document.getElementById('pmSuccessScreen').classList.add('active');
+  }
+
+  function showReportSuccess(date) {
+    hideLoading();
+    hideAllSections();
+    document.getElementById('reportSuccessDate').textContent = date;
+    document.getElementById('reportSuccessTime').textContent = new Date().toLocaleString();
+    document.getElementById('reportSuccessScreen').classList.add('active');
+  }
+  
+  const DENOMINATIONS = [
+    { label: '$100', value: 100.00 },
+    { label: '$50', value: 50.00 },
+    { label: '$20', value: 20.00 },
+    { label: '$10', value: 10.00 },
+    { label: '$5', value: 5.00 },
+    { label: '$1', value: 1.00 },
+    { label: '$0.25', value: 0.25 },
+    { label: '$0.10', value: 0.10 },
+    { label: '$0.05', value: 0.05 },
+    { label: '$0.01', value: 0.01 }
+  ];
+  
+  // Password protection for date changes (only Demetri knows this)
+  const ADMIN_PASSWORD = 'JaynaGyro2025!';
+  
+  let supabase = null;
+  let currentAMData = null;
+  
+  // Initialize app
+  document.addEventListener('DOMContentLoaded', function() {
+    initializeSupabase();
+    initializeEmailJS();
+    setTodayDate();
+    // Removed "App ready" message to prevent page bouncing
+  });
+  
+  function initializeSupabase() {
+    if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
+      showMessage('Please configure Supabase credentials', 'error');
+      return;
+    }
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log('Supabase initialized');
+    } catch (error) {
+      console.error('Supabase init failed:', error);
+      showMessage('Database connection failed', 'error');
+    }
+  }
+  
+  function initializeEmailJS() {
+    if (typeof emailjs !== 'undefined') {
+      emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
+    }
+  }
+  
+  function setTodayDate() {
+    const today = getPacificDate();
+    document.getElementById('amDate').value = today;
+    document.getElementById('pmDate').value = today;
+    document.getElementById('reportDate').value = today;
+    
+    // Add password protection to date inputs
+    document.getElementById('amDate').addEventListener('change', function() {
+      const result = validateDateChange(this);
+      if (result instanceof Promise) {
+        // Handle async validation - input value already reset if needed
+        return;
+      }
+    });
+    
+    document.getElementById('pmDate').addEventListener('change', function() {
+      const result = validateDateChange(this);
+      if (result instanceof Promise) {
+        result.then((success) => {
+          if (success) {
+            // Only load AM data if date change was authorized
+            loadAMData();
+          }
+        });
+      } else if (result) {
+        // Synchronous case (current date selected)
+        loadAMData();
+      }
+    });
+    
+    document.getElementById('reportDate').addEventListener('change', function() {
+      const result = validateDateChange(this);
+      if (result instanceof Promise) {
+        // Handle async validation - input value already reset if needed
+        return;
+      }
+    });
+  }
+  
+  function getPacificDate() {
+    const now = new Date();
+    const pacific = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
+    const year = pacific.getFullYear();
+    const month = String(pacific.getMonth() + 1).padStart(2, '0');
+    const day = String(pacific.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  
+  function showMessage(text, type) {
+    // Only show popups for important messages (errors), ignore info/success
+    if (type === 'error') {
+      showPopupMessage(text, type);
+    }
+    // Silently ignore info and success messages to prevent bouncing
+  }
+  
+  function showPopupMessage(text, type) {
+    const messageType = type === 'error' ? 'Error' : type === 'success' ? 'Success' : 'Notice';
+    const backgroundColor = type === 'error' ? '#f44336' : '#4CAF50';
+    const iconEmoji = type === 'error' ? '❌' : '✅';
+    
+    const modalHTML = `
+      <div id="messageModal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      ">
+        <div style="
+          background: white;
+          padding: 30px;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+        ">
+          <h3 style="margin: 0 0 20px 0; color: ${backgroundColor};">${iconEmoji} ${messageType}</h3>
+          <p style="margin: 0 0 25px 0; line-height: 1.4; font-size: 16px;">
+            ${text}
+          </p>
+          <button onclick="closeMessageModal()" style="
+            background: ${backgroundColor};
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+          ">OK</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+  }
+  
+  function closeMessageModal() {
+    const modal = document.getElementById('messageModal');
+    if (modal) {
+      modal.remove();
+    }
+  }
+  
+  function validateDateChange(inputElement) {
+    const selectedDate = inputElement.value;
+    const currentDate = getPacificDate();
+    
+    // If user selects current date, allow it
+    if (selectedDate === currentDate) {
+      return true;
+    }
+    
+    // If user selects different date, require password using custom modal
+    return new Promise((resolve) => {
+      showPasswordModal(selectedDate, currentDate, (success) => {
+        if (!success) {
+          inputElement.value = currentDate;
+        }
+        resolve(success);
+      });
+    });
+  }
+  
+  function showPasswordModal(selectedDate, currentDate, callback) {
+    // Create modal HTML
+    const modalHTML = `
+      <div id="passwordModal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      ">
+        <div style="
+          background: white;
+          padding: 30px;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+        ">
+          <h3 style="margin: 0 0 20px 0; color: #d32f2f;">⚠️ Date Change Warning</h3>
+          <p style="margin: 0 0 15px 0; line-height: 1.4;">
+            You are trying to change the date from<br>
+            <strong>TODAY (${currentDate})</strong> to <strong>${selectedDate}</strong>
+          </p>
+          <p style="margin: 0 0 20px 0; color: #d32f2f; font-weight: bold;">
+            This could overwrite existing data!
+          </p>
+          <p style="margin: 0 0 15px 0;">Enter admin password to continue:</p>
+          <input type="password" id="passwordInput" style="
+            width: 80%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 20px;
+          " placeholder="Password">
+          <div>
+            <button onclick="submitPassword()" style="
+              background: #4CAF50;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 6px;
+              margin: 0 10px;
+              cursor: pointer;
+              font-size: 16px;
+            ">Continue</button>
+            <button onclick="cancelPassword()" style="
+              background: #f44336;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 6px;
+              margin: 0 10px;
+              cursor: pointer;
+              font-size: 16px;
+            ">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Focus password input
+    document.getElementById('passwordInput').focus();
+    
+    // Store callback for button handlers
+    window.passwordModalCallback = callback;
+    
+    // Add enter key support
+    document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        submitPassword();
+      }
+    });
+  }
+  
+  function submitPassword() {
+    const password = document.getElementById('passwordInput').value;
+    const modal = document.getElementById('passwordModal');
+    
+    if (password === ADMIN_PASSWORD) {
+      // Silent success - no bouncing message
+      modal.remove();
+      window.passwordModalCallback(true);
+    } else {
+      showMessage('Incorrect password. Date has been reset to today for safety.', 'error');
+      modal.remove();
+      window.passwordModalCallback(false);
+    }
+  }
+  
+  function cancelPassword() {
+    const modal = document.getElementById('passwordModal');
+    modal.remove();
+    window.passwordModalCallback(false);
+  }
+  
+  function hideAllSections() {
+    document.querySelectorAll('.form-section').forEach(section => section.classList.remove('active'));
+  }
+  
+  function goHome() {
+    hideAllSections();
+    document.getElementById('mainMenu').style.display = 'grid';
+    
+    // Reset container width
+    const container = document.querySelector('.container');
+    if (container) {
+      container.style.maxWidth = '600px';
+    }
+  }
+  
+  function startAMCount() {
+    document.getElementById('mainMenu').style.display = 'none';
+    hideAllSections();
+    document.getElementById('amForm').classList.add('active');
+    setupDenominations('am');
+  }
+  
+  async function startPMCount() {
+    document.getElementById('mainMenu').style.display = 'none';
+    hideAllSections();
+    document.getElementById('pmForm').classList.add('active');
+    setupDenominations('pm');
+    
+    await loadAMData();
+  }
+  
+  function showReports() {
+    document.getElementById('mainMenu').style.display = 'none';
+    hideAllSections();
+    document.getElementById('reportsForm').classList.add('active');
+  }
+  
+  function setupDenominations(shift) {
+    [1, 2].forEach(drawer => {
+      const container = document.getElementById(`${shift}Drawer${drawer}Denoms`);
+      container.innerHTML = '';
+      
+      DENOMINATIONS.forEach((denom, index) => {
+        const row = document.createElement('div');
+        row.className = 'denom-row';
+        row.innerHTML = `
+          <div>
+            <div class="denom-label">${denom.label}</div>
+            <div class="denom-value" id="${shift}D${drawer}V${index}">0 × $${denom.value.toFixed(2)} = $0.00</div>
+          </div>
+          <input type="number" class="qty-input" id="${shift}D${drawer}Q${index}" 
+                 min="0" step="1" value="0" 
+                 inputmode="numeric" pattern="[0-9]*"
+                 oninput="updateCalculations('${shift}', ${drawer})" 
+                 onfocus="this.select()">
+        `;
+        container.appendChild(row);
+      });
+    });
+    
+    // Apply disabled state based on current name selection
+    toggleDenominationInputs(shift);
+  }
+  
+  function toggleSkip(shift, drawer) {
+    const skipBox = document.getElementById(`${shift}Drawer${drawer}Skip`);
+    const content = document.getElementById(`${shift}Drawer${drawer}Content`);
+    const skipContent = document.getElementById(`${shift}Drawer${drawer}SkipContent`);
+    
+    if (skipBox.checked) {
+      content.classList.add('hidden');
+      skipContent.classList.remove('hidden');
+    } else {
+      content.classList.remove('hidden');
+      skipContent.classList.add('hidden');
+    }
+    updateCalculations(shift, drawer);
+  }
+  
+  function toggleDenominationInputs(shift) {
+    const counterSelect = document.getElementById(`${shift}Counter`);
+    if (!counterSelect) return; // Safety check
+    
+    const hasName = counterSelect.value.trim() !== '';
+    
+    // Toggle denomination inputs for both drawers
+    for (let drawer = 1; drawer <= 2; drawer++) {
+      DENOMINATIONS.forEach((denom, index) => {
+        const qtyInput = document.getElementById(`${shift}D${drawer}Q${index}`);
+        if (!qtyInput) return; // Safety check
+        
+        const denomRow = qtyInput.closest('.denom-row');
+        if (!denomRow) return; // Safety check
+        
+        if (hasName) {
+          qtyInput.disabled = false;
+          denomRow.classList.remove('disabled');
+        } else {
+          qtyInput.disabled = true;
+          qtyInput.value = ''; // Clear any existing values
+          denomRow.classList.add('disabled');
+        }
+      });
+      
+      // Update calculations after enabling/disabling
+      updateCalculations(shift, drawer);
+    }
+  }
+  
+  function updateCalculations(shift, drawer) {
+    const skipBox = document.getElementById(`${shift}Drawer${drawer}Skip`);
+    let drawerTotal = 0;
+    
+    if (!skipBox.checked) {
+      DENOMINATIONS.forEach((denom, index) => {
+        const qtyInput = document.getElementById(`${shift}D${drawer}Q${index}`);
+        const qty = parseInt(qtyInput.value) || 0;
+        const value = qty * denom.value;
+        
+        document.getElementById(`${shift}D${drawer}V${index}`).textContent = 
+          `${qty} × $${denom.value.toFixed(2)} = $${value.toFixed(2)}`;
+        
+        drawerTotal += value;
+      });
+    }
+    
+    document.getElementById(`${shift}Drawer${drawer}Total`).textContent = `$${drawerTotal.toFixed(2)}`;
+    updateGrandTotal(shift);
+  }
+  
+  function updateGrandTotal(shift) {
+    const drawer1Skip = document.getElementById(`${shift}Drawer1Skip`).checked;
+    const drawer2Skip = document.getElementById(`${shift}Drawer2Skip`).checked;
+    
+    const drawer1Total = drawer1Skip ? 0 : parseFloat(document.getElementById(`${shift}Drawer1Total`).textContent.replace('$', ''));
+    const drawer2Total = drawer2Skip ? 0 : parseFloat(document.getElementById(`${shift}Drawer2Total`).textContent.replace('$', ''));
+    
+    const grandTotal = drawer1Total + drawer2Total;
+    document.getElementById(`${shift}GrandTotal`).textContent = `$${grandTotal.toFixed(2)}`;
+  }
+  
+  async function loadAMData() {
+    const date = document.getElementById('pmDate').value;
+    console.log('Loading AM data for date:', date);
+    
+    if (!date) {
+      document.getElementById('pmAmTotal').textContent = 'Please select a date';
+      document.getElementById('amCounterName').textContent = 'Please select a date';
+      document.getElementById('amCountTime').textContent = 'Please select a date';
+      return;
+    }
+    
+    // Show loading state
+    document.getElementById('pmAmTotal').textContent = 'Loading...';
+    document.getElementById('amCounterName').textContent = 'Loading...';
+    document.getElementById('amCountTime').textContent = 'Loading...';
+    
+    try {
+      if (!supabase) {
+        throw new Error('Database not connected');
+      }
+      
+      console.log('Querying Supabase for AM data...');
+      const amData = await getAMData(date);
+      console.log('AM data result:', amData);
+      
+      if (amData && amData.total > 0) {
+        currentAMData = amData;
+        document.getElementById('pmAmTotal').textContent = `$${amData.total.toFixed(2)}`;
+        
+        // FIX: Set AM counter name and timestamp
+        document.getElementById('amCounterName').textContent = amData.counter || 'N/A';
+        document.getElementById('amCountTime').textContent = amData.timestamp ? new Date(amData.timestamp).toLocaleString() : 'N/A';
+        
+        // Handle AM notes display
+        const amNotesDisplay = document.getElementById('amNotesDisplay');
+        const amNotesEl = document.getElementById('amNotes');
+        if (amData.notes && amData.notes.trim()) {
+          amNotesEl.textContent = amData.notes;
+          amNotesDisplay.style.display = 'block';
+        } else {
+          amNotesDisplay.style.display = 'none';
+        }
+        
+        // Removed "AM data loaded successfully" message to prevent bouncing
+      } else {
+        currentAMData = null;
+        document.getElementById('pmAmTotal').textContent = 'No AM data found';
+        document.getElementById('amCounterName').textContent = 'No AM data found';
+        document.getElementById('amCountTime').textContent = 'No AM data found';
+        const amNotesDisplay = document.getElementById('amNotesDisplay');
+        if (amNotesDisplay) amNotesDisplay.style.display = 'none';
+        showMessage(`No AM count found for ${date}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error loading AM data:', error);
+      document.getElementById('pmAmTotal').textContent = 'Error loading AM data';
+      document.getElementById('amCounterName').textContent = 'Error loading AM data';
+      document.getElementById('amCountTime').textContent = 'Error loading AM data';
+      showMessage(`Error: ${error.message}`, 'error');
+    }
+  }
+  
+  function collectFormData(shift) {
+    const counter = document.getElementById(`${shift}Counter`).value;
+    const date = document.getElementById(`${shift}Date`).value;
+    const notes = document.getElementById(`${shift}Notes`).value.trim();
+    
+    if (!counter) throw new Error('Please select a name');
+    if (!date) throw new Error('Please select a date');
+    
+    const drawer1Skip = document.getElementById(`${shift}Drawer1Skip`).checked;
+    const drawer2Skip = document.getElementById(`${shift}Drawer2Skip`).checked;
+    
+    const drawer1Data = collectDrawerData(shift, 1, drawer1Skip);
+    const drawer2Data = collectDrawerData(shift, 2, drawer2Skip);
+    
+    const data = {
+      shift: shift,
+      counter: counter,
+      date: date,
+      timestamp: new Date().toISOString(),
+      drawer1: drawer1Data,
+      drawer2: drawer2Data,
+      drawer1Total: drawer1Data.total, // Add individual drawer totals for email template
+      drawer2Total: drawer2Data.total,
+      notes: notes || null,
+      total: drawer1Data.total + drawer2Data.total
+    };
+    
+    if (shift === 'pm') {
+      const toastSales = parseFloat(document.getElementById('toastSales').value) || 0;
+      const cashTips = parseInt(document.getElementById('cashTips').value) || 0;
+      
+      data.toastSales = toastSales;
+      data.cashTips = cashTips;
+      data.amTotal = currentAMData ? currentAMData.total : 0;
+    }
+    
+    return data;
+  }
+  
+  function collectDrawerData(shift, drawer, skipped) {
+    if (skipped) {
+      const reason = document.getElementById(`${shift}Drawer${drawer}Reason`).value.trim();
+      return {
+        skipped: true,
+        skipReason: reason || 'No reason provided',
+        counts: {},
+        total: 0
+      };
+    }
+    
+    const counts = {};
+    let total = 0;
+    
+    // Map denomination labels to email template keys
+    const denominationKeys = [
+      'hundreds',    // $100
+      'fifties',     // $50
+      'twenties',    // $20
+      'tens',        // $10
+      'fives',       // $5
+      'ones',        // $1
+      'quarters',    // $0.25
+      'dimes',       // $0.10
+      'nickels',     // $0.05
+      'pennies'      // $0.01
+    ];
+    
+    DENOMINATIONS.forEach((denom, index) => {
+      const qty = parseInt(document.getElementById(`${shift}D${drawer}Q${index}`).value) || 0;
+      // Store with both the original label and the email template key
+      counts[denom.label] = qty;
+      counts[denominationKeys[index]] = qty;
+      total += qty * denom.value;
+    });
+    
+    return {
+      skipped: false,
+      skipReason: null,
+      counts: counts,
+      total: Math.round(total * 100) / 100
+    };
+  }
+  
+  async function submitAM() {
+    try {
+      showLoading('Submitting AM Count', 'Recording your morning cash count...');
+      
+      const data = collectFormData('am');
+      await storeAMData(data);
+      
+      // Show elegant success screen
+      showAMSuccess(data.total);
+      resetForm('am');
+      
+    } catch (error) {
+      hideLoading();
+      console.error('AM submission error:', error);
+      showMessage(`Error: ${error.message}`, 'error');
+    }
+  }
+  
+  async function submitPM() {
+    try {
+      showLoading('Processing PM Close', 'Calculating totals and sending report to management...');
+      
+      const data = collectFormData('pm');
+      const calculations = calculatePMAmounts(data);
+      
+      await storePMData(data, calculations);
+      await sendEmailReport(data, calculations);
+      
+      // Show elegant success screen with deposit/return instructions
+      showPMSuccess(calculations.depositAmount, calculations.returnAmount, calculations.discrepancy);
+      
+    } catch (error) {
+      hideLoading();
+      console.error('PM submission error:', error);
+      
+      // Check if it's a validation error (these shouldn't reset the form)
+      const isValidationError = error.message.includes('Please select') || 
+                               error.message.includes('required') ||
+                               error.message.includes('name') ||
+                               error.message.includes('date');
+      
+      showMessage(`Error: ${error.message}`, 'error');
+      
+      // Only redirect home for non-validation errors (like network issues)
+      if (!isValidationError) {
+        goHome();
+      }
+    }
+  }
+  
+  function calculatePMAmounts(data) {
+    const amTotal = data.amTotal;
+    const pmTotal = data.total;
+    const toastSales = data.toastSales;
+    const cashTips = data.cashTips;
+    
+    // Drawer change = PM - AM
+    const drawerChange = pmTotal - amTotal;
+    
+    // Actual cash in
+    const actualCashIn = drawerChange;
+    
+    // Expected vs actual (Toast sales vs actual cash in)
+    const discrepancy = actualCashIn - toastSales;
+    
+    // Step 1: Calculate raw deposit amount
+    const rawDepositAmount = toastSales + cashTips;
+    
+    // Step 2: Round deposit to whole dollars (what staff actually deposits)
+    const depositAmount = Math.round(rawDepositAmount);
+    
+    // Step 3: Calculate deposit rounding adjustment needed
+    const depositRoundingAdjustment = depositAmount - rawDepositAmount;
+    
+    // Step 4: Handle deposit rounding with whole dollar tip adjustments
+    let depositTipAdjustment = 0;
+    let depositExcessToCashbox = 0;
+    
+    if (depositRoundingAdjustment > 0) {
+      // Need extra money for rounding - take whole dollars from tips
+      depositTipAdjustment = Math.ceil(depositRoundingAdjustment);
+      depositExcessToCashbox = depositTipAdjustment - depositRoundingAdjustment;
+    } else if (depositRoundingAdjustment < 0) {
+      // Deposit rounded down - staff keeps the rounding benefit
+      depositExcessToCashbox = Math.abs(depositRoundingAdjustment);
+    }
+    
+    // Step 5: Handle shortage/overage adjustments with whole dollars
+    let shortageTipAdjustment = 0;
+    let shortageExcessToCashbox = 0;
+    
+    if (discrepancy < 0) {
+      // SHORTAGE: Take whole dollars from tips to cover shortage
+      const shortageAmount = Math.abs(discrepancy);
+      shortageTipAdjustment = Math.ceil(shortageAmount);
+      shortageExcessToCashbox = shortageTipAdjustment - shortageAmount;
+    }
+    
+    // Step 6: Calculate final tip amounts
+    const totalTipAdjustment = depositTipAdjustment + shortageTipAdjustment;
+    let finalCashTips = cashTips - totalTipAdjustment;
+    
+    // Ensure tips don't go negative
+    if (finalCashTips < 0) {
+      const shortfall = Math.abs(finalCashTips);
+      finalCashTips = 0;
+      // Add shortfall to what business owes staff (tracked but not paid)
+    }
+    
+    // Final tips are always whole dollars (floor any remaining decimals)
+    const adjustedTips = Math.floor(finalCashTips);
+    const tipDecimalRemainder = finalCashTips - adjustedTips;
+    
+    // Step 7: Calculate return amount to cashbox
+    let returnAmount = amTotal;
+    
+    // Add overage to cashbox
+    if (discrepancy > 0) {
+      returnAmount += discrepancy;
+    }
+    
+    // Add all excess amounts to cashbox
+    returnAmount += depositExcessToCashbox + shortageExcessToCashbox + tipDecimalRemainder;
+    
+    return {
+      amTotal,
+      pmTotal,
+      drawerChange,
+      actualCashIn,
+      toastSales,
+      cashTips, // Original tips reported
+      discrepancy,
+      tipAdjustment: totalTipAdjustment, // Total amount taken from tips
+      adjustedTips, // Final whole dollar tips
+      depositAmount, // Rounded deposit amount (what staff deposits)
+      returnAmount, // What goes back to cashbox
+      drawerOver: discrepancy > 0 ? discrepancy : 0,
+      drawerShort: discrepancy < 0 ? Math.abs(discrepancy) : 0,
+      restaurantOwed: toastSales, // Exact Toast sales amount
+      staffOwed: adjustedTips, // Final tips after adjustment
+      // New fields for tracking the logic
+      rawDepositAmount, // Original exact deposit amount
+      depositRoundingAdjustment, // How much rounding was needed
+      depositTipAdjustment, // Whole dollars taken from tips for rounding
+      depositExcessToCashbox, // Excess from deposit rounding adjustments
+      shortageTipAdjustment, // Whole dollars taken from tips for shortage
+      shortageExcessToCashbox, // Excess from shortage adjustments
+      tipDecimalRemainder // Decimal remainder from final tip flooring
+    };
+  }
+  
+  async function storeAMData(data) {
+    if (!supabase) throw new Error('Database not connected');
+    
+    const { error } = await supabase
+      .from('cash_counts')
+      .upsert({
+        date: data.date,
+        am_counter: data.counter,
+        am_timestamp: data.timestamp,
+        am_total: data.total,
+        am_drawer1_total: data.drawer1.total,
+        am_drawer1_skip: data.drawer1.skipped,
+        am_drawer1_skip_reason: data.drawer1.skipReason,
+        am_drawer1_data: data.drawer1.counts,
+        am_drawer2_total: data.drawer2.total,
+        am_drawer2_skip: data.drawer2.skipped,
+        am_drawer2_skip_reason: data.drawer2.skipReason,
+        am_drawer2_data: data.drawer2.counts,
+        am_notes: data.notes
+      });
+    
+    if (error) throw new Error(`Database error: ${error.message}`);
+  }
+  
+  async function storePMData(data, calculations) {
+    if (!supabase) throw new Error('Database not connected');
+    
+    const { error } = await supabase
+      .from('cash_counts')
+      .update({
+        pm_counter: data.counter,
+        pm_timestamp: data.timestamp,
+        pm_total: data.total,
+        pm_cash_tips: data.cashTips,
+        pm_toast_sales: data.toastSales,
+        pm_drawer1_total: data.drawer1.total,
+        pm_drawer1_skip: data.drawer1.skipped,
+        pm_drawer1_skip_reason: data.drawer1.skipReason,
+        pm_drawer1_data: data.drawer1.counts,
+        pm_drawer2_total: data.drawer2.total,
+        pm_drawer2_skip: data.drawer2.skipped,
+        pm_drawer2_skip_reason: data.drawer2.skipReason,
+        pm_drawer2_data: data.drawer2.counts,
+        pm_notes: data.notes,
+        pm_discrepancy: calculations.discrepancy,
+        pm_adjusted_tips: calculations.adjustedTips,
+        pm_drawer_over_amount: calculations.drawerOver,
+        pm_deposit_amount: calculations.depositAmount,
+        pm_amount_to_keep: calculations.returnAmount
+      })
+      .eq('date', data.date);
+    
+    if (error) throw new Error(`Database error: ${error.message}`);
+  }
+  
+  async function getAMData(date) {
+    if (!supabase) return null;
+    
+    const { data, error } = await supabase
+      .from('cash_counts')
+      .select('*')
+      .eq('date', date)
+      .single();
+    
+    if (error || !data || !data.am_total) return null;
+    
+    return {
+      date: data.date,
+      counter: data.am_counter,
+      timestamp: data.am_timestamp,
+      total: data.am_total,
+      drawer1: {
+        total: data.am_drawer1_total,
+        skipped: data.am_drawer1_skip,
+        skipReason: data.am_drawer1_skip_reason,
+        counts: data.am_drawer1_data
+      },
+      drawer2: {
+        total: data.am_drawer2_total,
+        skipped: data.am_drawer2_skip,
+        skipReason: data.am_drawer2_skip_reason,
+        counts: data.am_drawer2_data
+      },
+      notes: data.am_notes
+    };
+  }
+  
+  async function sendEmailReport(data, calculations) {
+    // Format date with day of the week
+    const dateObj = new Date(data.date + 'T00:00:00');
+    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    const formattedDate = dateObj.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }).toUpperCase();
+    
+    const templateParams = {
+      to_email: EMAILJS_CONFIG.MANAGER_EMAIL,
+      date: data.date,
+      day_of_week: dayOfWeek,
+      formatted_date: formattedDate,
+      am_counter: currentAMData ? currentAMData.counter : 'N/A',
+      counter: data.counter, // PM counter (was pm_counter)
+      am_timestamp: currentAMData ? new Date(currentAMData.timestamp).toLocaleString() : 'N/A',
+      pm_timestamp: new Date(data.timestamp).toLocaleString(),
+      am_total: calculations.amTotal.toFixed(2),
+      pm_total: calculations.pmTotal.toFixed(2),
+      total_cash: calculations.pmTotal.toFixed(2), // Template expects total_cash
+      drawer_change: calculations.drawerChange.toFixed(2),
+      actual_cash_in: calculations.actualCashIn.toFixed(2),
+      toast_sales: calculations.toastSales.toFixed(2),
+      original_tips: calculations.cashTips.toFixed(2),
+      discrepancy: Math.abs(calculations.discrepancy).toFixed(2),
+      discrepancy_direction: calculations.discrepancy >= 0 ? 'Over' : 'Short',
+      discrepancy_sign: calculations.discrepancy >= 0 ? '+' : '-',
+      large_discrepancy_flag: Math.abs(calculations.discrepancy) > 10 ? ' ⚠️ LARGE DISCREPANCY!' : '',
+      tip_adjustment: (calculations.shortageTipAdjustment || 0) > 0 ? (calculations.shortageTipAdjustment || 0).toFixed(2) : null,
+      adjusted_tips: calculations.adjustedTips.toString(), // Whole dollars only
+      deposit_amount: calculations.depositAmount.toString(), // Already rounded to whole dollar
+      amount_to_keep: calculations.returnAmount.toFixed(2), // Template expects amount_to_keep
+      return_breakdown: (calculations.returnAmount - calculations.amTotal).toFixed(2),
+      drawer_over: calculations.drawerOver.toFixed(2),
+      drawer_short: calculations.drawerShort.toFixed(2),
+      am_notes: currentAMData ? (currentAMData.notes || '') : '',
+      notes: data.notes || '', // Template expects notes (not pm_notes)
+      has_discrepancy: calculations.discrepancy !== 0 ? 'true' : 'false',
+      // Add drawer breakdown for comparison table
+      has_am_comparison: currentAMData ? 'true' : 'false',
+      am_drawer1_total: currentAMData ? currentAMData.drawer1.total.toFixed(2) : '0.00',
+      am_drawer2_total: currentAMData ? currentAMData.drawer2.total.toFixed(2) : '0.00',
+      pm_drawer1_total: data.drawer1Total.toFixed(2),
+      pm_drawer2_total: data.drawer2Total.toFixed(2),
+      am_grand_total: calculations.amTotal.toFixed(2),
+      pm_grand_total: calculations.pmTotal.toFixed(2),
+      // Manager breakdown fields
+      restaurant_owed: calculations.toastSales.toFixed(2),
+      staff_owed: calculations.adjustedTips.toString(), // Whole dollars only
+      total_accounted: (calculations.toastSales + calculations.adjustedTips).toFixed(2),
+      
+      // Deposit rounding breakdown fields
+      raw_deposit_amount: calculations.rawDepositAmount ? calculations.rawDepositAmount.toFixed(2) : null,
+      deposit_rounding_adjustment: calculations.depositRoundingAdjustment ? calculations.depositRoundingAdjustment.toFixed(2) : null,
+      deposit_tip_adjustment: calculations.depositTipAdjustment ? calculations.depositTipAdjustment.toFixed(2) : null,
+      deposit_excess_to_cashbox: calculations.depositExcessToCashbox ? calculations.depositExcessToCashbox.toFixed(2) : null,
+      has_deposit_rounding: (calculations.depositRoundingAdjustment && Math.abs(calculations.depositRoundingAdjustment) > 0) ? 'true' : 'false',
+      
+      // AM Drawer 1 denomination breakdown
+      am_drawer1_100: currentAMData ? (currentAMData.drawer1.counts.hundreds || 0) : 0,
+      am_drawer1_100_total: currentAMData ? ((currentAMData.drawer1.counts.hundreds || 0) * 100).toFixed(2) : '0.00',
+      am_drawer1_50: currentAMData ? (currentAMData.drawer1.counts.fifties || 0) : 0,
+      am_drawer1_50_total: currentAMData ? ((currentAMData.drawer1.counts.fifties || 0) * 50).toFixed(2) : '0.00',
+      am_drawer1_20: currentAMData ? (currentAMData.drawer1.counts.twenties || 0) : 0,
+      am_drawer1_20_total: currentAMData ? ((currentAMData.drawer1.counts.twenties || 0) * 20).toFixed(2) : '0.00',
+      am_drawer1_10: currentAMData ? (currentAMData.drawer1.counts.tens || 0) : 0,
+      am_drawer1_10_total: currentAMData ? ((currentAMData.drawer1.counts.tens || 0) * 10).toFixed(2) : '0.00',
+      am_drawer1_5: currentAMData ? (currentAMData.drawer1.counts.fives || 0) : 0,
+      am_drawer1_5_total: currentAMData ? ((currentAMData.drawer1.counts.fives || 0) * 5).toFixed(2) : '0.00',
+      am_drawer1_1: currentAMData ? (currentAMData.drawer1.counts.ones || 0) : 0,
+      am_drawer1_1_total: currentAMData ? ((currentAMData.drawer1.counts.ones || 0) * 1).toFixed(2) : '0.00',
+      am_drawer1_quarter: currentAMData ? (currentAMData.drawer1.counts.quarters || 0) : 0,
+      am_drawer1_quarter_total: currentAMData ? ((currentAMData.drawer1.counts.quarters || 0) * 0.25).toFixed(2) : '0.00',
+      am_drawer1_dime: currentAMData ? (currentAMData.drawer1.counts.dimes || 0) : 0,
+      am_drawer1_dime_total: currentAMData ? ((currentAMData.drawer1.counts.dimes || 0) * 0.10).toFixed(2) : '0.00',
+      am_drawer1_nickel: currentAMData ? (currentAMData.drawer1.counts.nickels || 0) : 0,
+      am_drawer1_nickel_total: currentAMData ? ((currentAMData.drawer1.counts.nickels || 0) * 0.05).toFixed(2) : '0.00',
+      am_drawer1_penny: currentAMData ? (currentAMData.drawer1.counts.pennies || 0) : 0,
+      am_drawer1_penny_total: currentAMData ? ((currentAMData.drawer1.counts.pennies || 0) * 0.01).toFixed(2) : '0.00',
+      
+      // AM Drawer 2 denomination breakdown
+      am_drawer2_100: currentAMData ? (currentAMData.drawer2.counts.hundreds || 0) : 0,
+      am_drawer2_100_total: currentAMData ? ((currentAMData.drawer2.counts.hundreds || 0) * 100).toFixed(2) : '0.00',
+      am_drawer2_50: currentAMData ? (currentAMData.drawer2.counts.fifties || 0) : 0,
+      am_drawer2_50_total: currentAMData ? ((currentAMData.drawer2.counts.fifties || 0) * 50).toFixed(2) : '0.00',
+      am_drawer2_20: currentAMData ? (currentAMData.drawer2.counts.twenties || 0) : 0,
+      am_drawer2_20_total: currentAMData ? ((currentAMData.drawer2.counts.twenties || 0) * 20).toFixed(2) : '0.00',
+      am_drawer2_10: currentAMData ? (currentAMData.drawer2.counts.tens || 0) : 0,
+      am_drawer2_10_total: currentAMData ? ((currentAMData.drawer2.counts.tens || 0) * 10).toFixed(2) : '0.00',
+      am_drawer2_5: currentAMData ? (currentAMData.drawer2.counts.fives || 0) : 0,
+      am_drawer2_5_total: currentAMData ? ((currentAMData.drawer2.counts.fives || 0) * 5).toFixed(2) : '0.00',
+      am_drawer2_1: currentAMData ? (currentAMData.drawer2.counts.ones || 0) : 0,
+      am_drawer2_1_total: currentAMData ? ((currentAMData.drawer2.counts.ones || 0) * 1).toFixed(2) : '0.00',
+      am_drawer2_quarter: currentAMData ? (currentAMData.drawer2.counts.quarters || 0) : 0,
+      am_drawer2_quarter_total: currentAMData ? ((currentAMData.drawer2.counts.quarters || 0) * 0.25).toFixed(2) : '0.00',
+      am_drawer2_dime: currentAMData ? (currentAMData.drawer2.counts.dimes || 0) : 0,
+      am_drawer2_dime_total: currentAMData ? ((currentAMData.drawer2.counts.dimes || 0) * 0.10).toFixed(2) : '0.00',
+      am_drawer2_nickel: currentAMData ? (currentAMData.drawer2.counts.nickels || 0) : 0,
+      am_drawer2_nickel_total: currentAMData ? ((currentAMData.drawer2.counts.nickels || 0) * 0.05).toFixed(2) : '0.00',
+      am_drawer2_penny: currentAMData ? (currentAMData.drawer2.counts.pennies || 0) : 0,
+      am_drawer2_penny_total: currentAMData ? ((currentAMData.drawer2.counts.pennies || 0) * 0.01).toFixed(2) : '0.00',
+      
+      // PM Drawer 1 denomination breakdown
+      pm_drawer1_100: data.drawer1.counts.hundreds || 0,
+      pm_drawer1_100_total: ((data.drawer1.counts.hundreds || 0) * 100).toFixed(2),
+      pm_drawer1_50: data.drawer1.counts.fifties || 0,
+      pm_drawer1_50_total: ((data.drawer1.counts.fifties || 0) * 50).toFixed(2),
+      pm_drawer1_20: data.drawer1.counts.twenties || 0,
+      pm_drawer1_20_total: ((data.drawer1.counts.twenties || 0) * 20).toFixed(2),
+      pm_drawer1_10: data.drawer1.counts.tens || 0,
+      pm_drawer1_10_total: ((data.drawer1.counts.tens || 0) * 10).toFixed(2),
+      pm_drawer1_5: data.drawer1.counts.fives || 0,
+      pm_drawer1_5_total: ((data.drawer1.counts.fives || 0) * 5).toFixed(2),
+      pm_drawer1_1: data.drawer1.counts.ones || 0,
+      pm_drawer1_1_total: ((data.drawer1.counts.ones || 0) * 1).toFixed(2),
+      pm_drawer1_quarter: data.drawer1.counts.quarters || 0,
+      pm_drawer1_quarter_total: ((data.drawer1.counts.quarters || 0) * 0.25).toFixed(2),
+      pm_drawer1_dime: data.drawer1.counts.dimes || 0,
+      pm_drawer1_dime_total: ((data.drawer1.counts.dimes || 0) * 0.10).toFixed(2),
+      pm_drawer1_nickel: data.drawer1.counts.nickels || 0,
+      pm_drawer1_nickel_total: ((data.drawer1.counts.nickels || 0) * 0.05).toFixed(2),
+      pm_drawer1_penny: data.drawer1.counts.pennies || 0,
+      pm_drawer1_penny_total: ((data.drawer1.counts.pennies || 0) * 0.01).toFixed(2),
+      
+      // PM Drawer 2 denomination breakdown
+      pm_drawer2_100: data.drawer2.counts.hundreds || 0,
+      pm_drawer2_100_total: ((data.drawer2.counts.hundreds || 0) * 100).toFixed(2),
+      pm_drawer2_50: data.drawer2.counts.fifties || 0,
+      pm_drawer2_50_total: ((data.drawer2.counts.fifties || 0) * 50).toFixed(2),
+      pm_drawer2_20: data.drawer2.counts.twenties || 0,
+      pm_drawer2_20_total: ((data.drawer2.counts.twenties || 0) * 20).toFixed(2),
+      pm_drawer2_10: data.drawer2.counts.tens || 0,
+      pm_drawer2_10_total: ((data.drawer2.counts.tens || 0) * 10).toFixed(2),
+      pm_drawer2_5: data.drawer2.counts.fives || 0,
+      pm_drawer2_5_total: ((data.drawer2.counts.fives || 0) * 5).toFixed(2),
+      pm_drawer2_1: data.drawer2.counts.ones || 0,
+      pm_drawer2_1_total: ((data.drawer2.counts.ones || 0) * 1).toFixed(2),
+      pm_drawer2_quarter: data.drawer2.counts.quarters || 0,
+      pm_drawer2_quarter_total: ((data.drawer2.counts.quarters || 0) * 0.25).toFixed(2),
+      pm_drawer2_dime: data.drawer2.counts.dimes || 0,
+      pm_drawer2_dime_total: ((data.drawer2.counts.dimes || 0) * 0.10).toFixed(2),
+      pm_drawer2_nickel: data.drawer2.counts.nickels || 0,
+      pm_drawer2_nickel_total: ((data.drawer2.counts.nickels || 0) * 0.05).toFixed(2),
+      pm_drawer2_penny: data.drawer2.counts.pennies || 0,
+      pm_drawer2_penny_total: ((data.drawer2.counts.pennies || 0) * 0.01).toFixed(2)
+    };
+    
+    const response = await emailjs.send(
+      EMAILJS_CONFIG.SERVICE_ID,
+      EMAILJS_CONFIG.TEMPLATE_ID,
+      templateParams
+    );
+    
+    if (!response.status === 200) {
+      throw new Error('Email send failed');
+    }
+  }
+  
+  async function generateReport() {
+    const date = document.getElementById('reportDate').value;
+    if (!date) {
+      showMessage('Please select a date', 'error');
+      return;
+    }
+
+    try {
+      showLoading('Generating Report', 'Creating email report for management...');
+      
+      const amData = await getAMData(date);
+      if (!amData) {
+        throw new Error('No data found for this date');
+      }
+      
+      // For report generation, we'll use stored PM data or create a basic report
+      const { data: fullData } = await supabase
+        .from('cash_counts')
+        .select('*')
+        .eq('date', date)
+        .single();
+      
+      if (fullData && fullData.pm_total) {
+        // Full day report - recalculate using the same logic as PM flow
+        const reportData = {
+          date: date,
+          counter: fullData.pm_counter,
+          total: fullData.pm_total,
+          toastSales: fullData.pm_toast_sales,
+          cashTips: fullData.pm_cash_tips,
+          amTotal: fullData.am_total,
+          notes: fullData.pm_notes
+        };
+        
+        // Use same calculation function as PM flow for consistency
+        const calculations = calculatePMAmounts({
+          amTotal: fullData.am_total,
+          total: fullData.pm_total,
+          toastSales: fullData.pm_toast_sales,
+          cashTips: fullData.pm_cash_tips
+        });
+        
+        currentAMData = amData;
+        await sendEmailReport(reportData, calculations);
+      } else {
+        throw new Error('Incomplete data for this date');
+      }
+      
+      // Show elegant success screen
+      showReportSuccess(date);
+      
+    } catch (error) {
+      hideLoading();
+      console.error('Report generation error:', error);
+      showMessage(`Error: ${error.message}`, 'error');
+    }
+  }
+  
+  // New Report Functions
+  function toggleReportType() {
+    const reportType = document.querySelector('input[name="reportType"]:checked').value;
+    const singleGroup = document.getElementById('singleDateGroup');
+    const rangeGroup = document.getElementById('dateRangeGroup');
+    
+    if (reportType === 'single') {
+      singleGroup.style.display = 'block';
+      rangeGroup.style.display = 'none';
+    } else {
+      singleGroup.style.display = 'none';
+      rangeGroup.style.display = 'block';
+    }
+    
+    // Hide any existing report
+    document.getElementById('reportDisplay').style.display = 'none';
+  }
+  
+  async function generateAndDownloadReport() {
+    const reportType = document.querySelector('input[name="reportType"]:checked').value;
+    
+    try {
+      showLoading('Generating PDF Report', 'Creating your report...');
+      
+      if (reportType === 'single') {
+        await generateSingleDayPDF();
+      } else {
+        await generateDateRangePDF();
+      }
+      
+      hideLoading();
+      showPDFSuccessMessage();
+      
+    } catch (error) {
+      hideLoading();
+      console.error('Report generation error:', error);
+      showMessage(`Error: ${error.message}`, 'error');
+    }
+  }
+  
+  function showPDFSuccessMessage() {
+    const modalHTML = `
+      <div id="pdfSuccessModal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      ">
+        <div style="
+          background: white;
+          padding: 40px;
+          border-radius: 12px;
+          text-align: center;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        ">
+          <div style="font-size: 48px; margin-bottom: 20px;">📄</div>
+          <h2 style="color: #28a745; margin-bottom: 15px; font-size: 24px;">PDF Downloaded Successfully!</h2>
+          <p style="color: #666; margin-bottom: 30px; font-size: 16px;">Your cash report has been generated and downloaded.</p>
+          <button onclick="closePDFSuccessModal(); goHome();" style="
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+          ">Return to Menu</button>
+          <button onclick="closePDFSuccessModal();" style="
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+          ">Stay Here</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+  }
+  
+  function closePDFSuccessModal() {
+    const modal = document.getElementById('pdfSuccessModal');
+    if (modal) {
+      modal.remove();
+    }
+  }
+  
+  async function generateSingleDayPDF() {
+    const date = document.getElementById('reportDate').value;
+    console.log('generateSingleDayPDF called with date:', date);
+    
+    if (!date) {
+      throw new Error('Please select a date');
+    }
+    
+    console.log('Getting AM data for date:', date);
+    const amData = await getAMData(date);
+    console.log('AM data retrieved:', amData);
+    
+    if (!amData) {
+      throw new Error('No AM data found for this date');
+    }
+    
+    console.log('Getting PM data for date:', date);
+    const { data: fullData, error } = await supabase
+      .from('cash_counts')
+      .select('*')
+      .eq('date', date)
+      .single();
+    
+    console.log('PM data retrieved:', fullData, 'Error:', error);
+    
+    if (!fullData || !fullData.pm_total) {
+      throw new Error('No PM data found for this date');
+    }
+    
+    console.log('Generating report HTML...');
+    
+    // Calculate PM amounts using same logic as PM flow for consistency
+    const calculations = calculatePMAmounts({
+      amTotal: amData.total,
+      total: fullData.pm_total,
+      toastSales: fullData.pm_toast_sales,
+      cashTips: fullData.pm_cash_tips
+    });
+    
+    console.log('Calculations for report:', calculations);
+    
+    // Create enhanced pmData with calculation results
+    const enhancedPmData = {
+      ...fullData,
+      // Add calculated fields for deposit rounding breakdown
+      raw_deposit_amount: calculations.rawDepositAmount ? calculations.rawDepositAmount.toFixed(2) : null,
+      deposit_rounding_adjustment: calculations.depositRoundingAdjustment ? calculations.depositRoundingAdjustment.toFixed(2) : null,
+      deposit_tip_adjustment: calculations.depositTipAdjustment ? calculations.depositTipAdjustment.toFixed(2) : null,
+      deposit_excess_to_cashbox: calculations.depositExcessToCashbox ? calculations.depositExcessToCashbox.toFixed(2) : null,
+      // Only show deposit rounding breakdown if:
+      // 1. There's actually a meaningful rounding adjustment (> 0.001)
+      // 2. This data was processed with the new logic (stored amount matches rounded amount)
+      has_deposit_rounding: (
+        calculations.depositRoundingAdjustment && 
+        Math.abs(calculations.depositRoundingAdjustment) > 0.001 &&
+        Math.abs(fullData.pm_deposit_amount - calculations.depositAmount) < 0.001
+      ) ? 'true' : 'false',
+      deposit_amount: calculations.depositAmount.toString()
+    };
+    
+    console.log('Enhanced PM Data:', enhancedPmData);
+    
+    // Generate full single day report (same format as email)
+    const reportHtml = generateSingleDayReportHtml(date, amData, enhancedPmData);
+    console.log('Report HTML generated, creating PDF...');
+    
+    // Set the content in the hidden div
+    const reportContent = document.getElementById('reportContent');
+    if (reportContent) {
+      reportContent.innerHTML = reportHtml;
+      
+      // Generate PDF
+      const filename = `jayna-gyro-daily-report-${date}.pdf`;
+      await generatePDF(reportContent, filename);
+      
+    } else {
+      throw new Error('Report content element not found');
+    }
+  }
+  
+  async function generateDateRangePDF() {
+    const startDate = document.getElementById('reportStartDate').value;
+    const endDate = document.getElementById('reportEndDate').value;
+    
+    if (!startDate || !endDate) {
+      throw new Error('Please select both start and end dates');
+    }
+    
+    // Handle dates properly with timezone-safe parsing (like AM/PM flows)
+    const start = new Date(startDate + 'T12:00:00');
+    const end = new Date(endDate + 'T12:00:00');
+    
+    if (start > end) {
+      throw new Error('Start date must be before end date');
+    }
+    
+    // Check if date range exceeds 7 days
+    const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    if (daysDiff > 7) {
+      throw new Error('Date range cannot exceed 7 days');
+    }
+    
+    console.log('Date range query:', { startDate, endDate, daysDiff });
+    
+    const { data: rangeData } = await supabase
+      .from('cash_counts')
+      .select('*')
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .not('pm_total', 'is', null)
+      .order('date', { ascending: true });
+    
+    if (!rangeData || rangeData.length === 0) {
+      throw new Error('No data found for this date range');
+    }
+    
+    // Generate date range summary report
+    const reportHtml = generateDateRangeReportHtml(startDate, endDate, rangeData);
+    
+    // Set the content in the hidden div
+    const reportContent = document.getElementById('reportContent');
+    if (reportContent) {
+      reportContent.innerHTML = reportHtml;
+      
+      // Generate PDF
+      const filename = `jayna-gyro-range-report-${startDate}-to-${endDate}.pdf`;
+      await generatePDF(reportContent, filename);
+      
+    } else {
+      throw new Error('Report content element not found');
+    }
+  }
+  
+  async function generatePDF(element, filename) {
+    console.log('Generating PDF with filename:', filename);
+    
+    // Extract only the body content, skipping the CSS
+    const fullHTML = element.innerHTML;
+    
+    // Find the start of the actual content (after </style> tag)
+    const contentStart = fullHTML.indexOf('</style>') + 8;
+    const contentEnd = fullHTML.lastIndexOf('</html>');
+    
+    let bodyContent = '';
+    if (contentStart > 7 && contentEnd > contentStart) {
+      // Extract content between </style> and </html>
+      bodyContent = fullHTML.substring(contentStart, contentEnd);
+      // Remove any remaining head/body tags and just keep the content
+      bodyContent = bodyContent.replace(/<\/head>|<body>|<\/body>/g, '').trim();
+    } else {
+      // Fallback: try to find content starting with "JAYNA GYRO"
+      const jaynaStart = fullHTML.indexOf('JAYNA GYRO DAILY CASH REPORT');
+      if (jaynaStart > 0) {
+        bodyContent = fullHTML.substring(jaynaStart);
+        bodyContent = bodyContent.replace(/<\/html>|<\/body>/g, '').trim();
+      } else {
+        bodyContent = element.innerHTML;
+      }
+    }
+    
+    // Create a temporary element with just the clean content and basic styling
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = `
+      <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 8px; font-size: 9px; line-height: 1.1; }
+        .header { text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 2px; border-bottom: 2px solid #000; padding-bottom: 4px; }
+        .date-header { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 8px; padding-bottom: 4px; }
+        .section { border: 1px solid #000; margin: 4px 0; padding: 6px; }
+        .section-title { font-weight: bold; font-size: 12px; text-align: center; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+        .two-column { display: table; width: 100%; }
+        .column { display: table-cell; width: 50%; vertical-align: top; padding: 0 4px; }
+        .column:first-child { border-right: 1px solid #ccc; }
+        .data-row { display: flex; justify-content: space-between; margin: 1px 0; max-width: 150px; }
+        .label { font-weight: bold; text-align: right; padding-right: 8px; }
+        .value { text-align: left; font-weight: bold; }
+        .deposit-box { background-color: #e6ffe6; border: 2px solid #000; padding: 6px; text-align: center; font-weight: bold; font-size: 11px; margin: 4px 0; }
+        .keep-box { background-color: #fff0e6; border: 2px solid #000; padding: 6px; text-align: center; font-weight: bold; font-size: 11px; margin: 4px 0; }
+        .notes-section { display: table; width: 100%; margin: 4px 0; }
+        .notes-column { display: table-cell; width: 50%; padding: 4px; border: 1px solid #000; vertical-align: top; text-align: center; font-weight: bold; }
+        .notes-column:first-child { border-right: none; }
+        .breakdown-grid { display: table; width: 100%; }
+        .breakdown-row { display: table-row; }
+        .breakdown-cell { display: table-cell; padding: 2px 4px; border-bottom: 1px dotted #ccc; }
+        .breakdown-label { font-weight: bold; width: 50%; text-align: right; padding-right: 8px; }
+        .breakdown-value { text-align: left; font-weight: bold; width: 50%; padding-left: 8px; }
+        .cash-count { font-size: 7px; line-height: 1.0; }
+        .drawer-total { font-weight: bold; border-top: 1px solid #000; margin-top: 2px; padding-top: 2px; }
+        .shift-total { font-weight: bold; text-align: center; padding: 3px; border: 2px solid #000; margin-top: 4px; font-size: 8px; }
+        .am-bg { background-color: #e6f3ff; }
+        .pm-bg { background-color: #fff8f0; }
+      </style>
+      ${bodyContent}
+    `;
+    
+    // Hide the original element and show the temp one
+    const originalParent = element.parentNode;
+    const originalDisplay = element.style.display;
+    
+    // Insert temp div and hide original
+    document.body.appendChild(tempDiv);
+    element.style.display = 'none';
+    
+    // Configure PDF options for better output
+    const opt = {
+      margin: 0.5,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: 800,
+        height: tempDiv.scrollHeight,
+        logging: false
+      },
+      jsPDF: { 
+        unit: 'in', 
+        format: 'letter', 
+        orientation: 'portrait' 
+      }
+    };
+    
+    try {
+      // Generate PDF from the clean temp element
+      await html2pdf().set(opt).from(tempDiv).save();
+      console.log('PDF generated and downloaded successfully');
+    } finally {
+      // Clean up: remove temp div and restore original
+      document.body.removeChild(tempDiv);
+      element.style.display = originalDisplay;
+    }
+  }
+  
+  function generateSingleDayReportHtml(date, amData, pmData) {
+    console.log('generateSingleDayReportHtml called with:');
+    console.log('date:', date);
+    console.log('amData:', amData);
+    console.log('pmData:', pmData);
+    
+    // Validate data exists
+    if (!amData || !pmData) {
+      console.error('Missing data - amData:', !!amData, 'pmData:', !!pmData);
+      return '<div style="padding: 20px; color: red; font-size: 18px;">Error: Missing report data</div>';
+    }
+    
+    const dayOfWeek = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }).toUpperCase();
+    
+    const actualCashIn = pmData.pm_total - amData.total;
+    const discrepancySign = pmData.pm_discrepancy >= 0 ? '+' : '';
+    const tipAdjustment = pmData.pm_discrepancy < 0 ? Math.abs(pmData.pm_discrepancy) : 0;
+    
+    // Helper function to get denomination counts and totals
+    function getDenomData(drawerData, denomKey) {
+      if (!drawerData || !drawerData) return { count: 0, total: 0 };
+      
+      // Map display format to stored format
+      const denomMapping = {
+        '$100': 'hundreds',
+        '$50': 'fifties', 
+        '$20': 'twenties',
+        '$10': 'tens',
+        '$5': 'fives',
+        '$1': 'ones',
+        '¢25': 'quarters',
+        '¢10': 'dimes', 
+        '¢5': 'nickels',
+        '¢1': 'pennies'
+      };
+      
+      const dataKey = denomMapping[denomKey];
+      if (!dataKey) return { count: 0, total: 0 };
+      
+      const count = parseInt(drawerData[dataKey]) || 0;
+      const denomValues = {
+        '$100': 100, '$50': 50, '$20': 20, '$10': 10, '$5': 5, '$1': 1,
+        '¢25': 0.25, '¢10': 0.10, '¢5': 0.05, '¢1': 0.01
+      };
+      const value = denomValues[denomKey] || 0;
+      return { count, total: (count * value).toFixed(2) };
+    }
+    
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 8px;
+                font-size: 9px;
+                line-height: 1.1;
+            }
+            .header {
+                text-align: center;
+                font-weight: bold;
+                font-size: 16px;
+                margin-bottom: 2px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 4px;
+            }
+            .date-header {
+                text-align: center;
+                font-weight: bold;
+                font-size: 14px;
+                margin-bottom: 8px;
+                padding-bottom: 4px;
+            }
+            .section {
+                border: 1px solid #000;
+                margin: 4px 0;
+                padding: 6px;
+            }
+            .section-title {
+                font-weight: bold;
+                font-size: 12px;
+                text-align: center;
+                margin-bottom: 4px;
+                border-bottom: 1px solid #000;
+                padding-bottom: 2px;
+            }
+            .two-column {
+                display: table;
+                width: 100%;
+            }
+            .column {
+                display: table-cell;
+                width: 50%;
+                vertical-align: top;
+                padding: 0 4px;
+            }
+            .column:first-child {
+                border-right: 1px solid #ccc;
+            }
+            .data-row {
+                display: flex;
+                justify-content: space-between;
+                margin: 1px 0;
+                max-width: 150px;
+            }
+            .label {
+                font-weight: bold;
+                text-align: right;
+                padding-right: 8px;
+            }
+            .value {
+                text-align: left;
+                font-weight: bold;
+            }
+            .deposit-box {
+                background-color: #e6ffe6;
+                border: 2px solid #000;
+                padding: 6px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 11px;
+                margin: 4px 0;
+            }
+            .keep-box {
+                background-color: #fff0e6;
+                border: 2px solid #000;
+                padding: 6px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 11px;
+                margin: 4px 0;
+            }
+            .notes-section {
+                display: table;
+                width: 100%;
+                margin: 4px 0;
+            }
+            .notes-column {
+                display: table-cell;
+                width: 50%;
+                padding: 4px;
+                border: 1px solid #000;
+                vertical-align: top;
+                text-align: center;
+                font-weight: bold;
+            }
+            .notes-column:first-child {
+                border-right: none;
+            }
+            .breakdown-grid {
+                display: table;
+                width: 100%;
+            }
+            .breakdown-row {
+                display: table-row;
+            }
+            .breakdown-cell {
+                display: table-cell;
+                padding: 2px 4px;
+                border-bottom: 1px dotted #ccc;
+            }
+            .breakdown-label {
+                font-weight: bold;
+                width: 50%;
+                text-align: right;
+                padding-right: 8px;
+            }
+            .breakdown-value {
+                text-align: left;
+                font-weight: bold;
+                width: 50%;
+                padding-left: 8px;
+            }
+            .cash-count {
+                font-size: 7px;
+                line-height: 1.0;
+            }
+            .drawer-total {
+                font-weight: bold;
+                border-top: 1px solid #000;
+                margin-top: 2px;
+                padding-top: 2px;
+            }
+            .shift-total {
+                font-weight: bold;
+                text-align: center;
+                padding: 3px;
+                border: 2px solid #000;
+                margin-top: 4px;
+                font-size: 8px;
+            }
+            .am-bg { background-color: #e6f3ff; }
+            .pm-bg { background-color: #fff8f0; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            JAYNA GYRO DAILY CASH REPORT
+        </div>
+        <div class="date-header">
+            ${dayOfWeek} ${formattedDate}
+        </div>
+        <div style="text-align: center; font-size: 8px; color: #666; margin-bottom: 8px; border-bottom: 1px dotted #ccc; padding-bottom: 4px;">
+            Report Generated: ${new Date().toLocaleString()}
+        </div>
+
+        <!-- Staff and Timing Info -->
+        <div class="section">
+            <div class="two-column">
+                <div class="column">
+                    <div class="data-row">
+                        <span class="label">AM Counter:</span>
+                        <span class="value">${amData.counter}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">AM Time:</span>
+                        <span class="value">${new Date(amData.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="data-row">
+                        <span class="label">PM Counter:</span>
+                        <span class="value">${pmData.pm_counter}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">PM Time:</span>
+                        <span class="value">${new Date(pmData.pm_timestamp).toLocaleTimeString()}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cash Summary -->
+        <div class="section">
+            <div class="section-title">CASH FLOW SUMMARY</div>
+            <div class="two-column">
+                <div class="column">
+                    <div class="data-row">
+                        <span class="label">Starting Cash (AM):</span>
+                        <span class="value">$${amData.total.toFixed(2)}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Ending Cash (PM):</span>
+                        <span class="value">$${pmData.pm_total.toFixed(2)}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Actual Cash In:</span>
+                        <span class="value">$${actualCashIn.toFixed(2)}</span>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="data-row">
+                        <span class="label">Toast Sales:</span>
+                        <span class="value">$${pmData.pm_toast_sales.toFixed(2)}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Original Tips:</span>
+                        <span class="value">$${pmData.pm_cash_tips.toFixed(2)}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Discrepancy:</span>
+                        <span class="value">${discrepancySign}$${Math.abs(pmData.pm_discrepancy).toFixed(2)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deposit Instructions -->
+        <div class="deposit-box">
+            DEPOSIT IN ENVELOPE: $${pmData.pm_deposit_amount}
+            <div style="font-size: 8px;">(Toast Sales $${pmData.pm_toast_sales.toFixed(2)} + Original Tips $${pmData.pm_cash_tips.toFixed(2)})</div>
+        </div>
+        <div class="keep-box">
+            RETURN TO CASHBOX/SAFE: $${pmData.pm_amount_to_keep.toFixed(2)}
+        </div>
+
+        <!-- Notes Section -->
+        <div class="notes-section">
+            <div class="notes-column am-bg">
+                <div style="font-weight: bold; text-align: center; margin-bottom: 3px;">AM NOTES</div>
+                <div style="text-align: center; font-weight: bold;">
+                    ${amData.notes || 'No AM Notes'}
+                </div>
+            </div>
+            <div class="notes-column pm-bg">
+                <div style="font-weight: bold; text-align: center; margin-bottom: 3px;">PM NOTES</div>
+                <div style="text-align: center; font-weight: bold;">
+                    ${pmData.pm_notes || 'No PM Notes'}
+                </div>
+            </div>
+        </div>
+
+        <!-- Manager Breakdown -->
+        <div class="section">
+            <div class="section-title">MANAGER BREAKDOWN</div>
+            <div class="breakdown-grid">
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Starting Cash Total:</div>
+                    <div class="breakdown-cell breakdown-value">$${amData.total.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Ending Cash Total:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.pm_total.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Actual Cash In:</div>
+                    <div class="breakdown-cell breakdown-value">$${actualCashIn.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Toast Sales Reported:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.pm_toast_sales.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Tips Reported by Staff:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.pm_cash_tips.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Discrepancy (Drawers vs Toast):</div>
+                    <div class="breakdown-cell breakdown-value">${discrepancySign}$${Math.abs(pmData.pm_discrepancy).toFixed(2)}</div>
+                </div>
+                ${tipAdjustment > 0 ? `
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Cash Tip Adjustment:</div>
+                    <div class="breakdown-cell breakdown-value">-$${tipAdjustment.toFixed(2)}</div>
+                </div>` : ''}
+                ${pmData.has_deposit_rounding === 'true' ? `
+                <div class="breakdown-row" style="background-color: #fff3cd;">
+                    <div class="breakdown-cell breakdown-label">Raw Deposit Amount:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.raw_deposit_amount}</div>
+                </div>
+                <div class="breakdown-row" style="background-color: #fff3cd;">
+                    <div class="breakdown-cell breakdown-label">Rounded Deposit Amount:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.deposit_amount}</div>
+                </div>
+                <div class="breakdown-row" style="background-color: #fff3cd;">
+                    <div class="breakdown-cell breakdown-label">Rounding Adjustment Needed:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.deposit_rounding_adjustment}</div>
+                </div>
+                <div class="breakdown-row" style="background-color: #fff3cd;">
+                    <div class="breakdown-cell breakdown-label">Taken from Tips (Whole $):</div>
+                    <div class="breakdown-cell breakdown-value">-$${pmData.deposit_tip_adjustment}</div>
+                </div>
+                <div class="breakdown-row" style="background-color: #fff3cd;">
+                    <div class="breakdown-cell breakdown-label">Excess to Cashbox:</div>
+                    <div class="breakdown-cell breakdown-value">+$${pmData.deposit_excess_to_cashbox}</div>
+                </div>` : ''}
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Owed to Restaurant:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.pm_toast_sales.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Cash Tips Owed to Staff:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.pm_adjusted_tips.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Returned to Cashbox:</div>
+                    <div class="breakdown-cell breakdown-value">$${(pmData.pm_amount_to_keep - amData.total).toFixed(2)} + AM Total</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Complete Cash Count Breakdown -->
+        <div class="section">
+            <div class="section-title">COMPLETE CASH COUNT BREAKDOWN</div>
+            <div class="two-column">
+                <!-- AM Counts -->
+                <div class="column">
+                    <div style="text-align: center; font-weight: bold; font-size: 8px; margin-bottom: 3px; background-color: #e6f3ff; padding: 2px;">AM COUNTS</div>
+                    
+                    <div class="cash-count">
+                        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 1</div>
+                        ${['$100', '$50', '$20', '$10', '$5', '$1', '¢25', '¢10', '¢5', '¢1'].map(denom => {
+                          const data = getDenomData(amData.drawer1.counts, denom);
+                          return `<div>${denom}: ${data.count} = $${data.total}</div>`;
+                        }).join('')}
+                        <div class="drawer-total">TOTAL: $${amData.drawer1.total.toFixed(2)}</div>
+                    </div>
+                    
+                    <div class="cash-count" style="margin-top: 4px;">
+                        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 2</div>
+                        ${['$100', '$50', '$20', '$10', '$5', '$1', '¢25', '¢10', '¢5', '¢1'].map(denom => {
+                          const data = getDenomData(amData.drawer2.counts, denom);
+                          return `<div>${denom}: ${data.count} = $${data.total}</div>`;
+                        }).join('')}
+                        <div class="drawer-total">TOTAL: $${amData.drawer2.total.toFixed(2)}</div>
+                    </div>
+                    
+                    <div class="shift-total am-bg">TOTAL AM: $${amData.total.toFixed(2)}</div>
+                </div>
+                
+                <!-- PM Counts -->
+                <div class="column">
+                    <div style="text-align: center; font-weight: bold; font-size: 8px; margin-bottom: 3px; background-color: #fff8f0; padding: 2px;">PM COUNTS</div>
+                    
+                    <div class="cash-count">
+                        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 1</div>
+                        ${['$100', '$50', '$20', '$10', '$5', '$1', '¢25', '¢10', '¢5', '¢1'].map(denom => {
+                          const data = getDenomData(pmData.pm_drawer1_data, denom);
+                          return `<div>${denom}: ${data.count} = $${data.total}</div>`;
+                        }).join('')}
+                        <div class="drawer-total">TOTAL: $${pmData.pm_drawer1_total.toFixed(2)}</div>
+                    </div>
+                    
+                    <div class="cash-count" style="margin-top: 4px;">
+                        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 2</div>
+                        ${['$100', '$50', '$20', '$10', '$5', '$1', '¢25', '¢10', '¢5', '¢1'].map(denom => {
+                          const data = getDenomData(pmData.pm_drawer2_data, denom);
+                          return `<div>${denom}: ${data.count} = $${data.total}</div>`;
+                        }).join('')}
+                        <div class="drawer-total">TOTAL: $${pmData.pm_drawer2_total.toFixed(2)}</div>
+                    </div>
+                    
+                    <div class="shift-total pm-bg">TOTAL PM: $${pmData.pm_total.toFixed(2)}</div>
+                </div>
+            </div>
+            
+            <!-- Overall Drawer Totals Summary -->
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 2px solid #000;">
+                <div style="text-align: center; font-weight: bold; font-size: 10px; margin-bottom: 6px;">DRAWER TOTALS SUMMARY</div>
+                <div class="two-column">
+                    <div class="column">
+                        <div style="font-size: 8px; font-weight: bold; text-align: center; margin-bottom: 3px;">DRAWER 1 TOTALS</div>
+                        <div style="font-size: 8px;">
+                            <div style="display: flex; justify-content: space-between; margin: 1px 0;">
+                                <span>AM:</span>
+                                <span>$${amData.drawer1.total.toFixed(2)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin: 1px 0;">
+                                <span>PM:</span>
+                                <span>$${pmData.pm_drawer1_total.toFixed(2)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin: 1px 0; border-top: 1px solid #000; padding-top: 1px; font-weight: bold;">
+                                <span>Change:</span>
+                                <span>$${(pmData.pm_drawer1_total - amData.drawer1.total).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="column">
+                        <div style="font-size: 8px; font-weight: bold; text-align: center; margin-bottom: 3px;">DRAWER 2 TOTALS</div>
+                        <div style="font-size: 8px;">
+                            <div style="display: flex; justify-content: space-between; margin: 1px 0;">
+                                <span>AM:</span>
+                                <span>$${amData.drawer2.total.toFixed(2)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin: 1px 0;">
+                                <span>PM:</span>
+                                <span>$${pmData.pm_drawer2_total.toFixed(2)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin: 1px 0; border-top: 1px solid #000; padding-top: 1px; font-weight: bold;">
+                                <span>Change:</span>
+                                <span>$${(pmData.pm_drawer2_total - amData.drawer2.total).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align: center; font-weight: bold; font-size: 9px; margin-top: 6px; padding: 4px; border: 2px solid #000; background-color: #f0f0f0;">
+                    COMBINED DRAWER CHANGE: $${(actualCashIn).toFixed(2)}
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+    
+    console.log('Generated HTML length:', htmlContent.length);
+    return htmlContent;
+  }
+  
+  function generateDateRangeReportHtml(startDate, endDate, data) {
+    // Calculate totals according to requirements
+    let totalToastSalesReported = 0;
+    let totalActualCashIn = 0;
+    let totalDiscrepancy = 0;
+    let totalOriginalCashTips = 0;
+    let totalAdjustedCashTips = 0;
+    let totalEnvelopeDeposits = 0;
+    let totalBackToCashbox = 0;
+    
+    data.forEach(day => {
+      totalToastSalesReported += day.pm_toast_sales || 0;
+      totalActualCashIn += (day.pm_total - day.am_total) || 0;
+      totalDiscrepancy += day.pm_discrepancy || 0;
+      totalOriginalCashTips += day.pm_cash_tips || 0;
+      totalAdjustedCashTips += day.pm_adjusted_tips || 0;
+      totalEnvelopeDeposits += day.pm_deposit_amount || 0;
+      totalBackToCashbox += day.pm_amount_to_keep || 0;
+    });
+    
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; font-size: 14px; line-height: 1.3;">
+        <!-- Title with Confidential -->
+        <div style="text-align: center; margin-bottom: 25px; padding: 15px; background: #f0f0f0; border-radius: 8px; border: 2px solid #000;">
+          <h2 style="margin: 0; color: #333; font-size: 18px; font-weight: bold;">**CONFIDENTIAL**</h2>
+          <h2 style="margin: 5px 0; color: #333; font-size: 16px;">JAYNA GYRO MULTI-DAY CASH REPORT</h2>
+          <p style="margin: 5px 0; font-size: 14px; color: #666; font-weight: bold;">
+            ${new Date(startDate + 'T12:00:00').toLocaleDateString()} - ${new Date(endDate + 'T12:00:00').toLocaleDateString()}
+          </p>
+          <p style="margin: 5px 0; font-size: 12px; color: #888;">${data.length} days included</p>
+        </div>
+        
+        <!-- Key Totals Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
+          
+          <div style="background: #e6f3ff; padding: 15px; border: 2px solid #000; border-radius: 8px; text-align: center;">
+            <h4 style="margin: 0 0 8px 0; color: #1e3c72; font-size: 12px;">TOTAL TOAST CASH SALES REPORTED</h4>
+            <p style="font-size: 20px; font-weight: bold; margin: 0; color: #1e3c72;">$${totalToastSalesReported.toFixed(2)}</p>
+          </div>
+          
+          <div style="background: #f0f8ff; padding: 15px; border: 2px solid #000; border-radius: 8px; text-align: center;">
+            <h4 style="margin: 0 0 8px 0; color: #28a745; font-size: 12px;">TOTAL ACTUAL CASH IN</h4>
+            <p style="font-size: 20px; font-weight: bold; margin: 0; color: #28a745;">$${totalActualCashIn.toFixed(2)}</p>
+            <p style="font-size: 10px; margin: 5px 0 0 0; color: #666;">(Based on PM-AM counts for each day)</p>
+          </div>
+          
+          <div style="background: #ffe6e6; padding: 15px; border: 2px solid #000; border-radius: 8px; text-align: center;">
+            <h4 style="margin: 0 0 8px 0; color: #dc3545; font-size: 12px;">TOTAL DISCREPANCY</h4>
+            <p style="font-size: 20px; font-weight: bold; margin: 0; color: #dc3545;">
+              ${totalDiscrepancy >= 0 ? '+' : ''}$${totalDiscrepancy.toFixed(2)}
+            </p>
+            <p style="font-size: 10px; margin: 5px 0 0 0; color: #666;">(Between Toast and Count)</p>
+          </div>
+          
+          <div style="background: #fff3e0; padding: 15px; border: 2px solid #000; border-radius: 8px; text-align: center;">
+            <h4 style="margin: 0 0 8px 0; color: #ff9800; font-size: 12px;">TOTAL CASH TIPS ORIGINALLY REPORTED</h4>
+            <p style="font-size: 20px; font-weight: bold; margin: 0; color: #ff9800;">$${totalOriginalCashTips.toFixed(2)}</p>
+          </div>
+          
+          <div style="background: #f3e5f5; padding: 15px; border: 2px solid #000; border-radius: 8px; text-align: center;">
+            <h4 style="margin: 0 0 8px 0; color: #9c27b0; font-size: 12px;">TOTAL ADJUSTED CASH TIPS</h4>
+            <p style="font-size: 20px; font-weight: bold; margin: 0; color: #9c27b0;">$${totalAdjustedCashTips.toFixed(2)}</p>
+            <p style="font-size: 10px; margin: 5px 0 0 0; color: #666;">(Adjusted to make up for discrepancies)</p>
+          </div>
+          
+          <div style="background: #e8f5e8; padding: 15px; border: 2px solid #000; border-radius: 8px; text-align: center;">
+            <h4 style="margin: 0 0 8px 0; color: #2e7d32; font-size: 12px;">TOTAL ENVELOPE DEPOSITS</h4>
+            <p style="font-size: 20px; font-weight: bold; margin: 0; color: #2e7d32;">$${totalEnvelopeDeposits}</p>
+          </div>
+          
+          <div style="background: #fff8e1; padding: 15px; border: 2px solid #000; border-radius: 8px; text-align: center;">
+            <h4 style="margin: 0 0 8px 0; color: #f57c00; font-size: 12px;">TOTAL "BACK TO CASHBOX"</h4>
+            <p style="font-size: 20px; font-weight: bold; margin: 0; color: #f57c00;">$${totalBackToCashbox.toFixed(2)}</p>
+          </div>
+          
+        </div>
+        
+        <!-- Daily Breakdown Table -->
+        <div style="border: 2px solid #000; margin: 20px 0; border-radius: 8px; overflow: hidden;">
+          <div style="background: #f0f0f0; padding: 10px; border-bottom: 2px solid #000;">
+            <h4 style="margin: 0; text-align: center; font-size: 14px;">DAILY BREAKDOWN</h4>
+          </div>
+          
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+              <thead>
+                <tr style="background: #f8f9fa;">
+                  <th style="border: 1px solid #000; padding: 8px; text-align: left;">Date</th>
+                  <th style="border: 1px solid #000; padding: 8px; text-align: center;">Counter</th>
+                  <th style="border: 1px solid #000; padding: 8px; text-align: right;">Toast Sales</th>
+                  <th style="border: 1px solid #000; padding: 8px; text-align: right;">Actual Cash In</th>
+                  <th style="border: 1px solid #000; padding: 8px; text-align: right;">Discrepancy</th>
+                  <th style="border: 1px solid #000; padding: 8px; text-align: right;">Envelope</th>
+                  <th style="border: 1px solid #000; padding: 8px; text-align: right;">Cashbox</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.map(day => {
+                  const actualCashIn = day.pm_total - day.am_total;
+                  const discrepancySign = day.pm_discrepancy >= 0 ? '+' : '';
+                  return `
+                    <tr>
+                      <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">
+                        ${new Date(day.date + 'T12:00:00').toLocaleDateString()}
+                      </td>
+                      <td style="border: 1px solid #000; padding: 6px; text-align: center;">
+                        ${day.pm_counter || 'N/A'}
+                      </td>
+                      <td style="border: 1px solid #000; padding: 6px; text-align: right;">
+                        $${(day.pm_toast_sales || 0).toFixed(2)}
+                      </td>
+                      <td style="border: 1px solid #000; padding: 6px; text-align: right;">
+                        $${actualCashIn.toFixed(2)}
+                      </td>
+                      <td style="border: 1px solid #000; padding: 6px; text-align: right; color: ${day.pm_discrepancy >= 0 ? '#28a745' : '#dc3545'};">
+                        ${discrepancySign}$${Math.abs(day.pm_discrepancy || 0).toFixed(2)}
+                      </td>
+                      <td style="border: 1px solid #000; padding: 6px; text-align: right;">
+                        $${day.pm_deposit_amount || 0}
+                      </td>
+                      <td style="border: 1px solid #000; padding: 6px; text-align: right;">
+                        $${(day.pm_amount_to_keep || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  function resetForm(shift) {
+    document.getElementById(`${shift}Counter`).value = '';
+    document.getElementById(`${shift}Notes`).value = '';
+    
+    // Reset drawer skips
+    document.getElementById(`${shift}Drawer1Skip`).checked = false;
+    document.getElementById(`${shift}Drawer2Skip`).checked = false;
+    toggleSkip(shift, 1);
+    toggleSkip(shift, 2);
+    
+    // Reset all denomination inputs
+    DENOMINATIONS.forEach((denom, index) => {
+      document.getElementById(`${shift}D1Q${index}`).value = '0';
+      document.getElementById(`${shift}D2Q${index}`).value = '0';
+    });
+    
+    if (shift === 'pm') {
+      document.getElementById('toastSales').value = '';
+      document.getElementById('cashTips').value = '';
+    }
+    
+    updateCalculations(shift, 1);
+    updateCalculations(shift, 2);
+  }
+</script>
+</body>
+</html>
