@@ -2007,8 +2007,26 @@
     
     // Helper function to get denomination counts and totals
     function getDenomData(drawerData, denomKey) {
-      if (!drawerData || !drawerData[denomKey]) return { count: 0, total: 0 };
-      const count = parseInt(drawerData[denomKey]) || 0;
+      if (!drawerData || !drawerData) return { count: 0, total: 0 };
+      
+      // Map display format to stored format
+      const denomMapping = {
+        '$100': 'hundreds',
+        '$50': 'fifties', 
+        '$20': 'twenties',
+        '$10': 'tens',
+        '$5': 'fives',
+        '$1': 'ones',
+        '¢25': 'quarters',
+        '¢10': 'dimes', 
+        '¢5': 'nickels',
+        '¢1': 'pennies'
+      };
+      
+      const dataKey = denomMapping[denomKey];
+      if (!dataKey) return { count: 0, total: 0 };
+      
+      const count = parseInt(drawerData[dataKey]) || 0;
       const denomValues = {
         '$100': 100, '$50': 50, '$20': 20, '$10': 10, '$5': 5, '$1': 1,
         '¢25': 0.25, '¢10': 0.10, '¢5': 0.05, '¢1': 0.01
