@@ -1907,6 +1907,8 @@
       cashTips: fullData.pm_cash_tips
     });
     
+    console.log('Calculations for report:', calculations);
+    
     // Create enhanced pmData with calculation results
     const enhancedPmData = {
       ...fullData,
@@ -1915,9 +1917,18 @@
       deposit_rounding_adjustment: calculations.depositRoundingAdjustment ? calculations.depositRoundingAdjustment.toFixed(2) : null,
       deposit_tip_adjustment: calculations.depositTipAdjustment ? calculations.depositTipAdjustment.toFixed(2) : null,
       deposit_excess_to_cashbox: calculations.depositExcessToCashbox ? calculations.depositExcessToCashbox.toFixed(2) : null,
-      has_deposit_rounding: (calculations.depositRoundingAdjustment && Math.abs(calculations.depositRoundingAdjustment) > 0) ? 'true' : 'false',
+      // Only show deposit rounding breakdown if:
+      // 1. There's actually a meaningful rounding adjustment (> 0.001)
+      // 2. This data was processed with the new logic (stored amount matches rounded amount)
+      has_deposit_rounding: (
+        calculations.depositRoundingAdjustment && 
+        Math.abs(calculations.depositRoundingAdjustment) > 0.001 &&
+        Math.abs(fullData.pm_deposit_amount - calculations.depositAmount) < 0.001
+      ) ? 'true' : 'false',
       deposit_amount: calculations.depositAmount.toString()
     };
+    
+    console.log('Enhanced PM Data:', enhancedPmData);
     
     // Generate full single day report (same format as email)
     const reportHtml = generateSingleDayReportHtml(date, amData, enhancedPmData);
