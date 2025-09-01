@@ -1895,9 +1895,64 @@
   }
   
   function generateSingleDayReportHtml(date, amData, pmData) {
+    console.log('generateSingleDayReportHtml called with:');
+    console.log('date:', date);
+    console.log('amData:', amData);
+    console.log('pmData:', pmData);
+    
+    // Validate data exists
+    if (!amData || !pmData) {
+      console.error('Missing data - amData:', !!amData, 'pmData:', !!pmData);
+      return '<div style="padding: 20px; color: red; font-size: 18px;">Error: Missing report data</div>';
+    }
+    
     const dayOfWeek = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
-    const actualCashIn = pmData.pm_total - pmData.am_total;
+    const actualCashIn = pmData.pm_total - amData.total; // Fixed this line
     const discrepancySign = pmData.pm_discrepancy >= 0 ? '+' : '';
+    
+    console.log('Calculated values:');
+    console.log('dayOfWeek:', dayOfWeek);
+    console.log('actualCashIn:', actualCashIn);
+    console.log('amData.total:', amData.total);
+    console.log('pmData.pm_total:', pmData.pm_total);
+    console.log('discrepancy:', pmData.pm_discrepancy);
+    
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; font-size: 14px; line-height: 1.3;">
+        <div style="text-align: center; margin-bottom: 20px; padding: 15px; background: #f0f0f0; border-radius: 8px; border: 2px solid #000;">
+          <h2 style="margin: 0; color: #333; font-size: 18px; font-weight: bold;">**CONFIDENTIAL**</h2>
+          <h2 style="margin: 5px 0; color: #333; font-size: 16px;">JAYNA GYRO DAILY CASH REPORT</h2>
+          <p style="margin: 5px 0; font-size: 14px; color: #666; font-weight: bold;">${dayOfWeek}, ${new Date(date).toLocaleDateString()}</p>
+        </div>
+        
+        <!-- Test content -->
+        <div style="background: yellow; padding: 20px; margin: 10px 0; border: 2px solid red;">
+          <h3 style="color: red;">TEST SECTION - Can you see this?</h3>
+          <p>AM Total: $${(amData.total || 0).toFixed(2)}</p>
+          <p>PM Total: $${(pmData.pm_total || 0).toFixed(2)}</p>
+          <p>Date: ${date}</p>
+        </div>
+        
+        <!-- Staff and Timing Info -->
+        <div style="border: 2px solid #000; margin: 10px 0; padding: 10px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+              <div style="margin-bottom: 8px;"><strong>AM Counter:</strong> ${amData.counter || 'N/A'}</div>
+              <div><strong>AM Time:</strong> ${amData.timestamp ? new Date(amData.timestamp).toLocaleString() : 'N/A'}</div>
+            </div>
+            <div>
+              <div style="margin-bottom: 8px;"><strong>PM Counter:</strong> ${pmData.pm_counter || 'N/A'}</div>
+              <div><strong>PM Time:</strong> ${pmData.pm_timestamp ? new Date(pmData.pm_timestamp).toLocaleString() : 'N/A'}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    console.log('Generated HTML length:', htmlContent.length);
+    console.log('First 200 chars of HTML:', htmlContent.substring(0, 200));
+    return htmlContent;
+  }
     
     return `
       <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; font-size: 14px; line-height: 1.3;">
