@@ -681,17 +681,11 @@
           </div>
         </div>
         
-        <button class="submit-btn" onclick="viewReport()" style="background: #007bff;">Generate Report</button>
+        <button class="submit-btn" onclick="generateAndDownloadReport()" style="background: #007bff;">Generate & Download PDF Report</button>
         
-        <!-- On-Screen Report Display -->
-        <div id="reportDisplay" style="display: none; margin-top: 30px; padding: 20px; border: 3px solid #007bff; border-radius: 12px; background: #ffffff; position: relative; z-index: 10; box-shadow: 0 4px 12px rgba(0,123,255,0.15);">
-          <div style="text-align: center; margin-bottom: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px;">
-            <h3 style="margin: 0; color: #1976d2;">📊 Generated Report</h3>
-          </div>
+        <!-- Hidden Report Display for PDF generation -->
+        <div id="reportDisplay" style="display: none; position: absolute; left: -9999px; width: 800px;">
           <div id="reportContent"></div>
-          <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <button id="downloadPdfBtn" class="submit-btn" onclick="downloadReportAsPDF()" style="background: #dc3545;">Download PDF</button>
-          </div>
         </div>
         
         <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 10px;">Back to Menu</button>
@@ -1753,67 +1747,31 @@
     document.getElementById('reportDisplay').style.display = 'none';
   }
   
-  async function viewReport() {
+  async function generateAndDownloadReport() {
     const reportType = document.querySelector('input[name="reportType"]:checked').value;
     
     try {
-      showLoading('Loading Report', 'Retrieving data...');
+      showLoading('Generating PDF Report', 'Creating your report...');
       
       if (reportType === 'single') {
-        await viewSingleDayReport();
+        await generateSingleDayPDF();
       } else {
-        await viewDateRangeReport();
+        await generateDateRangePDF();
       }
       
       hideLoading();
-      
-      // Make sure the report display is visible
-      const reportDisplay = document.getElementById('reportDisplay');
-      const container = document.querySelector('.container');
-      
-      if (reportDisplay) {
-        reportDisplay.style.display = 'block';
-        reportDisplay.style.visibility = 'visible';
-        reportDisplay.style.opacity = '1';
-        reportDisplay.style.height = 'auto';
-        reportDisplay.style.minHeight = '200px';
-        
-        // Expand container for report display
-        if (container) {
-          container.style.maxWidth = '1000px';
-        }
-        
-        console.log('Report display made visible');
-        console.log('Report display computed style:', getComputedStyle(reportDisplay).display);
-        console.log('Report display offsetHeight:', reportDisplay.offsetHeight);
-        console.log('Report display children count:', reportDisplay.children.length);
-        
-        // Add a test element to see if anything shows
-        const testDiv = document.createElement('div');
-        testDiv.innerHTML = '<h2 style="color: red; background: yellow; padding: 20px;">TEST - Can you see this?</h2>';
-        reportDisplay.appendChild(testDiv);
-        
-        // Scroll to the report
-        setTimeout(() => {
-          reportDisplay.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-          });
-        }, 100);
-      } else {
-        console.error('Report display element not found');
-      }
+      showMessage('PDF report downloaded successfully!', 'success');
       
     } catch (error) {
       hideLoading();
-      console.error('Report viewing error:', error);
+      console.error('Report generation error:', error);
       showMessage(`Error: ${error.message}`, 'error');
     }
   }
   
-  async function viewSingleDayReport() {
+  async function generateSingleDayPDF() {
     const date = document.getElementById('reportDate').value;
-    console.log('viewSingleDayReport called with date:', date);
+    console.log('generateSingleDayPDF called with date:', date);
     
     if (!date) {
       throw new Error('Please select a date');
@@ -1840,32 +1798,26 @@
       throw new Error('No PM data found for this date');
     }
     
-    // Store current data for PDF functionality  
-    window.currentReportData = {
-      type: 'single',
-      date: date,
-      amData: amData,
-      pmData: fullData
-    };
-    
     console.log('Generating report HTML...');
     // Generate full single day report (same format as email)
     const reportHtml = generateSingleDayReportHtml(date, amData, fullData);
-    console.log('Report HTML generated, setting content...');
+    console.log('Report HTML generated, creating PDF...');
     
+    // Set the content in the hidden div
     const reportContent = document.getElementById('reportContent');
     if (reportContent) {
       reportContent.innerHTML = reportHtml;
-      console.log('Report content set successfully');
-      console.log('Report HTML length:', reportHtml.length);
-      console.log('Report content innerHTML length:', reportContent.innerHTML.length);
-      console.log('Report content first 200 chars:', reportContent.innerHTML.substring(0, 200));
+      
+      // Generate PDF
+      const filename = `jayna-gyro-daily-report-${date}.pdf`;
+      await generatePDF(reportContent, filename);
+      
     } else {
-      console.error('reportContent element not found');
+      throw new Error('Report content element not found');
     }
   }
   
-  async function viewDateRangeReport() {
+  async function generateDateRangePDF() {
     const startDate = document.getElementById('reportStartDate').value;
     const endDate = document.getElementById('reportEndDate').value;
     
@@ -1898,17 +1850,48 @@
       throw new Error('No data found for this date range');
     }
     
-    // Store current data for PDF functionality
-    window.currentReportData = {
-      type: 'range',
-      startDate: startDate,
-      endDate: endDate,
-      data: rangeData
-    };
-    
     // Generate date range summary report
     const reportHtml = generateDateRangeReportHtml(startDate, endDate, rangeData);
-    document.getElementById('reportContent').innerHTML = reportHtml;
+    
+    // Set the content in the hidden div
+    const reportContent = document.getElementById('reportContent');
+    if (reportContent) {
+      reportContent.innerHTML = reportHtml;
+      
+      // Generate PDF
+      const filename = `jayna-gyro-range-report-${startDate}-to-${endDate}.pdf`;
+      await generatePDF(reportContent, filename);
+      
+    } else {
+      throw new Error('Report content element not found');
+    }
+  }
+  
+  async function generatePDF(element, filename) {
+    console.log('Generating PDF with filename:', filename);
+    
+    // Configure PDF options
+    const opt = {
+      margin: 0.5,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: 800,
+        height: element.scrollHeight
+      },
+      jsPDF: { 
+        unit: 'in', 
+        format: 'letter', 
+        orientation: 'portrait' 
+      }
+    };
+    
+    // Generate and download PDF
+    await html2pdf().set(opt).from(element).save();
+    console.log('PDF generated and downloaded successfully');
   }
   
   function generateSingleDayReportHtml(date, amData, pmData) {
@@ -2131,120 +2114,6 @@
         </div>
       </div>
     `;
-  }
-  
-  async function emailCurrentReport() {
-    if (!window.currentReportData) {
-      showMessage('No report data available', 'error');
-      return;
-    }
-    
-    try {
-      showLoading('Sending Email', 'Generating and sending email report...');
-      
-      if (window.currentReportData.type === 'single') {
-        // Send single day email report using existing function
-        const data = {
-          date: window.currentReportData.date,
-          counter: window.currentReportData.pmData.pm_counter,
-          total: window.currentReportData.pmData.pm_total,
-          toastSales: window.currentReportData.pmData.pm_toast_sales,
-          cashTips: window.currentReportData.pmData.pm_cash_tips,
-          amTotal: window.currentReportData.pmData.am_total,
-          notes: window.currentReportData.pmData.pm_notes
-        };
-        
-        const calculations = {
-          amTotal: window.currentReportData.pmData.am_total,
-          pmTotal: window.currentReportData.pmData.pm_total,
-          drawerChange: window.currentReportData.pmData.pm_total - window.currentReportData.pmData.am_total,
-          toastSales: window.currentReportData.pmData.pm_toast_sales,
-          cashTips: window.currentReportData.pmData.pm_cash_tips,
-          discrepancy: window.currentReportData.pmData.pm_discrepancy,
-          adjustedTips: window.currentReportData.pmData.pm_adjusted_tips,
-          depositAmount: window.currentReportData.pmData.pm_deposit_amount,
-          returnAmount: window.currentReportData.pmData.pm_amount_to_keep,
-          drawerOver: window.currentReportData.pmData.pm_drawer_over_amount || 0,
-          drawerShort: window.currentReportData.pmData.pm_discrepancy < 0 ? Math.abs(window.currentReportData.pmData.pm_discrepancy) : 0
-        };
-        
-        currentAMData = window.currentReportData.amData;
-        await sendEmailReport(data, calculations);
-        
-      } else {
-        // For date range reports, we'd need a new email template or send as attachment
-        showMessage('Date range email reports coming soon!', 'info');
-        hideLoading();
-        return;
-      }
-      
-      hideLoading();
-      showMessage('Email report sent successfully!', 'success');
-      
-    } catch (error) {
-      hideLoading();
-      console.error('Email report error:', error);
-      showMessage(`Error sending email: ${error.message}`, 'error');
-    }
-  }
-  
-  async function downloadReportAsPDF() {
-    if (!window.currentReportData) {
-      showMessage('No report data available for download', 'error');
-      return;
-    }
-    
-    try {
-      showLoading('Generating PDF', 'Creating PDF document...');
-      
-      const element = document.getElementById('reportContent');
-      if (!element) {
-        throw new Error('Report content not found');
-      }
-      
-      // Configure PDF options
-      const opt = {
-        margin: 0.5,
-        filename: getReportFilename(),
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff'
-        },
-        jsPDF: { 
-          unit: 'in', 
-          format: 'letter', 
-          orientation: 'portrait' 
-        }
-      };
-      
-      // Generate PDF
-      await html2pdf().set(opt).from(element).save();
-      
-      hideLoading();
-      showMessage('PDF downloaded successfully!', 'success');
-      
-    } catch (error) {
-      hideLoading();
-      console.error('PDF generation error:', error);
-      showMessage(`Error generating PDF: ${error.message}`, 'error');
-    }
-  }
-  
-  function getReportFilename() {
-    if (!window.currentReportData) {
-      return 'jayna-gyro-report.pdf';
-    }
-    
-    if (window.currentReportData.type === 'single') {
-      const date = window.currentReportData.date;
-      return `jayna-gyro-daily-report-${date}.pdf`;
-    } else {
-      const startDate = window.currentReportData.startDate;
-      const endDate = window.currentReportData.endDate;
-      return `jayna-gyro-range-report-${startDate}-to-${endDate}.pdf`;
-    }
   }
   
   function resetForm(shift) {
