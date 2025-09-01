@@ -1975,6 +1975,16 @@
       throw new Error('Missing report data for PDF generation');
     }
     
+    // IMPORTANT: Recalculate using the EXACT same logic as PM flow
+    const pmCalculationData = {
+      amTotal: amData.total,
+      total: pmResults.pm_total,
+      toastSales: pmResults.pm_toast_sales,
+      cashTips: pmResults.pm_cash_tips
+    };
+    
+    const calculations = calculatePMAmounts(pmCalculationData);
+    
     // Set up the document
     let yPosition = 40;
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -2028,19 +2038,18 @@
     });
     yPosition += 15;
     
-    // Cash flow summary
+    // Cash flow summary using CALCULATED values (not stored values)
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
     doc.text('CASH FLOW SUMMARY', margin, yPosition);
     yPosition += 20;
     
-    const actualCashIn = pmResults.pm_total - amData.total;
-    const discrepancySign = pmResults.pm_discrepancy >= 0 ? '+' : '';
+    const discrepancySign = calculations.discrepancy >= 0 ? '+' : '';
     
     const cashFlowData = [
-      ['Starting Cash (AM):', `$${amData.total.toFixed(2)}`, 'Toast Sales:', `$${pmResults.pm_toast_sales.toFixed(2)}`],
-      ['Ending Cash (PM):', `$${pmResults.pm_total.toFixed(2)}`, 'Original Tips:', `$${pmResults.pm_cash_tips.toFixed(2)}`],
-      ['Actual Cash In:', `$${actualCashIn.toFixed(2)}`, 'Discrepancy:', `${discrepancySign}$${Math.abs(pmResults.pm_discrepancy).toFixed(2)}`]
+      ['Starting Cash (AM):', `$${calculations.amTotal.toFixed(2)}`, 'Toast Sales:', `$${calculations.toastSales.toFixed(2)}`],
+      ['Ending Cash (PM):', `$${calculations.pmTotal.toFixed(2)}`, 'Original Tips:', `$${calculations.cashTips.toFixed(2)}`],
+      ['Actual Cash In:', `$${calculations.actualCashIn.toFixed(2)}`, 'Discrepancy:', `${discrepancySign}$${Math.abs(calculations.discrepancy).toFixed(2)}`]
     ];
     
     doc.setFontSize(10);
@@ -2054,17 +2063,17 @@
     });
     yPosition += 20;
     
-    // Deposit and return boxes
+    // Deposit and return boxes using CALCULATED values
     doc.setFillColor(230, 255, 230);
     doc.rect(margin, yPosition, contentWidth, 25, 'F');
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
-    doc.text(`DEPOSIT IN ENVELOPE: $${pmResults.pm_deposit_amount.toFixed(2)}`, pageWidth / 2, yPosition + 15, { align: 'center' });
+    doc.text(`DEPOSIT IN ENVELOPE: $${calculations.depositAmount.toFixed(2)}`, pageWidth / 2, yPosition + 15, { align: 'center' });
     yPosition += 35;
     
     doc.setFillColor(255, 240, 230);
     doc.rect(margin, yPosition, contentWidth, 25, 'F');
-    doc.text(`RETURN TO CASHBOX/SAFE: $${pmResults.pm_amount_to_keep.toFixed(2)}`, pageWidth / 2, yPosition + 15, { align: 'center' });
+    doc.text(`RETURN TO CASHBOX/SAFE: $${calculations.returnAmount.toFixed(2)}`, pageWidth / 2, yPosition + 15, { align: 'center' });
     yPosition += 45;
     
     // Check if we need a new page
@@ -2202,7 +2211,8 @@
       throw new Error('No data found for this date range');
     }
     
-    // Calculate totals
+    // IMPORTANT: Recalculate each day using the EXACT same logic as PM flow
+    const dailyCalculations = [];
     let totalToastSalesReported = 0;
     let totalActualCashIn = 0;
     let totalDiscrepancy = 0;
@@ -2212,13 +2222,34 @@
     let totalBackToCashbox = 0;
     
     rangeData.forEach(day => {
-      totalToastSalesReported += day.pm_toast_sales || 0;
-      totalActualCashIn += (day.pm_total - day.am_total) || 0;
-      totalDiscrepancy += day.pm_discrepancy || 0;
-      totalOriginalCashTips += day.pm_cash_tips || 0;
-      totalAdjustedCashTips += day.pm_adjusted_tips || 0;
-      totalEnvelopeDeposits += day.pm_deposit_amount || 0;
-      totalBackToCashbox += day.pm_amount_to_keep || 0;
+      // Create the same data structure used in PM flow
+      const pmCalculationData = {
+        amTotal: day.am_total,
+        total: day.pm_total,
+        toastSales: day.pm_toast_sales,
+        cashTips: day.pm_cash_tips
+      };
+      
+      // Use the exact same calculation function as PM flow
+      const dayCalculations = calculatePMAmounts(pmCalculationData);
+      
+      // Store calculated values for this day
+      dailyCalculations.push({
+        date: day.date,
+        counter: day.pm_counter,
+        calculations: dayCalculations,
+        // Keep original data for reference
+        originalData: day
+      });
+      
+      // Sum up totals using CALCULATED values (not stored values)
+      totalToastSalesReported += dayCalculations.toastSales;
+      totalActualCashIn += dayCalculations.actualCashIn;
+      totalDiscrepancy += dayCalculations.discrepancy;
+      totalOriginalCashTips += dayCalculations.cashTips;
+      totalAdjustedCashTips += dayCalculations.adjustedTips;
+      totalEnvelopeDeposits += dayCalculations.depositAmount;
+      totalBackToCashbox += dayCalculations.returnAmount;
     });
     
     // Set up the document
@@ -2295,20 +2326,21 @@
       ['Date', 'Counter', 'Toast Sales', 'Actual Cash In', 'Discrepancy', 'Original Tips', 'Adjusted Tips', 'Envelope']
     ];
     
-    rangeData.forEach(day => {
-      const actualCashIn = day.pm_total - day.am_total;
-      const discrepancySign = day.pm_discrepancy >= 0 ? '+' : '';
-      const dateFormatted = new Date(day.date + 'T12:00:00').toLocaleDateString();
+    // Use calculated values for each day (not stored values)
+    dailyCalculations.forEach(dayData => {
+      const calc = dayData.calculations;
+      const discrepancySign = calc.discrepancy >= 0 ? '+' : '';
+      const dateFormatted = new Date(dayData.date + 'T12:00:00').toLocaleDateString();
       
       tableData.push([
         dateFormatted,
-        day.pm_counter || 'N/A',
-        `$${(day.pm_toast_sales || 0).toFixed(2)}`,
-        `$${actualCashIn.toFixed(2)}`,
-        `${discrepancySign}$${Math.abs(day.pm_discrepancy || 0).toFixed(2)}`,
-        `$${(day.pm_cash_tips || 0).toFixed(2)}`,
-        `$${(day.pm_adjusted_tips || 0).toFixed(2)}`,
-        `$${(day.pm_deposit_amount || 0).toFixed(2)}`
+        dayData.counter || 'N/A',
+        `$${calc.toastSales.toFixed(2)}`,
+        `$${calc.actualCashIn.toFixed(2)}`,
+        `${discrepancySign}$${Math.abs(calc.discrepancy).toFixed(2)}`,
+        `$${calc.cashTips.toFixed(2)}`,
+        `$${calc.adjustedTips.toFixed(2)}`,
+        `$${calc.depositAmount.toFixed(2)}`
       ]);
     });
     
