@@ -394,6 +394,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -2004,54 +2006,51 @@
   async function generatePDF(element, filename) {
     console.log('Generating PDF with filename:', filename);
     
-    // Temporarily make the element visible for PDF generation
-    const reportDisplay = document.getElementById('reportDisplay');
-    const originalDisplay = reportDisplay.style.display;
-    const originalOpacity = reportDisplay.style.opacity;
+    // Use jsPDF for reliable PDF generation instead of html2pdf.js
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
     
-    // Make visible but transparent
-    reportDisplay.style.display = 'block';
-    reportDisplay.style.opacity = '1';
+    // Extract text content from the element
+    const content = element.textContent || element.innerText || 'No content available';
+    const lines = content.split('\n').filter(line => line.trim() !== '');
     
-    // Wait a moment for rendering
-    await new Promise(resolve => setTimeout(resolve, 100));
+    let yPosition = 20;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const lineHeight = 6;
+    const margin = 10;
+    const maxWidth = 190; // A4 width minus margins
     
-    console.log('Element dimensions:', {
-      offsetWidth: element.offsetWidth,
-      offsetHeight: element.offsetHeight,
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight
-    });
+    doc.setFontSize(10);
     
-    // Configure PDF options
-    const opt = {
-      margin: 0.5,
-      filename: filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        width: element.offsetWidth || 800,
-        height: element.scrollHeight || element.offsetHeight || 600,
-        logging: true
-      },
-      jsPDF: { 
-        unit: 'in', 
-        format: 'letter', 
-        orientation: 'portrait' 
+    for (let i = 0; i < lines.length; i++) {
+      // Check if we need a new page
+      if (yPosition > pageHeight - 20) {
+        doc.addPage();
+        yPosition = 20;
       }
-    };
-    
-    try {
-      // Generate PDF
-      await html2pdf().set(opt).from(element).save();
-      console.log('PDF generated and downloaded successfully');
-    } finally {
-      // Restore original visibility
-      reportDisplay.style.display = originalDisplay;
-      reportDisplay.style.opacity = originalOpacity;
+      
+      const line = lines[i].trim();
+      if (line.length === 0) {
+        yPosition += lineHeight / 2; // Small space for empty lines
+        continue;
+      }
+      
+      // Split long lines to fit page width
+      const splitLines = doc.splitTextToSize(line, maxWidth);
+      
+      for (let j = 0; j < splitLines.length; j++) {
+        if (yPosition > pageHeight - 20) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(splitLines[j], margin, yPosition);
+        yPosition += lineHeight;
+      }
     }
+    
+    // Save the PDF
+    doc.save(filename);
+    console.log('PDF generated and downloaded successfully with jsPDF');
   }
   
   function generateSingleDayReportHtml(date, amData, pmData) {
