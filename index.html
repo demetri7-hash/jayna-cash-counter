@@ -1932,52 +1932,382 @@
       return '<div style="padding: 20px; color: red; font-size: 18px;">Error: Missing report data</div>';
     }
     
-    const dayOfWeek = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
-    const actualCashIn = pmData.pm_total - amData.total; // Fixed this line
-    const discrepancySign = pmData.pm_discrepancy >= 0 ? '+' : '';
+    const dayOfWeek = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }).toUpperCase();
     
-    console.log('Calculated values:');
-    console.log('dayOfWeek:', dayOfWeek);
-    console.log('actualCashIn:', actualCashIn);
-    console.log('amData.total:', amData.total);
-    console.log('pmData.pm_total:', pmData.pm_total);
-    console.log('discrepancy:', pmData.pm_discrepancy);
+    const actualCashIn = pmData.pm_total - amData.total;
+    const discrepancySign = pmData.pm_discrepancy >= 0 ? '+' : '';
+    const tipAdjustment = pmData.pm_discrepancy < 0 ? Math.abs(pmData.pm_discrepancy) : 0;
+    
+    // Helper function to get denomination counts and totals
+    function getDenomData(drawerData, denomKey) {
+      if (!drawerData || !drawerData[denomKey]) return { count: 0, total: 0 };
+      const count = parseInt(drawerData[denomKey]) || 0;
+      const denomValues = {
+        '$100': 100, '$50': 50, '$20': 20, '$10': 10, '$5': 5, '$1': 1,
+        '¢25': 0.25, '¢10': 0.10, '¢5': 0.05, '¢1': 0.01
+      };
+      const value = denomValues[denomKey] || 0;
+      return { count, total: (count * value).toFixed(2) };
+    }
     
     const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; font-size: 14px; line-height: 1.3;">
-        <div style="text-align: center; margin-bottom: 20px; padding: 15px; background: #f0f0f0; border-radius: 8px; border: 2px solid #000;">
-          <h2 style="margin: 0; color: #333; font-size: 18px; font-weight: bold;">**CONFIDENTIAL**</h2>
-          <h2 style="margin: 5px 0; color: #333; font-size: 16px;">JAYNA GYRO DAILY CASH REPORT</h2>
-          <p style="margin: 5px 0; font-size: 14px; color: #666; font-weight: bold;">${dayOfWeek}, ${new Date(date).toLocaleDateString()}</p>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 8px;
+                font-size: 9px;
+                line-height: 1.1;
+            }
+            .header {
+                text-align: center;
+                font-weight: bold;
+                font-size: 16px;
+                margin-bottom: 2px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 4px;
+            }
+            .date-header {
+                text-align: center;
+                font-weight: bold;
+                font-size: 14px;
+                margin-bottom: 8px;
+                padding-bottom: 4px;
+            }
+            .section {
+                border: 1px solid #000;
+                margin: 4px 0;
+                padding: 6px;
+            }
+            .section-title {
+                font-weight: bold;
+                font-size: 12px;
+                text-align: center;
+                margin-bottom: 4px;
+                border-bottom: 1px solid #000;
+                padding-bottom: 2px;
+            }
+            .two-column {
+                display: table;
+                width: 100%;
+            }
+            .column {
+                display: table-cell;
+                width: 50%;
+                vertical-align: top;
+                padding: 0 4px;
+            }
+            .column:first-child {
+                border-right: 1px solid #ccc;
+            }
+            .data-row {
+                display: flex;
+                justify-content: space-between;
+                margin: 1px 0;
+                max-width: 150px;
+            }
+            .label {
+                font-weight: bold;
+                text-align: right;
+                padding-right: 8px;
+            }
+            .value {
+                text-align: left;
+                font-weight: bold;
+            }
+            .deposit-box {
+                background-color: #e6ffe6;
+                border: 2px solid #000;
+                padding: 6px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 11px;
+                margin: 4px 0;
+            }
+            .keep-box {
+                background-color: #fff0e6;
+                border: 2px solid #000;
+                padding: 6px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 11px;
+                margin: 4px 0;
+            }
+            .notes-section {
+                display: table;
+                width: 100%;
+                margin: 4px 0;
+            }
+            .notes-column {
+                display: table-cell;
+                width: 50%;
+                padding: 4px;
+                border: 1px solid #000;
+                vertical-align: top;
+                text-align: center;
+                font-weight: bold;
+            }
+            .notes-column:first-child {
+                border-right: none;
+            }
+            .breakdown-grid {
+                display: table;
+                width: 100%;
+            }
+            .breakdown-row {
+                display: table-row;
+            }
+            .breakdown-cell {
+                display: table-cell;
+                padding: 2px 4px;
+                border-bottom: 1px dotted #ccc;
+            }
+            .breakdown-label {
+                font-weight: bold;
+                width: 50%;
+                text-align: right;
+                padding-right: 8px;
+            }
+            .breakdown-value {
+                text-align: left;
+                font-weight: bold;
+                width: 50%;
+                padding-left: 8px;
+            }
+            .cash-count {
+                font-size: 7px;
+                line-height: 1.0;
+            }
+            .drawer-total {
+                font-weight: bold;
+                border-top: 1px solid #000;
+                margin-top: 2px;
+                padding-top: 2px;
+            }
+            .shift-total {
+                font-weight: bold;
+                text-align: center;
+                padding: 3px;
+                border: 2px solid #000;
+                margin-top: 4px;
+                font-size: 8px;
+            }
+            .am-bg { background-color: #e6f3ff; }
+            .pm-bg { background-color: #fff8f0; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            JAYNA GYRO DAILY CASH REPORT
         </div>
-        
-        <!-- Test content -->
-        <div style="background: yellow; padding: 20px; margin: 10px 0; border: 2px solid red;">
-          <h3 style="color: red;">TEST SECTION - Can you see this?</h3>
-          <p>AM Total: $${(amData.total || 0).toFixed(2)}</p>
-          <p>PM Total: $${(pmData.pm_total || 0).toFixed(2)}</p>
-          <p>Date: ${date}</p>
+        <div class="date-header">
+            ${dayOfWeek} ${formattedDate}
         </div>
-        
+
         <!-- Staff and Timing Info -->
-        <div style="border: 2px solid #000; margin: 10px 0; padding: 10px;">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <div>
-              <div style="margin-bottom: 8px;"><strong>AM Counter:</strong> ${amData.counter || 'N/A'}</div>
-              <div><strong>AM Time:</strong> ${amData.timestamp ? new Date(amData.timestamp).toLocaleString() : 'N/A'}</div>
+        <div class="section">
+            <div class="two-column">
+                <div class="column">
+                    <div class="data-row">
+                        <span class="label">AM Counter:</span>
+                        <span class="value">${amData.counter}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">AM Time:</span>
+                        <span class="value">${new Date(amData.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="data-row">
+                        <span class="label">PM Counter:</span>
+                        <span class="value">${pmData.pm_counter}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">PM Time:</span>
+                        <span class="value">${new Date(pmData.pm_timestamp).toLocaleTimeString()}</span>
+                    </div>
+                </div>
             </div>
-            <div>
-              <div style="margin-bottom: 8px;"><strong>PM Counter:</strong> ${pmData.pm_counter || 'N/A'}</div>
-              <div><strong>PM Time:</strong> ${pmData.pm_timestamp ? new Date(pmData.pm_timestamp).toLocaleString() : 'N/A'}</div>
-            </div>
-          </div>
         </div>
-      </div>
+
+        <!-- Cash Summary -->
+        <div class="section">
+            <div class="section-title">CASH FLOW SUMMARY</div>
+            <div class="two-column">
+                <div class="column">
+                    <div class="data-row">
+                        <span class="label">Starting Cash (AM):</span>
+                        <span class="value">$${amData.total.toFixed(2)}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Ending Cash (PM):</span>
+                        <span class="value">$${pmData.pm_total.toFixed(2)}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Actual Cash In:</span>
+                        <span class="value">$${actualCashIn.toFixed(2)}</span>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="data-row">
+                        <span class="label">Toast Sales:</span>
+                        <span class="value">$${pmData.pm_toast_sales.toFixed(2)}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Original Tips:</span>
+                        <span class="value">$${pmData.pm_cash_tips.toFixed(2)}</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">Discrepancy:</span>
+                        <span class="value">${discrepancySign}$${Math.abs(pmData.pm_discrepancy).toFixed(2)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deposit Instructions -->
+        <div class="deposit-box">
+            DEPOSIT IN ENVELOPE: $${pmData.pm_deposit_amount.toFixed(2)}
+            <div style="font-size: 8px;">(Toast Sales $${pmData.pm_toast_sales.toFixed(2)} + Original Tips $${pmData.pm_cash_tips.toFixed(2)})</div>
+        </div>
+        <div class="keep-box">
+            RETURN TO CASHBOX/SAFE: $${pmData.pm_amount_to_keep.toFixed(2)}
+        </div>
+
+        <!-- Notes Section -->
+        <div class="notes-section">
+            <div class="notes-column am-bg">
+                <div style="font-weight: bold; text-align: center; margin-bottom: 3px;">AM NOTES</div>
+                <div style="text-align: center; font-weight: bold;">
+                    ${amData.notes || 'No AM Notes'}
+                </div>
+            </div>
+            <div class="notes-column pm-bg">
+                <div style="font-weight: bold; text-align: center; margin-bottom: 3px;">PM NOTES</div>
+                <div style="text-align: center; font-weight: bold;">
+                    ${pmData.pm_notes || 'No PM Notes'}
+                </div>
+            </div>
+        </div>
+
+        <!-- Manager Breakdown -->
+        <div class="section">
+            <div class="section-title">MANAGER BREAKDOWN</div>
+            <div class="breakdown-grid">
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Starting Cash Total:</div>
+                    <div class="breakdown-cell breakdown-value">$${amData.total.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Ending Cash Total:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.pm_total.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Actual Cash In:</div>
+                    <div class="breakdown-cell breakdown-value">$${actualCashIn.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Toast Sales Reported:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.pm_toast_sales.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Tips Reported by Staff:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.pm_cash_tips.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Discrepancy (Drawers vs Toast):</div>
+                    <div class="breakdown-cell breakdown-value">${discrepancySign}$${Math.abs(pmData.pm_discrepancy).toFixed(2)}</div>
+                </div>
+                ${tipAdjustment > 0 ? `
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Cash Tip Adjustment:</div>
+                    <div class="breakdown-cell breakdown-value">-$${tipAdjustment.toFixed(2)}</div>
+                </div>` : ''}
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Owed to Restaurant:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.pm_toast_sales.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Cash Tips Owed to Staff:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.pm_adjusted_tips.toFixed(2)}</div>
+                </div>
+                <div class="breakdown-row">
+                    <div class="breakdown-cell breakdown-label">Returned to Cashbox:</div>
+                    <div class="breakdown-cell breakdown-value">$${(pmData.pm_amount_to_keep - amData.total).toFixed(2)} + AM Total</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Complete Cash Count Breakdown -->
+        <div class="section">
+            <div class="section-title">COMPLETE CASH COUNT BREAKDOWN</div>
+            <div class="two-column">
+                <!-- AM Counts -->
+                <div class="column">
+                    <div style="text-align: center; font-weight: bold; font-size: 8px; margin-bottom: 3px; background-color: #e6f3ff; padding: 2px;">AM COUNTS</div>
+                    
+                    <div class="cash-count">
+                        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 1</div>
+                        ${['$100', '$50', '$20', '$10', '$5', '$1', '¢25', '¢10', '¢5', '¢1'].map(denom => {
+                          const data = getDenomData(amData.drawer1.counts, denom);
+                          return `<div>${denom}: ${data.count} = $${data.total}</div>`;
+                        }).join('')}
+                        <div class="drawer-total">TOTAL: $${amData.drawer1.total.toFixed(2)}</div>
+                    </div>
+                    
+                    <div class="cash-count" style="margin-top: 4px;">
+                        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 2</div>
+                        ${['$100', '$50', '$20', '$10', '$5', '$1', '¢25', '¢10', '¢5', '¢1'].map(denom => {
+                          const data = getDenomData(amData.drawer2.counts, denom);
+                          return `<div>${denom}: ${data.count} = $${data.total}</div>`;
+                        }).join('')}
+                        <div class="drawer-total">TOTAL: $${amData.drawer2.total.toFixed(2)}</div>
+                    </div>
+                    
+                    <div class="shift-total am-bg">TOTAL AM: $${amData.total.toFixed(2)}</div>
+                </div>
+                
+                <!-- PM Counts -->
+                <div class="column">
+                    <div style="text-align: center; font-weight: bold; font-size: 8px; margin-bottom: 3px; background-color: #fff8f0; padding: 2px;">PM COUNTS</div>
+                    
+                    <div class="cash-count">
+                        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 1</div>
+                        ${['$100', '$50', '$20', '$10', '$5', '$1', '¢25', '¢10', '¢5', '¢1'].map(denom => {
+                          const data = getDenomData(pmData.pm_drawer1_data, denom);
+                          return `<div>${denom}: ${data.count} = $${data.total}</div>`;
+                        }).join('')}
+                        <div class="drawer-total">TOTAL: $${pmData.pm_drawer1_total.toFixed(2)}</div>
+                    </div>
+                    
+                    <div class="cash-count" style="margin-top: 4px;">
+                        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 2</div>
+                        ${['$100', '$50', '$20', '$10', '$5', '$1', '¢25', '¢10', '¢5', '¢1'].map(denom => {
+                          const data = getDenomData(pmData.pm_drawer2_data, denom);
+                          return `<div>${denom}: ${data.count} = $${data.total}</div>`;
+                        }).join('')}
+                        <div class="drawer-total">TOTAL: $${pmData.pm_drawer2_total.toFixed(2)}</div>
+                    </div>
+                    
+                    <div class="shift-total pm-bg">TOTAL PM: $${pmData.pm_total.toFixed(2)}</div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
     `;
     
     console.log('Generated HTML length:', htmlContent.length);
-    console.log('First 200 chars of HTML:', htmlContent.substring(0, 200));
     return htmlContent;
+  }
   }
   
   function generateDateRangeReportHtml(startDate, endDate, data) {
