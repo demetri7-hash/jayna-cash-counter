@@ -684,7 +684,7 @@
         <button class="submit-btn" onclick="generateAndDownloadReport()" style="background: #007bff;">Generate & Download PDF Report</button>
         
         <!-- Hidden Report Display for PDF generation -->
-        <div id="reportDisplay" style="display: none; position: absolute; left: -9999px; width: 800px;">
+        <div id="reportDisplay" style="display: none; position: fixed; top: 0; left: 0; width: 800px; background: white; z-index: 9999; opacity: 0; pointer-events: none;">
           <div id="reportContent"></div>
         </div>
         
@@ -1870,6 +1870,25 @@
   async function generatePDF(element, filename) {
     console.log('Generating PDF with filename:', filename);
     
+    // Temporarily make the element visible for PDF generation
+    const reportDisplay = document.getElementById('reportDisplay');
+    const originalDisplay = reportDisplay.style.display;
+    const originalOpacity = reportDisplay.style.opacity;
+    
+    // Make visible but transparent
+    reportDisplay.style.display = 'block';
+    reportDisplay.style.opacity = '1';
+    
+    // Wait a moment for rendering
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    console.log('Element dimensions:', {
+      offsetWidth: element.offsetWidth,
+      offsetHeight: element.offsetHeight,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight
+    });
+    
     // Configure PDF options
     const opt = {
       margin: 0.5,
@@ -1879,8 +1898,9 @@
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
-        width: 800,
-        height: element.scrollHeight
+        width: element.offsetWidth || 800,
+        height: element.scrollHeight || element.offsetHeight || 600,
+        logging: true
       },
       jsPDF: { 
         unit: 'in', 
@@ -1889,9 +1909,15 @@
       }
     };
     
-    // Generate and download PDF
-    await html2pdf().set(opt).from(element).save();
-    console.log('PDF generated and downloaded successfully');
+    try {
+      // Generate PDF
+      await html2pdf().set(opt).from(element).save();
+      console.log('PDF generated and downloaded successfully');
+    } finally {
+      // Restore original visibility
+      reportDisplay.style.display = originalDisplay;
+      reportDisplay.style.opacity = originalOpacity;
+    }
   }
   
   function generateSingleDayReportHtml(date, amData, pmData) {
