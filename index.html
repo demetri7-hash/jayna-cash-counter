@@ -2206,13 +2206,19 @@
     let totalToastSalesReported = 0;
     let totalActualCashIn = 0;
     let totalDiscrepancy = 0;
+    let totalOriginalCashTips = 0;
+    let totalAdjustedCashTips = 0;
     let totalEnvelopeDeposits = 0;
+    let totalBackToCashbox = 0;
     
     rangeData.forEach(day => {
       totalToastSalesReported += day.pm_toast_sales || 0;
       totalActualCashIn += (day.pm_total - day.am_total) || 0;
       totalDiscrepancy += day.pm_discrepancy || 0;
+      totalOriginalCashTips += day.pm_cash_tips || 0;
+      totalAdjustedCashTips += day.pm_adjusted_tips || 0;
       totalEnvelopeDeposits += day.pm_deposit_amount || 0;
+      totalBackToCashbox += day.pm_amount_to_keep || 0;
     });
     
     // Set up the document
@@ -2242,26 +2248,36 @@
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
     
-    // Total Toast Sales
+    // Row 1: Total Toast Sales and Total Actual Cash In
     doc.setFillColor(230, 243, 255);
     doc.rect(margin, yPosition, 250, 30, 'F');
     doc.text('TOTAL TOAST CASH SALES', margin + 125, yPosition + 12, { align: 'center' });
     doc.text(`$${totalToastSalesReported.toFixed(2)}`, margin + 125, yPosition + 25, { align: 'center' });
     
-    // Total Actual Cash In
     doc.setFillColor(240, 248, 255);
     doc.rect(margin + 260, yPosition, 250, 30, 'F');
     doc.text('TOTAL ACTUAL CASH IN', margin + 385, yPosition + 12, { align: 'center' });
     doc.text(`$${totalActualCashIn.toFixed(2)}`, margin + 385, yPosition + 25, { align: 'center' });
     yPosition += 40;
     
-    // Total Discrepancy
+    // Row 2: Total Discrepancy and Original Cash Tips
     doc.setFillColor(255, 230, 230);
     doc.rect(margin, yPosition, 250, 30, 'F');
     doc.text('TOTAL DISCREPANCY', margin + 125, yPosition + 12, { align: 'center' });
     doc.text(`${totalDiscrepancy >= 0 ? '+' : ''}$${totalDiscrepancy.toFixed(2)}`, margin + 125, yPosition + 25, { align: 'center' });
     
-    // Total Envelope Deposits
+    doc.setFillColor(255, 243, 224);
+    doc.rect(margin + 260, yPosition, 250, 30, 'F');
+    doc.text('TOTAL ORIGINAL CASH TIPS', margin + 385, yPosition + 12, { align: 'center' });
+    doc.text(`$${totalOriginalCashTips.toFixed(2)}`, margin + 385, yPosition + 25, { align: 'center' });
+    yPosition += 40;
+    
+    // Row 3: Adjusted Cash Tips and Envelope Deposits
+    doc.setFillColor(243, 229, 245);
+    doc.rect(margin, yPosition, 250, 30, 'F');
+    doc.text('TOTAL ADJUSTED CASH TIPS', margin + 125, yPosition + 12, { align: 'center' });
+    doc.text(`$${totalAdjustedCashTips.toFixed(2)}`, margin + 125, yPosition + 25, { align: 'center' });
+    
     doc.setFillColor(232, 245, 232);
     doc.rect(margin + 260, yPosition, 250, 30, 'F');
     doc.text('TOTAL ENVELOPE DEPOSITS', margin + 385, yPosition + 12, { align: 'center' });
@@ -2276,7 +2292,7 @@
     
     // Table headers
     const tableData = [
-      ['Date', 'Counter', 'Toast Sales', 'Actual Cash In', 'Discrepancy', 'Envelope']
+      ['Date', 'Counter', 'Toast Sales', 'Actual Cash In', 'Discrepancy', 'Original Tips', 'Adjusted Tips', 'Envelope']
     ];
     
     rangeData.forEach(day => {
@@ -2290,6 +2306,8 @@
         `$${(day.pm_toast_sales || 0).toFixed(2)}`,
         `$${actualCashIn.toFixed(2)}`,
         `${discrepancySign}$${Math.abs(day.pm_discrepancy || 0).toFixed(2)}`,
+        `$${(day.pm_cash_tips || 0).toFixed(2)}`,
+        `$${(day.pm_adjusted_tips || 0).toFixed(2)}`,
         `$${(day.pm_deposit_amount || 0).toFixed(2)}`
       ]);
     });
@@ -2300,15 +2318,17 @@
       body: tableData.slice(1),
       startY: yPosition,
       margin: { left: margin, right: margin },
-      styles: { fontSize: 9, cellPadding: 3 },
+      styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [240, 240, 240], fontStyle: 'bold' },
       columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: 60, halign: 'center' },
-        2: { cellWidth: 80, halign: 'right' },
-        3: { cellWidth: 80, halign: 'right' },
-        4: { cellWidth: 80, halign: 'right' },
-        5: { cellWidth: 80, halign: 'right' }
+        0: { cellWidth: 70 },
+        1: { cellWidth: 50, halign: 'center' },
+        2: { cellWidth: 65, halign: 'right' },
+        3: { cellWidth: 65, halign: 'right' },
+        4: { cellWidth: 65, halign: 'right' },
+        5: { cellWidth: 65, halign: 'right' },
+        6: { cellWidth: 65, halign: 'right' },
+        7: { cellWidth: 65, halign: 'right' }
       }
     });
     
