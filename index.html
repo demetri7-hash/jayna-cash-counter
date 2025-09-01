@@ -1394,9 +1394,13 @@
     const adjustedTips = Math.floor(finalCashTips);
     
     // Deposit amount = Toast + Original Tips (what staff sees)
-    const depositAmount = toastSales + cashTips;
+    const rawDepositAmount = toastSales + cashTips;
     
-    // Return to cashbox = AM Total + any overage + any tip decimal remainder
+    // IMPORTANT: Deposit amount is rounded to nearest dollar in PM flow
+    const depositAmount = Math.round(rawDepositAmount);
+    const depositRoundingAdjustment = rawDepositAmount - depositAmount;
+    
+    // Return to cashbox = AM Total + any overage + any tip decimal remainder + deposit rounding adjustment
     let returnAmount = amTotal;
     if (discrepancy > 0) {
       // Add overage to cashbox
@@ -1406,6 +1410,9 @@
       const tipRemainder = finalCashTips - adjustedTips;
       returnAmount += tipRemainder;
     }
+    
+    // Add deposit rounding adjustment to cashbox (when deposit is rounded up, remainder comes from cashbox)
+    returnAmount += depositRoundingAdjustment;
     
     return {
       amTotal,
@@ -2068,7 +2075,7 @@
     doc.rect(margin, yPosition, contentWidth, 25, 'F');
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
-    doc.text(`DEPOSIT IN ENVELOPE: $${calculations.depositAmount.toFixed(2)}`, pageWidth / 2, yPosition + 15, { align: 'center' });
+    doc.text(`DEPOSIT IN ENVELOPE: $${calculations.depositAmount}`, pageWidth / 2, yPosition + 15, { align: 'center' });
     yPosition += 35;
     
     doc.setFillColor(255, 240, 230);
@@ -2312,7 +2319,7 @@
     doc.setFillColor(232, 245, 232);
     doc.rect(margin + 260, yPosition, 250, 30, 'F');
     doc.text('TOTAL ENVELOPE DEPOSITS', margin + 385, yPosition + 12, { align: 'center' });
-    doc.text(`$${totalEnvelopeDeposits.toFixed(2)}`, margin + 385, yPosition + 25, { align: 'center' });
+    doc.text(`$${totalEnvelopeDeposits}`, margin + 385, yPosition + 25, { align: 'center' });
     yPosition += 50;
     
     // Daily breakdown table
@@ -2340,7 +2347,7 @@
         `${discrepancySign}$${Math.abs(calc.discrepancy).toFixed(2)}`,
         `$${calc.cashTips.toFixed(2)}`,
         `$${calc.adjustedTips.toFixed(2)}`,
-        `$${calc.depositAmount.toFixed(2)}`
+        `$${Math.round(calc.depositAmount)}`
       ]);
     });
     
@@ -2644,7 +2651,7 @@
 
         <!-- Deposit Instructions -->
         <div class="deposit-box">
-            DEPOSIT IN ENVELOPE: $${pmData.pm_deposit_amount.toFixed(2)}
+            DEPOSIT IN ENVELOPE: $${pmData.pm_deposit_amount}
             <div style="font-size: 8px;">(Toast Sales $${pmData.pm_toast_sales.toFixed(2)} + Original Tips $${pmData.pm_cash_tips.toFixed(2)})</div>
         </div>
         <div class="keep-box">
@@ -2889,7 +2896,7 @@
           
           <div style="background: #e8f5e8; padding: 15px; border: 2px solid #000; border-radius: 8px; text-align: center;">
             <h4 style="margin: 0 0 8px 0; color: #2e7d32; font-size: 12px;">TOTAL ENVELOPE DEPOSITS</h4>
-            <p style="font-size: 20px; font-weight: bold; margin: 0; color: #2e7d32;">$${totalEnvelopeDeposits.toFixed(2)}</p>
+            <p style="font-size: 20px; font-weight: bold; margin: 0; color: #2e7d32;">$${totalEnvelopeDeposits}</p>
           </div>
           
           <div style="background: #fff8e1; padding: 15px; border: 2px solid #000; border-radius: 8px; text-align: center;">
