@@ -393,7 +393,8 @@
   
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -1932,54 +1933,387 @@
   async function generatePDF(element, filename) {
     console.log('Generating PDF with filename:', filename);
     
-    // Temporarily make the element visible for PDF generation
-    const reportDisplay = document.getElementById('reportDisplay');
-    const originalDisplay = reportDisplay.style.display;
-    const originalOpacity = reportDisplay.style.opacity;
+    try {
+      // Get the HTML content from the element
+      const reportContent = element.innerHTML;
+      
+      // Check if this is a single day report (look for specific content)
+      if (reportContent.includes('COMPLETE CASH COUNT BREAKDOWN')) {
+        await generateSingleDayPDFDirect(filename);
+      } else {
+        await generateDateRangePDFDirect(filename);
+      }
+      
+      console.log('PDF generated and downloaded successfully');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      throw new Error('Failed to generate PDF: ' + error.message);
+    }
+  }
+  
+  async function generateSingleDayPDFDirect(filename) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('portrait', 'pt', 'letter');
     
-    // Make visible but transparent
-    reportDisplay.style.display = 'block';
-    reportDisplay.style.opacity = '1';
+    // Get current report data from the last generated report
+    const reportDate = document.getElementById('reportStartDate')?.value || document.getElementById('reportDate')?.value;
     
-    // Wait a moment for rendering
-    await new Promise(resolve => setTimeout(resolve, 100));
+    if (!reportDate) {
+      throw new Error('No report date found');
+    }
     
-    console.log('Element dimensions:', {
-      offsetWidth: element.offsetWidth,
-      offsetHeight: element.offsetHeight,
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight
+    // Get the data
+    const amData = await getAMData(reportDate);
+    const { data: pmResults } = await supabase
+      .from('cash_counts')
+      .select('*')
+      .eq('date', reportDate)
+      .not('pm_total', 'is', null)
+      .single();
+    
+    if (!amData || !pmResults) {
+      throw new Error('Missing report data for PDF generation');
+    }
+    
+    // Set up the document
+    let yPosition = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    const contentWidth = pageWidth - (margin * 2);
+    
+    // Header
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('JAYNA GYRO DAILY CASH REPORT', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 25;
+    
+    // Date
+    const dateObj = new Date(reportDate + 'T12:00:00');
+    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    const formattedDate = dateObj.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }).toUpperCase();
+    
+    doc.setFontSize(14);
+    doc.text(`${dayOfWeek} ${formattedDate}`, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 20;
+    
+    // Report generation timestamp
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Report Generated: ${new Date().toLocaleString()}`, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 30;
+    
+    // Staff and timing info
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('STAFF & TIMING INFORMATION', margin, yPosition);
+    yPosition += 20;
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    const staffData = [
+      ['AM Counter:', amData.counter, 'PM Counter:', pmResults.pm_counter],
+      ['AM Time:', new Date(amData.timestamp).toLocaleTimeString(), 'PM Time:', new Date(pmResults.pm_timestamp).toLocaleTimeString()]
+    ];
+    
+    staffData.forEach(row => {
+      doc.text(row[0], margin, yPosition);
+      doc.text(row[1], margin + 120, yPosition);
+      doc.text(row[2], margin + 280, yPosition);
+      doc.text(row[3], margin + 400, yPosition);
+      yPosition += 15;
+    });
+    yPosition += 15;
+    
+    // Cash flow summary
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('CASH FLOW SUMMARY', margin, yPosition);
+    yPosition += 20;
+    
+    const actualCashIn = pmResults.pm_total - amData.total;
+    const discrepancySign = pmResults.pm_discrepancy >= 0 ? '+' : '';
+    
+    const cashFlowData = [
+      ['Starting Cash (AM):', `$${amData.total.toFixed(2)}`, 'Toast Sales:', `$${pmResults.pm_toast_sales.toFixed(2)}`],
+      ['Ending Cash (PM):', `$${pmResults.pm_total.toFixed(2)}`, 'Original Tips:', `$${pmResults.pm_cash_tips.toFixed(2)}`],
+      ['Actual Cash In:', `$${actualCashIn.toFixed(2)}`, 'Discrepancy:', `${discrepancySign}$${Math.abs(pmResults.pm_discrepancy).toFixed(2)}`]
+    ];
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    cashFlowData.forEach(row => {
+      doc.text(row[0], margin, yPosition);
+      doc.text(row[1], margin + 120, yPosition);
+      doc.text(row[2], margin + 280, yPosition);
+      doc.text(row[3], margin + 400, yPosition);
+      yPosition += 15;
+    });
+    yPosition += 20;
+    
+    // Deposit and return boxes
+    doc.setFillColor(230, 255, 230);
+    doc.rect(margin, yPosition, contentWidth, 25, 'F');
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text(`DEPOSIT IN ENVELOPE: $${pmResults.pm_deposit_amount.toFixed(2)}`, pageWidth / 2, yPosition + 15, { align: 'center' });
+    yPosition += 35;
+    
+    doc.setFillColor(255, 240, 230);
+    doc.rect(margin, yPosition, contentWidth, 25, 'F');
+    doc.text(`RETURN TO CASHBOX/SAFE: $${pmResults.pm_amount_to_keep.toFixed(2)}`, pageWidth / 2, yPosition + 15, { align: 'center' });
+    yPosition += 45;
+    
+    // Check if we need a new page
+    if (yPosition > 650) {
+      doc.addPage();
+      yPosition = 40;
+    }
+    
+    // Cash count breakdown
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('COMPLETE CASH COUNT BREAKDOWN', margin, yPosition);
+    yPosition += 25;
+    
+    // Helper function for denomination data
+    function getDenomData(drawerData, denomKey) {
+      if (!drawerData) return { count: 0, total: 0 };
+      
+      const denomMapping = {
+        '$100': 'hundreds', '$50': 'fifties', '$20': 'twenties', '$10': 'tens',
+        '$5': 'fives', '$1': 'ones', '¢25': 'quarters', '¢10': 'dimes', 
+        '¢5': 'nickels', '¢1': 'pennies'
+      };
+      
+      const dataKey = denomMapping[denomKey];
+      if (!dataKey) return { count: 0, total: 0 };
+      
+      const count = parseInt(drawerData[dataKey]) || 0;
+      const denomValues = {
+        '$100': 100, '$50': 50, '$20': 20, '$10': 10, '$5': 5, '$1': 1,
+        '¢25': 0.25, '¢10': 0.10, '¢5': 0.05, '¢1': 0.01
+      };
+      const value = denomValues[denomKey] || 0;
+      return { count, total: (count * value).toFixed(2) };
+    }
+    
+    // AM Counts column
+    const startY = yPosition;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('AM COUNTS', margin + 100, yPosition);
+    yPosition += 20;
+    
+    // AM Drawer 1
+    doc.setFont(undefined, 'bold');
+    doc.text('DRAWER 1', margin, yPosition);
+    yPosition += 15;
+    
+    doc.setFont(undefined, 'normal');
+    const denoms = ['$100', '$50', '$20', '$10', '$5', '$1', '¢25', '¢10', '¢5', '¢1'];
+    denoms.forEach(denom => {
+      const data = getDenomData(amData.drawer1.counts, denom);
+      doc.text(`${denom}: ${data.count} = $${data.total}`, margin, yPosition);
+      yPosition += 12;
     });
     
-    // Configure PDF options
-    const opt = {
-      margin: 0.5,
-      filename: filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        width: element.offsetWidth || 800,
-        height: element.scrollHeight || element.offsetHeight || 600,
-        logging: true
-      },
-      jsPDF: { 
-        unit: 'in', 
-        format: 'letter', 
-        orientation: 'portrait' 
-      }
-    };
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL: $${amData.drawer1.total.toFixed(2)}`, margin, yPosition);
+    yPosition += 20;
     
-    try {
-      // Generate PDF
-      await html2pdf().set(opt).from(element).save();
-      console.log('PDF generated and downloaded successfully');
-    } finally {
-      // Restore original visibility
-      reportDisplay.style.display = originalDisplay;
-      reportDisplay.style.opacity = originalOpacity;
+    // AM Drawer 2
+    doc.text('DRAWER 2', margin, yPosition);
+    yPosition += 15;
+    
+    doc.setFont(undefined, 'normal');
+    denoms.forEach(denom => {
+      const data = getDenomData(amData.drawer2.counts, denom);
+      doc.text(`${denom}: ${data.count} = $${data.total}`, margin, yPosition);
+      yPosition += 12;
+    });
+    
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL: $${amData.drawer2.total.toFixed(2)}`, margin, yPosition);
+    yPosition += 15;
+    doc.text(`TOTAL AM: $${amData.total.toFixed(2)}`, margin, yPosition);
+    
+    // PM Counts column  
+    yPosition = startY + 20;
+    const pmColumn = margin + 280;
+    doc.setFont(undefined, 'bold');
+    doc.text('PM COUNTS', pmColumn + 100, startY);
+    
+    // PM Drawer 1
+    doc.text('DRAWER 1', pmColumn, yPosition);
+    yPosition += 15;
+    
+    doc.setFont(undefined, 'normal');
+    denoms.forEach(denom => {
+      const data = getDenomData(pmResults.pm_drawer1_data, denom);
+      doc.text(`${denom}: ${data.count} = $${data.total}`, pmColumn, yPosition);
+      yPosition += 12;
+    });
+    
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL: $${pmResults.pm_drawer1_total.toFixed(2)}`, pmColumn, yPosition);
+    yPosition += 20;
+    
+    // PM Drawer 2
+    doc.text('DRAWER 2', pmColumn, yPosition);
+    yPosition += 15;
+    
+    doc.setFont(undefined, 'normal');
+    denoms.forEach(denom => {
+      const data = getDenomData(pmResults.pm_drawer2_data, denom);
+      doc.text(`${denom}: ${data.count} = $${data.total}`, pmColumn, yPosition);
+      yPosition += 12;
+    });
+    
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL: $${pmResults.pm_drawer2_total.toFixed(2)}`, pmColumn, yPosition);
+    yPosition += 15;
+    doc.text(`TOTAL PM: $${pmResults.pm_total.toFixed(2)}`, pmColumn, yPosition);
+    
+    // Save the PDF
+    doc.save(filename);
+  }
+  
+  async function generateDateRangePDFDirect(filename) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('portrait', 'pt', 'letter');
+    
+    // Get date range data
+    const startDate = document.getElementById('reportStartDate').value;
+    const endDate = document.getElementById('reportEndDate').value;
+    
+    const { data: rangeData } = await supabase
+      .from('cash_counts')
+      .select('*')
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .not('pm_total', 'is', null)
+      .order('date', { ascending: true });
+    
+    if (!rangeData || rangeData.length === 0) {
+      throw new Error('No data found for this date range');
     }
+    
+    // Calculate totals
+    let totalToastSalesReported = 0;
+    let totalActualCashIn = 0;
+    let totalDiscrepancy = 0;
+    let totalEnvelopeDeposits = 0;
+    
+    rangeData.forEach(day => {
+      totalToastSalesReported += day.pm_toast_sales || 0;
+      totalActualCashIn += (day.pm_total - day.am_total) || 0;
+      totalDiscrepancy += day.pm_discrepancy || 0;
+      totalEnvelopeDeposits += day.pm_deposit_amount || 0;
+    });
+    
+    // Set up the document
+    let yPosition = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    
+    // Header
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('**CONFIDENTIAL**', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 20;
+    doc.text('JAYNA GYRO MULTI-DAY CASH REPORT', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 25;
+    
+    // Date range
+    doc.setFontSize(12);
+    const startDateFormatted = new Date(startDate + 'T12:00:00').toLocaleDateString();
+    const endDateFormatted = new Date(endDate + 'T12:00:00').toLocaleDateString();
+    doc.text(`${startDateFormatted} - ${endDateFormatted}`, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 15;
+    doc.setFontSize(10);
+    doc.text(`${rangeData.length} days included`, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 30;
+    
+    // Key totals grid
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    
+    // Total Toast Sales
+    doc.setFillColor(230, 243, 255);
+    doc.rect(margin, yPosition, 250, 30, 'F');
+    doc.text('TOTAL TOAST CASH SALES', margin + 125, yPosition + 12, { align: 'center' });
+    doc.text(`$${totalToastSalesReported.toFixed(2)}`, margin + 125, yPosition + 25, { align: 'center' });
+    
+    // Total Actual Cash In
+    doc.setFillColor(240, 248, 255);
+    doc.rect(margin + 260, yPosition, 250, 30, 'F');
+    doc.text('TOTAL ACTUAL CASH IN', margin + 385, yPosition + 12, { align: 'center' });
+    doc.text(`$${totalActualCashIn.toFixed(2)}`, margin + 385, yPosition + 25, { align: 'center' });
+    yPosition += 40;
+    
+    // Total Discrepancy
+    doc.setFillColor(255, 230, 230);
+    doc.rect(margin, yPosition, 250, 30, 'F');
+    doc.text('TOTAL DISCREPANCY', margin + 125, yPosition + 12, { align: 'center' });
+    doc.text(`${totalDiscrepancy >= 0 ? '+' : ''}$${totalDiscrepancy.toFixed(2)}`, margin + 125, yPosition + 25, { align: 'center' });
+    
+    // Total Envelope Deposits
+    doc.setFillColor(232, 245, 232);
+    doc.rect(margin + 260, yPosition, 250, 30, 'F');
+    doc.text('TOTAL ENVELOPE DEPOSITS', margin + 385, yPosition + 12, { align: 'center' });
+    doc.text(`$${totalEnvelopeDeposits.toFixed(2)}`, margin + 385, yPosition + 25, { align: 'center' });
+    yPosition += 50;
+    
+    // Daily breakdown table
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(12);
+    doc.text('DAILY BREAKDOWN', margin, yPosition);
+    yPosition += 20;
+    
+    // Table headers
+    const tableData = [
+      ['Date', 'Counter', 'Toast Sales', 'Actual Cash In', 'Discrepancy', 'Envelope']
+    ];
+    
+    rangeData.forEach(day => {
+      const actualCashIn = day.pm_total - day.am_total;
+      const discrepancySign = day.pm_discrepancy >= 0 ? '+' : '';
+      const dateFormatted = new Date(day.date + 'T12:00:00').toLocaleDateString();
+      
+      tableData.push([
+        dateFormatted,
+        day.pm_counter || 'N/A',
+        `$${(day.pm_toast_sales || 0).toFixed(2)}`,
+        `$${actualCashIn.toFixed(2)}`,
+        `${discrepancySign}$${Math.abs(day.pm_discrepancy || 0).toFixed(2)}`,
+        `$${(day.pm_deposit_amount || 0).toFixed(2)}`
+      ]);
+    });
+    
+    // Generate table
+    doc.autoTable({
+      head: [tableData[0]],
+      body: tableData.slice(1),
+      startY: yPosition,
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [240, 240, 240], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 80 },
+        1: { cellWidth: 60, halign: 'center' },
+        2: { cellWidth: 80, halign: 'right' },
+        3: { cellWidth: 80, halign: 'right' },
+        4: { cellWidth: 80, halign: 'right' },
+        5: { cellWidth: 80, halign: 'right' }
+      }
+    });
+    
+    // Save the PDF
+    doc.save(filename);
   }
   
   function generateSingleDayReportHtml(date, amData, pmData) {
