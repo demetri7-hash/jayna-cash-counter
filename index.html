@@ -2006,51 +2006,177 @@
   async function generatePDF(element, filename) {
     console.log('Generating PDF with filename:', filename);
     
-    // Use jsPDF for reliable PDF generation instead of html2pdf.js
+    // Use jsPDF for reliable PDF generation
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
     
-    // Extract text content from the element
-    const content = element.textContent || element.innerText || 'No content available';
-    const lines = content.split('\n').filter(line => line.trim() !== '');
-    
     let yPosition = 20;
     const pageHeight = doc.internal.pageSize.getHeight();
-    const lineHeight = 6;
-    const margin = 10;
-    const maxWidth = 190; // A4 width minus margins
+    const margin = 15;
+    const pageWidth = doc.internal.pageSize.getWidth() - (margin * 2);
     
-    doc.setFontSize(10);
-    
-    for (let i = 0; i < lines.length; i++) {
-      // Check if we need a new page
-      if (yPosition > pageHeight - 20) {
+    // Helper function to add a new page if needed
+    function checkPageBreak(neededHeight = 10) {
+      if (yPosition + neededHeight > pageHeight - 20) {
         doc.addPage();
         yPosition = 20;
       }
+    }
+    
+    // Helper function to add text with word wrapping
+    function addText(text, fontSize = 10, isBold = false, align = 'left') {
+      doc.setFontSize(fontSize);
+      doc.setFont('helvetica', isBold ? 'bold' : 'normal');
       
-      const line = lines[i].trim();
-      if (line.length === 0) {
-        yPosition += lineHeight / 2; // Small space for empty lines
-        continue;
-      }
+      const lines = doc.splitTextToSize(text, pageWidth);
+      checkPageBreak(lines.length * (fontSize * 0.5));
       
-      // Split long lines to fit page width
-      const splitLines = doc.splitTextToSize(line, maxWidth);
-      
-      for (let j = 0; j < splitLines.length; j++) {
-        if (yPosition > pageHeight - 20) {
-          doc.addPage();
-          yPosition = 20;
+      for (let i = 0; i < lines.length; i++) {
+        let xPosition = margin;
+        if (align === 'center') {
+          xPosition = (doc.internal.pageSize.getWidth() - doc.getTextWidth(lines[i])) / 2;
         }
-        doc.text(splitLines[j], margin, yPosition);
-        yPosition += lineHeight;
+        doc.text(lines[i], xPosition, yPosition);
+        yPosition += fontSize * 0.5;
       }
+    }
+    
+    // Helper function to add a line
+    function addLine() {
+      checkPageBreak(5);
+      doc.line(margin, yPosition, doc.internal.pageSize.getWidth() - margin, yPosition);
+      yPosition += 5;
+    }
+    
+    // Parse the HTML element and extract structured data
+    const headerElement = element.querySelector('.header');
+    const dateElement = element.querySelector('.date-header');
+    
+    // Add header
+    if (headerElement) {
+      addText(headerElement.textContent.trim(), 16, true, 'center');
+      yPosition += 5;
+    }
+    
+    if (dateElement) {
+      addText(dateElement.textContent.trim(), 14, true, 'center');
+      addLine();
+    }
+    
+    // Extract report generation time
+    const reportTime = element.textContent.match(/Report Generated: ([^\n]+)/);
+    if (reportTime) {
+      addText('Report Generated: ' + reportTime[1], 8, false, 'center');
+      yPosition += 10;
+    }
+    
+    // Extract counter information
+    const amCounterMatch = element.textContent.match(/AM Counter:\s*([^\n]+)/);
+    const amTimeMatch = element.textContent.match(/AM Time:\s*([^\n]+)/);
+    const pmCounterMatch = element.textContent.match(/PM Counter:\s*([^\n]+)/);
+    const pmTimeMatch = element.textContent.match(/PM Time:\s*([^\n]+)/);
+    
+    if (amCounterMatch && amTimeMatch && pmCounterMatch && pmTimeMatch) {
+      addText('SHIFT INFORMATION', 12, true, 'center');
+      yPosition += 5;
+      addText(`AM Counter: ${amCounterMatch[1].trim()}  |  Time: ${amTimeMatch[1].trim()}`, 10);
+      addText(`PM Counter: ${pmCounterMatch[1].trim()}  |  Time: ${pmTimeMatch[1].trim()}`, 10);
+      yPosition += 10;
+    }
+    
+    // Extract cash flow summary
+    const cashFlowSection = element.textContent.match(/CASH FLOW SUMMARY([\s\S]*?)DEPOSIT IN ENVELOPE/);
+    if (cashFlowSection) {
+      addText('CASH FLOW SUMMARY', 12, true, 'center');
+      addLine();
+      
+      const lines = cashFlowSection[1].trim().split('\n').filter(line => line.trim());
+      for (const line of lines) {
+        if (line.includes(':')) {
+          const [label, value] = line.split(':').map(s => s.trim());
+          if (value) {
+            addText(`${label}: ${value}`, 10);
+          }
+        }
+      }
+      yPosition += 10;
+    }
+    
+    // Extract deposit information
+    const depositMatch = element.textContent.match(/DEPOSIT IN ENVELOPE: ([^\n]+)/);
+    const returnMatch = element.textContent.match(/RETURN TO CASHBOX\/SAFE: ([^\n]+)/);
+    
+    if (depositMatch || returnMatch) {
+      addText('DEPOSIT & RETURN AMOUNTS', 12, true, 'center');
+      addLine();
+      
+      if (depositMatch) {
+        addText(`DEPOSIT IN ENVELOPE: ${depositMatch[1]}`, 11, true);
+      }
+      if (returnMatch) {
+        addText(`RETURN TO CASHBOX/SAFE: ${returnMatch[1]}`, 11, true);
+      }
+      yPosition += 10;
+    }
+    
+    // Extract notes
+    const amNotesMatch = element.textContent.match(/AM NOTES\s*([^\n]*(?:\n(?!PM NOTES)[^\n]*)*)/);
+    const pmNotesMatch = element.textContent.match(/PM NOTES\s*([^\n]*(?:\n(?!MANAGER)[^\n]*)*)/);
+    
+    if (amNotesMatch || pmNotesMatch) {
+      addText('NOTES', 12, true, 'center');
+      addLine();
+      
+      if (amNotesMatch) {
+        const amNotes = amNotesMatch[1].trim() || 'No AM Notes';
+        addText(`AM Notes: ${amNotes}`, 10);
+      }
+      
+      if (pmNotesMatch) {
+        const pmNotes = pmNotesMatch[1].trim() || 'No PM Notes';
+        addText(`PM Notes: ${pmNotes}`, 10);
+      }
+      yPosition += 10;
+    }
+    
+    // Extract cash count details
+    const amCountsMatch = element.textContent.match(/AM COUNTS([\s\S]*?)PM COUNTS/);
+    const pmCountsMatch = element.textContent.match(/PM COUNTS([\s\S]*?)DRAWER TOTALS/);
+    
+    if (amCountsMatch) {
+      checkPageBreak(50);
+      addText('AM CASH COUNTS', 12, true, 'center');
+      addLine();
+      
+      const amText = amCountsMatch[1].replace(/\s+/g, ' ').trim();
+      addText(amText, 9);
+      yPosition += 10;
+    }
+    
+    if (pmCountsMatch) {
+      checkPageBreak(50);
+      addText('PM CASH COUNTS', 12, true, 'center');
+      addLine();
+      
+      const pmText = pmCountsMatch[1].replace(/\s+/g, ' ').trim();
+      addText(pmText, 9);
+      yPosition += 10;
+    }
+    
+    // Extract drawer totals summary
+    const drawerTotalsMatch = element.textContent.match(/DRAWER TOTALS SUMMARY([\s\S]*?)$/);
+    if (drawerTotalsMatch) {
+      checkPageBreak(30);
+      addText('DRAWER TOTALS SUMMARY', 12, true, 'center');
+      addLine();
+      
+      const totalsText = drawerTotalsMatch[1].trim();
+      addText(totalsText, 10);
     }
     
     // Save the PDF
     doc.save(filename);
-    console.log('PDF generated and downloaded successfully with jsPDF');
+    console.log('PDF generated and downloaded successfully with formatted jsPDF');
   }
   
   function generateSingleDayReportHtml(date, amData, pmData) {
