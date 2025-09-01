@@ -393,8 +393,7 @@
   
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -729,7 +728,7 @@
   function showPMSuccess(depositAmount, returnAmount, discrepancy) {
     hideLoading();
     hideAllSections();
-    document.getElementById('depositAmount').textContent = `$${Math.round(depositAmount)}`;
+    document.getElementById('depositAmount').textContent = `$${depositAmount}`;
     document.getElementById('returnAmount').textContent = `$${returnAmount.toFixed(2)}`;
     document.getElementById('pmSuccessScreen').classList.add('active');
   }
@@ -1379,40 +1378,64 @@
     // Expected vs actual (Toast sales vs actual cash in)
     const discrepancy = actualCashIn - toastSales;
     
-    // Calculate tip adjustments
-    let tipAdjustment = 0;
-    let finalCashTips = cashTips;
-    
-    if (discrepancy < 0) {
-      // SHORTAGE: Remove from tips to cover exact restaurant amount
-      tipAdjustment = Math.abs(discrepancy);
-      finalCashTips = cashTips - tipAdjustment;
-    }
-    // If overage (discrepancy > 0), tips stay the same, overage goes to cashbox
-    
-    // Final tips are always whole dollars (floor)
-    const adjustedTips = Math.floor(finalCashTips);
-    
-    // Deposit amount = Toast + Original Tips (what staff sees)
+    // Step 1: Calculate raw deposit amount
     const rawDepositAmount = toastSales + cashTips;
     
-    // IMPORTANT: Deposit amount is rounded to nearest dollar in PM flow
+    // Step 2: Round deposit to whole dollars (what staff actually deposits)
     const depositAmount = Math.round(rawDepositAmount);
-    const depositRoundingAdjustment = rawDepositAmount - depositAmount;
     
-    // Return to cashbox = AM Total + any overage + any tip decimal remainder + deposit rounding adjustment
-    let returnAmount = amTotal;
-    if (discrepancy > 0) {
-      // Add overage to cashbox
-      returnAmount += discrepancy;
-    } else if (discrepancy < 0) {
-      // Add any decimal remainder from tip adjustment back to cashbox
-      const tipRemainder = finalCashTips - adjustedTips;
-      returnAmount += tipRemainder;
+    // Step 3: Calculate deposit rounding adjustment needed
+    const depositRoundingAdjustment = depositAmount - rawDepositAmount;
+    
+    // Step 4: Handle deposit rounding with whole dollar tip adjustments
+    let depositTipAdjustment = 0;
+    let depositExcessToCashbox = 0;
+    
+    if (depositRoundingAdjustment > 0) {
+      // Need extra money for rounding - take whole dollars from tips
+      depositTipAdjustment = Math.ceil(depositRoundingAdjustment);
+      depositExcessToCashbox = depositTipAdjustment - depositRoundingAdjustment;
+    } else if (depositRoundingAdjustment < 0) {
+      // Deposit rounded down - staff keeps the rounding benefit
+      depositExcessToCashbox = Math.abs(depositRoundingAdjustment);
     }
     
-    // Add deposit rounding adjustment to cashbox (when deposit is rounded up, remainder comes from cashbox)
-    returnAmount += depositRoundingAdjustment;
+    // Step 5: Handle shortage/overage adjustments with whole dollars
+    let shortageTipAdjustment = 0;
+    let shortageExcessToCashbox = 0;
+    
+    if (discrepancy < 0) {
+      // SHORTAGE: Take whole dollars from tips to cover shortage
+      const shortageAmount = Math.abs(discrepancy);
+      shortageTipAdjustment = Math.ceil(shortageAmount);
+      shortageExcessToCashbox = shortageTipAdjustment - shortageAmount;
+    }
+    
+    // Step 6: Calculate final tip amounts
+    const totalTipAdjustment = depositTipAdjustment + shortageTipAdjustment;
+    let finalCashTips = cashTips - totalTipAdjustment;
+    
+    // Ensure tips don't go negative
+    if (finalCashTips < 0) {
+      const shortfall = Math.abs(finalCashTips);
+      finalCashTips = 0;
+      // Add shortfall to what business owes staff (tracked but not paid)
+    }
+    
+    // Final tips are always whole dollars (floor any remaining decimals)
+    const adjustedTips = Math.floor(finalCashTips);
+    const tipDecimalRemainder = finalCashTips - adjustedTips;
+    
+    // Step 7: Calculate return amount to cashbox
+    let returnAmount = amTotal;
+    
+    // Add overage to cashbox
+    if (discrepancy > 0) {
+      returnAmount += discrepancy;
+    }
+    
+    // Add all excess amounts to cashbox
+    returnAmount += depositExcessToCashbox + shortageExcessToCashbox + tipDecimalRemainder;
     
     return {
       amTotal,
@@ -1422,14 +1445,22 @@
       toastSales,
       cashTips, // Original tips reported
       discrepancy,
-      tipAdjustment: discrepancy < 0 ? tipAdjustment : 0,
+      tipAdjustment: totalTipAdjustment, // Total amount taken from tips
       adjustedTips, // Final whole dollar tips
-      depositAmount, // Toast + Original Tips (what staff deposits)
+      depositAmount, // Rounded deposit amount (what staff deposits)
       returnAmount, // What goes back to cashbox
       drawerOver: discrepancy > 0 ? discrepancy : 0,
       drawerShort: discrepancy < 0 ? Math.abs(discrepancy) : 0,
       restaurantOwed: toastSales, // Exact Toast sales amount
-      staffOwed: adjustedTips // Final tips after adjustment
+      staffOwed: adjustedTips, // Final tips after adjustment
+      // New fields for tracking the logic
+      rawDepositAmount, // Original exact deposit amount
+      depositRoundingAdjustment, // How much rounding was needed
+      depositTipAdjustment, // Whole dollars taken from tips for rounding
+      depositExcessToCashbox, // Excess from deposit rounding adjustments
+      shortageTipAdjustment, // Whole dollars taken from tips for shortage
+      shortageExcessToCashbox, // Excess from shortage adjustments
+      tipDecimalRemainder // Decimal remainder from final tip flooring
     };
   }
   
@@ -1550,9 +1581,9 @@
       discrepancy_direction: calculations.discrepancy >= 0 ? 'Over' : 'Short',
       discrepancy_sign: calculations.discrepancy >= 0 ? '+' : '-',
       large_discrepancy_flag: Math.abs(calculations.discrepancy) > 10 ? ' ⚠️ LARGE DISCREPANCY!' : '',
-      tip_adjustment: calculations.tipAdjustment > 0 ? calculations.tipAdjustment.toFixed(2) : null,
-      adjusted_tips: calculations.adjustedTips.toFixed(2),
-      deposit_amount: Math.round(calculations.depositAmount).toString(),
+      tip_adjustment: (calculations.shortageTipAdjustment || 0) > 0 ? (calculations.shortageTipAdjustment || 0).toFixed(2) : null,
+      adjusted_tips: calculations.adjustedTips.toString(), // Whole dollars only
+      deposit_amount: calculations.depositAmount.toString(), // Already rounded to whole dollar
       amount_to_keep: calculations.returnAmount.toFixed(2), // Template expects amount_to_keep
       return_breakdown: (calculations.returnAmount - calculations.amTotal).toFixed(2),
       drawer_over: calculations.drawerOver.toFixed(2),
@@ -1572,6 +1603,13 @@
       restaurant_owed: calculations.toastSales.toFixed(2),
       staff_owed: calculations.adjustedTips.toString(), // Whole dollars only
       total_accounted: (calculations.toastSales + calculations.adjustedTips).toFixed(2),
+      
+      // Deposit rounding breakdown fields
+      raw_deposit_amount: calculations.rawDepositAmount ? calculations.rawDepositAmount.toFixed(2) : null,
+      deposit_rounding_adjustment: calculations.depositRoundingAdjustment ? calculations.depositRoundingAdjustment.toFixed(2) : null,
+      deposit_tip_adjustment: calculations.depositTipAdjustment ? calculations.depositTipAdjustment.toFixed(2) : null,
+      deposit_excess_to_cashbox: calculations.depositExcessToCashbox ? calculations.depositExcessToCashbox.toFixed(2) : null,
+      has_deposit_rounding: (calculations.depositRoundingAdjustment && Math.abs(calculations.depositRoundingAdjustment) > 0) ? 'true' : 'false',
       
       // AM Drawer 1 denomination breakdown
       am_drawer1_100: currentAMData ? (currentAMData.drawer1.counts.hundreds || 0) : 0,
@@ -1696,7 +1734,7 @@
         .single();
       
       if (fullData && fullData.pm_total) {
-        // Full day report
+        // Full day report - recalculate using the same logic as PM flow
         const reportData = {
           date: date,
           counter: fullData.pm_counter,
@@ -1707,19 +1745,13 @@
           notes: fullData.pm_notes
         };
         
-        const calculations = {
+        // Use same calculation function as PM flow for consistency
+        const calculations = calculatePMAmounts({
           amTotal: fullData.am_total,
-          pmTotal: fullData.pm_total,
-          drawerChange: fullData.pm_total - fullData.am_total,
+          total: fullData.pm_total,
           toastSales: fullData.pm_toast_sales,
-          cashTips: fullData.pm_cash_tips,
-          discrepancy: fullData.pm_discrepancy,
-          adjustedTips: fullData.pm_adjusted_tips,
-          depositAmount: fullData.pm_deposit_amount,
-          returnAmount: fullData.pm_amount_to_keep,
-          drawerOver: fullData.pm_drawer_over_amount || 0,
-          drawerShort: fullData.pm_discrepancy < 0 ? Math.abs(fullData.pm_discrepancy) : 0
-        };
+          cashTips: fullData.pm_cash_tips
+        });
         
         currentAMData = amData;
         await sendEmailReport(reportData, calculations);
@@ -1813,7 +1845,7 @@
             cursor: pointer;
             margin-right: 10px;
           ">Return to Menu</button>
-          <button onclick="closePDFSuccessModal(); showReports();" style="
+          <button onclick="closePDFSuccessModal();" style="
             background: #6c757d;
             color: white;
             border: none;
@@ -1866,8 +1898,29 @@
     }
     
     console.log('Generating report HTML...');
+    
+    // Calculate PM amounts using same logic as PM flow for consistency
+    const calculations = calculatePMAmounts({
+      amTotal: amData.total,
+      total: fullData.pm_total,
+      toastSales: fullData.pm_toast_sales,
+      cashTips: fullData.pm_cash_tips
+    });
+    
+    // Create enhanced pmData with calculation results
+    const enhancedPmData = {
+      ...fullData,
+      // Add calculated fields for deposit rounding breakdown
+      raw_deposit_amount: calculations.rawDepositAmount ? calculations.rawDepositAmount.toFixed(2) : null,
+      deposit_rounding_adjustment: calculations.depositRoundingAdjustment ? calculations.depositRoundingAdjustment.toFixed(2) : null,
+      deposit_tip_adjustment: calculations.depositTipAdjustment ? calculations.depositTipAdjustment.toFixed(2) : null,
+      deposit_excess_to_cashbox: calculations.depositExcessToCashbox ? calculations.depositExcessToCashbox.toFixed(2) : null,
+      has_deposit_rounding: (calculations.depositRoundingAdjustment && Math.abs(calculations.depositRoundingAdjustment) > 0) ? 'true' : 'false',
+      deposit_amount: calculations.depositAmount.toString()
+    };
+    
     // Generate full single day report (same format as email)
-    const reportHtml = generateSingleDayReportHtml(date, amData, fullData);
+    const reportHtml = generateSingleDayReportHtml(date, amData, enhancedPmData);
     console.log('Report HTML generated, creating PDF...');
     
     // Set the content in the hidden div
@@ -1940,439 +1993,54 @@
   async function generatePDF(element, filename) {
     console.log('Generating PDF with filename:', filename);
     
-    try {
-      // Get the HTML content from the element
-      const reportContent = element.innerHTML;
-      
-      // Check if this is a single day report (look for specific content)
-      if (reportContent.includes('COMPLETE CASH COUNT BREAKDOWN')) {
-        await generateSingleDayPDFDirect(filename);
-      } else {
-        await generateDateRangePDFDirect(filename);
+    // Temporarily make the element visible for PDF generation
+    const reportDisplay = document.getElementById('reportDisplay');
+    const originalDisplay = reportDisplay.style.display;
+    const originalOpacity = reportDisplay.style.opacity;
+    
+    // Make visible but transparent
+    reportDisplay.style.display = 'block';
+    reportDisplay.style.opacity = '1';
+    
+    // Wait a moment for rendering
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    console.log('Element dimensions:', {
+      offsetWidth: element.offsetWidth,
+      offsetHeight: element.offsetHeight,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight
+    });
+    
+    // Configure PDF options
+    const opt = {
+      margin: 0.5,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: element.offsetWidth || 800,
+        height: element.scrollHeight || element.offsetHeight || 600,
+        logging: true
+      },
+      jsPDF: { 
+        unit: 'in', 
+        format: 'letter', 
+        orientation: 'portrait' 
       }
-      
-      console.log('PDF generated and downloaded successfully');
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      throw new Error('Failed to generate PDF: ' + error.message);
-    }
-  }
-  
-  async function generateSingleDayPDFDirect(filename) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('portrait', 'pt', 'letter');
-    
-    // Get current report data from the last generated report
-    const reportDate = document.getElementById('reportStartDate')?.value || document.getElementById('reportDate')?.value;
-    
-    if (!reportDate) {
-      throw new Error('No report date found');
-    }
-    
-    // Get the data
-    const amData = await getAMData(reportDate);
-    const { data: pmResults } = await supabase
-      .from('cash_counts')
-      .select('*')
-      .eq('date', reportDate)
-      .not('pm_total', 'is', null)
-      .single();
-    
-    if (!amData || !pmResults) {
-      throw new Error('Missing report data for PDF generation');
-    }
-    
-    // IMPORTANT: Recalculate using the EXACT same logic as PM flow
-    const pmCalculationData = {
-      amTotal: amData.total,
-      total: pmResults.pm_total,
-      toastSales: pmResults.pm_toast_sales,
-      cashTips: pmResults.pm_cash_tips
     };
     
-    const calculations = calculatePMAmounts(pmCalculationData);
-    
-    // Set up the document
-    let yPosition = 40;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 40;
-    const contentWidth = pageWidth - (margin * 2);
-    
-    // Header
-    doc.setFontSize(16);
-    doc.setFont(undefined, 'bold');
-    doc.text('JAYNA GYRO DAILY CASH REPORT', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 25;
-    
-    // Date
-    const dateObj = new Date(reportDate + 'T12:00:00');
-    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
-    const formattedDate = dateObj.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    }).toUpperCase();
-    
-    doc.setFontSize(14);
-    doc.text(`${dayOfWeek} ${formattedDate}`, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 20;
-    
-    // Report generation timestamp
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Report Generated: ${new Date().toLocaleString()}`, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 30;
-    
-    // Staff and timing info
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('STAFF & TIMING INFORMATION', margin, yPosition);
-    yPosition += 20;
-    
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    const staffData = [
-      ['AM Counter:', amData.counter, 'PM Counter:', pmResults.pm_counter],
-      ['AM Time:', new Date(amData.timestamp).toLocaleTimeString(), 'PM Time:', new Date(pmResults.pm_timestamp).toLocaleTimeString()]
-    ];
-    
-    staffData.forEach(row => {
-      doc.text(row[0], margin, yPosition);
-      doc.text(row[1], margin + 120, yPosition);
-      doc.text(row[2], margin + 280, yPosition);
-      doc.text(row[3], margin + 400, yPosition);
-      yPosition += 15;
-    });
-    yPosition += 15;
-    
-    // Cash flow summary using CALCULATED values (not stored values)
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('CASH FLOW SUMMARY', margin, yPosition);
-    yPosition += 20;
-    
-    const discrepancySign = calculations.discrepancy >= 0 ? '+' : '';
-    
-    const cashFlowData = [
-      ['Starting Cash (AM):', `$${calculations.amTotal.toFixed(2)}`, 'Toast Sales:', `$${calculations.toastSales.toFixed(2)}`],
-      ['Ending Cash (PM):', `$${calculations.pmTotal.toFixed(2)}`, 'Original Tips:', `$${calculations.cashTips.toFixed(2)}`],
-      ['Actual Cash In:', `$${calculations.actualCashIn.toFixed(2)}`, 'Discrepancy:', `${discrepancySign}$${Math.abs(calculations.discrepancy).toFixed(2)}`]
-    ];
-    
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    cashFlowData.forEach(row => {
-      doc.text(row[0], margin, yPosition);
-      doc.text(row[1], margin + 120, yPosition);
-      doc.text(row[2], margin + 280, yPosition);
-      doc.text(row[3], margin + 400, yPosition);
-      yPosition += 15;
-    });
-    yPosition += 20;
-    
-    // Deposit and return boxes using CALCULATED values
-    doc.setFillColor(230, 255, 230);
-    doc.rect(margin, yPosition, contentWidth, 25, 'F');
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.text(`DEPOSIT IN ENVELOPE: $${calculations.depositAmount}`, pageWidth / 2, yPosition + 15, { align: 'center' });
-    yPosition += 35;
-    
-    doc.setFillColor(255, 240, 230);
-    doc.rect(margin, yPosition, contentWidth, 25, 'F');
-    doc.text(`RETURN TO CASHBOX/SAFE: $${calculations.returnAmount.toFixed(2)}`, pageWidth / 2, yPosition + 15, { align: 'center' });
-    yPosition += 45;
-    
-    // Check if we need a new page
-    if (yPosition > 650) {
-      doc.addPage();
-      yPosition = 40;
+    try {
+      // Generate PDF
+      await html2pdf().set(opt).from(element).save();
+      console.log('PDF generated and downloaded successfully');
+    } finally {
+      // Restore original visibility
+      reportDisplay.style.display = originalDisplay;
+      reportDisplay.style.opacity = originalOpacity;
     }
-    
-    // Cash count breakdown
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('COMPLETE CASH COUNT BREAKDOWN', margin, yPosition);
-    yPosition += 25;
-    
-    // Helper function for denomination data
-    function getDenomData(drawerData, denomKey) {
-      if (!drawerData) return { count: 0, total: 0 };
-      
-      const denomMapping = {
-        '$100': 'hundreds', '$50': 'fifties', '$20': 'twenties', '$10': 'tens',
-        '$5': 'fives', '$1': 'ones', '¢25': 'quarters', '¢10': 'dimes', 
-        '¢5': 'nickels', '¢1': 'pennies'
-      };
-      
-      const dataKey = denomMapping[denomKey];
-      if (!dataKey) return { count: 0, total: 0 };
-      
-      const count = parseInt(drawerData[dataKey]) || 0;
-      const denomValues = {
-        '$100': 100, '$50': 50, '$20': 20, '$10': 10, '$5': 5, '$1': 1,
-        '¢25': 0.25, '¢10': 0.10, '¢5': 0.05, '¢1': 0.01
-      };
-      const value = denomValues[denomKey] || 0;
-      return { count, total: (count * value).toFixed(2) };
-    }
-    
-    // AM Counts column
-    const startY = yPosition;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.text('AM COUNTS', margin + 100, yPosition);
-    yPosition += 20;
-    
-    // AM Drawer 1
-    doc.setFont(undefined, 'bold');
-    doc.text('DRAWER 1', margin, yPosition);
-    yPosition += 15;
-    
-    doc.setFont(undefined, 'normal');
-    const denoms = ['$100', '$50', '$20', '$10', '$5', '$1', '¢25', '¢10', '¢5', '¢1'];
-    denoms.forEach(denom => {
-      const data = getDenomData(amData.drawer1.counts, denom);
-      doc.text(`${denom}: ${data.count} = $${data.total}`, margin, yPosition);
-      yPosition += 12;
-    });
-    
-    doc.setFont(undefined, 'bold');
-    doc.text(`TOTAL: $${amData.drawer1.total.toFixed(2)}`, margin, yPosition);
-    yPosition += 20;
-    
-    // AM Drawer 2
-    doc.text('DRAWER 2', margin, yPosition);
-    yPosition += 15;
-    
-    doc.setFont(undefined, 'normal');
-    denoms.forEach(denom => {
-      const data = getDenomData(amData.drawer2.counts, denom);
-      doc.text(`${denom}: ${data.count} = $${data.total}`, margin, yPosition);
-      yPosition += 12;
-    });
-    
-    doc.setFont(undefined, 'bold');
-    doc.text(`TOTAL: $${amData.drawer2.total.toFixed(2)}`, margin, yPosition);
-    yPosition += 15;
-    doc.text(`TOTAL AM: $${amData.total.toFixed(2)}`, margin, yPosition);
-    
-    // PM Counts column  
-    yPosition = startY + 20;
-    const pmColumn = margin + 280;
-    doc.setFont(undefined, 'bold');
-    doc.text('PM COUNTS', pmColumn + 100, startY);
-    
-    // PM Drawer 1
-    doc.text('DRAWER 1', pmColumn, yPosition);
-    yPosition += 15;
-    
-    doc.setFont(undefined, 'normal');
-    denoms.forEach(denom => {
-      const data = getDenomData(pmResults.pm_drawer1_data, denom);
-      doc.text(`${denom}: ${data.count} = $${data.total}`, pmColumn, yPosition);
-      yPosition += 12;
-    });
-    
-    doc.setFont(undefined, 'bold');
-    doc.text(`TOTAL: $${pmResults.pm_drawer1_total.toFixed(2)}`, pmColumn, yPosition);
-    yPosition += 20;
-    
-    // PM Drawer 2
-    doc.text('DRAWER 2', pmColumn, yPosition);
-    yPosition += 15;
-    
-    doc.setFont(undefined, 'normal');
-    denoms.forEach(denom => {
-      const data = getDenomData(pmResults.pm_drawer2_data, denom);
-      doc.text(`${denom}: ${data.count} = $${data.total}`, pmColumn, yPosition);
-      yPosition += 12;
-    });
-    
-    doc.setFont(undefined, 'bold');
-    doc.text(`TOTAL: $${pmResults.pm_drawer2_total.toFixed(2)}`, pmColumn, yPosition);
-    yPosition += 15;
-    doc.text(`TOTAL PM: $${pmResults.pm_total.toFixed(2)}`, pmColumn, yPosition);
-    
-    // Save the PDF
-    doc.save(filename);
-  }
-  
-  async function generateDateRangePDFDirect(filename) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('portrait', 'pt', 'letter');
-    
-    // Get date range data
-    const startDate = document.getElementById('reportStartDate').value;
-    const endDate = document.getElementById('reportEndDate').value;
-    
-    const { data: rangeData } = await supabase
-      .from('cash_counts')
-      .select('*')
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .not('pm_total', 'is', null)
-      .order('date', { ascending: true });
-    
-    if (!rangeData || rangeData.length === 0) {
-      throw new Error('No data found for this date range');
-    }
-    
-    // IMPORTANT: Recalculate each day using the EXACT same logic as PM flow
-    const dailyCalculations = [];
-    let totalToastSalesReported = 0;
-    let totalActualCashIn = 0;
-    let totalDiscrepancy = 0;
-    let totalOriginalCashTips = 0;
-    let totalAdjustedCashTips = 0;
-    let totalEnvelopeDeposits = 0;
-    let totalBackToCashbox = 0;
-    
-    rangeData.forEach(day => {
-      // Create the same data structure used in PM flow
-      const pmCalculationData = {
-        amTotal: day.am_total,
-        total: day.pm_total,
-        toastSales: day.pm_toast_sales,
-        cashTips: day.pm_cash_tips
-      };
-      
-      // Use the exact same calculation function as PM flow
-      const dayCalculations = calculatePMAmounts(pmCalculationData);
-      
-      // Store calculated values for this day
-      dailyCalculations.push({
-        date: day.date,
-        counter: day.pm_counter,
-        calculations: dayCalculations,
-        // Keep original data for reference
-        originalData: day
-      });
-      
-      // Sum up totals using CALCULATED values (not stored values)
-      totalToastSalesReported += dayCalculations.toastSales;
-      totalActualCashIn += dayCalculations.actualCashIn;
-      totalDiscrepancy += dayCalculations.discrepancy;
-      totalOriginalCashTips += dayCalculations.cashTips;
-      totalAdjustedCashTips += dayCalculations.adjustedTips;
-      totalEnvelopeDeposits += dayCalculations.depositAmount;
-      totalBackToCashbox += dayCalculations.returnAmount;
-    });
-    
-    // Set up the document
-    let yPosition = 40;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 40;
-    
-    // Header
-    doc.setFontSize(16);
-    doc.setFont(undefined, 'bold');
-    doc.text('**CONFIDENTIAL**', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 20;
-    doc.text('JAYNA GYRO MULTI-DAY CASH REPORT', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 25;
-    
-    // Date range
-    doc.setFontSize(12);
-    const startDateFormatted = new Date(startDate + 'T12:00:00').toLocaleDateString();
-    const endDateFormatted = new Date(endDate + 'T12:00:00').toLocaleDateString();
-    doc.text(`${startDateFormatted} - ${endDateFormatted}`, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 15;
-    doc.setFontSize(10);
-    doc.text(`${rangeData.length} days included`, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 30;
-    
-    // Key totals grid
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    
-    // Row 1: Total Toast Sales and Total Actual Cash In
-    doc.setFillColor(230, 243, 255);
-    doc.rect(margin, yPosition, 250, 30, 'F');
-    doc.text('TOTAL TOAST CASH SALES', margin + 125, yPosition + 12, { align: 'center' });
-    doc.text(`$${totalToastSalesReported.toFixed(2)}`, margin + 125, yPosition + 25, { align: 'center' });
-    
-    doc.setFillColor(240, 248, 255);
-    doc.rect(margin + 260, yPosition, 250, 30, 'F');
-    doc.text('TOTAL ACTUAL CASH IN', margin + 385, yPosition + 12, { align: 'center' });
-    doc.text(`$${totalActualCashIn.toFixed(2)}`, margin + 385, yPosition + 25, { align: 'center' });
-    yPosition += 40;
-    
-    // Row 2: Total Discrepancy and Original Cash Tips
-    doc.setFillColor(255, 230, 230);
-    doc.rect(margin, yPosition, 250, 30, 'F');
-    doc.text('TOTAL DISCREPANCY', margin + 125, yPosition + 12, { align: 'center' });
-    doc.text(`${totalDiscrepancy >= 0 ? '+' : ''}$${totalDiscrepancy.toFixed(2)}`, margin + 125, yPosition + 25, { align: 'center' });
-    
-    doc.setFillColor(255, 243, 224);
-    doc.rect(margin + 260, yPosition, 250, 30, 'F');
-    doc.text('TOTAL ORIGINAL CASH TIPS', margin + 385, yPosition + 12, { align: 'center' });
-    doc.text(`$${totalOriginalCashTips.toFixed(2)}`, margin + 385, yPosition + 25, { align: 'center' });
-    yPosition += 40;
-    
-    // Row 3: Adjusted Cash Tips and Envelope Deposits
-    doc.setFillColor(243, 229, 245);
-    doc.rect(margin, yPosition, 250, 30, 'F');
-    doc.text('TOTAL ADJUSTED CASH TIPS', margin + 125, yPosition + 12, { align: 'center' });
-    doc.text(`$${totalAdjustedCashTips.toFixed(2)}`, margin + 125, yPosition + 25, { align: 'center' });
-    
-    doc.setFillColor(232, 245, 232);
-    doc.rect(margin + 260, yPosition, 250, 30, 'F');
-    doc.text('TOTAL ENVELOPE DEPOSITS', margin + 385, yPosition + 12, { align: 'center' });
-    doc.text(`$${totalEnvelopeDeposits}`, margin + 385, yPosition + 25, { align: 'center' });
-    yPosition += 50;
-    
-    // Daily breakdown table
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(12);
-    doc.text('DAILY BREAKDOWN', margin, yPosition);
-    yPosition += 20;
-    
-    // Table headers
-    const tableData = [
-      ['Date', 'Counter', 'Toast Sales', 'Actual Cash In', 'Discrepancy', 'Original Tips', 'Adjusted Tips', 'Envelope']
-    ];
-    
-    // Use calculated values for each day (not stored values)
-    dailyCalculations.forEach(dayData => {
-      const calc = dayData.calculations;
-      const discrepancySign = calc.discrepancy >= 0 ? '+' : '';
-      const dateFormatted = new Date(dayData.date + 'T12:00:00').toLocaleDateString();
-      
-      tableData.push([
-        dateFormatted,
-        dayData.counter || 'N/A',
-        `$${calc.toastSales.toFixed(2)}`,
-        `$${calc.actualCashIn.toFixed(2)}`,
-        `${discrepancySign}$${Math.abs(calc.discrepancy).toFixed(2)}`,
-        `$${calc.cashTips.toFixed(2)}`,
-        `$${calc.adjustedTips.toFixed(2)}`,
-        `$${Math.round(calc.depositAmount)}`
-      ]);
-    });
-    
-    // Generate table
-    doc.autoTable({
-      head: [tableData[0]],
-      body: tableData.slice(1),
-      startY: yPosition,
-      margin: { left: margin, right: margin },
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [240, 240, 240], fontStyle: 'bold' },
-      columnStyles: {
-        0: { cellWidth: 70 },
-        1: { cellWidth: 50, halign: 'center' },
-        2: { cellWidth: 65, halign: 'right' },
-        3: { cellWidth: 65, halign: 'right' },
-        4: { cellWidth: 65, halign: 'right' },
-        5: { cellWidth: 65, halign: 'right' },
-        6: { cellWidth: 65, halign: 'right' },
-        7: { cellWidth: 65, halign: 'right' }
-      }
-    });
-    
-    // Save the PDF
-    doc.save(filename);
   }
   
   function generateSingleDayReportHtml(date, amData, pmData) {
@@ -2707,6 +2375,27 @@
                     <div class="breakdown-cell breakdown-label">Cash Tip Adjustment:</div>
                     <div class="breakdown-cell breakdown-value">-$${tipAdjustment.toFixed(2)}</div>
                 </div>` : ''}
+                ${pmData.has_deposit_rounding === 'true' ? `
+                <div class="breakdown-row" style="background-color: #fff3cd;">
+                    <div class="breakdown-cell breakdown-label">Raw Deposit Amount:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.raw_deposit_amount}</div>
+                </div>
+                <div class="breakdown-row" style="background-color: #fff3cd;">
+                    <div class="breakdown-cell breakdown-label">Rounded Deposit Amount:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.deposit_amount}</div>
+                </div>
+                <div class="breakdown-row" style="background-color: #fff3cd;">
+                    <div class="breakdown-cell breakdown-label">Rounding Adjustment Needed:</div>
+                    <div class="breakdown-cell breakdown-value">$${pmData.deposit_rounding_adjustment}</div>
+                </div>
+                <div class="breakdown-row" style="background-color: #fff3cd;">
+                    <div class="breakdown-cell breakdown-label">Taken from Tips (Whole $):</div>
+                    <div class="breakdown-cell breakdown-value">-$${pmData.deposit_tip_adjustment}</div>
+                </div>
+                <div class="breakdown-row" style="background-color: #fff3cd;">
+                    <div class="breakdown-cell breakdown-label">Excess to Cashbox:</div>
+                    <div class="breakdown-cell breakdown-value">+$${pmData.deposit_excess_to_cashbox}</div>
+                </div>` : ''}
                 <div class="breakdown-row">
                     <div class="breakdown-cell breakdown-label">Owed to Restaurant:</div>
                     <div class="breakdown-cell breakdown-value">$${pmData.pm_toast_sales.toFixed(2)}</div>
@@ -2947,7 +2636,7 @@
                         ${discrepancySign}$${Math.abs(day.pm_discrepancy || 0).toFixed(2)}
                       </td>
                       <td style="border: 1px solid #000; padding: 6px; text-align: right;">
-                        $${(day.pm_deposit_amount || 0).toFixed(2)}
+                        $${day.pm_deposit_amount || 0}
                       </td>
                       <td style="border: 1px solid #000; padding: 6px; text-align: right;">
                         $${(day.pm_amount_to_keep || 0).toFixed(2)}
