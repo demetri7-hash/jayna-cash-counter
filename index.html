@@ -684,7 +684,10 @@
         <button class="submit-btn" onclick="viewReport()" style="background: #007bff;">Generate Report</button>
         
         <!-- On-Screen Report Display -->
-        <div id="reportDisplay" style="display: none; margin-top: 30px; padding: 20px; border: 2px solid #e0e0e0; border-radius: 12px; background: #f8f9fa;">
+        <div id="reportDisplay" style="display: none; margin-top: 30px; padding: 20px; border: 3px solid #007bff; border-radius: 12px; background: #ffffff; position: relative; z-index: 10; box-shadow: 0 4px 12px rgba(0,123,255,0.15);">
+          <div style="text-align: center; margin-bottom: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px;">
+            <h3 style="margin: 0; color: #1976d2;">📊 Generated Report</h3>
+          </div>
           <div id="reportContent"></div>
           <div style="display: flex; gap: 10px; margin-top: 20px;">
             <button id="downloadPdfBtn" class="submit-btn" onclick="downloadReportAsPDF()" style="background: #dc3545;">Download PDF</button>
@@ -1037,6 +1040,12 @@
   function goHome() {
     hideAllSections();
     document.getElementById('mainMenu').style.display = 'grid';
+    
+    // Reset container width
+    const container = document.querySelector('.container');
+    if (container) {
+      container.style.maxWidth = '600px';
+    }
   }
   
   function startAMCount() {
@@ -1760,9 +1769,25 @@
       
       // Make sure the report display is visible
       const reportDisplay = document.getElementById('reportDisplay');
+      const container = document.querySelector('.container');
+      
       if (reportDisplay) {
         reportDisplay.style.display = 'block';
+        
+        // Expand container for report display
+        if (container) {
+          container.style.maxWidth = '1000px';
+        }
+        
         console.log('Report display made visible');
+        
+        // Scroll to the report
+        setTimeout(() => {
+          reportDisplay.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }, 100);
       } else {
         console.error('Report display element not found');
       }
