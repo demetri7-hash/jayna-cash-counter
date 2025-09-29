@@ -3857,7 +3857,7 @@
   }
 
   function generateCombinedReportHtml(startDate, endDate, cashData, realEnvelopeAmount = null) {
-    // Calculate cash report totals (reusing existing logic without modifying it)
+    // Calculate cash report totals using EXACT same logic as generateDateRangePDF
     let totalToastSalesReported = 0;
     let totalActualCashIn = 0;
     let totalDiscrepancy = 0;
@@ -3866,9 +3866,9 @@
 
     cashData.forEach(day => {
       totalToastSalesReported += day.pm_toast_sales || 0;
-      totalActualCashIn += (day.am_total || 0) + (day.pm_total || 0);
-      totalDiscrepancy += (day.pm_total || 0) - (day.pm_toast_sales || 0);
-      totalEnvelopeDeposits += day.pm_envelope_deposit || 0;
+      totalActualCashIn += (day.pm_total - day.am_total) || 0;  // Fixed: PM minus AM, not PM + AM
+      totalDiscrepancy += day.pm_discrepancy || 0;              // Fixed: Use stored discrepancy
+      totalEnvelopeDeposits += day.pm_deposit_amount || 0;      // Fixed: Use correct column name
       totalBackToCashbox += (day.pm_amount_to_keep - day.am_total) || 0;
     });
 
@@ -3919,7 +3919,7 @@
             </div>
             
             <div style="background: #fff8e1; padding: 15px; border: 2px solid #000; border-radius: 8px; text-align: center;">
-              <h4 style="margin: 0 0 8px 0; color: #f57c00; font-size: 12px;">BACK TO CASHBOX</h4>
+              <h4 style="margin: 0 0 8px 0; color: #f57c00; font-size: 12px;">EXCESS BACK TO CASH BOX</h4>
               <p style="font-size: 18px; font-weight: bold; margin: 0; color: #f57c00;">$${totalBackToCashbox.toFixed(2)}</p>
             </div>
             
@@ -3938,7 +3938,7 @@
             🎯 TIP POOL SUMMARY
           </h2>
           
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
             <div style="background: #e3f2fd; padding: 15px; border: 2px solid #007bff; border-radius: 8px; text-align: center;">
               <h4 style="margin: 0 0 8px 0; color: #007bff; font-size: 12px;">CREDIT TIPS</h4>
               <p style="font-size: 18px; font-weight: bold; margin: 0; color: #007bff;">$${tipPoolSummary.creditTips.toFixed(2)}</p>
@@ -3952,6 +3952,11 @@
             <div style="background: #fff3e0; padding: 15px; border: 2px solid #f57c00; border-radius: 8px; text-align: center;">
               <h4 style="margin: 0 0 8px 0; color: #f57c00; font-size: 12px;">EZCATER TIPS</h4>
               <p style="font-size: 18px; font-weight: bold; margin: 0; color: #f57c00;">$${tipPoolSummary.ezcaterTips.toFixed(2)}</p>
+            </div>
+            
+            <div style="background: #fce4ec; padding: 15px; border: 2px solid #e91e63; border-radius: 8px; text-align: center;">
+              <h4 style="margin: 0 0 8px 0; color: #e91e63; font-size: 12px;">TDS DRIVER</h4>
+              <p style="font-size: 18px; font-weight: bold; margin: 0; color: #e91e63;">$${tipPoolSummary.tdsDriverTips.toFixed(2)}</p>
             </div>
           </div>
 
@@ -4026,7 +4031,7 @@
             <tbody>
               ${cashData.map((day, index) => {
                 const rowBg = index % 2 === 0 ? '#f8f9fa' : 'white';
-                const discrepancy = (day.pm_total || 0) - (day.pm_toast_sales || 0);
+                const discrepancy = day.pm_discrepancy || 0;
                 const discrepancyColor = discrepancy >= 0 ? '#28a745' : '#dc3545';
                 return `
                   <tr style="background: ${rowBg};">
@@ -4039,7 +4044,7 @@
                     <td style="padding: 8px; text-align: center; border: 1px solid #000; color: ${discrepancyColor}; font-weight: bold;">
                       $${discrepancy.toFixed(2)}
                     </td>
-                    <td style="padding: 8px; text-align: center; border: 1px solid #000;">$${(day.pm_envelope_deposit || 0).toFixed(2)}</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #000;">$${(day.pm_deposit_amount || 0).toFixed(2)}</td>
                   </tr>
                 `;
               }).join('')}
