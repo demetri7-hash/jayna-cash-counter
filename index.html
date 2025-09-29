@@ -3387,8 +3387,16 @@
     console.log('renderTipPoolSummary called, tipPoolSummary:', tipPoolSummary);
     const summaryDiv = document.getElementById('tipPoolSummary');
     const { cashNeeded } = tipPoolSummary;
-    const cashStatusClass = cashNeeded >= 0 ? 'cash-surplus' : 'cash-needed';
-    const cashStatusText = cashNeeded >= 0 ? 'surplus' : 'needed';
+    
+    // COPY EXACT LOGIC FROM ORIGINAL TIP POOL CALCULATOR
+    let cashStatusHtml = '';
+    if (cashNeeded < 0) {
+      // Need additional cash - show positive amount in red
+      cashStatusHtml = `<p><strong>Cash needed to pay out tips:</strong> <span class="cash-needed">$${Math.abs(cashNeeded).toFixed(2)}</span></p>`;
+    } else {
+      // Have surplus - show positive amount in green
+      cashStatusHtml = `<p><strong>Zero cash needed to pay out tips this week. Excess cash on hand:</strong> <span class="cash-surplus">$${cashNeeded.toFixed(2)}</span></p>`;
+    }
     
     summaryDiv.innerHTML = `
       <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -3426,11 +3434,11 @@
             <p style="margin: 0; font-size: 18px; font-weight: bold; color: #f57c00;">$${tipPoolSummary.hourlyRate.toFixed(2)}</p>
           </div>
           
-          <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
-            <h4 style="margin: 0 0 8px 0; color: #666; font-size: 12px;">CASH ${cashStatusText.toUpperCase()}</h4>
-            <p style="margin: 0; font-size: 18px; font-weight: bold;" class="${cashStatusClass}">$${Math.abs(cashNeeded).toFixed(2)}</p>
-          </div>
-          
+        </div>
+        
+        <!-- Cash Status from Original Logic -->
+        <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+          ${cashStatusHtml}
         </div>
         
         <div style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; border-left: 4px solid #2196f3;">
@@ -3711,8 +3719,19 @@
 
   function generateTipPoolReportHtml() {
     const { cashNeeded } = tipPoolSummary;
-    const cashStatusClass = cashNeeded >= 0 ? 'color: #28a745' : 'color: #dc3545';
-    const cashStatusText = cashNeeded >= 0 ? 'SURPLUS' : 'NEEDED';
+    
+    // COPY EXACT LOGIC FROM ORIGINAL TIP POOL CALCULATOR
+    let cashStatusText = '';
+    let cashStatusClass = '';
+    if (cashNeeded < 0) {
+      // Need additional cash - show positive amount in red
+      cashStatusText = 'NEEDED';
+      cashStatusClass = 'color: #dc3545';
+    } else {
+      // Have surplus - show positive amount in green
+      cashStatusText = 'SURPLUS';
+      cashStatusClass = 'color: #28a745';
+    }
     
     return `
       <div style="font-family: Arial, sans-serif; padding: 20px; background: white;">
@@ -3892,8 +3911,19 @@
     });
 
     const { cashNeeded } = tipPoolSummary;
-    const cashStatusClass = cashNeeded >= 0 ? 'color: #28a745' : 'color: #dc3545';
-    const cashStatusText = cashNeeded >= 0 ? 'SURPLUS' : 'NEEDED';
+    
+    // COPY EXACT LOGIC FROM ORIGINAL TIP POOL CALCULATOR
+    let cashStatusText = '';
+    let cashStatusClass = '';
+    if (cashNeeded < 0) {
+      // Need additional cash - show positive amount in red
+      cashStatusText = 'NEEDED';
+      cashStatusClass = 'color: #dc3545';
+    } else {
+      // Have surplus - show positive amount in green
+      cashStatusText = 'SURPLUS';
+      cashStatusClass = 'color: #28a745';
+    }
 
     return `
       <div style="font-family: Arial, sans-serif; padding: 20px; background: white;">
