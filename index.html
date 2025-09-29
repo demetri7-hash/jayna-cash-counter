@@ -844,6 +844,14 @@
     </div>
   </div>
 
+  <!-- Historical Report Results Section -->
+  <div id="reportResults" style="display: none; margin-top: 20px;">
+    <div id="reportContent"></div>
+    <div style="text-align: center; margin-top: 20px;">
+      <button class="submit-btn" onclick="goHome()" style="background: #6c757d;">Back to Menu</button>
+    </div>
+  </div>
+
   <!-- Cashbox Count Section -->
   <div id="cashboxSection" class="form-section main-section">
     <div class="container">
@@ -2477,8 +2485,8 @@
     const reportContent = document.getElementById('reportContent');
     
     if (reportData.generated_cash_report_html && reportData.generated_tip_pool_html) {
-      // We have saved HTML content - just display it!
-      reportContent.innerHTML = `
+      // We have saved HTML content - display it in the main content area like tip pool results!
+      const mainContentHtml = `
         <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
           <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #28a745;">
             <h3 style="margin: 0 0 10px 0; color: #28a745;">📄 Historical Report Retrieved</h3>
@@ -2497,9 +2505,17 @@
           </div>
         </div>
       `;
+      
+      // Use the proven working method - set content and show like tip pool results
+      reportContent.innerHTML = mainContentHtml;
+      
+      // Hide all sections and show the results (copy exact pattern from tip pool)
+      hideAllSections();
+      document.getElementById('reportResults').style.display = 'block';
+      
     } else {
       // Fallback: no HTML content saved, show basic info
-      reportContent.innerHTML = `
+      const legacyContentHtml = `
         <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
           <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border-left: 4px solid #ffc107;">
             <h3 style="margin: 0 0 10px 0; color: #856404;">⚠️ Legacy Report Format</h3>
@@ -2515,17 +2531,11 @@
           </div>
         </div>
       `;
+      
+      reportContent.innerHTML = legacyContentHtml;
+      hideAllSections();
+      document.getElementById('reportResults').style.display = 'block';
     }
-    
-    console.log('Setting reportContent innerHTML...');
-    console.log('Report content element:', reportContent);
-    
-    // Show the report content
-    const reportDisplay = document.getElementById('reportDisplay');
-    console.log('Report display element:', reportDisplay);
-    console.log('Setting reportDisplay to visible...');
-    reportDisplay.style.display = 'block';
-    console.log('Report display should now be visible');
   }
 
   // Generate Single Day PDF Report
