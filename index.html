@@ -712,8 +712,10 @@
         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #007bff;">
           <h4 style="margin: 0 0 10px 0; color: #007bff;">Instructions:</h4>
           <p style="margin: 5px 0; font-size: 14px;">1. Upload Labor Summary CSV and Sales Summary ZIP files from Toast</p>
-          <p style="margin: 5px 0; font-size: 14px;">2. Enter cash tips, EZ Cater tips, and TDS Driver tips for the week</p>
-          <p style="margin: 5px 0; font-size: 14px;">3. Add your name and calculate tip distribution</p>
+          <p style="margin: 5px 0; font-size: 14px;">2. Select the date range matching your tip pool period</p>
+          <p style="margin: 5px 0; font-size: 14px;">3. Enter the actual cash amount counted from envelopes</p>
+          <p style="margin: 5px 0; font-size: 14px;">4. System will auto-calculate cash tips (Real Envelope - Toast Cash Sales)</p>
+          <p style="margin: 5px 0; font-size: 14px;">5. Enter EZ Cater tips, TDS Driver tips, and your name</p>
           <p style="margin: 5px 0; font-size: 14px; color: #dc3545;"><strong>Note:</strong> This integrates with your weekly cash reports</p>
         </div>
         
@@ -728,8 +730,36 @@
         </div>
         
         <div class="form-group">
-          <label for="cashTips">Cash Tips for the Week ($):</label>
-          <input type="number" id="cashTips" class="form-input" step="0.01" placeholder="e.g., 217.00">
+          <label for="tipPoolDateRange">Date Range for Cash Sales Calculation:</label>
+          <div style="display: flex; gap: 15px; margin: 10px 0;">
+            <div style="flex: 1;">
+              <label for="tipPoolStartDate" style="font-size: 12px; color: #666;">Start Date:</label>
+              <input type="date" id="tipPoolStartDate" class="form-input" onchange="calculateCashTips()">
+            </div>
+            <div style="flex: 1;">
+              <label for="tipPoolEndDate" style="font-size: 12px; color: #666;">End Date:</label>
+              <input type="date" id="tipPoolEndDate" class="form-input" onchange="calculateCashTips()">
+            </div>
+          </div>
+          <div style="font-size: 12px; color: #dc3545; margin-top: 5px;">
+            <strong>Note:</strong> Should match your tip pool period (max 7 days)
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="realEnvelopeDeposit">Real Envelope Deposit ($):</label>
+          <input type="number" id="realEnvelopeDeposit" class="form-input" step="0.01" placeholder="e.g., 550.23" onchange="calculateCashTips()">
+          <div style="font-size: 12px; color: #666; margin-top: 5px;">
+            Actual cash amount counted from envelopes
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="calculatedCashTips">Cash Tips (Auto-Calculated):</label>
+          <input type="number" id="calculatedCashTips" class="form-input" step="0.01" readonly style="background: #f8f9fa; color: #666;">
+          <div style="font-size: 12px; color: #007bff; margin-top: 5px;">
+            <strong>Formula:</strong> Real Envelope Deposit - Toast Cash Sales
+          </div>
         </div>
         
         <div class="form-group">
@@ -2874,10 +2904,59 @@
     'Morales, Emilio': 0.5
   };
 
+  async function calculateCashTips() {
+    const startDate = document.getElementById('tipPoolStartDate').value;
+    const endDate = document.getElementById('tipPoolEndDate').value;
+    const realEnvelopeDeposit = parseFloat(document.getElementById('realEnvelopeDeposit').value) || 0;
+
+    if (!startDate || !endDate) {
+      document.getElementById('calculatedCashTips').value = '';
+      return;
+    }
+
+    if (!realEnvelopeDeposit) {
+      document.getElementById('calculatedCashTips').value = '';
+      return;
+    }
+
+    try {
+      // Fetch cash sales data from Supabase for the date range
+      const { data: cashSalesData, error: cashSalesError } = await supabase
+        .from('cash_counts')
+        .select('toast_sales')
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (cashSalesError) {
+        console.error('Error fetching cash sales:', cashSalesError);
+        document.getElementById('calculatedCashTips').value = '';
+        return;
+      }
+
+      // Calculate total Toast cash sales
+      let totalToastCashSales = 0;
+      if (cashSalesData && cashSalesData.length > 0) {
+        totalToastCashSales = cashSalesData.reduce((sum, day) => sum + (day.toast_sales || 0), 0);
+      }
+
+      // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
+      const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
+      
+      // Update the display
+      document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
+
+    } catch (error) {
+      console.error('Error calculating cash tips:', error);
+      document.getElementById('calculatedCashTips').value = '';
+    }
+  }
+
   async function calculateTipPool() {
     const laborFile = document.getElementById('laborFile').files[0];
     const salesFile = document.getElementById('salesFile').files[0];
-    const cashTips = parseFloat(document.getElementById('cashTips').value) || 0;
+    const startDate = document.getElementById('tipPoolStartDate').value;
+    const endDate = document.getElementById('tipPoolEndDate').value;
+    const realEnvelopeDeposit = parseFloat(document.getElementById('realEnvelopeDeposit').value) || 0;
     const ezcaterTips = parseFloat(document.getElementById('ezcaterTips').value) || 0;
     const tdsDriverTips = parseFloat(document.getElementById('tdsDriverTips').value) || 0;
     const calculatedByName = document.getElementById('calculatedByName').value.trim();
@@ -2887,23 +2966,71 @@
       return;
     }
 
+    if (!startDate || !endDate) {
+      alert('Please select both start and end dates for cash sales calculation.');
+      return;
+    }
+
+    if (!realEnvelopeDeposit) {
+      alert('Please enter the Real Envelope Deposit amount.');
+      return;
+    }
+
     if (!calculatedByName) {
       alert('Please enter your name in the "Tips Calculated By" field.');
       return;
     }
 
     try {
-      showLoading('Calculating Tip Pool', 'Processing payroll and sales data...');
+      showLoading('Calculating Tip Pool', 'Processing payroll, sales data, and fetching cash sales...');
+
+      // First, get Toast Cash Sales from Supabase for the date range
+      const start = new Date(startDate + 'T12:00:00');
+      const end = new Date(endDate + 'T12:00:00');
+
+      if (start > end) {
+        throw new Error('Start date must be before end date');
+      }
+
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays > 7) {
+        throw new Error('Date range cannot exceed 7 days');
+      }
+
+      // Fetch cash sales data from Supabase
+      const { data: cashSalesData, error: cashSalesError } = await supabase
+        .from('cash_counts')
+        .select('toast_sales')
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (cashSalesError) {
+        throw new Error('Failed to fetch cash sales data: ' + cashSalesError.message);
+      }
+
+      // Calculate total Toast cash sales
+      let totalToastCashSales = 0;
+      if (cashSalesData && cashSalesData.length > 0) {
+        totalToastCashSales = cashSalesData.reduce((sum, day) => sum + (day.toast_sales || 0), 0);
+      }
+
+      // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
+      const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
+      
+      // Update the cash tips display
+      document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
 
       // Parse files
       const payrollData = await parsePayrollCSV(laborFile);
       const { creditTips, cashSales } = await parseSalesZip(salesFile);
 
-      // Compute tip pool
+      // Compute tip pool using calculated cash tips
       const result = computeTipPool(
         payrollData,
         creditTips,
-        cashTips,
+        calculatedCashTips,
         ezcaterTips,
         tdsDriverTips,
         cashSales
@@ -2918,7 +3045,9 @@
       tipPoolSummary = {
         creditTips: creditTips,
         cashSales: cashSales,
-        cashTips: cashTips,
+        cashTips: calculatedCashTips,
+        realEnvelopeDeposit: realEnvelopeDeposit,
+        toastCashSales: totalToastCashSales,
         ezcaterTips: ezcaterTips,
         tdsDriverTips: tdsDriverTips,
         totalTips: result.totalTips,
@@ -2940,7 +3069,7 @@
       document.getElementById('combinedReportSection').style.display = 'block';
 
       hideLoading();
-      alert('Tip pool calculated successfully! You can now generate a combined report with cash counting data.');
+      alert('Tip pool calculated successfully! Cash tips auto-calculated as $' + calculatedCashTips.toFixed(2) + ' (Real Envelope: $' + realEnvelopeDeposit.toFixed(2) + ' - Toast Sales: $' + totalToastCashSales.toFixed(2) + ')');
 
     } catch (error) {
       hideLoading();
@@ -3111,8 +3240,19 @@
           </div>
           
           <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
-            <h4 style="margin: 0 0 8px 0; color: #666; font-size: 12px;">CASH TIPS</h4>
+            <h4 style="margin: 0 0 8px 0; color: #666; font-size: 12px;">REAL ENVELOPE DEPOSIT</h4>
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #28a745;">$${tipPoolSummary.realEnvelopeDeposit.toFixed(2)}</p>
+          </div>
+          
+          <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+            <h4 style="margin: 0 0 8px 0; color: #666; font-size: 12px;">TOAST CASH SALES</h4>
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #dc3545;">$${tipPoolSummary.toastCashSales.toFixed(2)}</p>
+          </div>
+          
+          <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+            <h4 style="margin: 0 0 8px 0; color: #666; font-size: 12px;">CASH TIPS (CALCULATED)</h4>
             <p style="margin: 0; font-size: 18px; font-weight: bold; color: #28a745;">$${tipPoolSummary.cashTips.toFixed(2)}</p>
+            <p style="margin: 5px 0 0 0; font-size: 10px; color: #666;">($${tipPoolSummary.realEnvelopeDeposit.toFixed(2)} - $${tipPoolSummary.toastCashSales.toFixed(2)})</p>
           </div>
           
           <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
