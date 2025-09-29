@@ -4656,6 +4656,36 @@
         });
       }
       
+      // Add explanatory notes footer
+      currentY = doc.autoTable.previous.finalY + 25;
+      
+      // Check if we have enough space for notes, if not skip to keep single page
+      if (currentY < pageHeight - 100) {
+        // Section title
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80); // Medium gray
+        doc.text('COLUMN DEFINITIONS', margin, currentY);
+        
+        currentY += 12;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 100, 100); // Light gray
+        
+        // Column explanations in compact format
+        const explanations = [
+          '• DISCREPANCY: Register Count - Expected Toast Sales (negative = short, positive = over)',
+          '• EXCESS: Cash taken from register to balance daily operations',
+          '• HOURS: Total work hours for tip pool calculation',
+          '• EQUITY: Performance-based multiplier (1.0 = standard, higher = bonus)',
+          '• WEIGHTED: Hours × Equity for proportional tip distribution'
+        ];
+        
+        explanations.forEach((text, index) => {
+          doc.text(text, margin, currentY + (index * 8));
+        });
+      }
+      
       // Generate filename and save
       const dateStr = tipPoolSummary.dateRange || `${startDate}_to_${endDate}`.replace(/-/g, '_');
       const filename = `Combined_Weekly_Report_${dateStr}.pdf`;
