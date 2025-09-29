@@ -2008,6 +2008,65 @@
       modal.remove();
     }
   }
+
+  function showTipPoolSuccessMessage() {
+    const modalHTML = `
+      <div id="tipPoolSuccessModal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      ">
+        <div style="
+          background: white;
+          padding: 40px;
+          border-radius: 12px;
+          text-align: center;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        ">
+          <div style="font-size: 48px; margin-bottom: 20px;">💰</div>
+          <h2 style="color: #28a745; margin-bottom: 15px; font-size: 24px;">Tip Pool PDF Downloaded Successfully!</h2>
+          <p style="color: #666; margin-bottom: 30px; font-size: 16px;">Your tip pool distribution report has been generated and downloaded.</p>
+          <button onclick="closeTipPoolSuccessModal(); goHome();" style="
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+          ">Return to Menu</button>
+          <button onclick="closeTipPoolSuccessModal();" style="
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+          ">Stay Here</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+  }
+  
+  function closeTipPoolSuccessModal() {
+    const modal = document.getElementById('tipPoolSuccessModal');
+    if (modal) {
+      modal.remove();
+    }
+  }
   
   async function generateSingleDayPDF() {
     const date = document.getElementById('reportDate').value;
@@ -2904,6 +2963,44 @@
     'Morales, Emilio': 0.5
   };
 
+  // Helper function to show error messages
+  function showErrorMessage(message) {
+    const errorMsg = document.createElement('div');
+    errorMsg.className = 'message error';
+    errorMsg.innerHTML = `<strong>❌ Error:</strong> ${message}`;
+    
+    // Insert at the top of the tip pool form
+    const tipPoolForm = document.getElementById('tipPoolForm');
+    const firstChild = tipPoolForm.firstElementChild;
+    tipPoolForm.insertBefore(errorMsg, firstChild.nextSibling);
+    
+    // Remove message after 5 seconds
+    setTimeout(() => {
+      if (errorMsg.parentNode) {
+        errorMsg.remove();
+      }
+    }, 5000);
+  }
+
+  // Helper function to show success messages
+  function showSuccessMessage(message) {
+    const successMsg = document.createElement('div');
+    successMsg.className = 'message success';
+    successMsg.innerHTML = `<strong>✅ Success:</strong> ${message}`;
+    
+    // Insert at the top of the tip pool form
+    const tipPoolForm = document.getElementById('tipPoolForm');
+    const firstChild = tipPoolForm.firstElementChild;
+    tipPoolForm.insertBefore(successMsg, firstChild.nextSibling);
+    
+    // Remove message after 5 seconds
+    setTimeout(() => {
+      if (successMsg.parentNode) {
+        successMsg.remove();
+      }
+    }, 5000);
+  }
+
   async function calculateCashTips() {
     const startDate = document.getElementById('tipPoolStartDate').value;
     const endDate = document.getElementById('tipPoolEndDate').value;
@@ -2961,22 +3058,22 @@
     const calculatedByName = document.getElementById('calculatedByName').value.trim();
 
     if (!laborFile || !salesFile) {
-      alert('Please select both Labor Summary CSV and Sales Summary ZIP files.');
+      showErrorMessage('Please select both Labor Summary CSV and Sales Summary ZIP files.');
       return;
     }
 
     if (!startDate || !endDate) {
-      alert('Please select both start and end dates for cash sales calculation.');
+      showErrorMessage('Please select both start and end dates for cash sales calculation.');
       return;
     }
 
     if (!realEnvelopeDeposit) {
-      alert('Please enter the Real Envelope Deposit amount.');
+      showErrorMessage('Please enter the Real Envelope Deposit amount.');
       return;
     }
 
     if (!calculatedByName) {
-      alert('Please enter your name in the "Tips Calculated By" field.');
+      showErrorMessage('Please enter your name in the "Tips Calculated By" field.');
       return;
     }
 
@@ -3059,7 +3156,7 @@
         generatedAt: new Date().toLocaleString()
       };
 
-      // Display results
+      // Display results for user to review
       renderTipPoolSummary();
       renderTipPoolTable();
       
@@ -3068,12 +3165,30 @@
       document.getElementById('combinedReportSection').style.display = 'block';
 
       hideLoading();
-      alert('Tip pool calculated successfully! Cash tips auto-calculated as $' + calculatedCashTips.toFixed(2) + ' (Real Envelope: $' + realEnvelopeDeposit.toFixed(2) + ' - Toast Sales: $' + totalToastCashSales.toFixed(2) + ')');
-
+      
+      // Show success message with instruction to review equity
+      showSuccessMessage('Tip pool calculated successfully! Please review and adjust equity percentages if needed, then click "Download Tip Pool PDF".');
+      
     } catch (error) {
       hideLoading();
-      alert('Error calculating tip pool: ' + error.message);
       console.error('Tip pool calculation error:', error);
+      showErrorMessage(`Error: ${error.message}`);
+    }
+  }
+
+  async function downloadTipPoolPDF() {
+    try {
+      showLoading('Generating PDF', 'Creating tip pool distribution report...');
+      
+      await generateTipPoolPDF();
+      
+      hideLoading();
+      showTipPoolSuccessMessage();
+      
+    } catch (error) {
+      hideLoading();
+      console.error('PDF generation error:', error);
+      showErrorMessage(`Error generating PDF: ${error.message}`);
     }
   }
 
@@ -3285,13 +3400,16 @@
     let tableHtml = `
       <div style="margin: 20px 0;">
         <h3 style="color: #1e3c72; margin-bottom: 15px;">Employee Tip Distribution</h3>
+        <p style="color: #666; margin-bottom: 15px; font-style: italic;">You can adjust equity percentages below. Changes will automatically recalculate the tip distribution.</p>
         <div style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <table id="tipPoolRecordsTable" style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <thead>
               <tr style="background: #1e3c72; color: white;">
-                <th style="padding: 12px; text-align: left; font-size: 14px;">Employee</th>
+                <th style="padding: 12px; text-align: left; font-size: 14px;">#</th>
+                <th style="padding: 12px; text-align: left; font-size: 14px;">First</th>
+                <th style="padding: 12px; text-align: left; font-size: 14px;">Last</th>
                 <th style="padding: 12px; text-align: center; font-size: 14px;">Hours</th>
-                <th style="padding: 12px; text-align: center; font-size: 14px;">Equity</th>
+                <th style="padding: 12px; text-align: center; font-size: 14px;">Equity (%)</th>
                 <th style="padding: 12px; text-align: center; font-size: 14px;">Weighted Hours</th>
                 <th style="padding: 12px; text-align: center; font-size: 14px;">Tips Due</th>
               </tr>
@@ -3299,14 +3417,23 @@
             <tbody>
     `;
     
+    // Sort records by last name like original
+    tipPoolRecords.sort((a, b) => a.last.localeCompare(b.last));
+    
     tipPoolRecords.forEach((record, index) => {
       const rowBg = index % 2 === 0 ? '#f8f9fa' : 'white';
+      const equityPercent = record.equity * 100;
       tableHtml += `
-        <tr style="background: ${rowBg};">
-          <td style="padding: 12px; border-bottom: 1px solid #ddd;">${record.first} ${record.last}</td>
-          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd;">${record.hours.toFixed(1)}</td>
-          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd;">${record.equity.toFixed(2)}</td>
-          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd;">${record.weighted.toFixed(1)}</td>
+        <tr data-employee="${record.employee}" style="background: ${rowBg};">
+          <td style="padding: 12px; border-bottom: 1px solid #ddd;">${index + 1}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #ddd;">${record.first}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #ddd;">${record.last}</td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd;">${record.hours.toFixed(2)}</td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd;">
+            <input type="number" name="equity" step="1" min="1" max="100" value="${equityPercent.toFixed(0)}" 
+                   style="width: 60px; text-align: center; border: 1px solid #ccc; border-radius: 4px; padding: 4px;" />
+          </td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd;">${record.weighted.toFixed(3)}</td>
           <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd; font-weight: bold; color: #28a745;">$${record.due.toFixed(2)}</td>
         </tr>
       `;
@@ -3320,33 +3447,217 @@
     `;
     
     tableDiv.innerHTML = tableHtml;
+    
+    // Attach change listeners to equity inputs
+    const inputs = tableDiv.querySelectorAll('input[name="equity"]');
+    inputs.forEach(inp => {
+      inp.addEventListener('input', () => {
+        recomputeTipPoolFromTable();
+      });
+    });
   }
 
-  async function downloadTipPoolPDF() {
+  // Recompute the tip pool when equity values are changed in the table
+  function recomputeTipPoolFromTable() {
+    // Read equity inputs from DOM
+    const rows = document.querySelectorAll('#tipPoolRecordsTable tbody tr');
+    const updatedEquity = {};
+    
+    rows.forEach(row => {
+      const emp = row.getAttribute('data-employee');
+      const eqInput = row.querySelector('input[name="equity"]');
+      // The equity input represents a whole percentage (1—100). Convert it
+      // to a fractional equity by dividing by 100. Use 0 if parsing fails.
+      const eqPercent = parseFloat(eqInput.value);
+      const eqFraction = isNaN(eqPercent) ? 0 : eqPercent / 100.0;
+      updatedEquity[emp] = eqFraction;
+    });
+    
+    // Recalculate
+    let totalWeightedHours = 0;
+    tipPoolRecords.forEach(r => {
+      r.equity = updatedEquity[r.employee];
+      r.weighted = r.hours * r.equity;
+      totalWeightedHours += r.weighted;
+    });
+    
+    // Compute the raw pool and then floor it to meet business rules
+    const rawPool = tipPoolSummary.totalTips - tipPoolSummary.tdsDriverTips;
+    const pool = Math.floor(rawPool);
+    const rate = totalWeightedHours ? pool / totalWeightedHours : 0;
+    
+    tipPoolRecords.forEach(r => {
+      const rawDue = r.weighted * rate;
+      // Round each individual's due down to the nearest whole dollar
+      r.due = Math.floor(rawDue);
+    });
+    
+    // Update summary
+    tipPoolSummary.pool = pool;
+    tipPoolSummary.totalWeightedHours = totalWeightedHours;
+    tipPoolSummary.hourlyRate = rate;
+    tipPoolSummary.cashNeeded = tipPoolSummary.creditTips - tipPoolSummary.tdsDriverTips + tipPoolSummary.ezcaterTips - tipPoolSummary.cashSales;
+    
+    // Rerender summary and table
+    renderTipPoolSummary();
+    renderTipPoolTable();
+  }
+
+  async function generateTipPoolPDF() {
     try {
-      showLoading('Generating PDF', 'Creating tip pool distribution report...');
+      // Create jsPDF instance
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
       
-      // Create PDF content
-      const tipPoolReportHtml = generateTipPoolReportHtml();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
       
-      // Set content in hidden div
-      const reportContent = document.getElementById('tipPoolReportContent');
-      reportContent.innerHTML = tipPoolReportHtml;
+      // Set default font to a modern sans-serif and black text
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
       
-      // Generate filename
+      let currentY = margin;
+      
+      // Header text
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('JAYNA SAC WEEKLY TIP POOL REPORT', margin, currentY + 15);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Use uppercase labels and values for header metadata
+      const dateRange = (tipPoolSummary.dateRange || '').toUpperCase();
+      doc.text(`WEEK OF: ${dateRange}`, margin, currentY + 32);
+      const reporter = (tipPoolSummary.calculatedByName || '').toUpperCase();
+      doc.text(`RAN BY: ${reporter}`, margin, currentY + 44);
+      const timestamp = (tipPoolSummary.generatedAt || '').toUpperCase();
+      doc.text(`GENERATED: ${timestamp}`, margin, currentY + 56);
+      
+      // Draw a thin horizontal line below header for separation
+      doc.setLineWidth(0.5);
+      doc.line(margin, currentY + 70, pageWidth - margin, currentY + 70);
+      
+      // Summary section: arrange entries in two columns
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Build an array of [label, value] pairs
+      const entries = [
+        ['Cash tips', `$${tipPoolSummary.cashTips.toFixed(2)}`],
+        ['EZCater tips', `$${tipPoolSummary.ezcaterTips.toFixed(2)}`],
+        ['Credit tips', `$${tipPoolSummary.creditTips.toFixed(2)}`],
+        ['TDS driver', `$${tipPoolSummary.tdsDriverTips.toFixed(2)}`],
+        ['Cash sales', `$${tipPoolSummary.cashSales.toFixed(2)}`],
+        ['Total tips', `$${tipPoolSummary.totalTips.toFixed(2)}`],
+        ['Pool (minus TDS driver)', `$${tipPoolSummary.pool.toFixed(2)}`],
+        ['Total weighted hours', `${tipPoolSummary.totalWeightedHours.toFixed(3)}`],
+        ['Hourly rate', `$${tipPoolSummary.hourlyRate.toFixed(2)}`]
+      ].map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
+      
+      // Define fixed x offsets for values within each column
+      const colValueOffset = 200; // points from the left edge of the column
+      let summaryY = currentY + 86;
+      const lineHeight = 14;
+      const colSplitIndex = Math.ceil(entries.length / 2);
+      const col2X = pageWidth / 2;
+      
+      // Render first column
+      for (let i = 0; i < colSplitIndex; i++) {
+        const [label, value] = entries[i];
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${label}:`, margin, summaryY + i * lineHeight);
+        doc.setFont('helvetica', 'normal');
+        doc.text(value, margin + colValueOffset, summaryY + i * lineHeight);
+      }
+      
+      // Render second column
+      for (let i = colSplitIndex; i < entries.length; i++) {
+        const [label, value] = entries[i];
+        const rowIdx = i - colSplitIndex;
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${label}:`, col2X, summaryY + rowIdx * lineHeight);
+        doc.setFont('helvetica', 'normal');
+        doc.text(value, col2X + colValueOffset, summaryY + rowIdx * lineHeight);
+      }
+      
+      // Cash needed line with color coding
+      const cashNeeded = tipPoolSummary.cashNeeded;
+      let needLabel, needValue, textColor;
+      
+      if (cashNeeded < 0) {
+        // Need additional cash - show positive number in red
+        needLabel = 'CASH NEEDED TO PAY OUT TIPS';
+        needValue = `$${Math.abs(cashNeeded).toFixed(2)}`;
+        textColor = [220, 53, 69]; // Red color
+      } else {
+        // Have surplus - show positive number in green
+        needLabel = 'ZERO CASH NEEDED TO PAY OUT TIPS THIS WEEK. EXCESS CASH ON HAND';
+        needValue = `$${cashNeeded.toFixed(2)}`;
+        textColor = [40, 167, 69]; // Green color
+      }
+      
+      const summaryLines = Math.max(colSplitIndex, entries.length - colSplitIndex);
+      const cashY = summaryY + summaryLines * lineHeight + 10;
+      
+      // Set label in bold black
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text(`${needLabel}:`, margin, cashY);
+      
+      // Calculate proper positioning for the value
+      let valueX = margin + colValueOffset;
+      let valueY = cashY;
+      
+      if (needLabel.length > 35) { // Long label - put value on next line
+        valueX = margin;
+        valueY = cashY + lineHeight;
+      }
+      
+      // Set value in colored italic
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      doc.text(needValue, valueX, valueY);
+      
+      // Reset text color back to black for the rest of the document
+      doc.setTextColor(0, 0, 0);
+      
+      // Draw a horizontal separator before the table
+      const tableStartY = cashY + 25;
+      doc.setFont('helvetica', 'normal');
+      doc.setLineWidth(0.5);
+      doc.line(margin, tableStartY - 5, pageWidth - margin, tableStartY - 5);
+      
+      // Prepare table data (convert names to uppercase)
+      const tableBody = tipPoolRecords.map(r => [
+        r.first.toUpperCase(),
+        r.last.toUpperCase(),
+        r.hours.toFixed(2),
+        (r.equity * 100).toFixed(0),
+        r.weighted.toFixed(3),
+        '$' + r.due.toFixed(2)
+      ]);
+      
+      // Generate the table
+      doc.autoTable({
+        head: [['FIRST', 'LAST', 'HOURS', 'EQUITY (%)', 'WEIGHTED', 'DUE']],
+        body: tableBody,
+        startY: tableStartY,
+        margin: { left: margin, right: margin },
+        styles: { font: 'helvetica', fontSize: 8, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.1 },
+        headStyles: { font: 'helvetica', fontStyle: 'bold', textColor: [0, 0, 0], fillColor: null },
+        bodyStyles: { font: 'helvetica', textColor: [0, 0, 0], fillColor: null },
+        tableWidth: 'auto'
+      });
+      
+      // Generate filename and save
       const dateStr = tipPoolSummary.dateRange || new Date().toLocaleDateString().replace(/\//g, '-');
       const filename = `Tip_Pool_Distribution_${dateStr}.pdf`;
-      
-      // Generate PDF
-      await generatePDF(reportContent, filename);
-      
-      hideLoading();
-      alert('Tip pool PDF generated successfully!');
+      doc.save(filename);
       
     } catch (error) {
-      hideLoading();
-      alert('Error generating PDF: ' + error.message);
       console.error('PDF generation error:', error);
+      throw error;
     }
   }
 
