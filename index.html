@@ -2920,12 +2920,14 @@
     }
 
     try {
-      // Fetch cash sales data from Supabase for the date range
+      // Fetch cash sales data from Supabase for the date range (using same structure as working reports)
       const { data: cashSalesData, error: cashSalesError } = await supabase
         .from('cash_counts')
-        .select('toast_sales')
+        .select('*')
         .gte('date', startDate)
-        .lte('date', endDate);
+        .lte('date', endDate)
+        .not('pm_total', 'is', null)
+        .order('date', { ascending: true });
 
       if (cashSalesError) {
         console.error('Error fetching cash sales:', cashSalesError);
@@ -2933,10 +2935,10 @@
         return;
       }
 
-      // Calculate total Toast cash sales
+      // Calculate total Toast cash sales using correct column name
       let totalToastCashSales = 0;
       if (cashSalesData && cashSalesData.length > 0) {
-        totalToastCashSales = cashSalesData.reduce((sum, day) => sum + (day.toast_sales || 0), 0);
+        totalToastCashSales = cashSalesData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
       }
 
       // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
@@ -2999,21 +3001,23 @@
         throw new Error('Date range cannot exceed 7 days');
       }
 
-      // Fetch cash sales data from Supabase
+      // Fetch cash sales data from Supabase (using same structure as working reports)
       const { data: cashSalesData, error: cashSalesError } = await supabase
         .from('cash_counts')
-        .select('toast_sales')
+        .select('*')
         .gte('date', startDate)
-        .lte('date', endDate);
+        .lte('date', endDate)
+        .not('pm_total', 'is', null)
+        .order('date', { ascending: true });
 
       if (cashSalesError) {
         throw new Error('Failed to fetch cash sales data: ' + cashSalesError.message);
       }
 
-      // Calculate total Toast cash sales
+      // Calculate total Toast cash sales using correct column name
       let totalToastCashSales = 0;
       if (cashSalesData && cashSalesData.length > 0) {
-        totalToastCashSales = cashSalesData.reduce((sum, day) => sum + (day.toast_sales || 0), 0);
+        totalToastCashSales = cashSalesData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
       }
 
       // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
@@ -3527,9 +3531,9 @@
     let totalBackToCashbox = 0;
 
     cashData.forEach(day => {
-      totalToastSalesReported += day.toast_sales || 0;
+      totalToastSalesReported += day.pm_toast_sales || 0;
       totalActualCashIn += (day.am_total || 0) + (day.pm_total || 0);
-      totalDiscrepancy += (day.pm_total || 0) - (day.toast_sales || 0);
+      totalDiscrepancy += (day.pm_total || 0) - (day.pm_toast_sales || 0);
       totalEnvelopeDeposits += day.pm_envelope_deposit || 0;
       totalBackToCashbox += (day.pm_amount_to_keep - day.am_total) || 0;
     });
@@ -3688,14 +3692,14 @@
             <tbody>
               ${cashData.map((day, index) => {
                 const rowBg = index % 2 === 0 ? '#f8f9fa' : 'white';
-                const discrepancy = (day.pm_total || 0) - (day.toast_sales || 0);
+                const discrepancy = (day.pm_total || 0) - (day.pm_toast_sales || 0);
                 const discrepancyColor = discrepancy >= 0 ? '#28a745' : '#dc3545';
                 return `
                   <tr style="background: ${rowBg};">
                     <td style="padding: 8px; text-align: center; border: 1px solid #000; font-weight: bold;">
                       ${new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </td>
-                    <td style="padding: 8px; text-align: center; border: 1px solid #000;">$${(day.toast_sales || 0).toFixed(2)}</td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #000;">$${(day.pm_toast_sales || 0).toFixed(2)}</td>
                     <td style="padding: 8px; text-align: center; border: 1px solid #000;">$${(day.am_total || 0).toFixed(2)}</td>
                     <td style="padding: 8px; text-align: center; border: 1px solid #000;">$${(day.pm_total || 0).toFixed(2)}</td>
                     <td style="padding: 8px; text-align: center; border: 1px solid #000; color: ${discrepancyColor}; font-weight: bold;">
