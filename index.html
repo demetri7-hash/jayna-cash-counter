@@ -663,18 +663,23 @@
       
       <!-- Reports Section -->
       <div id="reportsForm" class="form-section">
-        <h2 style="margin-bottom: 20px; color: #1e3c72;">View Reports</h2>
+        <h2 style="margin-bottom: 20px; color: #1e3c72;">📊 Historical Reports</h2>
+        
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #1e3c72;">
+          <h4 style="margin: 0 0 10px 0; color: #1e3c72;">📈 Business Intelligence Reports</h4>
+          <p style="margin: 5px 0; font-size: 14px;">Generate comprehensive reports from your saved weekly data including tip pools, cash reconciliation, and employee performance.</p>
+        </div>
         
         <div class="form-group">
           <label>Report Type:</label>
           <div style="display: flex; gap: 15px; margin: 10px 0;">
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
               <input type="radio" name="reportType" value="single" checked onchange="toggleReportType()">
-              <span>Single Day</span>
+              <span>📅 Single Day Report</span>
             </label>
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input type="radio" name="reportType" value="range" onchange="toggleReportType()">
-              <span>Date Range</span>
+              <input type="radio" name="reportType" value="weekly" onchange="toggleReportType()">
+              <span>📋 Weekly Report (7 days)</span>
             </label>
           </div>
         </div>
@@ -683,28 +688,21 @@
           <label for="reportDate">Select Date:</label>
           <input type="date" id="reportDate" class="form-input" required>
           <div style="margin-top: 5px; font-size: 12px; color: #666;">
-            Note: For 8/31/25, enter as 2025-08-31
+            Generate a detailed report for a specific day including cash reconciliation and employee data.
           </div>
         </div>
         
-        <div id="dateRangeGroup" class="form-group" style="display: none;">
-          <label for="reportStartDate">Start Date:</label>
+        <div id="weeklyRangeGroup" class="form-group" style="display: none;">
+          <label for="reportStartDate">Week Start Date:</label>
           <input type="date" id="reportStartDate" class="form-input" required>
-          <label for="reportEndDate" style="margin-top: 10px;">End Date:</label>
+          <label for="reportEndDate" style="margin-top: 10px;">Week End Date:</label>
           <input type="date" id="reportEndDate" class="form-input" required>
-          <label for="realEnvelopeAmount" style="margin-top: 10px;">Real Envelope Amount ($):</label>
-          <input type="number" id="realEnvelopeAmount" class="form-input" step="0.01" min="0" placeholder="Actual counted envelope amount">
           <div style="margin-top: 10px; font-size: 14px; color: #666;">
-            <strong>Note:</strong> Maximum 7 days allowed. Real Envelope Amount is optional - enter the actual cash counted from envelopes.
+            <strong>📋 Weekly Report:</strong> Generate a comprehensive 7-day summary with tip pool distribution and cash flow analysis.
           </div>
         </div>
         
-        <button class="submit-btn" onclick="generateAndDownloadReport()" style="background: #007bff;">Generate & Download PDF Report</button>
-        
-        <!-- Hidden Report Display for PDF generation -->
-        <div id="reportDisplay" style="display: none; position: fixed; top: 0; left: 0; width: 800px; background: white; z-index: 9999; opacity: 0; pointer-events: none;">
-          <div id="reportContent"></div>
-        </div>
+        <button class="submit-btn" onclick="generateHistoricalReport()" style="background: #1e3c72;">📄 Generate Historical Report</button>
         
         <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 10px;">Back to Menu</button>
       </div>
@@ -2310,18 +2308,340 @@
   function toggleReportType() {
     const reportType = document.querySelector('input[name="reportType"]:checked').value;
     const singleGroup = document.getElementById('singleDateGroup');
-    const rangeGroup = document.getElementById('dateRangeGroup');
+    const weeklyGroup = document.getElementById('weeklyRangeGroup');
     
     if (reportType === 'single') {
       singleGroup.style.display = 'block';
-      rangeGroup.style.display = 'none';
+      weeklyGroup.style.display = 'none';
     } else {
       singleGroup.style.display = 'none';
-      rangeGroup.style.display = 'block';
+      weeklyGroup.style.display = 'block';
+    }
+  }
+
+  // Generate Historical Report from Database
+  async function generateHistoricalReport() {
+    const reportType = document.querySelector('input[name="reportType"]:checked').value;
+    
+    try {
+      showLoading('Generating Historical Report', 'Retrieving data from database...');
+      
+      if (reportType === 'single') {
+        await generateSingleDayHistoricalReport();
+      } else {
+        await generateWeeklyHistoricalReport();
+      }
+      
+      hideLoading();
+      showSuccessMessage('Historical report generated successfully!');
+      
+    } catch (error) {
+      hideLoading();
+      showErrorMessage('Error generating historical report: ' + error.message);
+      console.error('Historical report error:', error);
+    }
+  }
+
+  // Generate Single Day Historical Report
+  async function generateSingleDayHistoricalReport() {
+    const reportDate = document.getElementById('reportDate').value;
+    
+    if (!reportDate) {
+      throw new Error('Please select a date for the report');
     }
     
-    // Hide any existing report
-    document.getElementById('reportDisplay').style.display = 'none';
+    if (!supabase) {
+      throw new Error('Database connection not available');
+    }
+    
+    // Query for daily breakdown data
+    const { data: dailyData, error: dailyError } = await supabase
+      .from('weekly_daily_breakdown')
+      .select(`
+        *,
+        weekly_combined_reports!inner(
+          week_start_date,
+          week_end_date,
+          generated_by,
+          total_toast_sales,
+          actual_cash_in,
+          total_discrepancy
+        )
+      `)
+      .eq('date', reportDate);
+    
+    if (dailyError) {
+      throw new Error(`Database query failed: ${dailyError.message}`);
+    }
+    
+    if (!dailyData || dailyData.length === 0) {
+      throw new Error(`No data found for ${reportDate}. This date may not have been processed in a weekly report yet.`);
+    }
+    
+    // Generate PDF for single day
+    await generateSingleDayPDF(dailyData[0], reportDate);
+  }
+
+  // Generate Weekly Historical Report
+  async function generateWeeklyHistoricalReport() {
+    const startDate = document.getElementById('reportStartDate').value;
+    const endDate = document.getElementById('reportEndDate').value;
+    
+    if (!startDate || !endDate) {
+      throw new Error('Please select both start and end dates');
+    }
+    
+    if (new Date(endDate) < new Date(startDate)) {
+      throw new Error('End date must be after start date');
+    }
+    
+    if (!supabase) {
+      throw new Error('Database connection not available');
+    }
+    
+    // Query for weekly report data
+    const { data: weeklyData, error: weeklyError } = await supabase
+      .from('weekly_combined_reports')
+      .select(`
+        *,
+        weekly_employee_tips(*),
+        weekly_daily_breakdown(*)
+      `)
+      .eq('week_start_date', startDate)
+      .eq('week_end_date', endDate)
+      .single();
+    
+    if (weeklyError) {
+      throw new Error(`Database query failed: ${weeklyError.message}`);
+    }
+    
+    if (!weeklyData) {
+      throw new Error(`No weekly report found for ${startDate} to ${endDate}. This week may not have been processed yet.`);
+    }
+    
+    // Generate PDF for weekly report
+    await generateWeeklyHistoricalPDF(weeklyData, startDate, endDate);
+  }
+
+  // Generate Single Day PDF Report
+  async function generateSingleDayPDF(dayData, reportDate) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    let currentY = margin;
+    
+    // Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text('JAYNA GYRO DAILY REPORT', margin, currentY + 12);
+    
+    currentY += 30;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`DATE: ${reportDate.toUpperCase()}`, margin, currentY);
+    doc.text(`NIGHT COUNTER: ${(dayData.night_counter || 'N/A').toUpperCase()}`, margin, currentY + 12);
+    doc.text(`GENERATED: ${new Date().toLocaleString().toUpperCase()}`, margin, currentY + 24);
+    
+    // Cash reconciliation summary
+    currentY += 50;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('DAILY CASH RECONCILIATION', margin, currentY);
+    
+    currentY += 20;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    
+    const summaryData = [
+      ['TOAST SALES REPORTED:', `$${dayData.toast_sales.toFixed(2)}`],
+      ['ACTUAL CASH IN:', `$${dayData.actual_cash_in.toFixed(2)}`],
+      ['DISCREPANCY:', `$${dayData.discrepancy.toFixed(2)}`],
+      ['EXCESS:', `$${dayData.excess.toFixed(2)}`]
+    ];
+    
+    summaryData.forEach((row, index) => {
+      doc.text(row[0], margin, currentY + (index * 15));
+      doc.text(row[1], margin + 200, currentY + (index * 15));
+    });
+    
+    // Add explanatory notes
+    currentY += 100;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(80, 80, 80);
+    doc.text('DAILY REPORT NOTES', margin, currentY);
+    
+    currentY += 15;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
+    
+    const notes = [
+      'This daily report shows cash reconciliation for a single day.',
+      'DISCREPANCY: Actual Cash In - Expected Toast Sales (negative = short, positive = over)',
+      'EXCESS: Cash taken from tips to balance operations and account for discrepancies'
+    ];
+    
+    notes.forEach((note, index) => {
+      doc.text(note, margin, currentY + (index * 10));
+    });
+    
+    // Developer credit
+    currentY += 50;
+    if (currentY < 700) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
+      const creditText = 'Report Generation App designed and coded by Demetri Gregorakis';
+      const emailText = 'demetri_gregorakis@icloud.com for troubleshooting';
+      
+      const creditWidth = doc.getTextWidth(creditText);
+      const emailWidth = doc.getTextWidth(emailText);
+      const centerXCredit = (pageWidth - creditWidth) / 2;
+      const centerXEmail = (pageWidth - emailWidth) / 2;
+      
+      doc.text(creditText, centerXCredit, currentY);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.text(emailText, centerXEmail, currentY + 12);
+    }
+    
+    // Save PDF
+    const filename = `Daily_Report_${reportDate.replace(/-/g, '_')}.pdf`;
+    doc.save(filename);
+  }
+
+  // Generate Weekly Historical PDF Report
+  async function generateWeeklyHistoricalPDF(weeklyData, startDate, endDate) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    let currentY = margin;
+    
+    // Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text('JAYNA GYRO HISTORICAL WEEKLY REPORT', margin, currentY + 12);
+    
+    currentY += 30;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    const dateRange = `${startDate.toUpperCase()} TO ${endDate.toUpperCase()}`;
+    doc.text(`WEEK OF: ${dateRange}`, margin, currentY);
+    doc.text(`GENERATED BY: ${(weeklyData.generated_by || 'N/A').toUpperCase()}`, margin, currentY + 12);
+    doc.text(`GENERATED: ${new Date().toLocaleString().toUpperCase()}`, margin, currentY + 24);
+    
+    // Summary section
+    currentY += 50;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('WEEKLY SUMMARY', margin, currentY);
+    
+    currentY += 20;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    
+    const summaryLines = [
+      `TOAST CASH SALES REPORTED: $${weeklyData.total_toast_sales.toFixed(2)}`,
+      `ACTUAL CASH IN: $${weeklyData.actual_cash_in.toFixed(2)}`,
+      `TOTAL DISCREPANCY: $${weeklyData.total_discrepancy.toFixed(2)}`,
+      `ENVELOPE DEPOSITS: $${weeklyData.envelope_deposits.toFixed(2)}`,
+      `CREDIT TIPS: $${weeklyData.credit_tips.toFixed(2)}`,
+      `CASH TIPS: $${weeklyData.cash_tips.toFixed(2)}`,
+      `EZCATER TIPS: $${weeklyData.ezcater_tips.toFixed(2)}`,
+      `TOTAL TIPS: $${weeklyData.total_tips.toFixed(2)}`,
+      `TDS DRIVER: $${weeklyData.tds_driver_tips.toFixed(2)}`,
+      `TIP POOL TOTAL (MINUS TDS): $${weeklyData.tip_pool_total.toFixed(2)}`,
+      `HOURLY RATE: $${weeklyData.hourly_rate.toFixed(2)}`,
+      `CASH NEEDED: $${weeklyData.cash_needed.toFixed(2)}`
+    ];
+    
+    summaryLines.forEach((line, index) => {
+      if (index % 2 === 0) {
+        doc.text(line, margin, currentY + Math.floor(index / 2) * 15);
+      } else {
+        doc.text(line, margin + 280, currentY + Math.floor(index / 2) * 15);
+      }
+    });
+    
+    // Employee tips table
+    if (weeklyData.weekly_employee_tips && weeklyData.weekly_employee_tips.length > 0) {
+      currentY += Math.ceil(summaryLines.length / 2) * 15 + 30;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('EMPLOYEE TIP DISTRIBUTION', margin, currentY);
+      
+      currentY += 20;
+      
+      const employeeTableData = weeklyData.weekly_employee_tips.map(emp => [
+        `${emp.employee_first_name} ${emp.employee_last_name}`,
+        emp.hours_worked.toFixed(1),
+        emp.equity_percentage.toFixed(0),
+        emp.weighted_hours.toFixed(1),
+        `$${emp.tips_due.toFixed(2)}`
+      ]);
+      
+      doc.autoTable({
+        head: [['EMPLOYEE', 'HOURS', 'EQUITY (%)', 'WEIGHTED', 'DUE']],
+        body: employeeTableData,
+        startY: currentY,
+        margin: { left: margin, right: margin },
+        styles: { font: 'helvetica', fontSize: 8, textColor: [0, 0, 0] },
+        headStyles: { font: 'helvetica', fontStyle: 'bold', fillColor: [245, 245, 245] }
+      });
+      
+      currentY = doc.autoTable.previous.finalY + 20;
+    }
+    
+    // Daily breakdown table
+    if (weeklyData.weekly_daily_breakdown && weeklyData.weekly_daily_breakdown.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('DAILY CASH BREAKDOWN', margin, currentY);
+      
+      currentY += 20;
+      
+      const dailyTableData = weeklyData.weekly_daily_breakdown.map(day => [
+        day.date,
+        day.night_counter || 'N/A',
+        `$${day.toast_sales.toFixed(2)}`,
+        `$${day.actual_cash_in.toFixed(2)}`,
+        `${day.discrepancy >= 0 ? '+' : ''}$${day.discrepancy.toFixed(2)}`,
+        `$${day.excess.toFixed(2)}`
+      ]);
+      
+      doc.autoTable({
+        head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISCREPANCY', 'EXCESS']],
+        body: dailyTableData,
+        startY: currentY,
+        margin: { left: margin, right: margin },
+        styles: { font: 'helvetica', fontSize: 7, textColor: [0, 0, 0] },
+        headStyles: { font: 'helvetica', fontStyle: 'bold', fillColor: [245, 245, 245] },
+        didParseCell: function(data) {
+          // Color discrepancy column
+          if (data.column.index === 4 && data.row.index < dailyTableData.length) {
+            const cellValue = data.cell.text[0];
+            if (cellValue && cellValue.includes('-')) {
+              data.cell.styles.textColor = [139, 69, 19]; // Dark red
+              data.cell.styles.fontStyle = 'italic';
+            } else if (cellValue && cellValue.includes('+')) {
+              data.cell.styles.textColor = [34, 139, 34]; // Dark green
+            }
+          }
+        }
+      });
+    }
+    
+    // Save PDF
+    const filename = `Historical_Weekly_Report_${startDate.replace(/-/g, '_')}_to_${endDate.replace(/-/g, '_')}.pdf`;
+    doc.save(filename);
   }
   
   async function generateAndDownloadReport() {
