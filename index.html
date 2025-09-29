@@ -4674,37 +4674,44 @@
         
         // Excess column explanation
         const explanation = [
-          'EXCESS represents cash removed from registers to balance daily operations.',
-          'When preparing night deposits, we round envelope amounts (AM Start + Cash Tips)',
-          'to whole dollars. Excess coins and small bills return to the cashbox for next day.',
-          'This ensures clean envelope deposits while maintaining proper cash flow tracking.',
+          'EXCESS: Cash removed from registers for daily operations. Night deposits round envelope amounts',
+          'to whole dollars. Excess coins return to cashbox for next day operations.',
           '',
-          'COMING SOON: Weekly Cashbox Reconciliation',
-          'We will begin tracking total cash on hand in the cashbox once per week.',
-          'This will compare: Starting Cashbox + Weekly Excess - Weekly Discrepancies = Expected Ending.',
-          'Actual vs Expected differences will highlight cash flow issues and improve accuracy.',
-          '',
-          'Report Generation App designed and coded by Demetri Gregorakis',
-          'demetri_gregorakis@icloud.com for troubleshooting'
+          'COMING SOON: Weekly Cashbox Reconciliation - Starting + Excess - Discrepancies = Expected'
         ];
         
         explanation.forEach((text, index) => {
           if (text === '') {
-            // Add extra space for section breaks
             return;
           }
           if (text.startsWith('COMING SOON:')) {
             doc.setFont('helvetica', 'bold');
-            doc.text(text, margin, currentY + (index * 9));
-            doc.setFont('helvetica', 'normal');
-          } else if (text.startsWith('Report Generation App')) {
-            doc.setFont('helvetica', 'italic');
-            doc.text(text, margin, currentY + (index * 9));
+            doc.text(text, margin, currentY + (index * 8));
             doc.setFont('helvetica', 'normal');
           } else {
-            doc.text(text, margin, currentY + (index * 9));
+            doc.text(text, margin, currentY + (index * 8));
           }
         });
+        
+        // Add developer credit - centered, bold, black
+        currentY += 50;
+        if (currentY < pageHeight - 30) {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(0, 0, 0); // Black
+          const creditText = 'Report Generation App designed and coded by Demetri Gregorakis';
+          const emailText = 'demetri_gregorakis@icloud.com for troubleshooting';
+          
+          const creditWidth = doc.getTextWidth(creditText);
+          const emailWidth = doc.getTextWidth(emailText);
+          const centerXCredit = (pageWidth - creditWidth) / 2;
+          const centerXEmail = (pageWidth - emailWidth) / 2;
+          
+          doc.text(creditText, centerXCredit, currentY);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
+          doc.text(emailText, centerXEmail, currentY + 12);
+        }
       }
       
       // Generate filename and save
