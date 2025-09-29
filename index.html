@@ -2627,9 +2627,15 @@
         
         // Clean the content - remove any tip pool forms that shouldn't be there
         let cleanContent = reportContent.innerHTML;
-        // Remove any form elements that might be duplicated
+        
+        // Remove the Weekly Combined Report section and all form elements
+        cleanContent = cleanContent.replace(/<div[^>]*id="combinedReportSection"[^>]*>.*?<\/div>/gs, '');
         cleanContent = cleanContent.replace(/<div[^>]*id="tipPoolForm"[^>]*>.*?<\/div>/gs, '');
         cleanContent = cleanContent.replace(/<form[^>]*>.*?<\/form>/gs, '');
+        cleanContent = cleanContent.replace(/<button[^>]*onclick="goHome\(\)"[^>]*>.*?<\/button>/gs, '');
+        cleanContent = cleanContent.replace(/📊 Weekly Combined Report[\s\S]*?📄 Generate Combined Weekly Report/g, '');
+        cleanContent = cleanContent.replace(/📄 Download PDF Back to Menu/g, '');
+        
         contentDiv.innerHTML = cleanContent;
         contentBox.appendChild(contentDiv);
         
@@ -5964,7 +5970,12 @@
 
       // Generate the HTML content first
       const cashReportHtml = generateDateRangeReportHtml(startDate, endDate, rangeData, realEnvelopeAmount);
-      const tipPoolHtml = document.getElementById('tipPoolResults').innerHTML;
+      
+      // Clean tip pool HTML - remove the Weekly Combined Report section
+      let tipPoolHtml = document.getElementById('tipPoolResults').innerHTML;
+      tipPoolHtml = tipPoolHtml.replace(/<div[^>]*id="combinedReportSection"[^>]*>.*?<\/div>/gs, '');
+      tipPoolHtml = tipPoolHtml.replace(/📊 Weekly Combined Report[\s\S]*?📄 Generate Combined Weekly Report/g, '');
+      tipPoolHtml = tipPoolHtml.replace(/📄 Download PDF Back to Menu/g, '');
       
       // SAVE ALL DATA TO DATABASE BEFORE PDF GENERATION
       console.log('Saving comprehensive weekly report data to database...');
