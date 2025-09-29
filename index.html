@@ -668,6 +668,7 @@
         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #1e3c72;">
           <h4 style="margin: 0 0 10px 0; color: #1e3c72;">📈 Business Intelligence Reports</h4>
           <p style="margin: 5px 0; font-size: 14px;">Generate comprehensive reports from your saved weekly data including tip pools, cash reconciliation, and employee performance.</p>
+          <p style="margin: 5px 0; font-size: 12px; color: #666;"><strong>Note:</strong> Historical reports can only show data from dates that have been processed in weekly combined reports. Generate a weekly report first to save data to the database.</p>
         </div>
         
         <div class="form-group">
@@ -2371,11 +2372,12 @@
       .eq('date', reportDate);
     
     if (dailyError) {
+      console.error('Database error details:', dailyError);
       throw new Error(`Database query failed: ${dailyError.message}`);
     }
     
     if (!dailyData || dailyData.length === 0) {
-      throw new Error(`No data found for ${reportDate}. This date may not have been processed in a weekly report yet.`);
+      throw new Error(`No data found for ${reportDate}. You need to generate a weekly combined report that includes this date first. The historical reports can only show data from dates that have been processed in weekly reports.`);
     }
     
     // Generate PDF for single day
@@ -2399,28 +2401,55 @@
       throw new Error('Database connection not available');
     }
     
-    // Query for weekly report data
+    // Query for weekly report data - remove .single() to handle multiple results
     const { data: weeklyData, error: weeklyError } = await supabase
       .from('weekly_combined_reports')
-      .select(`
-        *,
-        weekly_employee_tips(*),
-        weekly_daily_breakdown(*)
-      `)
+      .select('*')
       .eq('week_start_date', startDate)
-      .eq('week_end_date', endDate)
-      .single();
+      .eq('week_end_date', endDate);
     
     if (weeklyError) {
+      console.error('Weekly query error details:', weeklyError);
       throw new Error(`Database query failed: ${weeklyError.message}`);
     }
     
-    if (!weeklyData) {
-      throw new Error(`No weekly report found for ${startDate} to ${endDate}. This week may not have been processed yet.`);
+    if (!weeklyData || weeklyData.length === 0) {
+      throw new Error(`No weekly report found for ${startDate} to ${endDate}. You need to generate a weekly combined report for this date range first. The historical reports can only show data from weeks that have been processed.`);
     }
     
+    // Use the first (most recent) result if multiple exist
+    const reportData = weeklyData[0];
+    
+    // Get employee tips data separately
+    const { data: employeeData, error: employeeError } = await supabase
+      .from('weekly_employee_tips')
+      .select('*')
+      .eq('weekly_report_id', reportData.id)
+      .order('employee_first_name', { ascending: true });
+    
+    if (employeeError) {
+      console.error('Employee query error:', employeeError);
+      // Don't throw - continue without employee data
+    }
+    
+    // Get daily breakdown data separately  
+    const { data: dailyData, error: dailyError } = await supabase
+      .from('weekly_daily_breakdown')
+      .select('*')
+      .eq('weekly_report_id', reportData.id)
+      .order('date', { ascending: true });
+    
+    if (dailyError) {
+      console.error('Daily breakdown query error:', dailyError);
+      // Don't throw - continue without daily data
+    }
+    
+    // Attach the related data to the main report
+    reportData.weekly_employee_tips = employeeData || [];
+    reportData.weekly_daily_breakdown = dailyData || [];
+    
     // Generate PDF for weekly report
-    await generateWeeklyHistoricalPDF(weeklyData, startDate, endDate);
+    await generateWeeklyHistoricalPDF(reportData, startDate, endDate);
   }
 
   // Generate Single Day PDF Report
@@ -3696,17 +3725,26 @@
     errorMsg.className = 'message error';
     errorMsg.innerHTML = `<strong>❌ Error:</strong> ${message}`;
     
-    // Insert at the top of the tip pool form
-    const tipPoolForm = document.getElementById('tipPoolForm');
-    const firstChild = tipPoolForm.firstElementChild;
-    tipPoolForm.insertBefore(errorMsg, firstChild.nextSibling);
+    // Find the currently active section
+    const activeSection = document.querySelector('.form-section.active');
     
-    // Remove message after 5 seconds
+    if (activeSection) {
+      // Insert at the top of the active section
+      const firstChild = activeSection.firstElementChild;
+      activeSection.insertBefore(errorMsg, firstChild.nextSibling);
+    } else {
+      // Fallback to tip pool form if no active section found
+      const tipPoolForm = document.getElementById('tipPoolForm');
+      const firstChild = tipPoolForm.firstElementChild;
+      tipPoolForm.insertBefore(errorMsg, firstChild.nextSibling);
+    }
+    
+    // Remove message after 8 seconds (longer for historical report errors)
     setTimeout(() => {
       if (errorMsg.parentNode) {
         errorMsg.remove();
       }
-    }, 5000);
+    }, 8000);
   }
 
   // Helper function to show success messages
