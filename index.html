@@ -3387,6 +3387,71 @@
     }
   }
 
+  async function downloadCombinedReportPDF() {
+    try {
+      const startDate = document.getElementById('combinedStartDate').value;
+      const endDate = document.getElementById('combinedEndDate').value;
+      const realEnvelopeAmount = parseFloat(document.getElementById('combinedRealEnvelope').value) || null;
+
+      if (!startDate || !endDate) {
+        showErrorMessage('Please select both start and end dates for the cash report period.');
+        return;
+      }
+
+      if (!tipPoolRecords || tipPoolRecords.length === 0) {
+        showErrorMessage('Please calculate tip pool first before generating combined report.');
+        return;
+      }
+
+      showLoading('Generating Combined PDF', 'Creating combined weekly report...');
+
+      // Fetch cash count data for the date range
+      const start = new Date(startDate + 'T12:00:00');
+      const end = new Date(endDate + 'T12:00:00');
+
+      if (start > end) {
+        throw new Error('Start date must be before end date');
+      }
+
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays > 7) {
+        throw new Error('Date range cannot exceed 7 days');
+      }
+
+      // Get cash data
+      const { data: rangeData } = await supabase
+        .from('cash_counts')
+        .select('*')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .not('pm_total', 'is', null)
+        .order('date', { ascending: true });
+
+      if (!rangeData || rangeData.length === 0) {
+        throw new Error('No cash count data found for this date range');
+      }
+
+      // Store cash data for potential re-generation
+      window.lastCombinedCashData = rangeData;
+      
+      // Save combined report data for persistence
+      saveCombinedReportData();
+
+      // Generate clean PDF using jsPDF (like tip pool report)
+      await generateCombinedReportPDF(startDate, endDate, rangeData, realEnvelopeAmount);
+      
+      hideLoading();
+      showSuccessMessage('Combined weekly report generated successfully!');
+      
+    } catch (error) {
+      hideLoading();
+      console.error('Combined PDF generation error:', error);
+      showErrorMessage(`Error generating combined report: ${error.message}`);
+    }
+  }
+
   async function downloadBothReports() {
     try {
       showLoading('Generating Both Reports', 'Creating tip pool and combined weekly reports...');
@@ -3397,8 +3462,8 @@
       // Small delay to ensure first PDF is processed
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Generate combined report PDF
-      await generateCombinedReport();
+      // Generate combined report PDF using new clean format
+      await downloadCombinedReportPDF();
       
       hideLoading();
       showSuccessMessage('Both reports have been downloaded successfully! Check your downloads folder for the Tip Pool PDF and Combined Weekly Report.');
