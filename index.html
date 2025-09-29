@@ -2543,25 +2543,68 @@
       console.log('reportResults element:', reportResultsElement);
       
       if (reportResultsElement) {
-        // SOLUTION: reportResults moved outside tipPoolForm to avoid parent display:none
-        console.log('=== SOLUTION APPLIED ===');
-        console.log('reportResults moved outside tipPoolForm container');
-        console.log('Parent element:', reportResultsElement.parentElement);
-        console.log('Parent display:', window.getComputedStyle(reportResultsElement.parentElement).display);
+        console.log('=== ALTERNATIVE DISPLAY METHOD ===');
         
-        // Set display properties
-        reportResultsElement.style.display = 'block';
-        reportResultsElement.style.visibility = 'visible';
-        reportResultsElement.style.opacity = '1';
+        // NUCLEAR OPTION: Create a completely new modal-style overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'reportOverlay';
+        overlay.style.cssText = `
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          background: rgba(0, 0, 0, 0.8) !important;
+          z-index: 99999 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          overflow: auto !important;
+        `;
         
-        console.log('Final element display:', window.getComputedStyle(reportResultsElement).display);
-        console.log('Element should now be visible!');
+        const contentBox = document.createElement('div');
+        contentBox.style.cssText = `
+          background: white !important;
+          margin: 20px !important;
+          padding: 30px !important;
+          border-radius: 8px !important;
+          max-width: 90vw !important;
+          max-height: 90vh !important;
+          overflow: auto !important;
+          position: relative !important;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+        `;
         
-        // Scroll to the element
-        setTimeout(() => {
-          reportResultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          console.log('Scrolled to reportResults element');
-        }, 100);
+        // Add close button
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '✕ Close Report';
+        closeBtn.style.cssText = `
+          position: sticky !important;
+          top: 0 !important;
+          right: 0 !important;
+          float: right !important;
+          background: #dc3545 !important;
+          color: white !important;
+          border: none !important;
+          padding: 10px 15px !important;
+          border-radius: 4px !important;
+          cursor: pointer !important;
+          margin-bottom: 20px !important;
+          font-size: 14px !important;
+        `;
+        closeBtn.onclick = () => document.body.removeChild(overlay);
+        
+        // Copy the content
+        contentBox.appendChild(closeBtn);
+        const contentDiv = document.createElement('div');
+        contentDiv.innerHTML = reportContent.innerHTML;
+        contentBox.appendChild(contentDiv);
+        
+        overlay.appendChild(contentBox);
+        document.body.appendChild(overlay);
+        
+        console.log('Created modal overlay for report display');
+        console.log('Report should be visible as modal overlay!');
         
       } else {
         console.error('reportResults element not found!');
@@ -2601,11 +2644,68 @@
       console.log('reportResults element found (legacy):', !!reportResultsElement);
       
       if (reportResultsElement) {
-        // SOLUTION: reportResults moved outside tipPoolForm to avoid parent display:none
-        reportResultsElement.style.display = 'block';
-        reportResultsElement.style.visibility = 'visible';
-        reportResultsElement.style.opacity = '1';
-        console.log('Applied solution - element should be visible (legacy path)');
+        console.log('=== ALTERNATIVE DISPLAY METHOD (LEGACY) ===');
+        
+        // NUCLEAR OPTION: Create a completely new modal-style overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'reportOverlayLegacy';
+        overlay.style.cssText = `
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          background: rgba(0, 0, 0, 0.8) !important;
+          z-index: 99999 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          overflow: auto !important;
+        `;
+        
+        const contentBox = document.createElement('div');
+        contentBox.style.cssText = `
+          background: white !important;
+          margin: 20px !important;
+          padding: 30px !important;
+          border-radius: 8px !important;
+          max-width: 90vw !important;
+          max-height: 90vh !important;
+          overflow: auto !important;
+          position: relative !important;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+        `;
+        
+        // Add close button
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '✕ Close Report (Legacy)';
+        closeBtn.style.cssText = `
+          position: sticky !important;
+          top: 0 !important;
+          right: 0 !important;
+          float: right !important;
+          background: #dc3545 !important;
+          color: white !important;
+          border: none !important;
+          padding: 10px 15px !important;
+          border-radius: 4px !important;
+          cursor: pointer !important;
+          margin-bottom: 20px !important;
+          font-size: 14px !important;
+        `;
+        closeBtn.onclick = () => document.body.removeChild(overlay);
+        
+        // Set fallback content
+        contentBox.appendChild(closeBtn);
+        const contentDiv = document.createElement('div');
+        contentDiv.innerHTML = '<h2>Legacy Report Content</h2><p>This is the legacy path display.</p>';
+        contentBox.appendChild(contentDiv);
+        
+        overlay.appendChild(contentBox);
+        document.body.appendChild(overlay);
+        
+        console.log('Created modal overlay for report display (legacy)');
+        
       } else {
         console.error('reportResults element not found (legacy)!');
       }
