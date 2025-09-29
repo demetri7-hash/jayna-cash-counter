@@ -4017,74 +4017,77 @@
       doc.setFontSize(9);   // Reduced from 10
       doc.setFont('helvetica', 'normal');
       
-      // Build an array of [label, value] pairs for both cash and tip pool data
-      const entries = [
-        ['Toast Sales Reported', `$${totalToastSalesReported.toFixed(2)}`],
+      // Create separate left and right column entries
+      const leftColumnEntries = [
+        ['Toast Cash Sales Reported', `$${totalToastSalesReported.toFixed(2)}`],
         ['Actual Cash In', `$${totalActualCashIn.toFixed(2)}`],
         ['Total Discrepancy', `$${totalDiscrepancy.toFixed(2)}`],
-        ['Envelope Deposits', `$${totalEnvelopeDeposits.toFixed(2)}`],
+        ['Envelope Deposits', `$${totalEnvelopeDeposits.toFixed(2)}`]
+      ].map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
+      
+      const rightColumnEntries = [
         ['Credit Tips', `$${tipPoolSummary.creditTips.toFixed(2)}`],
         ['Cash Tips', `$${tipPoolSummary.cashTips.toFixed(2)}`],
         ['EZCater Tips', `$${tipPoolSummary.ezcaterTips.toFixed(2)}`],
         ['Total Tips', `$${tipPoolSummary.totalTips.toFixed(2)}`],
         ['TDS Driver', `$${tipPoolSummary.tdsDriverTips.toFixed(2)}`],
-        ['Tip Pool Total (Minus TDS)', `$${tipPoolSummary.pool.toFixed(2)}`],
-        ['Cash Needed', `$${Math.abs(tipPoolSummary.cashNeeded).toFixed(2)}`]
+        ['Tip Pool Total (Minus TDS)', `$${tipPoolSummary.pool.toFixed(2)}`]
       ].map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
       
       // Define fixed x offsets for values within each column
       const colValueOffset = 170;  // Reduced from 200
       let summaryY = currentY + 66; // Reduced from 86
       const lineHeight = 11;        // Reduced from 14
-      const colSplitIndex = Math.ceil(entries.length / 2);
       const col2X = pageWidth / 2;
       
-      // Draw left column
-      for (let i = 0; i < colSplitIndex; i++) {
-        const [label, value] = entries[i];
+      // Draw left column (cash data)
+      let leftColumnY = summaryY;
+      for (const [label, value] of leftColumnEntries) {
         doc.setFont('helvetica', 'bold');
-        doc.text(`${label}:`, margin, summaryY);
+        doc.text(`${label}:`, margin, leftColumnY);
         doc.setFont('helvetica', 'normal');
-        doc.text(value, margin + colValueOffset, summaryY);
-        summaryY += lineHeight;
+        doc.text(value, margin + colValueOffset, leftColumnY);
+        leftColumnY += lineHeight;
       }
       
-      // Draw right column with special handling for Cash Needed
-      let rightColumnY = currentY + 66; // Match summaryY start
-      for (let i = colSplitIndex; i < entries.length; i++) {
-        const [label, value] = entries[i];
-        
-        // Special color handling for Cash Needed
-        if (label.includes('CASH NEEDED')) {
-          // Determine color based on cash needed amount
-          if (tipPoolSummary.cashNeeded > 0) {
-            // Cash is needed - show in red
-            doc.setTextColor(220, 53, 69); // Red color
-          } else {
-            // Cash surplus - show in green  
-            doc.setTextColor(40, 167, 69); // Green color
-          }
-          
-          doc.setFont('helvetica', 'bold');
-          doc.text(`${label}:`, col2X + 6, rightColumnY);
-          doc.setFont('helvetica', 'normal');
-          doc.text(value, col2X + 6 + colValueOffset, rightColumnY);
-          
-          // Reset to black for subsequent text
-          doc.setTextColor(0, 0, 0);
-        } else {
-          // Normal black text for other entries
-          doc.setFont('helvetica', 'bold');
-          doc.text(`${label}:`, col2X + 6, rightColumnY);
-          doc.setFont('helvetica', 'normal');
-          doc.text(value, col2X + 6 + colValueOffset, rightColumnY);
-        }
-        
+      // Draw right column (tip data)
+      let rightColumnY = summaryY;
+      for (const [label, value] of rightColumnEntries) {
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${label}:`, col2X + 6, rightColumnY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(value, col2X + 6 + colValueOffset, rightColumnY);
         rightColumnY += lineHeight;
       }
       
+      // Add centered Cash Needed/Surplus line below both columns with larger italic font
+      const cashNeededY = Math.max(leftColumnY, rightColumnY) + 8;
+      const cashNeededLabel = tipPoolSummary.cashNeeded > 0 ? 'CASH NEEDED' : 'CASH SURPLUS';
+      const cashNeededValue = `$${Math.abs(tipPoolSummary.cashNeeded).toFixed(2)}`;
+      const cashNeededText = `${cashNeededLabel}: ${cashNeededValue}`;
+      
+      // Set color and font for cash needed line
+      if (tipPoolSummary.cashNeeded > 0) {
+        doc.setTextColor(220, 53, 69); // Red for cash needed
+      } else {
+        doc.setTextColor(40, 167, 69); // Green for surplus
+      }
+      
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(12); // 2pts bigger than normal 10pt text
+      
+      // Center the text between the margins
+      const textWidth = doc.getTextWidth(cashNeededText);
+      const centerX = (pageWidth / 2) - (textWidth / 2);
+      doc.text(cashNeededText, centerX, cashNeededY);
+      
+      // Reset font and color
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      
       // Draw a horizontal line after summary with reduced spacing
-      const postSummaryY = Math.max(summaryY, rightColumnY) + 6; // Reduced from 10
+      const postSummaryY = cashNeededY + 12; // Account for cash needed line
       doc.setLineWidth(0.5);
       doc.line(margin, postSummaryY, pageWidth - margin, postSummaryY);
       
@@ -4143,10 +4146,32 @@
           ];
         });
         
+        // Calculate totals for numerical columns (skip DATE and NIGHT COUNTER columns)
+        const totalsRow = ['TOTALS', '', '', '', '', '', ''];
+        
+        // Calculate totals for columns 2-6 (TOAST SALES, ACTUAL CASH IN, DISCREPANCY, ENVELOPE, CASHBOX)
+        for (let col = 2; col < 7; col++) {
+          let total = 0;
+          dailyTableData.forEach(row => {
+            let value = row[col].replace('$', '').replace('+', '').replace(',', '');
+            total += parseFloat(value) || 0;
+          });
+          
+          if (col === 4) { // DISCREPANCY column - show sign
+            const sign = total >= 0 ? '+' : '';
+            totalsRow[col] = `${sign}$${Math.abs(total).toFixed(2)}`;
+          } else {
+            totalsRow[col] = `$${total.toFixed(2)}`;
+          }
+        }
+        
+        // Add totals row to table data
+        const tableDataWithTotals = [...dailyTableData, totalsRow];
+        
         doc.autoTable({
           startY: currentY,
-          head: [['DATE', 'COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISCREPANCY', 'ENVELOPE', 'CASHBOX']],
-          body: dailyTableData,
+          head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISCREPANCY', 'ENVELOPE', 'CASHBOX']],
+          body: tableDataWithTotals,
           margin: { left: margin, right: margin },
           theme: 'grid',
           headStyles: { 
@@ -4163,6 +4188,13 @@
             fillColor: null,
             fontSize: 7,        // Smaller font for daily table
             cellPadding: 2      // Smaller padding for daily table
+          },
+          didParseCell: function(data) {
+            // Apply bold italic styling to totals row
+            if (data.row.index === tableDataWithTotals.length - 1) {
+              data.cell.styles.fontStyle = 'bolditalic';
+              data.cell.styles.fillColor = [240, 240, 240]; // Light gray background for totals
+            }
           },
           tableWidth: 'auto'
         });
