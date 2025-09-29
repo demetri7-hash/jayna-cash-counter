@@ -1388,10 +1388,15 @@
     
     reconciliationDetails.innerHTML = `
       <div style="margin-bottom: 10px;">
-        <strong>Previous Count:</strong> ${lastDate} - $${lastAmount.toFixed(2)}
+        <strong>Previous Cashbox Count:</strong> ${lastDate} - $${lastAmount.toFixed(2)}
+      </div>
+      <div style="margin-bottom: 10px; font-size: 12px; color: #856404;">
+        <strong>Reconciliation Logic:</strong><br>
+        Expected This Week = Previous Week + Daily Discrepancies<br>
+        <em>Note: AM register loading amounts do not affect total cashbox reconciliation</em>
       </div>
       <div style="font-size: 12px; color: #856404;">
-        After entering your count, we'll calculate any variances for reconciliation.
+        After entering your count, we'll calculate discrepancies and verify reconciliation.
       </div>
     `;
     
@@ -1499,7 +1504,7 @@
         return {
           isFirstCount: true,
           currentTotal: currentTotal,
-          message: 'First cashbox count recorded'
+          message: 'First cashbox count recorded - baseline established'
         };
       }
       
@@ -1508,15 +1513,36 @@
           isFirstCount: true,
           currentTotal: currentTotal,
           previousTotal: null,
-          message: 'Second cashbox count - no comparison available yet'
+          message: 'Second cashbox count - reconciliation will begin next week'
         };
       }
       
       const current = data[0]; // Most recent (just saved)
-      const previous = data[1]; // Second most recent
+      const previous = data[1]; // Previous week
       
-      const variance = currentTotal - previous.total;
-      const variancePercentage = previous.total > 0 ? (variance / previous.total) * 100 : 0;
+      // Get date range for daily discrepancies between the two cashbox counts
+      const startDate = new Date(previous.date);
+      const endDate = new Date(current.date);
+      
+      // Fetch daily discrepancies for the period
+      const { data: discrepancyData, error: discrepancyError } = await supabase
+        .from('cash_counts')
+        .select('pm_discrepancy, date')
+        .gte('date', previous.date)
+        .lt('date', current.date) // Use < to exclude current date
+        .not('pm_discrepancy', 'is', null)
+        .order('date', { ascending: true });
+      
+      if (discrepancyError) throw discrepancyError;
+      
+      // Calculate total discrepancies for the period
+      const totalDiscrepancies = discrepancyData ? 
+        discrepancyData.reduce((sum, day) => sum + (day.pm_discrepancy || 0), 0) : 0;
+      
+      // CORRECT RECONCILIATION FORMULA:
+      // Week_N_Ending_Cashbox = Week_N_Starting_Cashbox + Sum(Daily_Discrepancies)
+      const expectedEnding = previous.total + totalDiscrepancies;
+      const actualVariance = currentTotal - expectedEnding;
       
       return {
         isFirstCount: false,
@@ -1524,11 +1550,17 @@
         currentDate: new Date(current.date).toLocaleDateString(),
         previousTotal: previous.total,
         previousDate: new Date(previous.date).toLocaleDateString(),
-        variance: variance,
-        variancePercentage: variancePercentage,
-        message: variance === 0 ? 'No change from previous week' : 
-                 variance > 0 ? `Increase of $${variance.toFixed(2)}` : 
-                 `Decrease of $${Math.abs(variance).toFixed(2)}`
+        totalDiscrepancies: totalDiscrepancies,
+        expectedEnding: expectedEnding,
+        actualVariance: actualVariance,
+        discrepancyDays: discrepancyData ? discrepancyData.length : 0,
+        reconciliationStatus: Math.abs(actualVariance) < 0.01 ? 'BALANCED' : 
+                             actualVariance > 0 ? 'OVERAGE' : 'SHORTAGE',
+        message: Math.abs(actualVariance) < 0.01 ? 
+                'Perfect reconciliation! Cashbox balances correctly.' :
+                actualVariance > 0 ? 
+                `Unexplained overage of $${actualVariance.toFixed(2)}` :
+                `Unexplained shortage of $${Math.abs(actualVariance).toFixed(2)}`
       };
       
     } catch (error) {
@@ -4368,7 +4400,19 @@
       // Add cashbox reconciliation if available
       if (cashboxReconciliation) {
         leftColumnEntries.push(['Current Cashbox Total', `$${cashboxReconciliation.currentTotal.toFixed(2)}`]);
-        if (!cashboxReconciliation.isFirstCount && cashboxReconciliation.previousTotal !== null) {
+        
+        if (!cashboxReconciliation.isFirstCount && cashboxReconciliation.expectedEnding !== undefined) {
+          leftColumnEntries.push(['Expected Based on Discrepancies', `$${cashboxReconciliation.expectedEnding.toFixed(2)}`]);
+          leftColumnEntries.push(['Total Period Discrepancies', `$${cashboxReconciliation.totalDiscrepancies.toFixed(2)}`]);
+          
+          if (Math.abs(cashboxReconciliation.actualVariance) >= 0.01) {
+            const varianceLabel = cashboxReconciliation.actualVariance >= 0 ? 'Unexplained Overage' : 'Unexplained Shortage';
+            leftColumnEntries.push([varianceLabel, `$${Math.abs(cashboxReconciliation.actualVariance).toFixed(2)}`]);
+          } else {
+            leftColumnEntries.push(['Reconciliation Status', 'BALANCED']);
+          }
+        } else if (!cashboxReconciliation.isFirstCount) {
+          // Fallback for old logic
           const varianceLabel = cashboxReconciliation.variance >= 0 ? 'Cashbox Increase' : 'Cashbox Decrease';
           leftColumnEntries.push([varianceLabel, `$${Math.abs(cashboxReconciliation.variance).toFixed(2)}`]);
         }
