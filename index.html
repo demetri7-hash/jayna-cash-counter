@@ -4147,6 +4147,19 @@
               data.cell.styles.fontStyle = 'bold';
               data.cell.styles.fillColor = [240, 240, 240]; // Light gray background for totals
             }
+            
+            // Color formatting for DISCREPANCY column (column index 4)
+            if (data.column.index === 4 && data.row.index < tableDataWithTotals.length - 1) {
+              const cellValue = data.cell.text[0];
+              if (cellValue && cellValue.includes('-')) {
+                // Negative discrepancy - dark pastel red and italic
+                data.cell.styles.textColor = [139, 69, 19]; // Dark red
+                data.cell.styles.fontStyle = 'italic';
+              } else if (cellValue && cellValue.includes('+')) {
+                // Positive discrepancy - dark pastel green
+                data.cell.styles.textColor = [34, 139, 34]; // Dark green
+              }
+            }
           },
           tableWidth: 'auto'
         });
@@ -4158,32 +4171,34 @@
       if (cashData && cashData.length > 0) {
         const dailyTableData = cashData.map(day => {
           const actualCashIn = day.pm_total - day.am_total;
-          const discrepancySign = day.pm_discrepancy >= 0 ? '+' : '';
+          const discrepancy = day.pm_discrepancy || 0;
+          const discrepancyFormatted = discrepancy >= 0 ? `+$${discrepancy.toFixed(2)}` : `-$${Math.abs(discrepancy).toFixed(2)}`;
           const actualExcess = (day.pm_amount_to_keep || 0) - (day.am_total || 0); // Actual excess returned to cashbox
           return [
             new Date(day.date + 'T12:00:00').toLocaleDateString(),
             day.pm_counter || 'N/A',
             `$${(day.pm_toast_sales || 0).toFixed(2)}`,
             `$${actualCashIn.toFixed(2)}`,
-            `${discrepancySign}$${Math.abs(day.pm_discrepancy || 0).toFixed(2)}`,
-            `$${actualExcess.toFixed(2)}`,
-            `$${(day.pm_amount_to_keep || 0).toFixed(2)}`
+            discrepancyFormatted,
+            `$${actualExcess.toFixed(2)}`
           ];
         });
         
         // Calculate totals for numerical columns (skip DATE and NIGHT COUNTER columns)
-        const totalsRow = ['TOTALS', '', '', '', '', '', ''];
+        const totalsRow = ['TOTALS', '', '', '', '', ''];
         
-        // Calculate totals for columns 2-6 (TOAST SALES, ACTUAL CASH IN, DISCREPANCY, EXCESS, CASHBOX)
-        for (let col = 2; col < 7; col++) {
+        // Calculate totals for columns 2-5 (TOAST SALES, ACTUAL CASH IN, DISCREPANCY, EXCESS)
+        for (let col = 2; col < 6; col++) {
           let total = 0;
           dailyTableData.forEach(row => {
-            let value = row[col].replace('$', '').replace('+', '').replace(',', '');
-            total += parseFloat(value) || 0;
+            let value = row[col].replace('$', '').replace('+', '').replace('-', '').replace(',', '');
+            const isNegative = row[col].includes('-');
+            const numValue = parseFloat(value) || 0;
+            total += isNegative ? -numValue : numValue;
           });
           
-          if (col === 4) { // DISCREPANCY column - show sign
-            const sign = total >= 0 ? '+' : '';
+          if (col === 4) { // DISCREPANCY column - show sign and format
+            const sign = total >= 0 ? '+' : '-';
             totalsRow[col] = `${sign}$${Math.abs(total).toFixed(2)}`;
           } else {
             totalsRow[col] = `$${total.toFixed(2)}`;
@@ -4195,7 +4210,7 @@
         
         doc.autoTable({
           startY: currentY,
-          head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISCREPANCY', 'EXCESS', 'CASHBOX']],
+          head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISCREPANCY', 'EXCESS']],
           body: tableDataWithTotals,
           margin: { left: margin, right: margin },
           theme: 'grid',
