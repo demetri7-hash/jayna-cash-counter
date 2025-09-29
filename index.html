@@ -4754,6 +4754,128 @@
     }
   }
 
+  // Save ALL Weekly Combined Report Data to Database
+  async function saveWeeklyCombinedReportData(startDate, endDate, cashData, realEnvelopeAmount, cashboxTotal) {
+    try {
+      if (!supabase) {
+        console.log('Supabase not available - skipping data save');
+        return;
+      }
+
+      // Prepare comprehensive report data
+      const reportData = {
+        // Report metadata
+        week_start_date: startDate,
+        week_end_date: endDate,
+        generated_by: tipPoolSummary.calculatedByName || 'Unknown',
+        generated_at: new Date().toISOString(),
+        real_envelope_amount: realEnvelopeAmount,
+        cashbox_total: cashboxTotal,
+        
+        // Tip Pool Summary Data
+        total_toast_sales: tipPoolSummary.toastSalesReported || 0,
+        actual_cash_in: tipPoolSummary.actualCashIn || 0,
+        total_discrepancy: tipPoolSummary.totalDiscrepancy || 0,
+        envelope_deposits: tipPoolSummary.envelopeDeposits || 0,
+        credit_tips: tipPoolSummary.creditTips || 0,
+        cash_tips: tipPoolSummary.cashTips || 0,
+        ezcater_tips: tipPoolSummary.ezcaterTips || 0,
+        total_tips: tipPoolSummary.totalTips || 0,
+        tds_driver_tips: tipPoolSummary.tdsDriverTips || 0,
+        tip_pool_total: tipPoolSummary.tipPoolTotal || 0,
+        hourly_rate: tipPoolSummary.hourlyRate || 0,
+        cash_needed: tipPoolSummary.cashNeeded || 0,
+        
+        // Additional tip pool fields
+        calculated_cash_tips: tipPoolSummary.calculatedCashTips || 0,
+        total_weighted_hours: tipPoolSummary.totalWeightedHours || 0,
+        total_hours_worked: tipPoolSummary.totalHoursWorked || 0,
+        
+        // Employee data as JSON
+        employee_tip_data: JSON.stringify(tipPoolRecords || []),
+        
+        // Daily cash breakdown as JSON
+        daily_cash_breakdown: JSON.stringify(cashData || []),
+        
+        // System metadata
+        report_version: '3.0',
+        has_attachments: false // Will be updated if attachments exist
+      };
+
+      // Save main report data
+      const { data: savedReport, error: reportError } = await supabase
+        .from('weekly_combined_reports')
+        .insert([reportData])
+        .select()
+        .single();
+
+      if (reportError) {
+        console.error('Error saving weekly report:', reportError);
+        throw reportError;
+      }
+
+      console.log('Weekly combined report data saved successfully:', savedReport.id);
+      
+      // Save individual employee records for easier querying
+      if (tipPoolRecords && tipPoolRecords.length > 0) {
+        const employeeRecords = tipPoolRecords.map(employee => ({
+          weekly_report_id: savedReport.id,
+          week_start_date: startDate,
+          week_end_date: endDate,
+          employee_first_name: employee.first,
+          employee_last_name: employee.last,
+          hours_worked: employee.hours,
+          equity_percentage: employee.equity,
+          weighted_hours: employee.weighted,
+          tips_due: employee.due,
+          created_at: new Date().toISOString()
+        }));
+
+        const { error: employeeError } = await supabase
+          .from('weekly_employee_tips')
+          .insert(employeeRecords);
+
+        if (employeeError) {
+          console.error('Error saving employee tip records:', employeeError);
+          // Don't throw here - main report is saved
+        } else {
+          console.log(`Saved ${employeeRecords.length} employee tip records`);
+        }
+      }
+
+      // Save daily cash breakdown records
+      if (cashData && cashData.length > 0) {
+        const dailyRecords = cashData.map(day => ({
+          weekly_report_id: savedReport.id,
+          date: day.date,
+          night_counter: day.night_counter || day.night_counter_name,
+          toast_sales: day.toast_sales,
+          actual_cash_in: day.actual_cash_in,
+          discrepancy: day.discrepancy,
+          excess: day.excess,
+          created_at: new Date().toISOString()
+        }));
+
+        const { error: dailyError } = await supabase
+          .from('weekly_daily_breakdown')
+          .insert(dailyRecords);
+
+        if (dailyError) {
+          console.error('Error saving daily breakdown records:', dailyError);
+          // Don't throw here - main report is saved
+        } else {
+          console.log(`Saved ${dailyRecords.length} daily breakdown records`);
+        }
+      }
+
+      return savedReport.id;
+
+    } catch (error) {
+      console.error('Error saving weekly combined report data:', error);
+      throw error;
+    }
+  }
+
   // Generate Payday Sign Off Sheet as PDF page
   function generatePaydaySignOffPage(doc, startDate, endDate) {
     try {
@@ -5110,6 +5232,16 @@
       
       // Save combined report data for persistence
       saveCombinedReportData();
+
+      // SAVE ALL DATA TO DATABASE BEFORE PDF GENERATION
+      console.log('Saving comprehensive weekly report data to database...');
+      try {
+        const savedReportId = await saveWeeklyCombinedReportData(startDate, endDate, rangeData, realEnvelopeAmount, cashboxTotal);
+        console.log(`Weekly report data saved successfully with ID: ${savedReportId}`);
+      } catch (saveError) {
+        console.error('Warning: Failed to save report data to database:', saveError);
+        // Don't stop PDF generation if database save fails
+      }
 
       // Check for uploaded PDF attachments
       const voidsLogFile = document.getElementById('voidsLogUpload').files[0];
