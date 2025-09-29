@@ -4158,13 +4158,14 @@
         const dailyTableData = cashData.map(day => {
           const actualCashIn = day.pm_total - day.am_total;
           const discrepancySign = day.pm_discrepancy >= 0 ? '+' : '';
+          const actualExcess = (day.pm_amount_to_keep || 0) - (day.am_total || 0); // Actual excess returned to cashbox
           return [
             new Date(day.date + 'T12:00:00').toLocaleDateString(),
             day.pm_counter || 'N/A',
             `$${(day.pm_toast_sales || 0).toFixed(2)}`,
             `$${actualCashIn.toFixed(2)}`,
             `${discrepancySign}$${Math.abs(day.pm_discrepancy || 0).toFixed(2)}`,
-            `$${day.pm_deposit_amount || 0}`,
+            `$${actualExcess.toFixed(2)}`,
             `$${(day.pm_amount_to_keep || 0).toFixed(2)}`
           ];
         });
@@ -4172,7 +4173,7 @@
         // Calculate totals for numerical columns (skip DATE and NIGHT COUNTER columns)
         const totalsRow = ['TOTALS', '', '', '', '', '', ''];
         
-        // Calculate totals for columns 2-6 (TOAST SALES, ACTUAL CASH IN, DISCREPANCY, ENVELOPE, CASHBOX)
+        // Calculate totals for columns 2-6 (TOAST SALES, ACTUAL CASH IN, DISCREPANCY, EXCESS, CASHBOX)
         for (let col = 2; col < 7; col++) {
           let total = 0;
           dailyTableData.forEach(row => {
@@ -4193,7 +4194,7 @@
         
         doc.autoTable({
           startY: currentY,
-          head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISCREPANCY', 'ENVELOPE', 'CASHBOX']],
+          head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISCREPANCY', 'EXCESS', 'CASHBOX']],
           body: tableDataWithTotals,
           margin: { left: margin, right: margin },
           theme: 'grid',
