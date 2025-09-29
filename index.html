@@ -779,6 +779,7 @@
         
         <button class="submit-btn" onclick="calculateTipPool()" style="background: #28a745;">Calculate Tip Pool</button>
         <button class="submit-btn" onclick="downloadTipPoolPDF()" id="tipPoolPdfBtn" style="background: #007bff; margin-left: 10px; display: none;">Download Tip Pool PDF</button>
+        <button class="submit-btn" onclick="clearSavedData()" style="background: #dc3545; margin-left: 10px;" title="Clear all saved data and start fresh">Clear Saved Data</button>
         
 
         
@@ -888,6 +889,11 @@
     initializeSupabase();
     initializeEmailJS();
     setTodayDate();
+    
+    // Load saved data
+    loadTipPoolData();
+    loadCombinedReportData();
+    
     // Removed "App ready" message to prevent page bouncing
   });
   
@@ -2997,6 +3003,158 @@
     console.log('showSuccessMessage completed');
   }
 
+  // ===== DATA PERSISTENCE FUNCTIONS =====
+  
+  // Save tip pool data to localStorage
+  function saveTipPoolData() {
+    try {
+      const tipPoolData = {
+        tipPoolRecords: tipPoolRecords,
+        tipPoolSummary: tipPoolSummary,
+        formData: {
+          startDate: document.getElementById('tipPoolStartDate').value,
+          endDate: document.getElementById('tipPoolEndDate').value,
+          realEnvelopeDeposit: document.getElementById('realEnvelopeDeposit').value,
+          ezcaterTips: document.getElementById('ezcaterTips').value,
+          tdsDriverTips: document.getElementById('tdsDriverTips').value,
+          calculatedByName: document.getElementById('calculatedByName').value,
+          calculatedCashTips: document.getElementById('calculatedCashTips').value
+        },
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem('jaynaGyroCashCounter_tipPoolData', JSON.stringify(tipPoolData));
+      console.log('Tip pool data saved to localStorage');
+    } catch (error) {
+      console.error('Error saving tip pool data:', error);
+    }
+  }
+  
+  // Load tip pool data from localStorage
+  function loadTipPoolData() {
+    try {
+      const saved = localStorage.getItem('jaynaGyroCashCounter_tipPoolData');
+      if (!saved) return false;
+      
+      const tipPoolData = JSON.parse(saved);
+      
+      // Restore global state
+      tipPoolRecords = tipPoolData.tipPoolRecords || [];
+      tipPoolSummary = tipPoolData.tipPoolSummary || {};
+      
+      // Restore form data
+      if (tipPoolData.formData) {
+        const form = tipPoolData.formData;
+        document.getElementById('tipPoolStartDate').value = form.startDate || '';
+        document.getElementById('tipPoolEndDate').value = form.endDate || '';
+        document.getElementById('realEnvelopeDeposit').value = form.realEnvelopeDeposit || '';
+        document.getElementById('ezcaterTips').value = form.ezcaterTips || '';
+        document.getElementById('tdsDriverTips').value = form.tdsDriverTips || '';
+        document.getElementById('calculatedByName').value = form.calculatedByName || '';
+        document.getElementById('calculatedCashTips').value = form.calculatedCashTips || '';
+      }
+      
+      // Show results if we have data
+      if (tipPoolRecords.length > 0) {
+        renderTipPoolSummary();
+        renderTipPoolTable();
+        document.getElementById('tipPoolResults').style.display = 'block';
+        document.getElementById('tipPoolPdfBtn').style.display = 'inline-block';
+        document.getElementById('combinedReportSection').style.display = 'block';
+        document.getElementById('tipPoolForm').classList.add('active');
+        
+        // Auto-populate combined report data
+        document.getElementById('combinedStartDate').value = tipPoolData.formData?.startDate || '';
+        document.getElementById('combinedEndDate').value = tipPoolData.formData?.endDate || '';
+        document.getElementById('combinedRealEnvelope').value = tipPoolData.formData?.realEnvelopeDeposit || '';
+        
+        // Show restoration message
+        showSuccessMessage(`Previous tip pool data restored! You can make adjustments and re-download reports. Last saved: ${new Date(tipPoolData.timestamp).toLocaleString()}`);
+      }
+      
+      console.log('Tip pool data loaded from localStorage');
+      return true;
+    } catch (error) {
+      console.error('Error loading tip pool data:', error);
+      return false;
+    }
+  }
+  
+  // Save combined report data to localStorage
+  function saveCombinedReportData() {
+    try {
+      const combinedData = {
+        formData: {
+          startDate: document.getElementById('combinedStartDate').value,
+          endDate: document.getElementById('combinedEndDate').value,
+          realEnvelope: document.getElementById('combinedRealEnvelope').value
+        },
+        lastCashData: window.lastCombinedCashData || null,
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem('jaynaGyroCashCounter_combinedReportData', JSON.stringify(combinedData));
+      console.log('Combined report data saved to localStorage');
+    } catch (error) {
+      console.error('Error saving combined report data:', error);
+    }
+  }
+  
+  // Load combined report data from localStorage
+  function loadCombinedReportData() {
+    try {
+      const saved = localStorage.getItem('jaynaGyroCashCounter_combinedReportData');
+      if (!saved) return false;
+      
+      const combinedData = JSON.parse(saved);
+      
+      // Restore form data
+      if (combinedData.formData) {
+        const form = combinedData.formData;
+        document.getElementById('combinedStartDate').value = form.startDate || '';
+        document.getElementById('combinedEndDate').value = form.endDate || '';
+        document.getElementById('combinedRealEnvelope').value = form.realEnvelope || '';
+      }
+      
+      // Restore cash data for re-generation
+      if (combinedData.lastCashData) {
+        window.lastCombinedCashData = combinedData.lastCashData;
+      }
+      
+      console.log('Combined report data loaded from localStorage');
+      return true;
+    } catch (error) {
+      console.error('Error loading combined report data:', error);
+      return false;
+    }
+  }
+  
+  // Clear all saved data
+  function clearSavedData() {
+    try {
+      localStorage.removeItem('jaynaGyroCashCounter_tipPoolData');
+      localStorage.removeItem('jaynaGyroCashCounter_combinedReportData');
+      
+      // Reset tip pool state
+      tipPoolRecords = [];
+      tipPoolSummary = {};
+      
+      // Reset forms
+      document.getElementById('tipPoolForm').reset();
+      document.getElementById('combinedReportForm').reset();
+      
+      // Hide results
+      document.getElementById('tipPoolResults').style.display = 'none';
+      document.getElementById('tipPoolPdfBtn').style.display = 'none';
+      document.getElementById('combinedReportSection').style.display = 'none';
+      document.getElementById('tipPoolForm').classList.remove('active');
+      
+      showSuccessMessage('All saved data cleared. You can start fresh.');
+      console.log('All saved data cleared');
+    } catch (error) {
+      console.error('Error clearing saved data:', error);
+      showErrorMessage('Error clearing saved data: ' + error.message);
+    }
+  }
+
   async function calculateCashTips() {
     const startDate = document.getElementById('tipPoolStartDate').value;
     const endDate = document.getElementById('tipPoolEndDate').value;
@@ -3169,6 +3327,9 @@
       document.getElementById('combinedEndDate').value = endDate;
       document.getElementById('combinedRealEnvelope').value = realEnvelopeDeposit.toString();
       console.log('Auto-populated combined report data:', { startDate, endDate, realEnvelopeDeposit });
+      
+      // Save tip pool data for persistence
+      saveTipPoolData();
       
       // Ensure tip pool form stays active
       document.getElementById('tipPoolForm').classList.add('active');
@@ -3554,6 +3715,9 @@
     tipPoolSummary.hourlyRate = rate;
     tipPoolSummary.cashNeeded = tipPoolSummary.creditTips - tipPoolSummary.tdsDriverTips + tipPoolSummary.ezcaterTips - tipPoolSummary.cashSales;
     
+    // Auto-save updated data
+    saveTipPoolData();
+    
     // Rerender summary and table
     renderTipPoolSummary();
     renderTipPoolTable();
@@ -3869,6 +4033,12 @@
       if (!rangeData || rangeData.length === 0) {
         throw new Error('No cash count data found for this date range');
       }
+
+      // Store cash data for potential re-generation
+      window.lastCombinedCashData = rangeData;
+      
+      // Save combined report data for persistence
+      saveCombinedReportData();
 
       // Generate combined report HTML
       const combinedReportHtml = generateCombinedReportHtml(startDate, endDate, rangeData, realEnvelopeAmount);
