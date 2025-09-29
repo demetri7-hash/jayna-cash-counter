@@ -2293,10 +2293,21 @@
       // Generate PDF from the clean temp element
       await html2pdf().set(opt).from(tempDiv).save();
       console.log('PDF generated and downloaded successfully');
+    } catch (pdfError) {
+      console.error('PDF generation error:', pdfError);
+      throw pdfError;
     } finally {
       // Clean up: remove temp div and restore original
-      document.body.removeChild(tempDiv);
-      element.style.display = originalDisplay;
+      try {
+        if (tempDiv && tempDiv.parentNode) {
+          document.body.removeChild(tempDiv);
+        }
+        if (element) {
+          element.style.display = originalDisplay;
+        }
+      } catch (cleanupError) {
+        console.error('Cleanup error:', cleanupError);
+      }
     }
   }
   
@@ -3381,12 +3392,12 @@
       showLoading('Generating Both Reports', 'Creating tip pool and combined weekly reports...');
       
       // Generate tip pool PDF first
-      await generateTipPoolPDF();
+      await downloadTipPoolPDF();
       
       // Small delay to ensure first PDF is processed
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Generate combined report
+      // Generate combined report PDF
       await generateCombinedReport();
       
       hideLoading();
@@ -3617,7 +3628,7 @@
     let tableHtml = `
       <div style="margin: 20px 0;">
         <h3 style="color: #1e3c72; margin-bottom: 15px;">Employee Tip Distribution</h3>
-        <p style="color: #666; margin-bottom: 15px; font-style: italic;">You can adjust equity percentages below. Changes will automatically recalculate the tip distribution.</p>
+        <p style="color: #666; margin-bottom: 15px; font-style: italic;">You can adjust equity percentages below. Changes will save when you click outside the input box or press Enter.</p>
         <div style="overflow-x: auto;">
           <table id="tipPoolRecordsTable" style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <thead>
@@ -3665,11 +3676,17 @@
     
     tableDiv.innerHTML = tableHtml;
     
-    // Attach change listeners to equity inputs
+    // Attach change listeners to equity inputs - use 'blur' to prevent cursor jumping
     const inputs = tableDiv.querySelectorAll('input[name="equity"]');
     inputs.forEach(inp => {
-      inp.addEventListener('input', () => {
+      inp.addEventListener('blur', () => {
         recomputeTipPoolFromTable();
+      });
+      // Also listen for Enter key to update immediately
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          inp.blur(); // Trigger blur event
+        }
       });
     });
   }
