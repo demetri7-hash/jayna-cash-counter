@@ -4416,6 +4416,9 @@
           const varianceLabel = cashboxReconciliation.variance >= 0 ? 'Cashbox Increase' : 'Cashbox Decrease';
           leftColumnEntries.push([varianceLabel, `$${Math.abs(cashboxReconciliation.variance).toFixed(2)}`]);
         }
+      } else {
+        // Fallback when no cashbox data is available yet
+        leftColumnEntries.push(['Cashbox Reconciliation', 'N/A - New Feature']);
       }
       
       const leftColumnMapped = leftColumnEntries.map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
@@ -4482,8 +4485,29 @@
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       
+      // Add note about cashbox reconciliation if not available
+      if (!cashboxReconciliation || cashboxReconciliation.isFirstCount) {
+        const noteY = cashNeededY + 8;
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(7);
+        doc.setTextColor(128, 128, 128); // Light gray
+        
+        const noteText = cashboxReconciliation ? 
+          'Weekly cashbox reconciliation will be available after multiple counts are recorded.' :
+          'Weekly cashbox reconciliation feature coming soon - track total cash on hand vs. daily discrepancies.';
+        
+        const noteWidth = doc.getTextWidth(noteText);
+        const noteCenterX = (pageWidth / 2) - (noteWidth / 2);
+        doc.text(noteText, noteCenterX, noteY);
+        
+        // Reset font and color
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+      }
+      
       // Draw a horizontal line after summary with reduced spacing
-      const postSummaryY = cashNeededY + 12; // Account for cash needed line
+      const postSummaryY = cashNeededY + ((!cashboxReconciliation || cashboxReconciliation.isFirstCount) ? 20 : 12); // Account for note if present
       doc.setLineWidth(0.5);
       doc.line(margin, postSummaryY, pageWidth - margin, postSummaryY);
       
@@ -4768,30 +4792,44 @@
       return;
     }
 
-    // Prompt for current cashbox count
-    const cashboxAmount = prompt(
-      '💰 Enter current total cashbox amount for weekly reconciliation:\\n\\n' +
-      'Count all cash and coins in the cashbox and enter the total amount.\\n' +
-      'This will be used to track weekly cashbox changes.\\n\\n' +
-      'Amount (e.g., 1234.56):',
-      ''
+    // Prompt for current cashbox count (only if user wants to use this feature)
+    const shouldPromptCashbox = confirm(
+      '💰 NEW FEATURE: Weekly Cashbox Reconciliation\\n\\n' +
+      'Would you like to enter your current cashbox total for weekly tracking?\\n\\n' +
+      '• This feature tracks total cash on hand (not just registers)\\n' +
+      '• Helps reconcile weekly cashbox changes vs daily discrepancies\\n' +
+      '• Optional - you can skip for now and start using it later\\n\\n' +
+      'Click OK to enter cashbox amount, or Cancel to skip.'
     );
     
-    if (cashboxAmount === null) {
-      return; // User cancelled
-    }
-    
-    const cashboxTotal = parseFloat(cashboxAmount);
-    if (isNaN(cashboxTotal) || cashboxTotal < 0) {
-      showErrorMessage('Please enter a valid cashbox amount (numbers only, no $ sign).');
-      return;
+    let cashboxTotal = null;
+    if (shouldPromptCashbox) {
+      const cashboxAmount = prompt(
+        '💰 Enter current total cashbox amount:\\n\\n' +
+        'Count all cash and coins in the cashbox and enter the total amount.\\n' +
+        'This will be used to track weekly cashbox changes.\\n\\n' +
+        'Amount (e.g., 1234.56):',
+        ''
+      );
+      
+      if (cashboxAmount === null) {
+        return; // User cancelled
+      }
+      
+      cashboxTotal = parseFloat(cashboxAmount);
+      if (isNaN(cashboxTotal) || cashboxTotal < 0) {
+        showErrorMessage('Please enter a valid cashbox amount (numbers only, no $ sign).');
+        return;
+      }
     }
 
     try {
       showLoading('Generating Combined Report', 'Fetching cash count data and combining with tip pool...');
 
-      // Save cashbox count to database
-      await saveCashboxCountFromReport(cashboxTotal);
+      // Save cashbox count to database if provided
+      if (cashboxTotal !== null) {
+        await saveCashboxCountFromReport(cashboxTotal);
+      }
 
       // Fetch cash count data for the date range (reusing existing logic)
       const start = new Date(startDate + 'T12:00:00');
