@@ -2443,6 +2443,8 @@
   async function generateWeeklyHistoricalReport() {
     const reportId = document.getElementById('savedWeeksDropdown').value;
     
+    console.log('Selected report ID:', reportId);
+    
     if (!reportId) {
       throw new Error('Please select a saved weekly report from the dropdown');
     }
@@ -2466,6 +2468,10 @@
     if (!reportData) {
       throw new Error('Report not found');
     }
+    
+    console.log('Retrieved report data:', reportData);
+    console.log('Has cash HTML:', !!reportData.generated_cash_report_html);
+    console.log('Has tip pool HTML:', !!reportData.generated_tip_pool_html);
     
     // Display the saved HTML content directly
     const reportContent = document.getElementById('reportContent');
@@ -3791,20 +3797,27 @@
   };
 
   // Helper function to show error messages
-  function showErrorMessage(message) {
+  function showErrorMessage(message, targetSectionId = null) {
     const errorMsg = document.createElement('div');
     errorMsg.className = 'message error';
     errorMsg.innerHTML = `<strong>❌ Error:</strong> ${message}`;
     
-    // Find the currently active section
-    const activeSection = document.querySelector('.form-section.active');
+    let targetSection;
     
-    if (activeSection) {
-      // Insert at the top of the active section
-      const firstChild = activeSection.firstElementChild;
-      activeSection.insertBefore(errorMsg, firstChild.nextSibling);
+    if (targetSectionId) {
+      // Use specified target section
+      targetSection = document.getElementById(targetSectionId);
     } else {
-      // Fallback to tip pool form if no active section found
+      // Find the currently active section
+      targetSection = document.querySelector('.form-section.active');
+    }
+    
+    if (targetSection) {
+      // Insert at the top of the target section
+      const firstChild = targetSection.firstElementChild;
+      targetSection.insertBefore(errorMsg, firstChild.nextSibling);
+    } else {
+      // Fallback to tip pool form if no target section found
       const tipPoolForm = document.getElementById('tipPoolForm');
       const firstChild = tipPoolForm.firstElementChild;
       tipPoolForm.insertBefore(errorMsg, firstChild.nextSibling);
@@ -3819,17 +3832,17 @@
   }
 
   // Helper function to show success messages
-  function showSuccessMessage(message) {
+  function showSuccessMessage(message, targetSectionId = 'tipPoolForm') {
     console.log('showSuccessMessage called with:', message);
     const successMsg = document.createElement('div');
     successMsg.className = 'message success';
     successMsg.innerHTML = `<strong>✅ Success:</strong> ${message}`;
     
-    // Insert at the top of the tip pool form
-    const tipPoolForm = document.getElementById('tipPoolForm');
-    console.log('Tip pool form found:', tipPoolForm);
-    const firstChild = tipPoolForm.firstElementChild;
-    tipPoolForm.insertBefore(successMsg, firstChild.nextSibling);
+    // Insert at the top of the specified form
+    const targetForm = document.getElementById(targetSectionId);
+    console.log(`${targetSectionId} form found:`, targetForm);
+    const firstChild = targetForm.firstElementChild;
+    targetForm.insertBefore(successMsg, firstChild.nextSibling);
     console.log('Success message inserted');
     
     // Remove message after 5 seconds
@@ -3874,6 +3887,22 @@
       if (!saved) return false;
       
       const tipPoolData = JSON.parse(saved);
+      
+      // Check if data is older than 1 hour (3600000 ms)
+      if (tipPoolData.timestamp) {
+        const saveTime = new Date(tipPoolData.timestamp);
+        const now = new Date();
+        const ageInMs = now - saveTime;
+        const oneHourInMs = 60 * 60 * 1000; // 1 hour = 3600000 ms
+        
+        if (ageInMs > oneHourInMs) {
+          console.log(`Tip pool data is ${Math.round(ageInMs / (1000 * 60))} minutes old - clearing expired data`);
+          localStorage.removeItem('jaynaGyroCashCounter_tipPoolData');
+          return false;
+        }
+        
+        console.log(`Tip pool data is ${Math.round(ageInMs / (1000 * 60))} minutes old - still valid`);
+      }
       
       // Restore global state
       tipPoolRecords = tipPoolData.tipPoolRecords || [];
