@@ -420,6 +420,7 @@
         <button class="menu-btn" onclick="startPMCount()">PM Close</button>
         <button class="menu-btn report" onclick="showReports()">Generate Report</button>
         <button class="menu-btn" onclick="showTipPool()" style="background: #28a745;">Tip Pool Calculator</button>
+        <button class="menu-btn" onclick="showCashbox()" style="background: #6f42c1;">💰 Weekly Cashbox Count</button>
       </div>
       
       <!-- AM Count Form -->
@@ -817,6 +818,110 @@
     </div>
   </div>
 
+  <!-- Cashbox Count Section -->
+  <div id="cashboxSection" class="main-section" style="display: none;">
+    <div class="container">
+      <div class="form-container" style="max-width: 600px;">
+        <h2 style="text-align: center; margin-bottom: 30px; color: #6f42c1;">
+          💰 Weekly Cashbox Count
+        </h2>
+        <p style="text-align: center; margin-bottom: 30px; color: #666; font-size: 14px;">
+          Count all cash and coins in the cashbox. This will be used for weekly reconciliation.
+        </p>
+
+        <div class="form-group">
+          <label for="cashboxCounter">Counted by:</label>
+          <select id="cashboxCounter" class="form-select" onchange="toggleCashboxDenominationInputs()" required>
+            <option value="">Select your name</option>
+            <option value="Jayna Patel">Jayna Patel</option>
+            <option value="Demetri Rodriguez">Demetri Rodriguez</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="cashboxOtherNameGroup" style="display: none;">
+          <label for="cashboxOtherName">Enter your name:</label>
+          <input type="text" id="cashboxOtherName" class="form-input" placeholder="Full Name">
+        </div>
+
+        <!-- Denomination Input Section -->
+        <div id="cashboxDenominationInputs" style="display: none; margin-top: 20px;">
+          <h4 style="color: #6f42c1; margin-bottom: 15px;">💵 Count by Denomination</h4>
+          
+          <!-- Bills Section -->
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <h5 style="color: #495057; margin-bottom: 10px;">Bills</h5>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
+              <div class="denomination-group">
+                <label>$100 bills:</label>
+                <input type="number" id="cashbox_hundreds" class="form-input" min="0" value="0" onchange="calculateCashboxTotal()">
+              </div>
+              <div class="denomination-group">
+                <label>$50 bills:</label>
+                <input type="number" id="cashbox_fifties" class="form-input" min="0" value="0" onchange="calculateCashboxTotal()">
+              </div>
+              <div class="denomination-group">
+                <label>$20 bills:</label>
+                <input type="number" id="cashbox_twenties" class="form-input" min="0" value="0" onchange="calculateCashboxTotal()">
+              </div>
+              <div class="denomination-group">
+                <label>$10 bills:</label>
+                <input type="number" id="cashbox_tens" class="form-input" min="0" value="0" onchange="calculateCashboxTotal()">
+              </div>
+              <div class="denomination-group">
+                <label>$5 bills:</label>
+                <input type="number" id="cashbox_fives" class="form-input" min="0" value="0" onchange="calculateCashboxTotal()">
+              </div>
+              <div class="denomination-group">
+                <label>$1 bills:</label>
+                <input type="number" id="cashbox_ones" class="form-input" min="0" value="0" onchange="calculateCashboxTotal()">
+              </div>
+            </div>
+          </div>
+
+          <!-- Coins Section -->
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <h5 style="color: #495057; margin-bottom: 10px;">Coins</h5>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
+              <div class="denomination-group">
+                <label>Quarters:</label>
+                <input type="number" id="cashbox_quarters" class="form-input" min="0" value="0" onchange="calculateCashboxTotal()">
+              </div>
+              <div class="denomination-group">
+                <label>Dimes:</label>
+                <input type="number" id="cashbox_dimes" class="form-input" min="0" value="0" onchange="calculateCashboxTotal()">
+              </div>
+              <div class="denomination-group">
+                <label>Nickels:</label>
+                <input type="number" id="cashbox_nickels" class="form-input" min="0" value="0" onchange="calculateCashboxTotal()">
+              </div>
+              <div class="denomination-group">
+                <label>Pennies:</label>
+                <input type="number" id="cashbox_pennies" class="form-input" min="0" value="0" onchange="calculateCashboxTotal()">
+              </div>
+            </div>
+          </div>
+
+          <!-- Total Display -->
+          <div style="background: #e6f3ff; padding: 20px; border-radius: 8px; text-align: center; border: 2px solid #007bff;">
+            <h4 style="margin: 0 0 10px 0; color: #007bff;">Total Cashbox Amount</h4>
+            <div id="cashboxTotal" style="font-size: 24px; font-weight: bold; color: #007bff;">$0.00</div>
+          </div>
+
+          <!-- Reconciliation Section -->
+          <div id="cashboxReconciliation" style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107; display: none;">
+            <h5 style="color: #856404; margin-bottom: 10px;">📊 Weekly Reconciliation</h5>
+            <div id="reconciliationDetails"></div>
+          </div>
+
+          <button class="submit-btn" onclick="saveCashboxCount()" style="background: #6f42c1; margin-top: 20px;">Save Cashbox Count</button>
+        </div>
+
+        <button class="submit-btn" onclick="goHome()" style="background: #6c757d; margin-top: 20px;">Back to Menu</button>
+      </div>
+    </div>
+  </div>
+
 <script>
   // Configuration
    const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
@@ -1201,6 +1306,235 @@
     document.getElementById('mainMenu').style.display = 'none';
     hideAllSections();
     document.getElementById('tipPoolForm').classList.add('active');
+  }
+  
+  // ===== CASHBOX FUNCTIONS =====
+  
+  function showCashbox() {
+    document.getElementById('mainMenu').style.display = 'none';
+    hideAllSections();
+    document.getElementById('cashboxSection').style.display = 'block';
+    loadPreviousCashboxData();
+  }
+  
+  function toggleCashboxDenominationInputs() {
+    const counterSelect = document.getElementById('cashboxCounter');
+    const otherNameGroup = document.getElementById('cashboxOtherNameGroup');
+    const denominationInputs = document.getElementById('cashboxDenominationInputs');
+    
+    if (counterSelect.value === 'Other') {
+      otherNameGroup.style.display = 'block';
+    } else {
+      otherNameGroup.style.display = 'none';
+    }
+    
+    if (counterSelect.value && counterSelect.value !== '') {
+      denominationInputs.style.display = 'block';
+    } else {
+      denominationInputs.style.display = 'none';
+    }
+  }
+  
+  function calculateCashboxTotal() {
+    const denominations = [
+      { id: 'cashbox_hundreds', value: 100 },
+      { id: 'cashbox_fifties', value: 50 },
+      { id: 'cashbox_twenties', value: 20 },
+      { id: 'cashbox_tens', value: 10 },
+      { id: 'cashbox_fives', value: 5 },
+      { id: 'cashbox_ones', value: 1 },
+      { id: 'cashbox_quarters', value: 0.25 },
+      { id: 'cashbox_dimes', value: 0.10 },
+      { id: 'cashbox_nickels', value: 0.05 },
+      { id: 'cashbox_pennies', value: 0.01 }
+    ];
+    
+    let total = 0;
+    denominations.forEach(denom => {
+      const count = parseInt(document.getElementById(denom.id).value) || 0;
+      total += count * denom.value;
+    });
+    
+    document.getElementById('cashboxTotal').textContent = `$${total.toFixed(2)}`;
+    return total;
+  }
+  
+  async function loadPreviousCashboxData() {
+    try {
+      // Get the most recent cashbox count for reconciliation
+      const { data, error } = await supabase
+        .from('cashbox_counts')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(1);
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const lastCount = data[0];
+        showReconciliation(lastCount);
+      }
+    } catch (error) {
+      console.error('Error loading previous cashbox data:', error);
+    }
+  }
+  
+  function showReconciliation(lastCount) {
+    const reconciliationSection = document.getElementById('cashboxReconciliation');
+    const reconciliationDetails = document.getElementById('reconciliationDetails');
+    
+    const lastDate = new Date(lastCount.date).toLocaleDateString();
+    const lastAmount = lastCount.total;
+    
+    reconciliationDetails.innerHTML = `
+      <div style="margin-bottom: 10px;">
+        <strong>Previous Count:</strong> ${lastDate} - $${lastAmount.toFixed(2)}
+      </div>
+      <div style="font-size: 12px; color: #856404;">
+        After entering your count, we'll calculate any variances for reconciliation.
+      </div>
+    `;
+    
+    reconciliationSection.style.display = 'block';
+  }
+  
+  async function saveCashboxCount() {
+    try {
+      const counterSelect = document.getElementById('cashboxCounter');
+      const otherName = document.getElementById('cashboxOtherName').value;
+      
+      let counterName = counterSelect.value;
+      if (counterName === 'Other') {
+        counterName = otherName;
+      }
+      
+      if (!counterName) {
+        throw new Error('Please select or enter a name');
+      }
+      
+      const total = calculateCashboxTotal();
+      if (total === 0) {
+        throw new Error('Please enter denomination counts');
+      }
+      
+      const denominations = {
+        hundreds: parseInt(document.getElementById('cashbox_hundreds').value) || 0,
+        fifties: parseInt(document.getElementById('cashbox_fifties').value) || 0,
+        twenties: parseInt(document.getElementById('cashbox_twenties').value) || 0,
+        tens: parseInt(document.getElementById('cashbox_tens').value) || 0,
+        fives: parseInt(document.getElementById('cashbox_fives').value) || 0,
+        ones: parseInt(document.getElementById('cashbox_ones').value) || 0,
+        quarters: parseInt(document.getElementById('cashbox_quarters').value) || 0,
+        dimes: parseInt(document.getElementById('cashbox_dimes').value) || 0,
+        nickels: parseInt(document.getElementById('cashbox_nickels').value) || 0,
+        pennies: parseInt(document.getElementById('cashbox_pennies').value) || 0
+      };
+      
+      const { data, error } = await supabase
+        .from('cashbox_counts')
+        .insert([{
+          date: new Date().toISOString().split('T')[0],
+          counter: counterName,
+          denominations: denominations,
+          total: total,
+          timestamp: new Date().toISOString()
+        }]);
+      
+      if (error) throw error;
+      
+      showMessage(`Cashbox count saved successfully! Total: $${total.toFixed(2)}`, 'success');
+      
+      // Reset form
+      document.getElementById('cashboxCounter').value = '';
+      document.getElementById('cashboxOtherName').value = '';
+      toggleCashboxDenominationInputs();
+      
+      // Reset all denomination inputs
+      Object.keys(denominations).forEach(key => {
+        document.getElementById(`cashbox_${key}`).value = '0';
+      });
+      calculateCashboxTotal();
+      
+    } catch (error) {
+      showMessage(error.message, 'error');
+    }
+  }
+  
+  async function saveCashboxCountFromReport(total) {
+    try {
+      const counterName = tipPoolSummary.calculatedByName || 'Unknown';
+      
+      const { data, error } = await supabase
+        .from('cashbox_counts')
+        .insert([{
+          date: new Date().toISOString().split('T')[0],
+          counter: counterName,
+          denominations: { manual_entry: true }, // Mark as manual entry from report
+          total: total,
+          timestamp: new Date().toISOString(),
+          notes: 'Entered during combined report generation'
+        }]);
+      
+      if (error) throw error;
+      
+      console.log('Cashbox count saved from report:', total);
+      
+    } catch (error) {
+      console.error('Error saving cashbox count from report:', error);
+    }
+  }
+  
+  async function getCashboxReconciliation(currentTotal) {
+    try {
+      // Get the two most recent cashbox counts for comparison
+      const { data, error } = await supabase
+        .from('cashbox_counts')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(2);
+      
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        return {
+          isFirstCount: true,
+          currentTotal: currentTotal,
+          message: 'First cashbox count recorded'
+        };
+      }
+      
+      if (data.length === 1) {
+        return {
+          isFirstCount: true,
+          currentTotal: currentTotal,
+          previousTotal: null,
+          message: 'Second cashbox count - no comparison available yet'
+        };
+      }
+      
+      const current = data[0]; // Most recent (just saved)
+      const previous = data[1]; // Second most recent
+      
+      const variance = currentTotal - previous.total;
+      const variancePercentage = previous.total > 0 ? (variance / previous.total) * 100 : 0;
+      
+      return {
+        isFirstCount: false,
+        currentTotal: currentTotal,
+        currentDate: new Date(current.date).toLocaleDateString(),
+        previousTotal: previous.total,
+        previousDate: new Date(previous.date).toLocaleDateString(),
+        variance: variance,
+        variancePercentage: variancePercentage,
+        message: variance === 0 ? 'No change from previous week' : 
+                 variance > 0 ? `Increase of $${variance.toFixed(2)}` : 
+                 `Decrease of $${Math.abs(variance).toFixed(2)}`
+      };
+      
+    } catch (error) {
+      console.error('Error getting cashbox reconciliation:', error);
+      return null;
+    }
   }
   
   function setupDenominations(shift) {
@@ -3963,8 +4297,14 @@
     }
   }
 
-  async function generateCombinedReportPDF(startDate, endDate, cashData, realEnvelopeAmount = null) {
+  async function generateCombinedReportPDF(startDate, endDate, cashData, realEnvelopeAmount = null, cashboxTotal = null) {
     try {
+      // Fetch cashbox reconciliation data
+      let cashboxReconciliation = null;
+      if (cashboxTotal !== null) {
+        cashboxReconciliation = await getCashboxReconciliation(cashboxTotal);
+      }
+      
       // Create jsPDF instance
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
@@ -4023,7 +4363,18 @@
         ['Actual Cash In', `$${totalActualCashIn.toFixed(2)}`],
         ['Total Discrepancy', `$${totalDiscrepancy.toFixed(2)}`],
         ['Envelope Deposits', `$${totalEnvelopeDeposits.toFixed(2)}`]
-      ].map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
+      ];
+      
+      // Add cashbox reconciliation if available
+      if (cashboxReconciliation) {
+        leftColumnEntries.push(['Current Cashbox Total', `$${cashboxReconciliation.currentTotal.toFixed(2)}`]);
+        if (!cashboxReconciliation.isFirstCount && cashboxReconciliation.previousTotal !== null) {
+          const varianceLabel = cashboxReconciliation.variance >= 0 ? 'Cashbox Increase' : 'Cashbox Decrease';
+          leftColumnEntries.push([varianceLabel, `$${Math.abs(cashboxReconciliation.variance).toFixed(2)}`]);
+        }
+      }
+      
+      const leftColumnMapped = leftColumnEntries.map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
       
       const rightColumnEntries = [
         ['Credit Tips', `$${tipPoolSummary.creditTips.toFixed(2)}`],
@@ -4043,7 +4394,7 @@
       
       // Draw left column (cash data)
       let leftColumnY = summaryY;
-      for (const [label, value] of leftColumnEntries) {
+      for (const [label, value] of leftColumnMapped) {
         doc.setFont('helvetica', 'bold');
         doc.text(`${label}:`, margin, leftColumnY);
         doc.setFont('helvetica', 'normal');
@@ -4373,8 +4724,30 @@
       return;
     }
 
+    // Prompt for current cashbox count
+    const cashboxAmount = prompt(
+      '💰 Enter current total cashbox amount for weekly reconciliation:\\n\\n' +
+      'Count all cash and coins in the cashbox and enter the total amount.\\n' +
+      'This will be used to track weekly cashbox changes.\\n\\n' +
+      'Amount (e.g., 1234.56):',
+      ''
+    );
+    
+    if (cashboxAmount === null) {
+      return; // User cancelled
+    }
+    
+    const cashboxTotal = parseFloat(cashboxAmount);
+    if (isNaN(cashboxTotal) || cashboxTotal < 0) {
+      showErrorMessage('Please enter a valid cashbox amount (numbers only, no $ sign).');
+      return;
+    }
+
     try {
       showLoading('Generating Combined Report', 'Fetching cash count data and combining with tip pool...');
+
+      // Save cashbox count to database
+      await saveCashboxCountFromReport(cashboxTotal);
 
       // Fetch cash count data for the date range (reusing existing logic)
       const start = new Date(startDate + 'T12:00:00');
@@ -4411,7 +4784,7 @@
       saveCombinedReportData();
 
       // Generate clean PDF using jsPDF (like tip pool report)
-      await generateCombinedReportPDF(startDate, endDate, rangeData, realEnvelopeAmount);
+      await generateCombinedReportPDF(startDate, endDate, rangeData, realEnvelopeAmount, cashboxTotal);
       
       hideLoading();
       showSuccessMessage('Combined weekly report generated successfully!');
