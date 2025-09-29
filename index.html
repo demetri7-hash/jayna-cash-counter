@@ -4735,6 +4735,9 @@
         }
       }
       
+      // Add payday sign off sheet as page 2
+      generatePaydaySignOffPage(doc, startDate, endDate);
+      
       // Return PDF data for potential merging, or save directly if no attachments
       const dateStr = tipPoolSummary.dateRange || `${startDate}_to_${endDate}`.replace(/-/g, '_');
       const filename = `Combined_Weekly_Report_${dateStr}.pdf`;
@@ -4747,6 +4750,111 @@
       
     } catch (error) {
       console.error('Combined PDF generation error:', error);
+      throw error;
+    }
+  }
+
+  // Generate Payday Sign Off Sheet as PDF page
+  function generatePaydaySignOffPage(doc, startDate, endDate) {
+    try {
+      // Add new page for payday sign off
+      doc.addPage();
+      
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 40;
+      let currentY = margin;
+      
+      // Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(0, 0, 0);
+      doc.text('JAYNA GYRO EMPLOYEE TIP OUT ACKNOWLEDGEMENT', margin, currentY + 15);
+      
+      // Week of section
+      currentY += 35;
+      doc.setFontSize(13);
+      doc.text('WEEK OF', margin, currentY);
+      doc.setFont('helvetica', 'normal');
+      const weekRange = `${startDate.toUpperCase()} - ${endDate.toUpperCase()}`;
+      doc.text(weekRange, margin + 80, currentY);
+      
+      // Disclaimer text
+      currentY += 25;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      const disclaimerLines = [
+        'As an employee, it is important to ensure accuracy and transparency in matters relating to your working hours, compensation, and breaks.',
+        'Please carefully review the following statements:',
+        '',
+        'I have had the opportunity to review my hours worked each day and have been provided with a copy of this information if requested.',
+        'The tip amount in cash I was given is accurate and complete.',
+        '',
+        'All details entered into the timekeeping system and reflected on my paycheck, including tip amounts and entries for breaks,',
+        'meal periods, and overtime, are accurate and correct to the best of my knowledge.',
+        '',
+        'In the event that any information is found to be incorrect or if I have not been provided the opportunity to take a meal or',
+        'rest break, I will document such discrepancies in the "Corrections" column below.',
+        '',
+        'I understand that it is not mandatory to note missed meal breaks if I worked less than six hours OR over six hours',
+        'and have voluntarily signed a meal break waiver.',
+        '',
+        'I am aware that I am not required to document missed breaks if they were made available to me but I chose not to take them.'
+      ];
+      
+      disclaimerLines.forEach((line, index) => {
+        if (line !== '') {
+          doc.text(line, margin, currentY + (index * 10));
+        }
+      });
+      
+      // Employee signature table
+      currentY += disclaimerLines.length * 10 + 20;
+      
+      // Table headers
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('EMPLOYEE NAME', margin, currentY);
+      doc.text('EMPLOYEE SIGNATURE', margin + 250, currentY);
+      
+      // Line under headers
+      currentY += 5;
+      doc.line(margin, currentY, pageWidth - margin, currentY);
+      
+      // Employee rows - get from tip pool records
+      currentY += 15;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      
+      // Create employee list from tip pool records
+      const employees = tipPoolRecords.map(record => ({
+        first: record.first,
+        last: record.last
+      }));
+      
+      // Sort alphabetically by first name
+      employees.sort((a, b) => a.first.localeCompare(b.first));
+      
+      employees.forEach((employee, index) => {
+        const yPos = currentY + (index * 25);
+        
+        // Alternate row background (simulate with border)
+        if (index % 2 === 1) {
+          doc.setFillColor(232, 240, 254); // Light blue background
+          doc.rect(margin - 5, yPos - 8, pageWidth - 2 * margin + 10, 22, 'F');
+        }
+        
+        // Employee name
+        doc.setTextColor(0, 0, 0);
+        doc.text(`${employee.first} ${employee.last}`, margin, yPos);
+        
+        // Signature line
+        doc.line(margin + 250, yPos + 5, pageWidth - margin, yPos + 5);
+      });
+      
+      return doc;
+      
+    } catch (error) {
+      console.error('Error generating payday sign off sheet:', error);
       throw error;
     }
   }
