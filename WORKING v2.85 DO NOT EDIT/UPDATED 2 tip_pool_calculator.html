@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tip Pool Calculator (Client‑Side)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9f9f9;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    input[type="file"], input[type="number"] {
+      margin-top: 5px;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 6px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .summary {
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+    .hidden {
+      display: none;
+    }
+    .cash-needed {
+      color: #dc3545;
+      font-weight: bold;
+    }
+    .cash-surplus {
+      color: #28a745;
+      font-weight: bold;
+    }
+  </style>
+  <!-- Include JSZip for reading zip files -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <!-- Include PapaParse for parsing CSV files -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <!-- Include jsPDF and autotable for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Custom header with uppercase title and subtitle -->
+    <h1 style="margin-bottom: 0.25rem;">JAYNA GYRO TIP POOL CALCULATOR</h1>
+    <h2 style="margin-top: 0; font-size: 1rem; font-weight: normal;">CODE BY DEMETRI GREGORAKIS</h2>
+    <!-- Instructional content -->
+    <p class="instructions-title" style="font-weight: bold; margin-top: 1.5rem;">INSTRUCTIONS</p>
+    <div class="instructions" style="font-size: 0.9rem; line-height: 1.5;">
+      <p><strong>1.</strong> Make sure you have approved all hours for all employees in <strong><u>Labor Summary</u></strong> in Toast for the <u>entire week</u>. After you have corrected and approved all hours for the week, move to step&nbsp;2.</p>
+      <p><strong>2.</strong> In Toast Labor Summary page, viewing the past week (<em>Monday thru Sunday</em>) — download the <strong>Labor Summary</strong> as a <strong>.CSV file</strong> by clicking the small icon that looks like a green Excel&nbsp;logo.</p>
+      <p><strong>3.</strong> Next, open the <strong>Sales Summary Report</strong> in Toast for the <em>same time period (1&nbsp;week, Mon—Sun)</em>, and download the Labor Summary at the top right of the report (a downward facing arrow).  The file will automatically save as a <strong>ZIP file</strong>.</p>
+      <p><strong>4.</strong> Still in the Sales Summary Report, change the filter to <strong>Employee TDS&nbsp;DRIVER</strong>, and make note of the <strong>Total Tips</strong> amount, which you will enter below, <em>including the change</em>, for example: 550.23.</p>
+      <p><strong>5.</strong> Upload your <strong>Labor Summary CSV</strong> and <strong>Sales Summary ZIP</strong> for the past week, enter the weekly Cash Tips, EZ Cater, and TDS Driver values.</p>
+      <p><strong>6.</strong> Add your name and hit <strong>Calculate</strong>.</p>
+      <p><em>All computations happen in your browser—no data leaves your computer.</em></p>
+    </div>
+    <!-- Form inputs -->
+    <label for="payrollFile">LABOR SUMMARY CSV FILE:</label>
+    <input type="file" id="payrollFile" accept=".csv">
+    <label for="salesFile">SALES SUMMARY REPORT ZIP FILE:</label>
+    <input type="file" id="salesFile" accept=".zip">
+    <label for="cashTips">CASH TIPS FOR THE WEEK:</label>
+    <input type="number" id="cashTips" step="0.01" placeholder="e.g., 217">
+    <label for="ezcater">EZCATER TIPS FOR THE WEEK:</label>
+    <input type="number" id="ezcater" step="0.01" placeholder="e.g., 40">
+    <label for="tdsDriver">TDS DRIVER TIPS FOR THE WEEK:</label>
+    <input type="number" id="tdsDriver" step="0.01" placeholder="e.g., 617.69">
+    <label for="reporterName">TIPS CALCULATED BY:</label>
+    <input type="text" id="reporterName" placeholder="YOUR FULL NAME">
+    <button id="calculateBtn">Calculate</button>
+    <button id="downloadPdfBtn" class="hidden">Download PDF</button>
+    <div id="summary" class="summary hidden"></div>
+    <div id="tableContainer" class="hidden"></div>
+  </div>
+
+<script>
+  // Import jsPDF namespace from UMD module.  When using jsPDF from the CDN,
+  // the library attaches itself to window.jspdf.  We access jsPDF from that
+  // namespace.
+  const { jsPDF } = window.jspdf;
+
+  // Predefined equity mapping based on the example workbook.  You can
+  // extend or edit this mapping as needed.  Keys must match the
+  // "Employee" field in the payroll CSV (formatted as "Last, First").
+  const defaultEquity = {
+    'Dokcu, Huseyin': 2/3,
+    'Morales, Emilio': 0.5
+  };
+
+  // Global state to hold parsed records and summary values.  This will be
+  // updated after each calculation so that the PDF can be generated
+  // accurately.
+  let records = [];
+  let summary = {};
+
+  document.getElementById('calculateBtn').addEventListener('click', async () => {
+    const payrollFile = document.getElementById('payrollFile').files[0];
+    const salesFile = document.getElementById('salesFile').files[0];
+    const cashTips = parseFloat(document.getElementById('cashTips').value) || 0;
+    const ezcater = parseFloat(document.getElementById('ezcater').value) || 0;
+    const tdsDriver = parseFloat(document.getElementById('tdsDriver').value) || 0;
+    const reporterName = document.getElementById('reporterName').value.trim();
+
+    if (!payrollFile || !salesFile) {
+      alert('Please select both payroll and sales files.');
+      return;
+    }
+
+    // Parse payroll CSV
+    const payrollData = await parsePayrollCSV(payrollFile);
+    // Parse sales summary zip
+    const { creditTips, cashSales } = await parseSalesZip(salesFile);
+
+    // Compute tip pool
+    const result = computeTipPool(
+      payrollData,
+      creditTips,
+      cashTips,
+      ezcater,
+      tdsDriver,
+      cashSales
+    );
+
+    // Populate global state
+    records = result.records;
+    // Parse date range from file names.  Use either the payroll or sales
+    // filename to extract two dates formatted as YYYY_MM_DD-YYYY_MM_DD.
+    function parseDateRange(name) {
+      const re = /(\d{4})[_-](\d{2})[_-](\d{2})[-_](\d{4})[_-](\d{2})[_-](\d{2})/;
+      const m = name.match(re);
+      if (!m) return '';
+      const y1 = m[1];
+      const m1 = m[2];
+      const d1 = m[3];
+      const y2 = m[4];
+      const m2 = m[5];
+      const d2 = m[6];
+      // Format as M/D—M/D YYYY where year uses the second date
+      const startMonth = parseInt(m1, 10).toString();
+      const startDay = parseInt(d1, 10).toString();
+      const endMonth = parseInt(m2, 10).toString();
+      const endDay = parseInt(d2, 10).toString();
+      return `${startMonth}/${startDay}—${endMonth}/${endDay} ${y2}`;
+    }
+    const dateRange = parseDateRange(payrollFile.name) || parseDateRange(salesFile.name);
+
+    summary = {
+      creditTips: creditTips,
+      cashSales: cashSales,
+      cashTips: cashTips,
+      ezcater: ezcater,
+      tdsDriver: tdsDriver,
+      totalTips: result.totalTips,
+      pool: result.pool,
+      totalWeightedHours: result.totalWeightedHours,
+      hourlyRate: result.rate,
+      cashNeeded: result.cashNeeded,
+      dateRange: dateRange,
+      reporterName: reporterName,
+      generatedAt: new Date().toLocaleString()
+    };
+
+    // Render summary and table
+    renderSummary();
+    renderTable();
+    document.getElementById('downloadPdfBtn').classList.remove('hidden');
+
+    // Notify the user to review equity or name spelling before downloading
+    alert('Please review and adjust equity or name spelling if needed before downloading the PDF.');
+  });
+
+  document.getElementById('downloadPdfBtn').addEventListener('click', async () => {
+    await generatePdf();
+  });
+
+  /**
+   * Parse the payroll CSV file using PapaParse and group hours by employee.
+   * Returns an array of objects with fields: employee, first, last, hours.
+   */
+  function parsePayrollCSV(file) {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          const data = results.data;
+          const employeeMap = {};
+          data.forEach(row => {
+            const emp = row['Employee'];
+            if (!emp) return;
+            const regHours = parseFloat(row['Regular Hours']) || 0;
+            const otHours = parseFloat(row['Overtime Hours']) || 0;
+            const total = regHours + otHours;
+            if (!employeeMap[emp]) {
+              employeeMap[emp] = { hours: 0 };
+            }
+            employeeMap[emp].hours += total;
+          });
+          const result = [];
+          for (const emp in employeeMap) {
+            const parts = emp.split(',');
+            const last = parts[0].trim();
+            const first = parts.slice(1).join(',').trim();
+            result.push({ employee: emp, first: first, last: last, hours: employeeMap[emp].hours });
+          }
+          resolve(result);
+        },
+        error: function(err) {
+          reject(err);
+        }
+      });
+    });
+  }
+
+  /**
+   * Parse the sales summary ZIP file to extract credit card tips and cash sales.
+   * Returns an object { creditTips, cashSales }.
+   */
+  async function parseSalesZip(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    // Attempt to locate the Payments summary CSV.  Some exports include
+    // path prefixes, so we search for any file ending with
+    // 'Payments summary.csv'.
+    let paymentsFile = null;
+    zip.forEach((relativePath, zipEntry) => {
+      if (relativePath.endsWith('Payments summary.csv')) {
+        paymentsFile = zipEntry;
+      }
+    });
+    if (!paymentsFile) {
+      return { creditTips: 0, cashSales: 0 };
+    }
+    const paymentsCsv = await paymentsFile.async('string');
+    const parsed = Papa.parse(paymentsCsv, { header: true, skipEmptyLines: true });
+    let creditTips = 0;
+    let cashSales = 0;
+    parsed.data.forEach(row => {
+      const paymentType = row['Payment type'] ? row['Payment type'].trim() : '';
+      const paymentSubType = row['Payment sub type'];
+      // Credit tips are taken from the rows where the payment type is
+      // 'Credit/debit' and a specific card subtype is present (e.g.,
+      // AMEX, Visa).  We ignore the aggregated row with a blank sub type
+      // because the detailed card types provide the correct total.  See
+      // the 7/28-8/03 example where the blank sub type row sums to
+      // 3386.68 but the individual card types sum to 3465.60.
+      if (paymentType === 'Credit/debit' && paymentSubType && paymentSubType.trim() !== '') {
+        creditTips += parseFloat(row['Tips']) || 0;
+      }
+      if (paymentType === 'Cash') {
+        cashSales += parseFloat(row['Amount']) || 0;
+      }
+    });
+    return { creditTips, cashSales };
+  }
+
+  /**
+   * Compute the tip pool distribution.
+   *
+   * payrollData: array of {employee, first, last, hours}
+   */
+  function computeTipPool(payrollData, creditTips, cashTips, ezcater, tdsDriver, cashSales) {
+    // Build equity mapping: start with defaults then fill with 1.0
+    const equityMap = {};
+    payrollData.forEach(rec => {
+      equityMap[rec.employee] = defaultEquity.hasOwnProperty(rec.employee) ? defaultEquity[rec.employee] : 1.0;
+    });
+    // Compute weighted hours and sum
+    let totalWeightedHours = 0;
+    const records = payrollData.map(rec => {
+      const eq = equityMap[rec.employee];
+      const weighted = rec.hours * eq;
+      totalWeightedHours += weighted;
+      return {
+        employee: rec.employee,
+        first: rec.first,
+        last: rec.last,
+        hours: rec.hours,
+        equity: eq,
+        weighted: weighted,
+        due: 0
+      };
+    });
+    // Total tips and raw pool
+    const totalTips = creditTips + cashTips + ezcater;
+    const rawPool = totalTips - tdsDriver;
+    // Floor the pool to the lowest whole dollar amount.  This ensures the
+    // final tip pool does not exceed the available funds and matches the
+    // business requirement of rounding down.
+    const pool = Math.floor(rawPool);
+    // Hourly rate is calculated using the floored pool so that all
+    // distributions sum to the rounded pool.  If there are no weighted
+    // hours, set rate to 0 to avoid division by zero.
+    const rate = totalWeightedHours ? pool / totalWeightedHours : 0;
+    // Compute due for each employee.  Each individual's due is rounded
+    // down to the nearest whole dollar to match the specification.  We
+    // compute the raw due first then apply Math.floor.
+    records.forEach(r => {
+      const rawDue = r.weighted * rate;
+      r.due = Math.floor(rawDue);
+    });
+    // Cash needed (negative indicates additional cash required).  Formula
+    // from the example sheet: credit tips - tds driver + ezcater - cash
+    // sales.  This value can be negative when additional cash is needed.
+    const cashNeeded = creditTips - tdsDriver + ezcater - cashSales;
+    return { records, rate, totalWeightedHours, totalTips, pool, cashNeeded };
+  }
+
+  /**
+   * Recompute the tip pool when equity values are changed in the table.
+   */
+  function recomputeFromTable() {
+    // Read equity inputs from DOM
+    const rows = document.querySelectorAll('#recordsTable tbody tr');
+    const updatedEquity = {};
+    rows.forEach(row => {
+      const emp = row.getAttribute('data-employee');
+      const eqInput = row.querySelector('input[name="equity"]');
+      // The equity input represents a whole percentage (1—100).  Convert it
+      // to a fractional equity by dividing by 100.  Use 0 if parsing
+      // fails.
+      const eqPercent = parseFloat(eqInput.value);
+      const eqFraction = isNaN(eqPercent) ? 0 : eqPercent / 100.0;
+      updatedEquity[emp] = eqFraction;
+    });
+    // Recalculate
+    let totalWeightedHours = 0;
+    records.forEach(r => {
+      r.equity = updatedEquity[r.employee];
+      r.weighted = r.hours * r.equity;
+      totalWeightedHours += r.weighted;
+    });
+    // Compute the raw pool and then floor it to meet business rules.
+    const rawPool = summary.totalTips - summary.tdsDriver;
+    const pool = Math.floor(rawPool);
+    const rate = totalWeightedHours ? pool / totalWeightedHours : 0;
+    records.forEach(r => {
+      const rawDue = r.weighted * rate;
+      // Round each individual's due down to the nearest whole dollar.
+      r.due = Math.floor(rawDue);
+    });
+    summary.pool = pool;
+    summary.totalWeightedHours = totalWeightedHours;
+    summary.hourlyRate = rate;
+    summary.cashNeeded = summary.creditTips - summary.tdsDriver + summary.ezcater - summary.cashSales;
+    // Rerender summary and table
+    renderSummary();
+    renderTable();
+  }
+
+  /**
+   * Render the summary values to the page.
+   */
+  function renderSummary() {
+    const div = document.getElementById('summary');
+    div.classList.remove('hidden');
+    const cn = summary.cashNeeded;
+    
+    // Determine the cash status text and styling
+    let cashStatusHtml = '';
+    if (cn < 0) {
+      // Need additional cash - show positive amount in red
+      cashStatusHtml = `<p><strong>Cash needed to pay out tips:</strong> <span class="cash-needed">$${Math.abs(cn).toFixed(2)}</span></p>`;
+    } else {
+      // Have surplus - show positive amount in green
+      cashStatusHtml = `<p><strong>Zero cash needed to pay out tips this week. Excess cash on hand:</strong> <span class="cash-surplus">$${cn.toFixed(2)}</span></p>`;
+    }
+    
+    // Force browser cache refresh by logging the cash needed value
+    console.log('Cash needed value:', cn, 'Type:', typeof cn);
+    
+    div.innerHTML = `
+      <p><strong>Cash tips:</strong> ${summary.cashTips.toFixed(2)}</p>
+      <p><strong>EZCater tips:</strong> ${summary.ezcater.toFixed(2)}</p>
+      <p><strong>Credit tips:</strong> ${summary.creditTips.toFixed(2)}</p>
+      <p><strong>TDS driver:</strong> ${summary.tdsDriver.toFixed(2)}</p>
+      <p><strong>Cash sales:</strong> ${summary.cashSales.toFixed(2)}</p>
+      <p><strong>Total tips:</strong> ${summary.totalTips.toFixed(2)}</p>
+      <p><strong>Pool (minus TDS driver):</strong> ${summary.pool.toFixed(2)}</p>
+      <p><strong>Total weighted hours:</strong> ${summary.totalWeightedHours.toFixed(3)}</p>
+      <p><strong>Hourly rate:</strong> ${summary.hourlyRate.toFixed(2)}</p>
+      ${cashStatusHtml}
+    `;
+  }
+
+  /**
+   * Render the employee table to the page.
+   */
+  function renderTable() {
+    const container = document.getElementById('tableContainer');
+    container.classList.remove('hidden');
+    let html = '<table id="recordsTable"><thead><tr>' +
+      '<th>#</th><th>First</th><th>Last</th><th>Hours</th><th>Equity (%)</th><th>Weighted Hours</th><th>Due</th></tr></thead><tbody>';
+    records.sort((a,b) => a.last.localeCompare(b.last));
+    records.forEach((r, idx) => {
+      const equityPercent = r.equity * 100;
+      html += `<tr data-employee="${r.employee}">
+        <td>${idx + 1}</td>
+        <td>${r.first}</td>
+        <td>${r.last}</td>
+        <td>${r.hours.toFixed(2)}</td>
+        <td><input type="number" name="equity" step="1" min="1" max="100" value="${equityPercent.toFixed(0)}" /></td>
+        <td>${r.weighted.toFixed(3)}</td>
+        <td>$${r.due.toFixed(2)}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    // Attach change listeners to equity inputs
+    const inputs = container.querySelectorAll('input[name="equity"]');
+    inputs.forEach(inp => {
+      inp.addEventListener('input', () => {
+        recomputeFromTable();
+      });
+    });
+  }
+
+  /**
+   * Load the Jayna logo as a data URI.  The logo file must reside
+   * alongside this HTML file (see tip_pool_web/jayna_logo.png).  This
+   * helper fetches the PNG, converts it to a blob and then to a data URI
+   * so it can be embedded in the PDF.
+   * @returns {Promise<string>} A promise resolving to a data URI string.
+   */
+  async function loadLogo() {
+    const response = await fetch('jayna_logo.png');
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  /**
+   * Generate a polished one‑page PDF report summarising the tip pool.
+   * The report includes a header with the Jayna logo, report title,
+   * date range, reporter name and timestamp.  A summary section lists
+   * key metrics and a colour‑highlighted cash‑needed figure.  The
+   * employee table follows below with alternating row colors and
+   * matching header styling.
+   */
+  async function generatePdf() {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+    // Load the logo; ignore errors quietly
+    let logoData;
+    try {
+      logoData = await loadLogo();
+    } catch (err) {
+      logoData = null;
+    }
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    // Set default font to a modern sans-serif (Helvetica) and black text
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    // Insert logo at top-left if available
+    const logoSize = 50;
+    let currentY = margin;
+    if (logoData) {
+      doc.addImage(logoData, 'PNG', margin, currentY, logoSize, logoSize);
+    }
+    // Header text next to the logo
+    const headerX = margin + (logoData ? logoSize + 10 : 0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('JAYNA SAC WEEKLY TIP POOL REPORT', headerX, currentY + 15);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    // Use uppercase labels and values for header metadata
+    const dateRange = (summary.dateRange || '').toUpperCase();
+    doc.text(`WEEK OF: ${dateRange}`, headerX, currentY + 32);
+    const reporter = (summary.reporterName || '').toUpperCase();
+    doc.text(`RAN BY: ${reporter}`, headerX, currentY + 44);
+    const timestamp = (summary.generatedAt || '').toUpperCase();
+    doc.text(`GENERATED: ${timestamp}`, headerX, currentY + 56);
+    // Draw a thin horizontal line below header for separation
+    doc.setLineWidth(0.5);
+    doc.line(margin, currentY + 70, pageWidth - margin, currentY + 70);
+    // Summary section: arrange entries in two columns.  We use fixed
+    // positions for the values to avoid overlap regardless of label
+    // length.  All labels and values are converted to uppercase.
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    // Build an array of [label, value] pairs
+    const entries = [
+      ['Cash tips', `$${summary.cashTips.toFixed(2)}`],
+      ['EZCater tips', `$${summary.ezcater.toFixed(2)}`],
+      ['Credit tips', `$${summary.creditTips.toFixed(2)}`],
+      ['TDS driver', `$${summary.tdsDriver.toFixed(2)}`],
+      ['Cash sales', `$${summary.cashSales.toFixed(2)}`],
+      ['Total tips', `$${summary.totalTips.toFixed(2)}`],
+      ['Pool (minus TDS driver)', `$${summary.pool.toFixed(2)}`],
+      ['Total weighted hours', `${summary.totalWeightedHours.toFixed(3)}`],
+      ['Hourly rate', `$${summary.hourlyRate.toFixed(2)}`],
+    ].map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
+    // Define fixed x offsets for values within each column
+    const colValueOffset = 200; // points from the left edge of the column
+    let summaryY = currentY + 86;
+    const lineHeight = 14;
+    const colSplitIndex = Math.ceil(entries.length / 2);
+    const col2X = pageWidth / 2;
+    // Render first column
+    for (let i = 0; i < colSplitIndex; i++) {
+      const [label, value] = entries[i];
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${label}:`, margin, summaryY + i * lineHeight);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, margin + colValueOffset, summaryY + i * lineHeight);
+    }
+    // Render second column
+    for (let i = colSplitIndex; i < entries.length; i++) {
+      const [label, value] = entries[i];
+      const rowIdx = i - colSplitIndex;
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${label}:`, col2X, summaryY + rowIdx * lineHeight);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, col2X + colValueOffset, summaryY + rowIdx * lineHeight);
+    }
+    // Cash needed line with color coding and updated logic
+    const cashNeeded = summary.cashNeeded;
+    let needLabel, needValue, textColor;
+    
+    if (cashNeeded > 0) {
+      // Need additional cash - show positive number in red
+      needLabel = 'CASH NEEDED TO PAY OUT TIPS';
+      needValue = `${cashNeeded.toFixed(2)}`;
+      textColor = [220, 53, 69]; // Red color (RGB)
+    } else {
+      // Have surplus - show positive number in green
+      needLabel = 'ZERO CASH NEEDED TO PAY OUT TIPS THIS WEEK. EXCESS CASH ON HAND';
+      needValue = `${Math.abs(cashNeeded).toFixed(2)}`;
+      textColor = [40, 167, 69]; // Green color (RGB)
+    }
+    
+    const summaryLines = Math.max(colSplitIndex, entries.length - colSplitIndex);
+    const cashY = summaryY + summaryLines * lineHeight + 10;
+    
+    // Set label in bold black
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${needLabel}:`, margin, cashY);
+    
+    // Calculate proper positioning for the value based on label length
+    // For long labels, put value on next line; for short labels, use offset
+    let valueX = margin + colValueOffset;
+    let valueY = cashY;
+    
+    if (needLabel.length > 35) { // Long label - put value on next line
+      valueX = margin;
+      valueY = cashY + lineHeight;
+    }
+    
+    // Set value in colored italic
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text(needValue, valueX, valueY);
+    
+    // Reset text color back to black for the rest of the document
+    doc.setTextColor(0, 0, 0);
+    
+    // Draw a horizontal separator before the table
+    const tableStartY = cashY + 15;
+    doc.setFont('helvetica', 'normal');
+    doc.setLineWidth(0.5);
+    doc.line(margin, tableStartY - 5, pageWidth - margin, tableStartY - 5);
+    // Prepare table data (convert names to uppercase)
+    const tableBody = records.map(r => [
+      r.first.toUpperCase(),
+      r.last.toUpperCase(),
+      r.hours.toFixed(2),
+      (r.equity * 100).toFixed(0),
+      r.weighted.toFixed(3),
+      '$' + r.due.toFixed(2)
+    ]);
+    // Generate the table without coloured backgrounds.  Bold header row and normal body.
+    doc.autoTable({
+      head: [['FIRST', 'LAST', 'HOURS', 'EQUITY (%)', 'WEIGHTED', 'DUE']],
+      body: tableBody,
+      startY: tableStartY,
+      margin: { left: margin, right: margin },
+      styles: { font: 'helvetica', fontSize: 8, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.1 },
+      headStyles: { font: 'helvetica', fontStyle: 'bold', textColor: [0, 0, 0], fillColor: null },
+      bodyStyles: { font: 'helvetica', textColor: [0, 0, 0], fillColor: null },
+      tableWidth: 'auto'
+    });
+    doc.save('tip_pool_report.pdf');
+  }
+</script>
+</body>
+</html>

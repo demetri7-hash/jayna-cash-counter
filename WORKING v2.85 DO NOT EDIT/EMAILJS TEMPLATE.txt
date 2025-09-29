@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 8px;
+            font-size: 9px;
+            line-height: 1.1;
+        }
+        .header {
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 2px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 4px;
+        }
+        .date-header {
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+        }
+        .section {
+            border: 1px solid #000;
+            margin: 4px 0;
+            padding: 6px;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+        }
+        .two-column {
+            display: table;
+            width: 100%;
+        }
+        .column {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+            padding: 0 4px;
+        }
+        .column:first-child {
+            border-right: 1px solid #ccc;
+        }
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 1px 0;
+            max-width: 150px;
+        }
+        .label {
+            font-weight: bold;
+            text-align: right;
+            padding-right: 8px;
+        }
+        .value {
+            text-align: left;
+            font-weight: bold;
+        }
+        .highlight-box {
+            background-color: #f0f8ff;
+            border: 2px solid #000;
+            padding: 4px;
+            text-align: center;
+            font-weight: bold;
+            margin: 4px 0;
+        }
+        .deposit-box {
+            background-color: #e6ffe6;
+            border: 2px solid #000;
+            padding: 6px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 11px;
+            margin: 4px 0;
+        }
+        .keep-box {
+            background-color: #fff0e6;
+            border: 2px solid #000;
+            padding: 6px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 11px;
+            margin: 4px 0;
+        }
+        .notes-section {
+            display: table;
+            width: 100%;
+            margin: 4px 0;
+        }
+        .notes-column {
+            display: table-cell;
+            width: 50%;
+            padding: 4px;
+            border: 1px solid #000;
+            vertical-align: top;
+            text-align: center;
+            font-weight: bold;
+        }
+        .notes-column:first-child {
+            border-right: none;
+        }
+        .breakdown-grid {
+            display: table;
+            width: 100%;
+        }
+        .breakdown-row {
+            display: table-row;
+        }
+        .breakdown-cell {
+            display: table-cell;
+            padding: 2px 4px;
+            border-bottom: 1px dotted #ccc;
+        }
+        .breakdown-label {
+            font-weight: bold;
+            width: 50%;
+            text-align: right;
+            padding-right: 8px;
+        }
+        .breakdown-value {
+            text-align: left;
+            font-weight: bold;
+            width: 50%;
+            padding-left: 8px;
+        }
+        .cash-count {
+            font-size: 7px;
+            line-height: 1.0;
+        }
+        .drawer-total {
+            font-weight: bold;
+            border-top: 1px solid #000;
+            margin-top: 2px;
+            padding-top: 2px;
+        }
+        .shift-total {
+            font-weight: bold;
+            text-align: center;
+            padding: 3px;
+            border: 2px solid #000;
+            margin-top: 4px;
+            font-size: 8px;
+        }
+        .am-bg { background-color: #e6f3ff; }
+        .pm-bg { background-color: #fff8f0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        JAYNA GYRO DAILY CASH REPORT
+    </div>
+    <div class="date-header">
+        {{day_of_week}} {{formatted_date}}
+    </div>
+
+    <!-- Staff and Timing Info -->
+    <div class="section">
+        <div class="two-column">
+            <div class="column">
+                <div class="data-row">
+                    <span class="label">AM Counter:</span>
+                    <span class="value">{{am_counter}}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">AM Time:</span>
+                    <span class="value">{{am_timestamp}}</span>
+                </div>
+            </div>
+            <div class="column">
+                <div class="data-row">
+                    <span class="label">PM Counter:</span>
+                    <span class="value">{{counter}}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">PM Time:</span>
+                    <span class="value">{{pm_timestamp}}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cash Summary -->
+    {{#am_total}}
+    <div class="section">
+        <div class="section-title">CASH FLOW SUMMARY</div>
+        <div class="two-column">
+            <div class="column">
+                <div class="data-row">
+                    <span class="label">Starting Cash (AM):</span>
+                    <span class="value">${{am_total}}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Ending Cash (PM):</span>
+                    <span class="value">${{pm_total}}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Actual Cash In:</span>
+                    <span class="value">${{actual_cash_in}}</span>
+                </div>
+            </div>
+            <div class="column">
+                <div class="data-row">
+                    <span class="label">Toast Sales:</span>
+                    <span class="value">${{toast_sales}}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Original Tips:</span>
+                    <span class="value">${{original_tips}}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Discrepancy:</span>
+                    <span class="value">{{discrepancy_sign}}${{discrepancy}}{{large_discrepancy_flag}}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {{/am_total}}
+
+    <!-- Deposit Instructions -->
+    {{#deposit_amount}}
+    <div class="deposit-box">
+        DEPOSIT IN ENVELOPE: ${{deposit_amount}}
+        <div style="font-size: 8px;">(Toast Sales ${{toast_sales}} + Original Tips ${{original_tips}})</div>
+    </div>
+    <div class="keep-box">
+        RETURN TO CASHBOX/SAFE: ${{amount_to_keep}}
+    </div>
+    {{/deposit_amount}}
+
+    <!-- Notes Section -->
+    <div class="notes-section">
+        <div class="notes-column am-bg">
+            <div style="font-weight: bold; text-align: center; margin-bottom: 3px;">AM NOTES</div>
+            <div style="text-align: center; font-weight: bold;">
+                {{#am_notes}}{{am_notes}}{{/am_notes}}{{^am_notes}}No AM Notes{{/am_notes}}
+            </div>
+        </div>
+        <div class="notes-column pm-bg">
+            <div style="font-weight: bold; text-align: center; margin-bottom: 3px;">PM NOTES</div>
+            <div style="text-align: center; font-weight: bold;">
+                {{#notes}}{{notes}}{{/notes}}{{^notes}}No PM Notes{{/notes}}
+            </div>
+        </div>
+    </div>
+
+    <!-- Manager Breakdown -->
+    <div class="section">
+        <div class="section-title">MANAGER BREAKDOWN</div>
+        <div class="breakdown-grid">
+            <div class="breakdown-row">
+                <div class="breakdown-cell breakdown-label">Starting Cash Total:</div>
+                <div class="breakdown-cell breakdown-value">${{am_total}}</div>
+            </div>
+            <div class="breakdown-row">
+                <div class="breakdown-cell breakdown-label">Ending Cash Total:</div>
+                <div class="breakdown-cell breakdown-value">${{pm_total}}</div>
+            </div>
+            <div class="breakdown-row">
+                <div class="breakdown-cell breakdown-label">Actual Cash In:</div>
+                <div class="breakdown-cell breakdown-value">${{actual_cash_in}}</div>
+            </div>
+            <div class="breakdown-row">
+                <div class="breakdown-cell breakdown-label">Toast Sales Reported:</div>
+                <div class="breakdown-cell breakdown-value">${{toast_sales}}</div>
+            </div>
+            <div class="breakdown-row">
+                <div class="breakdown-cell breakdown-label">Tips Reported by Staff:</div>
+                <div class="breakdown-cell breakdown-value">${{original_tips}}</div>
+            </div>
+            <div class="breakdown-row">
+                <div class="breakdown-cell breakdown-label">Discrepancy (Drawers vs Toast):</div>
+                <div class="breakdown-cell breakdown-value">{{discrepancy_sign}}${{discrepancy}}</div>
+            </div>
+            {{#tip_adjustment}}
+            <div class="breakdown-row">
+                <div class="breakdown-cell breakdown-label">Cash Tip Adjustment:</div>
+                <div class="breakdown-cell breakdown-value">-${{tip_adjustment}}</div>
+            </div>
+            {{/tip_adjustment}}
+            {{#has_deposit_rounding}}
+            <div class="breakdown-row" style="background-color: #fff3cd;">
+                <div class="breakdown-cell breakdown-label">Raw Deposit Amount:</div>
+                <div class="breakdown-cell breakdown-value">${{raw_deposit_amount}}</div>
+            </div>
+            <div class="breakdown-row" style="background-color: #fff3cd;">
+                <div class="breakdown-cell breakdown-label">Rounded Deposit Amount:</div>
+                <div class="breakdown-cell breakdown-value">${{deposit_amount}}</div>
+            </div>
+            <div class="breakdown-row" style="background-color: #fff3cd;">
+                <div class="breakdown-cell breakdown-label">Rounding Adjustment Needed:</div>
+                <div class="breakdown-cell breakdown-value">${{deposit_rounding_adjustment}}</div>
+            </div>
+            <div class="breakdown-row" style="background-color: #fff3cd;">
+                <div class="breakdown-cell breakdown-label">Taken from Tips (Whole $):</div>
+                <div class="breakdown-cell breakdown-value">-${{deposit_tip_adjustment}}</div>
+            </div>
+            <div class="breakdown-row" style="background-color: #fff3cd;">
+                <div class="breakdown-cell breakdown-label">Excess to Cashbox:</div>
+                <div class="breakdown-cell breakdown-value">+${{deposit_excess_to_cashbox}}</div>
+            </div>
+            {{/has_deposit_rounding}}
+            <div class="breakdown-row">
+                <div class="breakdown-cell breakdown-label">Owed to Restaurant:</div>
+                <div class="breakdown-cell breakdown-value">${{restaurant_owed}}</div>
+            </div>
+            <div class="breakdown-row">
+                <div class="breakdown-cell breakdown-label">Cash Tips Owed to Staff:</div>
+                <div class="breakdown-cell breakdown-value">${{staff_owed}}</div>
+            </div>
+            <div class="breakdown-row">
+                <div class="breakdown-cell breakdown-label">Returned to Cashbox:</div>
+                <div class="breakdown-cell breakdown-value">${{return_breakdown}} + AM Total</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Complete Cash Count Breakdown -->
+    <div class="section">
+        <div class="section-title">COMPLETE CASH COUNT BREAKDOWN</div>
+        <div class="two-column">
+            <!-- AM Counts -->
+            <div class="column">
+                <div style="text-align: center; font-weight: bold; font-size: 8px; margin-bottom: 3px; background-color: #e6f3ff; padding: 2px;">AM COUNTS</div>
+                
+                <div class="cash-count">
+                    <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 1</div>
+                    <div>$100: {{am_drawer1_100}} = ${{am_drawer1_100_total}}</div>
+                    <div>$50: {{am_drawer1_50}} = ${{am_drawer1_50_total}}</div>
+                    <div>$20: {{am_drawer1_20}} = ${{am_drawer1_20_total}}</div>
+                    <div>$10: {{am_drawer1_10}} = ${{am_drawer1_10_total}}</div>
+                    <div>$5: {{am_drawer1_5}} = ${{am_drawer1_5_total}}</div>
+                    <div>$1: {{am_drawer1_1}} = ${{am_drawer1_1_total}}</div>
+                    <div>¢25: {{am_drawer1_quarter}} = ${{am_drawer1_quarter_total}}</div>
+                    <div>¢10: {{am_drawer1_dime}} = ${{am_drawer1_dime_total}}</div>
+                    <div>¢5: {{am_drawer1_nickel}} = ${{am_drawer1_nickel_total}}</div>
+                    <div>¢1: {{am_drawer1_penny}} = ${{am_drawer1_penny_total}}</div>
+                    <div class="drawer-total">TOTAL: ${{am_drawer1_total}}</div>
+                </div>
+                
+                <div class="cash-count" style="margin-top: 4px;">
+                    <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 2</div>
+                    <div>$100: {{am_drawer2_100}} = ${{am_drawer2_100_total}}</div>
+                    <div>$50: {{am_drawer2_50}} = ${{am_drawer2_50_total}}</div>
+                    <div>$20: {{am_drawer2_20}} = ${{am_drawer2_20_total}}</div>
+                    <div>$10: {{am_drawer2_10}} = ${{am_drawer2_10_total}}</div>
+                    <div>$5: {{am_drawer2_5}} = ${{am_drawer2_5_total}}</div>
+                    <div>$1: {{am_drawer2_1}} = ${{am_drawer2_1_total}}</div>
+                    <div>¢25: {{am_drawer2_quarter}} = ${{am_drawer2_quarter_total}}</div>
+                    <div>¢10: {{am_drawer2_dime}} = ${{am_drawer2_dime_total}}</div>
+                    <div>¢5: {{am_drawer2_nickel}} = ${{am_drawer2_nickel_total}}</div>
+                    <div>¢1: {{am_drawer2_penny}} = ${{am_drawer2_penny_total}}</div>
+                    <div class="drawer-total">TOTAL: ${{am_drawer2_total}}</div>
+                </div>
+                
+                <div class="shift-total am-bg">TOTAL AM: ${{am_grand_total}}</div>
+            </div>
+            
+            <!-- PM Counts -->
+            <div class="column">
+                <div style="text-align: center; font-weight: bold; font-size: 8px; margin-bottom: 3px; background-color: #fff8f0; padding: 2px;">PM COUNTS</div>
+                
+                <div class="cash-count">
+                    <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 1</div>
+                    <div>$100: {{pm_drawer1_100}} = ${{pm_drawer1_100_total}}</div>
+                    <div>$50: {{pm_drawer1_50}} = ${{pm_drawer1_50_total}}</div>
+                    <div>$20: {{pm_drawer1_20}} = ${{pm_drawer1_20_total}}</div>
+                    <div>$10: {{pm_drawer1_10}} = ${{pm_drawer1_10_total}}</div>
+                    <div>$5: {{pm_drawer1_5}} = ${{pm_drawer1_5_total}}</div>
+                    <div>$1: {{pm_drawer1_1}} = ${{pm_drawer1_1_total}}</div>
+                    <div>¢25: {{pm_drawer1_quarter}} = ${{pm_drawer1_quarter_total}}</div>
+                    <div>¢10: {{pm_drawer1_dime}} = ${{pm_drawer1_dime_total}}</div>
+                    <div>¢5: {{pm_drawer1_nickel}} = ${{pm_drawer1_nickel_total}}</div>
+                    <div>¢1: {{pm_drawer1_penny}} = ${{pm_drawer1_penny_total}}</div>
+                    <div class="drawer-total">TOTAL: ${{pm_drawer1_total}}</div>
+                </div>
+                
+                <div class="cash-count" style="margin-top: 4px;">
+                    <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">DRAWER 2</div>
+                    <div>$100: {{pm_drawer2_100}} = ${{pm_drawer2_100_total}}</div>
+                    <div>$50: {{pm_drawer2_50}} = ${{pm_drawer2_50_total}}</div>
+                    <div>$20: {{pm_drawer2_20}} = ${{pm_drawer2_20_total}}</div>
+                    <div>$10: {{pm_drawer2_10}} = ${{pm_drawer2_10_total}}</div>
+                    <div>$5: {{pm_drawer2_5}} = ${{pm_drawer2_5_total}}</div>
+                    <div>$1: {{pm_drawer2_1}} = ${{pm_drawer2_1_total}}</div>
+                    <div>¢25: {{pm_drawer2_quarter}} = ${{pm_drawer2_quarter_total}}</div>
+                    <div>¢10: {{pm_drawer2_dime}} = ${{pm_drawer2_dime_total}}</div>
+                    <div>¢5: {{pm_drawer2_nickel}} = ${{pm_drawer2_nickel_total}}</div>
+                    <div>¢1: {{pm_drawer2_penny}} = ${{pm_drawer2_penny_total}}</div>
+                    <div class="drawer-total">TOTAL: ${{pm_drawer2_total}}</div>
+                </div>
+                
+                <div class="shift-total pm-bg">TOTAL PM: ${{pm_grand_total}}</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
