@@ -3898,6 +3898,171 @@
     }
   }
 
+  async function generateCombinedReportPDF(startDate, endDate, cashData, realEnvelopeAmount = null) {
+    try {
+      // Create jsPDF instance
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+      
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      
+      // Set default font to a modern sans-serif and black text
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      
+      let currentY = margin;
+      
+      // Header text
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('JAYNA GYRO COMBINED WEEKLY REPORT', margin, currentY + 15);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Use uppercase labels and values for header metadata
+      const dateRange = `${startDate.toUpperCase()} TO ${endDate.toUpperCase()}`;
+      doc.text(`WEEK OF: ${dateRange}`, margin, currentY + 32);
+      const reporter = (tipPoolSummary.calculatedByName || '').toUpperCase();
+      doc.text(`RAN BY: ${reporter}`, margin, currentY + 44);
+      const timestamp = new Date().toLocaleString().toUpperCase();
+      doc.text(`GENERATED: ${timestamp}`, margin, currentY + 56);
+      
+      // Draw a thin horizontal line below header for separation
+      doc.setLineWidth(0.5);
+      doc.line(margin, currentY + 70, pageWidth - margin, currentY + 70);
+      
+      // Calculate cash report totals using same logic
+      let totalToastSalesReported = 0;
+      let totalActualCashIn = 0;
+      let totalDiscrepancy = 0;
+      let totalEnvelopeDeposits = 0;
+      let totalBackToCashbox = 0;
+
+      cashData.forEach(day => {
+        totalToastSalesReported += day.pm_toast_sales || 0;
+        totalActualCashIn += (day.pm_total - day.am_total) || 0;
+        totalDiscrepancy += day.pm_discrepancy || 0;
+        totalEnvelopeDeposits += day.pm_deposit_amount || 0;
+        totalBackToCashbox += (day.pm_amount_to_keep - day.am_total) || 0;
+      });
+
+      // Summary section: arrange entries in two columns
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Build an array of [label, value] pairs for both cash and tip pool data
+      const entries = [
+        ['Toast Sales Reported', `$${totalToastSalesReported.toFixed(2)}`],
+        ['Actual Cash In', `$${totalActualCashIn.toFixed(2)}`],
+        ['Total Discrepancy', `$${totalDiscrepancy.toFixed(2)}`],
+        ['Envelope Deposits', `$${totalEnvelopeDeposits.toFixed(2)}`],
+        ['Credit Tips', `$${tipPoolSummary.creditTips.toFixed(2)}`],
+        ['Cash Tips', `$${tipPoolSummary.cashTips.toFixed(2)}`],
+        ['EZCater Tips', `$${tipPoolSummary.ezcaterTips.toFixed(2)}`],
+        ['Tip Pool Total', `$${tipPoolSummary.pool.toFixed(2)}`],
+        ['Cash Needed', `$${Math.abs(tipPoolSummary.cashNeeded).toFixed(2)}`]
+      ].map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
+      
+      // Define fixed x offsets for values within each column
+      const colValueOffset = 200;
+      let summaryY = currentY + 86;
+      const lineHeight = 14;
+      const colSplitIndex = Math.ceil(entries.length / 2);
+      const col2X = pageWidth / 2;
+      
+      // Draw left column
+      for (let i = 0; i < colSplitIndex; i++) {
+        const [label, value] = entries[i];
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${label}:`, margin, summaryY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(value, margin + colValueOffset, summaryY);
+        summaryY += lineHeight;
+      }
+      
+      // Draw right column
+      let rightColumnY = currentY + 86;
+      for (let i = colSplitIndex; i < entries.length; i++) {
+        const [label, value] = entries[i];
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${label}:`, col2X + 6, rightColumnY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(value, col2X + 6 + colValueOffset, rightColumnY);
+        rightColumnY += lineHeight;
+      }
+      
+      // Draw a horizontal line after summary
+      const postSummaryY = Math.max(summaryY, rightColumnY) + 10;
+      doc.setLineWidth(0.5);
+      doc.line(margin, postSummaryY, pageWidth - margin, postSummaryY);
+      
+      // Employee distribution table
+      if (tipPoolRecords && tipPoolRecords.length > 0) {
+        currentY = postSummaryY + 20;
+        
+        const tableData = tipPoolRecords.map(record => [
+          `${record.first.toUpperCase()} ${record.last.toUpperCase()}`,
+          record.hours.toFixed(1),
+          (record.equity * 100).toFixed(0),
+          record.weighted.toFixed(1),
+          `$${record.due.toFixed(2)}`
+        ]);
+        
+        doc.autoTable({
+          startY: currentY,
+          head: [['EMPLOYEE', 'HOURS', 'EQUITY (%)', 'WEIGHTED', 'DUE']],
+          body: tableData,
+          margin: { left: margin, right: margin },
+          theme: 'grid',
+          headStyles: { font: 'helvetica', fontStyle: 'bold', textColor: [0, 0, 0], fillColor: [245, 245, 245] },
+          bodyStyles: { font: 'helvetica', textColor: [0, 0, 0], fillColor: null },
+          tableWidth: 'auto'
+        });
+        
+        currentY = doc.lastAutoTable.finalY + 20;
+      }
+      
+      // Daily cash breakdown table
+      if (cashData && cashData.length > 0) {
+        const dailyTableData = cashData.map(day => {
+          const actualCashIn = day.pm_total - day.am_total;
+          const discrepancySign = day.pm_discrepancy >= 0 ? '+' : '';
+          return [
+            new Date(day.date + 'T12:00:00').toLocaleDateString(),
+            day.pm_counter || 'N/A',
+            `$${(day.pm_toast_sales || 0).toFixed(2)}`,
+            `$${actualCashIn.toFixed(2)}`,
+            `${discrepancySign}$${Math.abs(day.pm_discrepancy || 0).toFixed(2)}`,
+            `$${day.pm_deposit_amount || 0}`,
+            `$${(day.pm_amount_to_keep || 0).toFixed(2)}`
+          ];
+        });
+        
+        doc.autoTable({
+          startY: currentY,
+          head: [['DATE', 'COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISCREPANCY', 'ENVELOPE', 'CASHBOX']],
+          body: dailyTableData,
+          margin: { left: margin, right: margin },
+          theme: 'grid',
+          headStyles: { font: 'helvetica', fontStyle: 'bold', textColor: [0, 0, 0], fillColor: [245, 245, 245] },
+          bodyStyles: { font: 'helvetica', textColor: [0, 0, 0], fillColor: null },
+          tableWidth: 'auto'
+        });
+      }
+      
+      // Generate filename and save
+      const dateStr = tipPoolSummary.dateRange || `${startDate}_to_${endDate}`.replace(/-/g, '_');
+      const filename = `Combined_Weekly_Report_${dateStr}.pdf`;
+      doc.save(filename);
+      
+    } catch (error) {
+      console.error('Combined PDF generation error:', error);
+      throw error;
+    }
+  }
+
   function generateTipPoolReportHtml() {
     const { cashNeeded } = tipPoolSummary;
     
@@ -4057,19 +4222,8 @@
       // Save combined report data for persistence
       saveCombinedReportData();
 
-      // Generate combined report HTML
-      const combinedReportHtml = generateCombinedReportHtml(startDate, endDate, rangeData, realEnvelopeAmount);
-      
-      // Set content in hidden div for PDF generation
-      const reportContent = document.getElementById('tipPoolReportContent');
-      reportContent.innerHTML = combinedReportHtml;
-      
-      // Generate filename
-      const dateStr = tipPoolSummary.dateRange || `${startDate}_to_${endDate}`.replace(/-/g, '_');
-      const filename = `Combined_Weekly_Report_${dateStr}.pdf`;
-      
-      // Generate PDF
-      await generatePDF(reportContent, filename);
+      // Generate clean PDF using jsPDF (like tip pool report)
+      await generateCombinedReportPDF(startDate, endDate, rangeData, realEnvelopeAmount);
       
       hideLoading();
       showSuccessMessage('Combined weekly report generated successfully!');
