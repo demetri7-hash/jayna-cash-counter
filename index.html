@@ -5203,16 +5203,23 @@
 
       // Save daily cash breakdown records
       if (cashData && cashData.length > 0) {
-        const dailyRecords = cashData.map(day => ({
-          weekly_report_id: savedReport.id,
-          date: day.date,
-          night_counter: day.night_counter || day.night_counter_name,
-          toast_sales: day.toast_sales,
-          actual_cash_in: day.actual_cash_in,
-          discrepancy: day.discrepancy,
-          excess: day.excess,
-          created_at: new Date().toISOString()
-        }));
+        console.log('Preparing daily breakdown records from cashData:', cashData);
+        
+        const dailyRecords = cashData.map(day => {
+          console.log('Processing day:', day);
+          return {
+            weekly_report_id: savedReport.id,
+            date: day.date,
+            night_counter: day.pm_counter || day.night_counter_name || 'Unknown',
+            toast_sales: parseFloat(day.pm_toast_sales) || 0,
+            actual_cash_in: parseFloat(day.pm_total) || 0,
+            discrepancy: parseFloat(day.pm_discrepancy) || 0,
+            excess: parseFloat(day.pm_drawer_over_amount) || 0,
+            created_at: new Date().toISOString()
+          };
+        });
+        
+        console.log('Final daily records to insert:', dailyRecords);
 
         const { error: dailyError } = await supabase
           .from('weekly_daily_breakdown')
