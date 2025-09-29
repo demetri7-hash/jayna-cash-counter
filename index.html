@@ -400,6 +400,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <!-- Tip Pool Calculator Dependencies -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
@@ -797,6 +798,26 @@
             <p style="margin: 0 0 15px 0; font-size: 14px; color: #666;">
               Generate a comprehensive weekly summary combining your tip pool calculations with cash count reports.
             </p>
+            
+            <!-- PDF Upload Options -->
+            <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border: 1px solid #ddd;">
+              <h5 style="margin: 0 0 10px 0; color: #333;">📎 Attach Additional PDFs (Optional)</h5>
+              
+              <div style="display: flex; gap: 15px; margin-bottom: 10px;">
+                <div style="flex: 1;">
+                  <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">🗂️ Add Weekly Voids Log:</label>
+                  <input type="file" id="voidsLogUpload" accept=".pdf" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="flex: 1;">
+                  <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">📄 Add Extras:</label>
+                  <input type="file" id="extrasUpload" accept=".pdf" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+              </div>
+              
+              <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">
+                💡 Upload PDFs to include in your weekly report. Order: Generated Report → Voids Log → Extras
+              </p>
+            </div>
             
             <div style="display: flex; gap: 15px; align-items: center;">
               <button class="submit-btn" onclick="generateCombinedReport()" style="background: #6f42c1; flex: 1;">📄 Generate Combined Weekly Report</button>
@@ -4714,14 +4735,67 @@
         }
       }
       
-      // Generate filename and save
+      // Return PDF data for potential merging, or save directly if no attachments
       const dateStr = tipPoolSummary.dateRange || `${startDate}_to_${endDate}`.replace(/-/g, '_');
       const filename = `Combined_Weekly_Report_${dateStr}.pdf`;
-      doc.save(filename);
+      
+      return {
+        doc: doc,
+        filename: filename,
+        pdfBytes: doc.output('arraybuffer')
+      };
       
     } catch (error) {
       console.error('Combined PDF generation error:', error);
       throw error;
+    }
+  }
+
+  // PDF Merging Function
+  async function mergePDFsWithAttachments(mainPdfData, voidsFile = null, extrasFile = null) {
+    try {
+      const { PDFDocument } = PDFLib;
+      
+      // Create new PDF document
+      const mergedPdf = await PDFDocument.create();
+      
+      // Add main report pages
+      const mainPdf = await PDFDocument.load(mainPdfData.pdfBytes);
+      const mainPages = await mergedPdf.copyPages(mainPdf, mainPdf.getPageIndices());
+      mainPages.forEach((page) => mergedPdf.addPage(page));
+      
+      // Add Voids Log if uploaded
+      if (voidsFile) {
+        const voidsArrayBuffer = await voidsFile.arrayBuffer();
+        const voidsPdf = await PDFDocument.load(voidsArrayBuffer);
+        const voidsPages = await mergedPdf.copyPages(voidsPdf, voidsPdf.getPageIndices());
+        voidsPages.forEach((page) => mergedPdf.addPage(page));
+      }
+      
+      // Add Extras if uploaded
+      if (extrasFile) {
+        const extrasArrayBuffer = await extrasFile.arrayBuffer();
+        const extrasPdf = await PDFDocument.load(extrasArrayBuffer);
+        const extrasPages = await mergedPdf.copyPages(extrasPdf, extrasPdf.getPageIndices());
+        extrasPages.forEach((page) => mergedPdf.addPage(page));
+      }
+      
+      // Save merged PDF
+      const mergedPdfBytes = await mergedPdf.save();
+      const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = mainPdfData.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      return true;
+    } catch (error) {
+      console.error('PDF merging error:', error);
+      throw new Error(`Failed to merge PDFs: ${error.message}`);
     }
   }
 
@@ -4920,11 +4994,34 @@
       // Save combined report data for persistence
       saveCombinedReportData();
 
-      // Generate clean PDF using jsPDF (like tip pool report)
-      await generateCombinedReportPDF(startDate, endDate, rangeData, realEnvelopeAmount, cashboxTotal);
+      // Check for uploaded PDF attachments
+      const voidsLogFile = document.getElementById('voidsLogUpload').files[0];
+      const extrasFile = document.getElementById('extrasUpload').files[0];
+      
+      // Generate main PDF report
+      const mainPdfData = await generateCombinedReportPDF(startDate, endDate, rangeData, realEnvelopeAmount, cashboxTotal);
+      
+      // If attachments exist, merge them; otherwise save main PDF directly
+      if (voidsLogFile || extrasFile) {
+        await mergePDFsWithAttachments(mainPdfData, voidsLogFile, extrasFile);
+        
+        let attachmentInfo = '';
+        if (voidsLogFile && extrasFile) {
+          attachmentInfo = ' (with Voids Log and Extras attached)';
+        } else if (voidsLogFile) {
+          attachmentInfo = ' (with Voids Log attached)';
+        } else if (extrasFile) {
+          attachmentInfo = ' (with Extras attached)';
+        }
+        
+        showSuccessMessage(`Combined weekly report generated successfully${attachmentInfo}! You can modify data and generate again.`);
+      } else {
+        // No attachments, save main PDF directly
+        mainPdfData.doc.save(mainPdfData.filename);
+        showSuccessMessage('Combined weekly report generated successfully! You can modify data and generate again.');
+      }
       
       hideLoading();
-      showSuccessMessage('Combined weekly report generated successfully! You can modify data and generate again.');
       
       // Return to tip pool section for easy re-editing
       showTipPool();
