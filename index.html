@@ -4439,7 +4439,22 @@
       console.log('Tip pool table rendered');
       
       console.log('About to show tip pool results div...');
-      document.getElementById('tipPoolResults').style.display = 'block';
+      
+      // NUCLEAR OPTION: Force all possible visibility settings
+      const tipPoolResultsDiv = document.getElementById('tipPoolResults');
+      tipPoolResultsDiv.style.display = 'block';
+      tipPoolResultsDiv.style.visibility = 'visible';
+      tipPoolResultsDiv.style.opacity = '1';
+      tipPoolResultsDiv.style.height = 'auto';
+      tipPoolResultsDiv.style.overflow = 'visible';
+      tipPoolResultsDiv.style.position = 'static';
+      tipPoolResultsDiv.style.zIndex = 'auto';
+      tipPoolResultsDiv.style.transform = 'none';
+      tipPoolResultsDiv.style.maxHeight = 'none';
+      tipPoolResultsDiv.style.width = 'auto';
+      
+      console.log('FORCED all visibility properties on tipPoolResults');
+      
       document.getElementById('tipPoolPdfBtn').style.display = 'inline-block';
       document.getElementById('combinedReportSection').style.display = 'block';
       
@@ -4466,10 +4481,23 @@
         const resultsDiv = document.getElementById('tipPoolResults');
         const formDiv = document.getElementById('tipPoolForm');
         console.log('FINAL CHECK - Results div display:', resultsDiv.style.display);
+        console.log('FINAL CHECK - Results div innerHTML length:', resultsDiv.innerHTML.length);
+        console.log('FINAL CHECK - Results div offsetHeight:', resultsDiv.offsetHeight);
+        console.log('FINAL CHECK - Results div scrollHeight:', resultsDiv.scrollHeight);
+        console.log('FINAL CHECK - Results div computed style:', window.getComputedStyle(resultsDiv).display);
         console.log('FINAL CHECK - Form div classes:', formDiv.className);
         console.log('FINAL CHECK - Form div active?', formDiv.classList.contains('active'));
         console.log('FINAL CHECK - Results div visible?', resultsDiv.offsetHeight > 0);
         console.log('FINAL CHECK - Form div visible?', formDiv.offsetHeight > 0);
+        
+        // If still not visible, try scrolling to it
+        if (resultsDiv.offsetHeight === 0) {
+          console.log('Results div still not visible - trying to force scroll and flash');
+          resultsDiv.style.border = '5px solid red';
+          resultsDiv.style.backgroundColor = 'yellow';
+          resultsDiv.style.minHeight = '200px';
+          resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       }, 100);
       
       console.log('calculateTipPool function completed successfully');
@@ -5971,16 +5999,19 @@
       // Generate the HTML content first
       const cashReportHtml = generateDateRangeReportHtml(startDate, endDate, rangeData, realEnvelopeAmount);
       
-      // Clean tip pool HTML - remove the Weekly Combined Report section
+      // Get tip pool HTML and clean ONLY for saving (don't modify the original DOM)
       let tipPoolHtml = document.getElementById('tipPoolResults').innerHTML;
-      tipPoolHtml = tipPoolHtml.replace(/<div[^>]*id="combinedReportSection"[^>]*>.*?<\/div>/gs, '');
-      tipPoolHtml = tipPoolHtml.replace(/📊 Weekly Combined Report[\s\S]*?📄 Generate Combined Weekly Report/g, '');
-      tipPoolHtml = tipPoolHtml.replace(/📄 Download PDF Back to Menu/g, '');
+      
+      // Create a clean copy for saving without affecting the live DOM
+      let cleanTipPoolHtml = tipPoolHtml;
+      cleanTipPoolHtml = cleanTipPoolHtml.replace(/<div[^>]*id="combinedReportSection"[^>]*>.*?<\/div>/gs, '');
+      cleanTipPoolHtml = cleanTipPoolHtml.replace(/📊 Weekly Combined Report[\s\S]*?📄 Generate Combined Weekly Report/g, '');
+      cleanTipPoolHtml = cleanTipPoolHtml.replace(/📄 Download PDF Back to Menu/g, '');
       
       // SAVE ALL DATA TO DATABASE BEFORE PDF GENERATION
       console.log('Saving comprehensive weekly report data to database...');
       try {
-        const savedReportId = await saveWeeklyCombinedReportData(startDate, endDate, rangeData, realEnvelopeAmount, cashboxTotal, cashReportHtml, tipPoolHtml);
+        const savedReportId = await saveWeeklyCombinedReportData(startDate, endDate, rangeData, realEnvelopeAmount, cashboxTotal, cashReportHtml, cleanTipPoolHtml);
         console.log(`Weekly report data saved successfully with ID: ${savedReportId}`);
       } catch (saveError) {
         console.error('Warning: Failed to save report data to database:', saveError);
