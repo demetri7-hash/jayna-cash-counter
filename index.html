@@ -3979,24 +3979,24 @@
       
       let currentY = margin;
       
-      // Header text
+      // Header text with tighter spacing
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
-      doc.text('JAYNA GYRO COMBINED WEEKLY REPORT', margin, currentY + 15);
-      doc.setFontSize(10);
+      doc.setFontSize(16);  // Reduced from 18
+      doc.text('JAYNA GYRO COMBINED WEEKLY REPORT', margin, currentY + 12);
+      doc.setFontSize(9);   // Reduced from 10
       doc.setFont('helvetica', 'normal');
       
-      // Use uppercase labels and values for header metadata
+      // Use uppercase labels and values for header metadata with tighter spacing
       const dateRange = `${startDate.toUpperCase()} TO ${endDate.toUpperCase()}`;
-      doc.text(`WEEK OF: ${dateRange}`, margin, currentY + 32);
+      doc.text(`WEEK OF: ${dateRange}`, margin, currentY + 26);  // Reduced spacing
       const reporter = (tipPoolSummary.calculatedByName || '').toUpperCase();
-      doc.text(`RAN BY: ${reporter}`, margin, currentY + 44);
+      doc.text(`RAN BY: ${reporter}`, margin, currentY + 36);     // Reduced spacing
       const timestamp = new Date().toLocaleString().toUpperCase();
-      doc.text(`GENERATED: ${timestamp}`, margin, currentY + 56);
+      doc.text(`GENERATED: ${timestamp}`, margin, currentY + 46); // Reduced spacing
       
       // Draw a thin horizontal line below header for separation
       doc.setLineWidth(0.5);
-      doc.line(margin, currentY + 70, pageWidth - margin, currentY + 70);
+      doc.line(margin, currentY + 56, pageWidth - margin, currentY + 56); // Reduced spacing
       
       // Calculate cash report totals using same logic
       let totalToastSalesReported = 0;
@@ -4013,8 +4013,8 @@
         totalBackToCashbox += (day.pm_amount_to_keep - day.am_total) || 0;
       });
 
-      // Summary section: arrange entries in two columns
-      doc.setFontSize(10);
+      // Summary section: arrange entries in two columns with tighter spacing
+      doc.setFontSize(9);   // Reduced from 10
       doc.setFont('helvetica', 'normal');
       
       // Build an array of [label, value] pairs for both cash and tip pool data
@@ -4031,9 +4031,9 @@
       ].map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
       
       // Define fixed x offsets for values within each column
-      const colValueOffset = 200;
-      let summaryY = currentY + 86;
-      const lineHeight = 14;
+      const colValueOffset = 170;  // Reduced from 200
+      let summaryY = currentY + 66; // Reduced from 86
+      const lineHeight = 11;        // Reduced from 14
       const colSplitIndex = Math.ceil(entries.length / 2);
       const col2X = pageWidth / 2;
       
@@ -4048,7 +4048,7 @@
       }
       
       // Draw right column
-      let rightColumnY = currentY + 86;
+      let rightColumnY = currentY + 66; // Match summaryY start
       for (let i = colSplitIndex; i < entries.length; i++) {
         const [label, value] = entries[i];
         doc.setFont('helvetica', 'bold');
@@ -4058,14 +4058,14 @@
         rightColumnY += lineHeight;
       }
       
-      // Draw a horizontal line after summary
-      const postSummaryY = Math.max(summaryY, rightColumnY) + 10;
+      // Draw a horizontal line after summary with reduced spacing
+      const postSummaryY = Math.max(summaryY, rightColumnY) + 6; // Reduced from 10
       doc.setLineWidth(0.5);
       doc.line(margin, postSummaryY, pageWidth - margin, postSummaryY);
       
-      // Employee distribution table
+      // Employee distribution table with reduced spacing
       if (tipPoolRecords && tipPoolRecords.length > 0) {
-        currentY = postSummaryY + 20;
+        currentY = postSummaryY + 12; // Reduced from 20
         
         const tableData = tipPoolRecords.map(record => [
           `${record.first.toUpperCase()} ${record.last.toUpperCase()}`,
@@ -4081,12 +4081,25 @@
           body: tableData,
           margin: { left: margin, right: margin },
           theme: 'grid',
-          headStyles: { font: 'helvetica', fontStyle: 'bold', textColor: [0, 0, 0], fillColor: [245, 245, 245] },
-          bodyStyles: { font: 'helvetica', textColor: [0, 0, 0], fillColor: null },
+          headStyles: { 
+            font: 'helvetica', 
+            fontStyle: 'bold', 
+            textColor: [0, 0, 0], 
+            fillColor: [245, 245, 245],
+            fontSize: 8,        // Reduced font size
+            cellPadding: 3      // Reduced padding
+          },
+          bodyStyles: { 
+            font: 'helvetica', 
+            textColor: [0, 0, 0], 
+            fillColor: null,
+            fontSize: 8,        // Reduced font size
+            cellPadding: 3      // Reduced padding
+          },
           tableWidth: 'auto'
         });
         
-        currentY = doc.lastAutoTable.finalY + 20;
+        currentY = doc.lastAutoTable.finalY + 10; // Reduced from 20
       }
       
       // Daily cash breakdown table
@@ -4111,8 +4124,21 @@
           body: dailyTableData,
           margin: { left: margin, right: margin },
           theme: 'grid',
-          headStyles: { font: 'helvetica', fontStyle: 'bold', textColor: [0, 0, 0], fillColor: [245, 245, 245] },
-          bodyStyles: { font: 'helvetica', textColor: [0, 0, 0], fillColor: null },
+          headStyles: { 
+            font: 'helvetica', 
+            fontStyle: 'bold', 
+            textColor: [0, 0, 0], 
+            fillColor: [245, 245, 245],
+            fontSize: 7,        // Smaller font for daily table
+            cellPadding: 2      // Smaller padding for daily table
+          },
+          bodyStyles: { 
+            font: 'helvetica', 
+            textColor: [0, 0, 0], 
+            fillColor: null,
+            fontSize: 7,        // Smaller font for daily table
+            cellPadding: 2      // Smaller padding for daily table
+          },
           tableWidth: 'auto'
         });
       }
