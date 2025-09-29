@@ -694,12 +694,12 @@
         </div>
         
         <div id="weeklyRangeGroup" class="form-group" style="display: none;">
-          <label for="reportStartDate">Week Start Date:</label>
-          <input type="date" id="reportStartDate" class="form-input" required>
-          <label for="reportEndDate" style="margin-top: 10px;">Week End Date:</label>
-          <input type="date" id="reportEndDate" class="form-input" required>
+          <label for="savedWeeksDropdown">Select Saved Weekly Report:</label>
+          <select id="savedWeeksDropdown" class="form-input" required>
+            <option value="">Loading saved reports...</option>
+          </select>
           <div style="margin-top: 10px; font-size: 14px; color: #666;">
-            <strong>📋 Weekly Report:</strong> Generate a comprehensive 7-day summary with tip pool distribution and cash flow analysis.
+            <strong>📋 Saved Weekly Reports:</strong> Select from previously generated weekly reports to view the complete summary.
           </div>
         </div>
         
@@ -2317,6 +2317,56 @@
     } else {
       singleGroup.style.display = 'none';
       weeklyGroup.style.display = 'block';
+      // Load saved weeks when weekly report is selected
+      loadSavedWeeks();
+    }
+  }
+
+  // Load Saved Weekly Reports for Dropdown
+  async function loadSavedWeeks() {
+    const dropdown = document.getElementById('savedWeeksDropdown');
+    
+    try {
+      dropdown.innerHTML = '<option value="">Loading saved reports...</option>';
+      
+      if (!supabase) {
+        dropdown.innerHTML = '<option value="">Database connection not available</option>';
+        return;
+      }
+
+      const { data: savedReports, error } = await supabase
+        .from('weekly_combined_reports')
+        .select('id, week_start_date, week_end_date, generated_by, generated_at')
+        .order('week_start_date', { ascending: false });
+
+      if (error) {
+        console.error('Error loading saved reports:', error);
+        dropdown.innerHTML = '<option value="">Error loading reports</option>';
+        return;
+      }
+
+      if (!savedReports || savedReports.length === 0) {
+        dropdown.innerHTML = '<option value="">No saved weekly reports found. Generate a weekly combined report first.</option>';
+        return;
+      }
+
+      // Populate dropdown with saved reports
+      dropdown.innerHTML = '<option value="">Select a saved weekly report...</option>';
+      
+      savedReports.forEach(report => {
+        const startDate = new Date(report.week_start_date).toLocaleDateString();
+        const endDate = new Date(report.week_end_date).toLocaleDateString();
+        const generatedDate = new Date(report.generated_at).toLocaleDateString();
+        
+        const option = document.createElement('option');
+        option.value = report.id;
+        option.textContent = `Week of ${startDate} - ${endDate} (Generated: ${generatedDate})`;
+        dropdown.appendChild(option);
+      });
+
+    } catch (error) {
+      console.error('Error in loadSavedWeeks:', error);
+      dropdown.innerHTML = '<option value="">Error loading reports</option>';
     }
   }
 
@@ -2386,70 +2436,78 @@
 
   // Generate Weekly Historical Report
   async function generateWeeklyHistoricalReport() {
-    const startDate = document.getElementById('reportStartDate').value;
-    const endDate = document.getElementById('reportEndDate').value;
+    const reportId = document.getElementById('savedWeeksDropdown').value;
     
-    if (!startDate || !endDate) {
-      throw new Error('Please select both start and end dates');
-    }
-    
-    if (new Date(endDate) < new Date(startDate)) {
-      throw new Error('End date must be after start date');
+    if (!reportId) {
+      throw new Error('Please select a saved weekly report from the dropdown');
     }
     
     if (!supabase) {
       throw new Error('Database connection not available');
     }
     
-    // Query for weekly report data - remove .single() to handle multiple results
-    const { data: weeklyData, error: weeklyError } = await supabase
+    // Get the saved report data including the generated HTML content
+    const { data: reportData, error: reportError } = await supabase
       .from('weekly_combined_reports')
       .select('*')
-      .eq('week_start_date', startDate)
-      .eq('week_end_date', endDate);
+      .eq('id', reportId)
+      .single();
     
-    if (weeklyError) {
-      console.error('Weekly query error details:', weeklyError);
-      throw new Error(`Database query failed: ${weeklyError.message}`);
+    if (reportError) {
+      console.error('Report query error:', reportError);
+      throw new Error(`Failed to load report: ${reportError.message}`);
     }
     
-    if (!weeklyData || weeklyData.length === 0) {
-      throw new Error(`No weekly report found for ${startDate} to ${endDate}. You need to generate a weekly combined report for this date range first. The historical reports can only show data from weeks that have been processed.`);
+    if (!reportData) {
+      throw new Error('Report not found');
     }
     
-    // Use the first (most recent) result if multiple exist
-    const reportData = weeklyData[0];
+    // Display the saved HTML content directly
+    const reportContent = document.getElementById('reportContent');
     
-    // Get employee tips data separately
-    const { data: employeeData, error: employeeError } = await supabase
-      .from('weekly_employee_tips')
-      .select('*')
-      .eq('weekly_report_id', reportData.id)
-      .order('employee_first_name', { ascending: true });
-    
-    if (employeeError) {
-      console.error('Employee query error:', employeeError);
-      // Don't throw - continue without employee data
+    if (reportData.generated_cash_report_html && reportData.generated_tip_pool_html) {
+      // We have saved HTML content - just display it!
+      reportContent.innerHTML = `
+        <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #28a745;">
+            <h3 style="margin: 0 0 10px 0; color: #28a745;">📄 Historical Report Retrieved</h3>
+            <p style="margin: 0; font-size: 14px;">Report for: ${new Date(reportData.week_start_date).toLocaleDateString()} - ${new Date(reportData.week_end_date).toLocaleDateString()}</p>
+            <p style="margin: 0; font-size: 14px;">Generated by: ${reportData.generated_by} on ${new Date(reportData.generated_at).toLocaleDateString()}</p>
+          </div>
+          
+          <div style="margin-bottom: 30px;">
+            <h3 style="color: #1e3c72; margin-bottom: 15px; border-bottom: 2px solid #1e3c72; padding-bottom: 5px;">WEEKLY CASH REPORT</h3>
+            ${reportData.generated_cash_report_html}
+          </div>
+          
+          <div>
+            <h3 style="color: #1e3c72; margin-bottom: 15px; border-bottom: 2px solid #1e3c72; padding-bottom: 5px;">TIP POOL DISTRIBUTION</h3>
+            ${reportData.generated_tip_pool_html}
+          </div>
+        </div>
+      `;
+    } else {
+      // Fallback: no HTML content saved, show basic info
+      reportContent.innerHTML = `
+        <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+          <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border-left: 4px solid #ffc107;">
+            <h3 style="margin: 0 0 10px 0; color: #856404;">⚠️ Legacy Report Format</h3>
+            <p style="margin: 0 0 10px 0; font-size: 14px;">This report was generated before HTML content saving was implemented.</p>
+            <p style="margin: 0; font-size: 14px;"><strong>Report Details:</strong></p>
+            <ul style="margin: 10px 0 0 20px;">
+              <li>Week: ${new Date(reportData.week_start_date).toLocaleDateString()} - ${new Date(reportData.week_end_date).toLocaleDateString()}</li>
+              <li>Generated by: ${reportData.generated_by}</li>
+              <li>Generated on: ${new Date(reportData.generated_at).toLocaleDateString()}</li>
+              <li>Total Tips: $${reportData.total_tips || 0}</li>
+              <li>Tip Pool Total: $${reportData.tip_pool_total || 0}</li>
+            </ul>
+          </div>
+        </div>
+      `;
     }
     
-    // Get daily breakdown data separately  
-    const { data: dailyData, error: dailyError } = await supabase
-      .from('weekly_daily_breakdown')
-      .select('*')
-      .eq('weekly_report_id', reportData.id)
-      .order('date', { ascending: true });
-    
-    if (dailyError) {
-      console.error('Daily breakdown query error:', dailyError);
-      // Don't throw - continue without daily data
-    }
-    
-    // Attach the related data to the main report
-    reportData.weekly_employee_tips = employeeData || [];
-    reportData.weekly_daily_breakdown = dailyData || [];
-    
-    // Generate PDF for weekly report
-    await generateWeeklyHistoricalPDF(reportData, startDate, endDate);
+    // Show the report content
+    document.getElementById('reportDisplay').style.display = 'block';
   }
 
   // Generate Single Day PDF Report
@@ -2635,16 +2693,24 @@
       doc.setFontSize(12);
       doc.text('DAILY CASH BREAKDOWN', margin, currentY);
       
-      currentY += 20;
+      currentY += 15;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(`* Only showing ${weeklyData.weekly_daily_breakdown.length} days with PM cash count data`, margin, currentY);
       
-      const dailyTableData = weeklyData.weekly_daily_breakdown.map(day => [
-        day.date,
-        day.night_counter || 'N/A',
-        `$${day.toast_sales.toFixed(2)}`,
-        `$${day.actual_cash_in.toFixed(2)}`,
-        `${day.discrepancy >= 0 ? '+' : ''}$${day.discrepancy.toFixed(2)}`,
-        `$${day.excess.toFixed(2)}`
-      ]);
+      currentY += 15;
+      
+      // Filter and format the data better
+      const dailyTableData = weeklyData.weekly_daily_breakdown
+        .filter(day => day.toast_sales > 0 || day.actual_cash_in > 0) // Only show days with actual data
+        .map(day => [
+          day.date,
+          day.night_counter || 'N/A',
+          day.toast_sales > 0 ? `$${day.toast_sales.toFixed(2)}` : 'No Data',
+          day.actual_cash_in > 0 ? `$${day.actual_cash_in.toFixed(2)}` : 'No Data', 
+          Math.abs(day.discrepancy) > 0.01 ? `${day.discrepancy >= 0 ? '+' : ''}$${day.discrepancy.toFixed(2)}` : '$0.00',
+          day.excess > 0 ? `$${day.excess.toFixed(2)}` : '$0.00'
+        ]);
       
       doc.autoTable({
         head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISCREPANCY', 'EXCESS']],
@@ -5113,7 +5179,7 @@
   }
 
   // Save ALL Weekly Combined Report Data to Database
-  async function saveWeeklyCombinedReportData(startDate, endDate, cashData, realEnvelopeAmount, cashboxTotal) {
+  async function saveWeeklyCombinedReportData(startDate, endDate, cashData, realEnvelopeAmount, cashboxTotal, cashReportHtml = null, tipPoolHtml = null) {
     try {
       if (!supabase) {
         console.log('Supabase not available - skipping data save');
@@ -5157,7 +5223,11 @@
         
         // System metadata
         report_version: '3.0',
-        has_attachments: false // Will be updated if attachments exist
+        has_attachments: false, // Will be updated if attachments exist
+        
+        // Store the generated HTML content for easy retrieval
+        generated_cash_report_html: cashReportHtml,
+        generated_tip_pool_html: tipPoolHtml
       };
 
       // Save main report data
@@ -5205,7 +5275,15 @@
       if (cashData && cashData.length > 0) {
         console.log('Preparing daily breakdown records from cashData:', cashData);
         
-        const dailyRecords = cashData.map(day => {
+        // Filter to only include days with meaningful PM data
+        const validDays = cashData.filter(day => 
+          day.pm_total && day.pm_total > 0 && 
+          day.pm_toast_sales && day.pm_toast_sales > 0
+        );
+        
+        console.log(`Filtered to ${validDays.length} days with valid PM data out of ${cashData.length} total days`);
+        
+        const dailyRecords = validDays.map(day => {
           console.log('Processing day:', day);
           return {
             weekly_report_id: savedReport.id,
@@ -5598,10 +5676,14 @@
       // Save combined report data for persistence
       saveCombinedReportData();
 
+      // Generate the HTML content first
+      const cashReportHtml = generateDateRangeReportHtml(startDate, endDate, rangeData, realEnvelopeAmount);
+      const tipPoolHtml = document.getElementById('tipPoolResults').innerHTML;
+      
       // SAVE ALL DATA TO DATABASE BEFORE PDF GENERATION
       console.log('Saving comprehensive weekly report data to database...');
       try {
-        const savedReportId = await saveWeeklyCombinedReportData(startDate, endDate, rangeData, realEnvelopeAmount, cashboxTotal);
+        const savedReportId = await saveWeeklyCombinedReportData(startDate, endDate, rangeData, realEnvelopeAmount, cashboxTotal, cashReportHtml, tipPoolHtml);
         console.log(`Weekly report data saved successfully with ID: ${savedReportId}`);
       } catch (saveError) {
         console.error('Warning: Failed to save report data to database:', saveError);
