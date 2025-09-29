@@ -780,42 +780,30 @@
         <button class="submit-btn" onclick="calculateTipPool()" style="background: #28a745;">Calculate Tip Pool</button>
         <button class="submit-btn" onclick="downloadTipPoolPDF()" id="tipPoolPdfBtn" style="background: #007bff; margin-left: 10px; display: none;">Download Tip Pool PDF</button>
         
-        <!-- Combined Report Section -->
-        <div id="combinedReportSection" style="display: none; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 2px solid #007bff;">
-          <h4 style="margin: 0 0 15px 0; color: #007bff;">Generate Combined Report</h4>
-          <p style="margin: 0 0 15px 0; font-size: 14px; color: #666;">
-            Combine your tip pool calculations with existing cash count reports for a comprehensive weekly summary.
-          </p>
-          
-          <div class="form-group">
-            <label>Select Date Range for Cash Reports:</label>
-            <div style="display: flex; gap: 15px; margin: 10px 0;">
-              <div style="flex: 1;">
-                <label for="combinedStartDate" style="font-size: 12px; color: #666;">Start Date:</label>
-                <input type="date" id="combinedStartDate" class="form-input">
-              </div>
-              <div style="flex: 1;">
-                <label for="combinedEndDate" style="font-size: 12px; color: #666;">End Date:</label>
-                <input type="date" id="combinedEndDate" class="form-input">
-              </div>
-            </div>
-            <div style="font-size: 12px; color: #dc3545; margin-top: 5px;">
-              <strong>Note:</strong> Date range should match your tip pool period (max 7 days)
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label for="combinedRealEnvelope">Real Envelope Amount (optional):</label>
-            <input type="number" id="combinedRealEnvelope" class="form-input" step="0.01" placeholder="Actual counted envelope amount">
-          </div>
-          
-          <button class="submit-btn" onclick="generateCombinedReport()" style="background: #6f42c1;">Generate Combined Weekly Report</button>
-        </div>
+
         
         <!-- Tip Pool Results Display -->
         <div id="tipPoolResults" style="display: none; margin-top: 20px;">
           <div id="tipPoolSummary"></div>
           <div id="tipPoolTable"></div>
+          
+          <!-- Combined Report Section - Auto-populated -->
+          <div id="combinedReportSection" style="display: none; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 2px solid #6f42c1;">
+            <h4 style="margin: 0 0 15px 0; color: #6f42c1;">📊 Weekly Combined Report</h4>
+            <p style="margin: 0 0 15px 0; font-size: 14px; color: #666;">
+              Generate a comprehensive weekly summary combining your tip pool calculations with cash count reports.
+            </p>
+            
+            <div style="display: flex; gap: 15px; align-items: center;">
+              <button class="submit-btn" onclick="generateCombinedReport()" style="background: #6f42c1; flex: 1;">📄 Generate Combined Weekly Report</button>
+              <button class="submit-btn" onclick="downloadBothReports()" style="background: #28a745; flex: 1;">📦 Download Both Reports</button>
+            </div>
+            
+            <!-- Hidden inputs for auto-populated data -->
+            <input type="hidden" id="combinedStartDate">
+            <input type="hidden" id="combinedEndDate">
+            <input type="hidden" id="combinedRealEnvelope">
+          </div>
         </div>
         
         <!-- Hidden Tip Pool Report Display for PDF generation -->
@@ -3176,6 +3164,12 @@
       document.getElementById('tipPoolPdfBtn').style.display = 'inline-block';
       document.getElementById('combinedReportSection').style.display = 'block';
       
+      // Auto-populate combined report data from tip pool inputs
+      document.getElementById('combinedStartDate').value = startDate;
+      document.getElementById('combinedEndDate').value = endDate;
+      document.getElementById('combinedRealEnvelope').value = realEnvelopeDeposit.toString();
+      console.log('Auto-populated combined report data:', { startDate, endDate, realEnvelopeDeposit });
+      
       // Ensure tip pool form stays active
       document.getElementById('tipPoolForm').classList.add('active');
       console.log('Tip pool results div should now be visible');
@@ -3218,6 +3212,29 @@
       hideLoading();
       console.error('PDF generation error:', error);
       showErrorMessage(`Error generating PDF: ${error.message}`);
+    }
+  }
+
+  async function downloadBothReports() {
+    try {
+      showLoading('Generating Both Reports', 'Creating tip pool and combined weekly reports...');
+      
+      // Generate tip pool PDF first
+      await generateTipPoolPDF();
+      
+      // Small delay to ensure first PDF is processed
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Generate combined report
+      await generateCombinedReport();
+      
+      hideLoading();
+      showSuccessMessage('Both reports have been downloaded successfully! Check your downloads folder for the Tip Pool PDF and Combined Weekly Report.');
+      
+    } catch (error) {
+      hideLoading();
+      console.error('Error downloading both reports:', error);
+      showErrorMessage(`Error generating reports: ${error.message}`);
     }
   }
 
@@ -3790,6 +3807,8 @@
     const startDate = document.getElementById('combinedStartDate').value;
     const endDate = document.getElementById('combinedEndDate').value;
     const realEnvelopeAmount = parseFloat(document.getElementById('combinedRealEnvelope').value) || null;
+
+    console.log('generateCombinedReport called with auto-populated data:', { startDate, endDate, realEnvelopeAmount });
 
     if (!startDate || !endDate) {
       showErrorMessage('Please select both start and end dates for the cash report period.');
