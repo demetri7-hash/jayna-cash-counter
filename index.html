@@ -4103,10 +4103,26 @@
           `$${record.due.toFixed(2)}`
         ]);
         
+        // Calculate totals for the employee table
+        const totalHours = tipPoolRecords.reduce((sum, record) => sum + record.hours, 0);
+        const totalWeighted = tipPoolRecords.reduce((sum, record) => sum + record.weighted, 0);
+        const totalDue = tipPoolRecords.reduce((sum, record) => sum + record.due, 0);
+        
+        // Add totals row
+        const totalsRow = [
+          'TOTALS',
+          totalHours.toFixed(1),
+          '', // Skip equity column as it doesn't make sense to total percentages
+          totalWeighted.toFixed(1),
+          `$${totalDue.toFixed(2)}`
+        ];
+        
+        const tableDataWithTotals = [...tableData, totalsRow];
+        
         doc.autoTable({
           startY: currentY,
           head: [['EMPLOYEE', 'HOURS', 'EQUITY (%)', 'WEIGHTED', 'DUE']],
-          body: tableData,
+          body: tableDataWithTotals,
           margin: { left: margin, right: margin },
           theme: 'grid',
           headStyles: { 
@@ -4123,6 +4139,13 @@
             fillColor: null,
             fontSize: 8,        // Reduced font size
             cellPadding: 3      // Reduced padding
+          },
+          didParseCell: function(data) {
+            // Apply bold styling to totals row (last row)
+            if (data.row.index === tableDataWithTotals.length - 1) {
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [240, 240, 240]; // Light gray background for totals
+            }
           },
           tableWidth: 'auto'
         });
