@@ -4049,14 +4049,37 @@
         summaryY += lineHeight;
       }
       
-      // Draw right column
+      // Draw right column with special handling for Cash Needed
       let rightColumnY = currentY + 66; // Match summaryY start
       for (let i = colSplitIndex; i < entries.length; i++) {
         const [label, value] = entries[i];
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${label}:`, col2X + 6, rightColumnY);
-        doc.setFont('helvetica', 'normal');
-        doc.text(value, col2X + 6 + colValueOffset, rightColumnY);
+        
+        // Special color handling for Cash Needed
+        if (label.includes('CASH NEEDED')) {
+          // Determine color based on cash needed amount
+          if (tipPoolSummary.cashNeeded > 0) {
+            // Cash is needed - show in red
+            doc.setTextColor(220, 53, 69); // Red color
+          } else {
+            // Cash surplus - show in green  
+            doc.setTextColor(40, 167, 69); // Green color
+          }
+          
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${label}:`, col2X + 6, rightColumnY);
+          doc.setFont('helvetica', 'normal');
+          doc.text(value, col2X + 6 + colValueOffset, rightColumnY);
+          
+          // Reset to black for subsequent text
+          doc.setTextColor(0, 0, 0);
+        } else {
+          // Normal black text for other entries
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${label}:`, col2X + 6, rightColumnY);
+          doc.setFont('helvetica', 'normal');
+          doc.text(value, col2X + 6 + colValueOffset, rightColumnY);
+        }
+        
         rightColumnY += lineHeight;
       }
       
