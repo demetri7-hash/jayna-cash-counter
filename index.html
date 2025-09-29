@@ -2920,8 +2920,8 @@
     }
 
     try {
-      // Fetch cash sales data from Supabase for the date range (using same structure as working reports)
-      const { data: cashSalesData, error: cashSalesError } = await supabase
+      // Copy exact working query from generateDateRangePDF
+      const { data: rangeData } = await supabase
         .from('cash_counts')
         .select('*')
         .gte('date', startDate)
@@ -2929,17 +2929,14 @@
         .not('pm_total', 'is', null)
         .order('date', { ascending: true });
 
-      if (cashSalesError) {
-        console.error('Error fetching cash sales:', cashSalesError);
+      if (!rangeData || rangeData.length === 0) {
         document.getElementById('calculatedCashTips').value = '';
         return;
       }
 
       // Calculate total Toast cash sales using correct column name
       let totalToastCashSales = 0;
-      if (cashSalesData && cashSalesData.length > 0) {
-        totalToastCashSales = cashSalesData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
-      }
+      totalToastCashSales = rangeData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
 
       // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
       const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
@@ -3001,8 +2998,8 @@
         throw new Error('Date range cannot exceed 7 days');
       }
 
-      // Fetch cash sales data from Supabase (using same structure as working reports)
-      const { data: cashSalesData, error: cashSalesError } = await supabase
+      // Copy exact working query from generateDateRangePDF
+      const { data: rangeData } = await supabase
         .from('cash_counts')
         .select('*')
         .gte('date', startDate)
@@ -3010,15 +3007,13 @@
         .not('pm_total', 'is', null)
         .order('date', { ascending: true });
 
-      if (cashSalesError) {
-        throw new Error('Failed to fetch cash sales data: ' + cashSalesError.message);
+      if (!rangeData || rangeData.length === 0) {
+        throw new Error('No cash count data found for this date range');
       }
 
       // Calculate total Toast cash sales using correct column name
       let totalToastCashSales = 0;
-      if (cashSalesData && cashSalesData.length > 0) {
-        totalToastCashSales = cashSalesData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
-      }
+      totalToastCashSales = rangeData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
 
       // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
       const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
@@ -3482,17 +3477,14 @@
         throw new Error('Date range cannot exceed 7 days');
       }
 
-      // Fetch data from Supabase
-      const { data: rangeData, error } = await supabase
+      // Copy exact working query from generateDateRangePDF
+      const { data: rangeData } = await supabase
         .from('cash_counts')
         .select('*')
         .gte('date', startDate)
         .lte('date', endDate)
+        .not('pm_total', 'is', null)
         .order('date', { ascending: true });
-
-      if (error) {
-        throw new Error('Failed to fetch cash count data: ' + error.message);
-      }
 
       if (!rangeData || rangeData.length === 0) {
         throw new Error('No cash count data found for this date range');
