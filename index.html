@@ -2594,10 +2594,43 @@
         `;
         closeBtn.onclick = () => document.body.removeChild(overlay);
         
-        // Copy the content
+        // Add PDF download button
+        const downloadBtn = document.createElement('button');
+        downloadBtn.innerHTML = '📄 Download PDF';
+        downloadBtn.style.cssText = `
+          position: sticky !important;
+          top: 0 !important;
+          right: 120px !important;
+          float: right !important;
+          background: #28a745 !important;
+          color: white !important;
+          border: none !important;
+          padding: 10px 15px !important;
+          border-radius: 4px !important;
+          cursor: pointer !important;
+          margin-bottom: 20px !important;
+          margin-right: 10px !important;
+          font-size: 14px !important;
+        `;
+        downloadBtn.onclick = () => {
+          if (window.currentHistoricalReport) {
+            downloadHistoricalReportPDF(window.currentHistoricalReport.week_start_date, window.currentHistoricalReport.week_end_date);
+          } else {
+            alert('Report data not available for PDF download');
+          }
+        };
+        
+        // Copy the content (clean it up to remove duplicate forms)
         contentBox.appendChild(closeBtn);
+        contentBox.appendChild(downloadBtn);
         const contentDiv = document.createElement('div');
-        contentDiv.innerHTML = reportContent.innerHTML;
+        
+        // Clean the content - remove any tip pool forms that shouldn't be there
+        let cleanContent = reportContent.innerHTML;
+        // Remove any form elements that might be duplicated
+        cleanContent = cleanContent.replace(/<div[^>]*id="tipPoolForm"[^>]*>.*?<\/div>/gs, '');
+        cleanContent = cleanContent.replace(/<form[^>]*>.*?<\/form>/gs, '');
+        contentDiv.innerHTML = cleanContent;
         contentBox.appendChild(contentDiv);
         
         overlay.appendChild(contentBox);
