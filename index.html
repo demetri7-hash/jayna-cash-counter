@@ -4835,20 +4835,29 @@
       employees.sort((a, b) => a.first.localeCompare(b.first));
       
       employees.forEach((employee, index) => {
-        const yPos = currentY + (index * 25);
+        const rowHeight = 25;
+        const yPos = currentY + (index * rowHeight);
         
-        // Alternate row background (simulate with border)
+        // Check if we're getting too close to bottom of page
+        if (yPos > 700) {
+          return; // Skip if too close to bottom to maintain single page
+        }
+        
+        // Alternating row background - properly aligned with text
         if (index % 2 === 1) {
           doc.setFillColor(232, 240, 254); // Light blue background
-          doc.rect(margin - 5, yPos - 8, pageWidth - 2 * margin + 10, 22, 'F');
+          doc.rect(margin - 5, yPos - 12, pageWidth - 2 * margin + 10, rowHeight, 'F');
         }
         
         // Employee name
         doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
         doc.text(`${employee.first} ${employee.last}`, margin, yPos);
         
-        // Signature line
-        doc.line(margin + 250, yPos + 5, pageWidth - margin, yPos + 5);
+        // Signature line - properly positioned
+        doc.setDrawColor(0, 0, 0);
+        doc.line(margin + 250, yPos + 2, pageWidth - margin - 10, yPos + 2);
       });
       
       return doc;
