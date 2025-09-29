@@ -1163,10 +1163,14 @@
   }
   
   function hideAllSections() {
+    console.log('hideAllSections() called - this might be hiding tip pool results!');
+    console.trace('hideAllSections call stack');
     document.querySelectorAll('.form-section').forEach(section => section.classList.remove('active'));
   }
   
   function goHome() {
+    console.log('goHome() called - this will hide tip pool results!');
+    console.trace('goHome call stack');
     hideAllSections();
     document.getElementById('mainMenu').style.display = 'grid';
     
@@ -2984,14 +2988,17 @@
 
   // Helper function to show success messages
   function showSuccessMessage(message) {
+    console.log('showSuccessMessage called with:', message);
     const successMsg = document.createElement('div');
     successMsg.className = 'message success';
     successMsg.innerHTML = `<strong>✅ Success:</strong> ${message}`;
     
     // Insert at the top of the tip pool form
     const tipPoolForm = document.getElementById('tipPoolForm');
+    console.log('Tip pool form found:', tipPoolForm);
     const firstChild = tipPoolForm.firstElementChild;
     tipPoolForm.insertBefore(successMsg, firstChild.nextSibling);
+    console.log('Success message inserted');
     
     // Remove message after 5 seconds
     setTimeout(() => {
@@ -2999,6 +3006,7 @@
         successMsg.remove();
       }
     }, 5000);
+    console.log('showSuccessMessage completed');
   }
 
   async function calculateCashTips() {
@@ -3181,10 +3189,14 @@
       setTimeout(() => {
         const resultsDiv = document.getElementById('tipPoolResults');
         const formDiv = document.getElementById('tipPoolForm');
-        console.log('After success message - Results div display:', resultsDiv.style.display);
-        console.log('After success message - Form div classes:', formDiv.className);
-        console.log('After success message - Form div active?', formDiv.classList.contains('active'));
+        console.log('FINAL CHECK - Results div display:', resultsDiv.style.display);
+        console.log('FINAL CHECK - Form div classes:', formDiv.className);
+        console.log('FINAL CHECK - Form div active?', formDiv.classList.contains('active'));
+        console.log('FINAL CHECK - Results div visible?', resultsDiv.offsetHeight > 0);
+        console.log('FINAL CHECK - Form div visible?', formDiv.offsetHeight > 0);
       }, 100);
+      
+      console.log('calculateTipPool function completed successfully');
       
     } catch (error) {
       hideLoading();
