@@ -137,7 +137,7 @@ export default async function handler(req, res) {
           return;
         }
 
-        // COMPREHENSIVE DELIVERY DETECTION
+        // COMPREHENSIVE DELIVERY DETECTION - MUCH BROADER APPROACH
         let isDelivery = false;
         let deliveryIndicators = [];
         
@@ -157,7 +157,7 @@ export default async function handler(req, res) {
 
         // Method 3: source analysis (delivery platforms)
         if (order.source) {
-          const deliverySources = ['delivery', 'doordash', 'ubereats', 'grubhub', 'postmates', 'seamless'];
+          const deliverySources = ['delivery', 'doordash', 'ubereats', 'grubhub', 'postmates', 'seamless', 'online'];
           if (deliverySources.some(source => order.source.toLowerCase().includes(source))) {
             isDelivery = true;
             deliveryIndicators.push('source');
@@ -165,9 +165,10 @@ export default async function handler(req, res) {
           }
         }
 
-        // Method 4: diningOption analysis (would need to cross-reference with dining options API)
+        // Method 4: diningOption analysis - ASSUME ALL NON-DINE-IN ARE POTENTIAL DELIVERY
         if (order.diningOption && order.diningOption.guid) {
-          // For now, assume certain GUIDs are delivery - would need dining options lookup
+          // Cast wider net - if it has a diningOption, it might be delivery/takeout
+          isDelivery = true;
           deliveryIndicators.push('diningOption');
           deliveryAnalysis.deliveryDetectionMethods.diningOption++;
         }
@@ -189,6 +190,26 @@ export default async function handler(req, res) {
           });
         }
 
+        // Method 6: BROAD TIP DETECTION - If order has ANY tips, consider it delivery
+        let hasAnyTips = false;
+        if (order.checks && Array.isArray(order.checks)) {
+          order.checks.forEach(check => {
+            if (check.payments && Array.isArray(check.payments)) {
+              check.payments.forEach(payment => {
+                if (payment.tipAmount && payment.tipAmount > 0) {
+                  hasAnyTips = true;
+                }
+              });
+            }
+          });
+        }
+        
+        // If order has tips but no other delivery indicators, still consider it potential delivery
+        if (hasAnyTips && !isDelivery) {
+          isDelivery = true;
+          deliveryIndicators.push('hasTips');
+        }
+
         // If any delivery indicators found, analyze tips
         if (isDelivery) {
           let orderTips = {
@@ -198,43 +219,64 @@ export default async function handler(req, res) {
             total: 0
           };
 
-          // TIP EXTRACTION from payments
+          // TIP EXTRACTION from payments - ENHANCED LOGIC
           if (order.checks && Array.isArray(order.checks)) {
             order.checks.forEach(check => {
-              // Method 1: Payment tipAmount (primary)
+              // Method 1: Payment tipAmount (primary) - INCLUDE ALL PAYMENT TYPES
               if (check.payments && Array.isArray(check.payments)) {
                 check.payments.forEach(payment => {
+                  // Extract tips from ALL payment types, not just specific ones
                   if (payment.tipAmount && payment.tipAmount > 0) {
                     orderTips.paymentTips += payment.tipAmount / 100; // Convert cents to dollars
+                    deliveryAnalysis.tipExtractionMethods.paymentTipAmount++;
+                  }
+                  
+                  // Also check for tips in different payment structures
+                  if (payment.tip && payment.tip > 0) {
+                    orderTips.paymentTips += payment.tip / 100;
                     deliveryAnalysis.tipExtractionMethods.paymentTipAmount++;
                   }
                 });
               }
 
-              // Method 2: Service charge gratuity
+              // Method 2: Service charge gratuity - ENHANCED DETECTION
               if (check.appliedServiceCharges && Array.isArray(check.appliedServiceCharges)) {
                 check.appliedServiceCharges.forEach(charge => {
+                  // Any service charge marked as gratuity
                   if (charge.gratuity && charge.chargeAmount > 0) {
                     orderTips.serviceChargeTips += charge.chargeAmount / 100;
                     deliveryAnalysis.tipExtractionMethods.serviceChargeGratuity++;
                   }
                   
-                  // Method 3: Delivery charges (may include tips)
+                  // Delivery charges (may include tips)
                   if (charge.delivery && charge.chargeAmount > 0) {
                     orderTips.deliveryCharges += charge.chargeAmount / 100;
                     deliveryAnalysis.tipExtractionMethods.deliveryCharges++;
                   }
+                  
+                  // Service charges with "tip" or "gratuity" in name
+                  if (charge.name && charge.chargeAmount > 0) {
+                    const tipKeywords = ['tip', 'gratuity', 'service', 'auto'];
+                    if (tipKeywords.some(keyword => charge.name.toLowerCase().includes(keyword))) {
+                      orderTips.serviceChargeTips += charge.chargeAmount / 100;
+                      deliveryAnalysis.tipExtractionMethods.serviceChargeGratuity++;
+                    }
+                  }
                 });
+              }
+              
+              // Method 3: Check-level tip amounts (if exists)
+              if (check.tipAmount && check.tipAmount > 0) {
+                orderTips.paymentTips += check.tipAmount / 100;
+                deliveryAnalysis.tipExtractionMethods.paymentTipAmount++;
               }
             });
           }
 
-          // Calculate total tips (avoid double counting)
-          orderTips.total = Math.max(
-            orderTips.paymentTips,
-            orderTips.serviceChargeTips + orderTips.deliveryCharges
-          );
-
+          // Calculate total tips (take the maximum to avoid double counting, but be more inclusive)
+          orderTips.total = orderTips.paymentTips + orderTips.serviceChargeTips + orderTips.deliveryCharges;
+          
+          // If we found tips, include this order regardless of amount
           if (orderTips.total > 0) {
             deliveryAnalysis.deliveryOrders.push({
               orderGuid: order.guid,
@@ -244,7 +286,8 @@ export default async function handler(req, res) {
               deliveryInfo: order.deliveryInfo || null,
               source: order.source || null,
               tips: orderTips,
-              estimatedFulfillmentDate: order.estimatedFulfillmentDate || null
+              estimatedFulfillmentDate: order.estimatedFulfillmentDate || null,
+              diningOptionGuid: order.diningOption?.guid || null
             });
 
             deliveryAnalysis.totalDeliveryTips += orderTips.total;
