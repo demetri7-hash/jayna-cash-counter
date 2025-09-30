@@ -126,19 +126,47 @@ export default async function handler(req, res) {
     };
 
     if (Array.isArray(allOrders)) {
-      // TDS Driver server GUID for filtering specific employee orders
-      const TDS_DRIVER_GUID = '7863337c-16f2-4d9e-a855-e83953bbb016';
+      // TDS Driver identification - multiple potential filters
+      const TDS_DRIVER_SERVER_GUID = '7863337c-16f2-4d9e-a855-e83953bbb016';
+      const TDS_DRIVER_USER_GUID = '0789eaf5-afc9-4c6c-86c3-8b16683a6ee6';
+      
+      // Enhanced filtering function for TDS Driver orders
+      const isTDSDriverOrder = (order) => {
+        // Method 1: Check server GUID
+        if (order.server?.guid === TDS_DRIVER_SERVER_GUID) {
+          return { method: 'serverGuid', guid: order.server.guid };
+        }
+        
+        // Method 2: Check for user GUID in externalId
+        if (order.server?.externalId === TDS_DRIVER_USER_GUID) {
+          return { method: 'externalId', guid: order.server.externalId };
+        }
+        
+        // Method 3: Check if email contains the TDS Driver GUID
+        if (order.diningOption?.externalId === TDS_DRIVER_USER_GUID) {
+          return { method: 'diningOptionExternal', guid: order.diningOption.externalId };
+        }
+        
+        return null;
+      };
       
       allOrders.forEach((order, index) => {
-        // CRITICAL FILTER: Only process orders from TDS Driver
-        if (order.server?.guid !== TDS_DRIVER_GUID) {
+        // ENHANCED FILTER: Check multiple ways to identify TDS Driver
+        const tdsMatch = isTDSDriverOrder(order);
+        if (!tdsMatch) {
           deliveryAnalysis.rejectedOrders.push({
             index,
-            reason: `Not TDS Driver order - server GUID: ${order.server?.guid || 'null'}`,
+            reason: `Not TDS Driver order - server GUID: ${order.server?.guid || 'null'}, externalId: ${order.server?.externalId || 'null'}`,
             orderGuid: order.guid
           });
           return;
         }
+        
+        // Track which method identified the TDS Driver order
+        if (!deliveryAnalysis.tdsDriverMatches) {
+          deliveryAnalysis.tdsDriverMatches = {};
+        }
+        deliveryAnalysis.tdsDriverMatches[tdsMatch.method] = (deliveryAnalysis.tdsDriverMatches[tdsMatch.method] || 0) + 1;
         
         // Skip voided/deleted orders
         if (order.voided || order.deleted) {
