@@ -1120,8 +1120,7 @@
     initializeEmailJS();
     setTodayDate();
     
-    // Load saved data
-    loadTipPoolData();
+    // Load saved data (removed loadTipPoolData to reset tip pool fields every time)
     loadCombinedReportData();
     
     // Initialize TDS data and button state
@@ -5727,90 +5726,17 @@
 
   // ===== DATA PERSISTENCE FUNCTIONS =====
   
-  // Save tip pool data to localStorage
+  // Save tip pool data to localStorage - DISABLED to reset fields every time
   function saveTipPoolData() {
-    try {
-      const tipPoolData = {
-        tipPoolRecords: tipPoolRecords,
-        tipPoolSummary: tipPoolSummary,
-        formData: {
-          startDate: document.getElementById('tipPoolStartDate').value,
-          endDate: document.getElementById('tipPoolEndDate').value,
-          realEnvelopeDeposit: document.getElementById('realEnvelopeDeposit').value,
-          ezcaterTips: document.getElementById('ezcaterTips').value,
-          tdsDriverTips: document.getElementById('tdsDriverTips').value,
-          calculatedByName: document.getElementById('calculatedByName').value,
-          calculatedCashTips: document.getElementById('calculatedCashTips').value
-        },
-        timestamp: new Date().toISOString()
-      };
-      localStorage.setItem('jaynaGyroCashCounter_tipPoolData', JSON.stringify(tipPoolData));
-      console.log('Tip pool data saved to localStorage');
-    } catch (error) {
-      console.error('Error saving tip pool data:', error);
-    }
+    // No-op: Tip pool fields now reset every time instead of persisting
+    console.log('Tip pool localStorage persistence disabled - fields will reset every time');
   }
   
-  // Load tip pool data from localStorage
+  // Load tip pool data from localStorage - DISABLED to reset fields every time
   function loadTipPoolData() {
-    try {
-      const saved = localStorage.getItem('jaynaGyroCashCounter_tipPoolData');
-      if (!saved) return false;
-      
-      const tipPoolData = JSON.parse(saved);
-      
-      // Check if data is older than 1 hour (3600000 ms)
-      if (tipPoolData.timestamp) {
-        const saveTime = new Date(tipPoolData.timestamp);
-        const now = new Date();
-        const ageInMs = now - saveTime;
-        const oneHourInMs = 60 * 60 * 1000; // 1 hour = 3600000 ms
-        
-        if (ageInMs > oneHourInMs) {
-          console.log(`Tip pool data is ${Math.round(ageInMs / (1000 * 60))} minutes old - clearing expired data`);
-          localStorage.removeItem('jaynaGyroCashCounter_tipPoolData');
-          return false;
-        }
-        
-        console.log(`Tip pool data is ${Math.round(ageInMs / (1000 * 60))} minutes old - still valid`);
-      }
-      
-      // Restore global state
-      tipPoolRecords = tipPoolData.tipPoolRecords || [];
-      tipPoolSummary = tipPoolData.tipPoolSummary || {};
-      
-      // Restore form data
-      if (tipPoolData.formData) {
-        const form = tipPoolData.formData;
-        document.getElementById('tipPoolStartDate').value = form.startDate || '';
-        document.getElementById('tipPoolEndDate').value = form.endDate || '';
-        document.getElementById('realEnvelopeDeposit').value = form.realEnvelopeDeposit || '';
-        document.getElementById('ezcaterTips').value = form.ezcaterTips || '';
-        document.getElementById('tdsDriverTips').value = form.tdsDriverTips || '';
-        document.getElementById('calculatedByName').value = form.calculatedByName || '';
-        document.getElementById('calculatedCashTips').value = form.calculatedCashTips || '';
-      }
-      
-      // Prepare results but don't auto-show form
-      if (tipPoolRecords.length > 0) {
-        renderTipPoolSummary();
-        renderTipPoolTable();
-        // Results will be shown when user manually opens tip pool section
-        
-        // Auto-populate combined report data for when user opens reports
-        document.getElementById('combinedStartDate').value = tipPoolData.formData?.startDate || '';
-        document.getElementById('combinedEndDate').value = tipPoolData.formData?.endDate || '';
-        document.getElementById('combinedRealEnvelope').value = tipPoolData.formData?.realEnvelopeDeposit || '';
-        
-        console.log(`Tip pool data loaded from ${new Date(tipPoolData.timestamp).toLocaleString()} - ready when user opens tip pool`);
-      }
-      
-      console.log('Tip pool data loaded from localStorage');
-      return true;
-    } catch (error) {
-      console.error('Error loading tip pool data:', error);
-      return false;
-    }
+    // No-op: Tip pool fields now reset every time instead of loading from localStorage
+    console.log('Tip pool localStorage loading disabled - fields start fresh every time');
+    return false;
   }
   
   // Save combined report data to localStorage
@@ -6250,8 +6176,7 @@
       document.getElementById('combinedRealEnvelope').value = realEnvelopeDeposit.toString();
       console.log('Auto-populated combined report data:', { startDate, endDate, realEnvelopeDeposit });
       
-      // Save tip pool data for persistence
-      saveTipPoolData();
+      // Removed saveTipPoolData() - tip pool fields now reset every time
       
       // Ensure tip pool form stays active
       document.getElementById('tipPoolForm').classList.add('active');
@@ -6698,8 +6623,7 @@
     tipPoolSummary.hourlyRate = rate;
     tipPoolSummary.cashNeeded = tipPoolSummary.creditTips - tipPoolSummary.tdsDriverTips + tipPoolSummary.ezcaterTips - tipPoolSummary.cashSales;
     
-    // Auto-save updated data
-    saveTipPoolData();
+    // Removed saveTipPoolData() - tip pool fields now reset every time
     
     // Rerender summary and table
     renderTipPoolSummary();
