@@ -651,42 +651,211 @@
       }
     }
 
-    // Component Loading Functions (Placeholders for now)
+    // LiveMetrics Implementation - Real Toast + Homebase Data
     async function loadLiveMetrics() {
-      console.log('📊 Loading Live Metrics...');
+      console.log('📊 Loading Live Metrics with real Toast + Homebase data...');
       
       try {
-        // TODO: Implement live metrics with Toast + Homebase data
+        // Fetch data from both APIs in parallel
+        const [toastData, homebaseData] = await Promise.all([
+          getToastLiveData(),
+          getHomebaseLiveData()
+        ]);
+        
+        // Calculate live metrics
+        const metrics = calculateLiveMetrics(toastData, homebaseData);
+        
+        // Render metrics
         const metricsHTML = `
-          <div class="metric-card good">
-            <div class="metric-value">12</div>
+          <div class="metric-card ${metrics.ordersQueue.status}">
+            <div class="metric-value">${metrics.ordersQueue.value}</div>
             <div class="metric-label">Orders in Queue</div>
-            <div class="metric-detail">Avg wait: 8 min</div>
+            <div class="metric-detail">${metrics.ordersQueue.detail}</div>
           </div>
-          <div class="metric-card normal">
-            <div class="metric-value">18/24</div>
+          <div class="metric-card ${metrics.staffOnDuty.status}">
+            <div class="metric-value">${metrics.staffOnDuty.value}</div>
             <div class="metric-label">Staff On Duty</div>
-            <div class="metric-detail">3 servers, 4 kitchen</div>
+            <div class="metric-detail">${metrics.staffOnDuty.detail}</div>
           </div>
-          <div class="metric-card good">
-            <div class="metric-value">$1,247</div>
+          <div class="metric-card ${metrics.revenueToday.status}">
+            <div class="metric-value">${metrics.revenueToday.value}</div>
             <div class="metric-label">Revenue Today</div>
-            <div class="metric-detail">vs $1,186 yesterday</div>
+            <div class="metric-detail">${metrics.revenueToday.detail}</div>
           </div>
-          <div class="metric-card warning">
-            <div class="metric-value">85%</div>
+          <div class="metric-card ${metrics.laborEfficiency.status}">
+            <div class="metric-value">${metrics.laborEfficiency.value}</div>
             <div class="metric-label">Labor Efficiency</div>
-            <div class="metric-detail">Target: 75-80%</div>
+            <div class="metric-detail">${metrics.laborEfficiency.detail}</div>
           </div>
         `;
         
         document.getElementById('live-metrics-grid').innerHTML = metricsHTML;
-        console.log('✅ Live Metrics loaded');
+        console.log('✅ Live Metrics loaded with real data:', metrics);
         
       } catch (error) {
         console.error('❌ Error loading Live Metrics:', error);
-        document.getElementById('live-metrics-grid').innerHTML = '<div class="error">Failed to load live metrics</div>';
+        document.getElementById('live-metrics-grid').innerHTML = '<div class="error">Failed to load live metrics: ' + error.message + '</div>';
       }
+    }
+
+    // Get real-time data from Toast API
+    async function getToastLiveData() {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Get today's orders for queue analysis
+        const ordersResponse = await callToastAPI(`/orders/v2/orders?startDate=${today}&endDate=${today}&pageSize=50`);
+        
+        // Get restaurant info for operational status
+        const restaurantResponse = await callToastAPI('/restaurants/v1/restaurants/' + CONFIG.TOAST_RESTAURANT_GUID);
+        
+        // Calculate revenue from today's orders
+        const todayRevenue = ordersResponse.reduce((sum, order) => {
+          if (order.status !== 'VOIDED' && order.status !== 'CANCELLED') {
+            return sum + (order.amount || 0);
+          }
+          return sum;
+        }, 0) / 100; // Toast amounts are in cents
+        
+        // Analyze order queue (orders not yet closed/delivered)
+        const activeOrders = ordersResponse.filter(order => 
+          order.status && !['CLOSED', 'VOIDED', 'CANCELLED'].includes(order.status)
+        );
+        
+        // Calculate average preparation time
+        const avgPrepTime = calculateAveragePreparationTime(ordersResponse);
+        
+        return {
+          orders: ordersResponse,
+          activeOrders: activeOrders,
+          todayRevenue: todayRevenue,
+          avgPrepTime: avgPrepTime,
+          restaurant: restaurantResponse
+        };
+        
+      } catch (error) {
+        console.error('❌ Toast API error:', error);
+        throw new Error('Toast API connection failed');
+      }
+    }
+
+    // Get real-time data from Homebase API
+    async function getHomebaseLiveData() {
+      try {
+        // Get current employees
+        const employeesResponse = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`);
+        
+        // Get today's timecards to see who's clocked in
+        const today = new Date().toISOString().split('T')[0];
+        const timecardsResponse = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?date=${today}`);
+        
+        // Get today's shifts for scheduling comparison
+        const shiftsResponse = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?date=${today}`);
+        
+        // Calculate who's currently on duty (clocked in)
+        const currentlyWorking = timecardsResponse.filter(timecard => 
+          timecard.clock_in && !timecard.clock_out
+        );
+        
+        // Calculate labor costs
+        const laborCosts = calculateLaborCosts(timecardsResponse, employeesResponse);
+        
+        return {
+          employees: employeesResponse,
+          timecards: timecardsResponse,
+          shifts: shiftsResponse,
+          currentlyWorking: currentlyWorking,
+          laborCosts: laborCosts
+        };
+        
+      } catch (error) {
+        console.error('❌ Homebase API error:', error);
+        throw new Error('Homebase API connection failed');
+      }
+    }
+
+    // Calculate live metrics from Toast + Homebase data
+    function calculateLiveMetrics(toastData, homebaseData) {
+      // Orders Queue Analysis
+      const ordersQueue = {
+        value: toastData.activeOrders.length,
+        status: toastData.activeOrders.length > 15 ? 'warning' : 
+                toastData.activeOrders.length > 25 ? 'error' : 'good',
+        detail: `Avg prep: ${Math.round(toastData.avgPrepTime)} min`
+      };
+      
+      // Staff On Duty Analysis
+      const staffCount = homebaseData.currentlyWorking.length;
+      const scheduledCount = homebaseData.shifts.length;
+      const staffOnDuty = {
+        value: `${staffCount}/${scheduledCount}`,
+        status: staffCount < scheduledCount * 0.8 ? 'warning' : 
+                staffCount > scheduledCount * 1.2 ? 'error' : 'good',
+        detail: getStaffBreakdown(homebaseData.currentlyWorking)
+      };
+      
+      // Revenue Today Analysis
+      const revenueToday = {
+        value: `$${toastData.todayRevenue.toFixed(0)}`,
+        status: 'good', // TODO: Compare with historical averages
+        detail: `${toastData.orders.length} orders today`
+      };
+      
+      // Labor Efficiency Analysis (Revenue per labor hour)
+      const totalLaborHours = calculateTotalLaborHours(homebaseData.timecards);
+      const revenuePerHour = totalLaborHours > 0 ? toastData.todayRevenue / totalLaborHours : 0;
+      const laborEfficiency = {
+        value: `$${revenuePerHour.toFixed(0)}/hr`,
+        status: revenuePerHour > 50 ? 'good' : 
+                revenuePerHour > 30 ? 'normal' : 'warning',
+        detail: `${totalLaborHours.toFixed(1)} labor hrs today`
+      };
+      
+      return {
+        ordersQueue,
+        staffOnDuty,
+        revenueToday,
+        laborEfficiency
+      };
+    }
+
+    // Helper Functions
+    function calculateAveragePreparationTime(orders) {
+      const completedOrders = orders.filter(order => 
+        order.openedDate && order.closedDate
+      );
+      
+      if (completedOrders.length === 0) return 15; // Default fallback
+      
+      const totalPrepTime = completedOrders.reduce((sum, order) => {
+        const opened = new Date(order.openedDate);
+        const closed = new Date(order.closedDate);
+        return sum + (closed - opened);
+      }, 0);
+      
+      return (totalPrepTime / completedOrders.length) / (1000 * 60); // Convert to minutes
+    }
+
+    function getStaffBreakdown(currentlyWorking) {
+      // TODO: Categorize by role if available in Homebase data
+      return `${currentlyWorking.length} staff active`;
+    }
+
+    function calculateTotalLaborHours(timecards) {
+      return timecards.reduce((total, timecard) => {
+        if (timecard.clock_in) {
+          const clockIn = new Date(timecard.clock_in);
+          const clockOut = timecard.clock_out ? new Date(timecard.clock_out) : new Date();
+          const hours = (clockOut - clockIn) / (1000 * 60 * 60);
+          return total + Math.max(0, hours);
+        }
+        return total;
+      }, 0);
+    }
+
+    function calculateLaborCosts(timecards, employees) {
+      // TODO: Calculate actual labor costs if hourly rates are available
+      return timecards.length * 15; // Placeholder: $15/hour average
     }
 
     async function loadStatsCards() {
