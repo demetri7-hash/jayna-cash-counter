@@ -589,8 +589,53 @@
         </div>
         
         <div class="form-group">
-          <label for="toastSales">Toast Cash Sales (exact amount):</label>
-          <input type="number" id="toastSales" class="currency-input" placeholder="0.00" step="0.01" min="0" inputmode="decimal" onfocus="this.select()">
+          <label for="toastSales">Toast Cash Sales:</label>
+          
+          <!-- Auto-fetch section -->
+          <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-weight: 600; color: #495057;">🤖 Auto-Calculate from Toast API</span>
+              <button type="button" id="fetchToastSalesBtn" onclick="fetchToastCashSales()" 
+                      style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                Fetch Today's Cash Sales
+              </button>
+            </div>
+            
+            <div id="toastApiResult" style="display: none;">
+              <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                <div style="font-weight: 600; color: #155724; margin-bottom: 5px;">✅ Auto-calculated Toast Cash Sales:</div>
+                <div style="font-size: 20px; font-weight: bold; color: #155724;" id="autoToastAmount">$0.00</div>
+                <div style="font-size: 12px; color: #155724; margin-top: 5px;" id="autoToastDetails">0 cash payments processed</div>
+              </div>
+            </div>
+            
+            <div id="toastApiError" style="display: none;">
+              <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px; color: #721c24;">
+                <div style="font-weight: 600; margin-bottom: 5px;">❌ Auto-fetch failed</div>
+                <div style="font-size: 12px;" id="toastErrorMessage">Please use manual entry below</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Manual override section -->
+          <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px;">
+            <div style="font-weight: 600; color: #856404; margin-bottom: 10px;">📋 Verification & Override</div>
+            <div style="font-size: 13px; color: #856404; margin-bottom: 10px; line-height: 1.4;">
+              <strong>Instructions:</strong> Compare the auto-calculated amount above with your printed Z-Report. 
+              If they don't match, enter the correct amount from your Z-Report below. Otherwise, leave blank to use the auto-calculated amount.
+            </div>
+            
+            <label for="toastSalesOverride" style="font-size: 14px; font-weight: 600; color: #856404;">
+              Manual Override (only if auto-calculation is wrong):
+            </label>
+            <input type="number" id="toastSalesOverride" class="currency-input" 
+                   placeholder="Leave blank to use auto-calculated amount" 
+                   step="0.01" min="0" inputmode="decimal" onfocus="this.select()"
+                   style="border: 2px solid #ffeaa7;">
+          </div>
+          
+          <!-- Hidden field for backward compatibility -->
+          <input type="hidden" id="toastSales" value="0">
         </div>
         
         <div class="form-group">
@@ -1544,6 +1589,98 @@
       container.style.maxWidth = '600px';
     }
   }
+
+  // Toast API Integration
+  let autoCalculatedToastAmount = 0;
+  
+  async function fetchToastCashSales() {
+    const fetchBtn = document.getElementById('fetchToastSalesBtn');
+    const resultDiv = document.getElementById('toastApiResult');
+    const errorDiv = document.getElementById('toastApiError');
+    
+    // Reset displays
+    resultDiv.style.display = 'none';
+    errorDiv.style.display = 'none';
+    
+    // Update button state
+    fetchBtn.disabled = true;
+    fetchBtn.textContent = 'Fetching...';
+    fetchBtn.style.background = '#6c757d';
+    
+    try {
+      // Get today's date in the format the business expects
+      const today = new Date();
+      const businessDate = formatDateForToast(today);
+      
+      console.log('Fetching Toast cash sales for:', businessDate);
+      
+      // First authenticate with Toast
+      const authResponse = await fetch('/api/toast-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!authResponse.ok) {
+        throw new Error('Failed to authenticate with Toast API');
+      }
+      
+      const authData = await authResponse.json();
+      if (!authData.success || !authData.data?.accessToken) {
+        throw new Error('Toast authentication failed');
+      }
+      
+      // Fetch cash sales using payments API
+      const paymentsUrl = `/api/toast-payments?businessDate=${businessDate}&token=${encodeURIComponent(authData.data.accessToken)}`;
+      const paymentsResponse = await fetch(paymentsUrl);
+      
+      if (!paymentsResponse.ok) {
+        throw new Error('Failed to fetch Toast payments data');
+      }
+      
+      const paymentsData = await paymentsResponse.json();
+      if (!paymentsData.success) {
+        throw new Error(paymentsData.error || 'Toast payments API returned an error');
+      }
+      
+      // Store the auto-calculated amount
+      autoCalculatedToastAmount = paymentsData.totalCashAmount;
+      
+      // Update the hidden field for backward compatibility
+      document.getElementById('toastSales').value = autoCalculatedToastAmount.toFixed(2);
+      
+      // Show success result
+      document.getElementById('autoToastAmount').textContent = `$${autoCalculatedToastAmount.toFixed(2)}`;
+      document.getElementById('autoToastDetails').textContent = 
+        `${paymentsData.totalCashPayments} cash payments from ${paymentsData.totalPaymentGuids} total payments`;
+      resultDiv.style.display = 'block';
+      
+      console.log('Toast cash sales fetched successfully:', autoCalculatedToastAmount);
+      
+    } catch (error) {
+      console.error('Toast API fetch error:', error);
+      
+      // Show error
+      document.getElementById('toastErrorMessage').textContent = error.message;
+      errorDiv.style.display = 'block';
+      
+      // Reset auto amount
+      autoCalculatedToastAmount = 0;
+      document.getElementById('toastSales').value = '0';
+    }
+    
+    // Reset button state
+    fetchBtn.disabled = false;
+    fetchBtn.textContent = 'Fetch Today\'s Cash Sales';
+    fetchBtn.style.background = '#28a745';
+  }
+  
+  function formatDateForToast(date) {
+    // Convert to YYYYMMDD format for Toast API
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+  }
   
   function startAMCount() {
     document.getElementById('mainMenu').style.display = 'none';
@@ -2035,12 +2172,20 @@
     };
     
     if (shift === 'pm') {
-      const toastSales = parseFloat(document.getElementById('toastSales').value) || 0;
+      // Use override field if provided, otherwise use auto-calculated amount
+      const toastSalesOverride = parseFloat(document.getElementById('toastSalesOverride').value);
+      const toastSales = toastSalesOverride || autoCalculatedToastAmount || 
+                        parseFloat(document.getElementById('toastSales').value) || 0;
+      
       const cashTips = parseInt(document.getElementById('cashTips').value) || 0;
       
       data.toastSales = toastSales;
       data.cashTips = cashTips;
       data.amTotal = currentAMData ? currentAMData.total : 0;
+      
+      // Store which method was used for reporting
+      data.toastSalesMethod = toastSalesOverride ? 'manual_override' : 
+                             (autoCalculatedToastAmount > 0 ? 'auto_calculated' : 'manual_entry');
     }
     
     return data;
