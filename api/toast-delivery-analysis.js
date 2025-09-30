@@ -126,7 +126,20 @@ export default async function handler(req, res) {
     };
 
     if (Array.isArray(allOrders)) {
+      // TDS Driver server GUID for filtering specific employee orders
+      const TDS_DRIVER_GUID = '7863337c-16f2-4d9e-a855-e83953bbb016';
+      
       allOrders.forEach((order, index) => {
+        // CRITICAL FILTER: Only process orders from TDS Driver
+        if (order.server?.guid !== TDS_DRIVER_GUID) {
+          deliveryAnalysis.rejectedOrders.push({
+            index,
+            reason: `Not TDS Driver order - server GUID: ${order.server?.guid || 'null'}`,
+            orderGuid: order.guid
+          });
+          return;
+        }
+        
         // Skip voided/deleted orders
         if (order.voided || order.deleted) {
           deliveryAnalysis.rejectedOrders.push({
