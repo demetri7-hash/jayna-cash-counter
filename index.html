@@ -419,9 +419,9 @@
       <div id="mainMenu" class="main-menu">
         <button class="menu-btn" onclick="startAMCount()">AM Count</button>
         <button class="menu-btn" onclick="startPMCount()">PM Close</button>
-        <button class="menu-btn report" onclick="showReports()">Generate Report</button>
-        <button class="menu-btn" onclick="showTipPool()" style="background: #28a745;">Tip Pool Calculator</button>
-        <button class="menu-btn" onclick="showCashbox()" style="background: #6f42c1;">💰 Weekly Cashbox Count</button>
+        <button class="menu-btn report" onclick="requirePasswordFor('Generate Reports', showReports)">Generate Report</button>
+        <button class="menu-btn" onclick="requirePasswordFor('Tip Pool Calculator', showTipPool)" style="background: #28a745;">Tip Pool Calculator</button>
+        <button class="menu-btn" onclick="requirePasswordFor('Weekly Cashbox Count', showCashbox)" style="background: #6f42c1;">💰 Weekly Cashbox Count</button>
       </div>
       
       <!-- AM Count Form -->
@@ -1294,7 +1294,117 @@
     modal.remove();
     window.passwordModalCallback(false);
   }
-  
+
+  // General password protection function for manager features
+  function requirePasswordFor(featureName, callback) {
+    showManagerPasswordModal(featureName, callback);
+  }
+
+  function showManagerPasswordModal(featureName, callback) {
+    // Create modal HTML for manager features
+    const modalHTML = `
+      <div id="passwordModal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      ">
+        <div style="
+          background: white;
+          padding: 30px;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+        ">
+          <h3 style="margin: 0 0 20px 0; color: #d32f2f;">🔒 Manager Access Required</h3>
+          <p style="margin: 0 0 15px 0; line-height: 1.4;">
+            <strong>${featureName}</strong> requires manager authorization.
+          </p>
+          <p style="margin: 0 0 20px 0; color: #666;">
+            This feature contains sensitive financial data and management tools.
+          </p>
+          <p style="margin: 0 0 15px 0;">Enter manager password:</p>
+          <input type="password" id="passwordInput" style="
+            width: 80%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 20px;
+          " placeholder="Manager Password">
+          <div>
+            <button onclick="submitManagerPassword()" style="
+              background: #4CAF50;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 6px;
+              margin: 0 10px;
+              cursor: pointer;
+              font-size: 16px;
+            ">Access ${featureName}</button>
+            <button onclick="cancelManagerPassword()" style="
+              background: #f44336;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 6px;
+              margin: 0 10px;
+              cursor: pointer;
+              font-size: 16px;
+            ">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Focus password input
+    document.getElementById('passwordInput').focus();
+    
+    // Store callback for button handlers
+    window.managerPasswordCallback = callback;
+    
+    // Add enter key support
+    document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        submitManagerPassword();
+      }
+    });
+  }
+
+  function submitManagerPassword() {
+    const password = document.getElementById('passwordInput').value;
+    const modal = document.getElementById('passwordModal');
+    
+    if (password === ADMIN_PASSWORD) {
+      // Success - execute the protected function
+      modal.remove();
+      window.managerPasswordCallback();
+    } else {
+      showMessage('Incorrect manager password. Access denied.', 'error');
+      modal.remove();
+    }
+  }
+
+  function cancelManagerPassword() {
+    const modal = document.getElementById('passwordModal');
+    modal.remove();
+    // Don't call callback on cancel
+  }
+
   function hideAllSections() {
     console.log('hideAllSections() called - this might be hiding tip pool results!');
     console.trace('hideAllSections call stack');
