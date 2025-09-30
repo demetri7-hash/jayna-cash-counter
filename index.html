@@ -410,6 +410,20 @@
     <div class="header">
       <h1>JAYNA GYRO CASH COUNTER</h1>
       <p>App created by Demetri Gregorakis</p>
+      <div style="font-size: 12px; color: #666; margin-top: 5px;">
+        <span id="sessionStatus"></span>
+        <button id="logoutBtn" onclick="logoutManager()" style="
+          background: #f44336; 
+          color: white; 
+          border: none; 
+          padding: 2px 8px; 
+          border-radius: 3px; 
+          font-size: 10px; 
+          margin-left: 10px;
+          cursor: pointer;
+          display: none;
+        ">Logout Manager</button>
+      </div>
     </div>
     
     <div class="content">
@@ -1020,6 +1034,33 @@
   // Password protection for date changes (only Demetri knows this)
   const ADMIN_PASSWORD = 'JaynaGyro2025!';
   
+  // Session management for manager access
+  function setManagerSession() {
+    const now = new Date().getTime();
+    const expiryTime = now + (60 * 60 * 1000); // 1 hour from now
+    localStorage.setItem('managerSession', expiryTime.toString());
+  }
+  
+  function isManagerSessionValid() {
+    const sessionExpiry = localStorage.getItem('managerSession');
+    if (!sessionExpiry) return false;
+    
+    const now = new Date().getTime();
+    const expiryTime = parseInt(sessionExpiry);
+    
+    if (now > expiryTime) {
+      // Session expired, clean up
+      localStorage.removeItem('managerSession');
+      return false;
+    }
+    
+    return true;
+  }
+  
+  function clearManagerSession() {
+    localStorage.removeItem('managerSession');
+  }
+  
   let supabase = null;
   let currentAMData = null;
   
@@ -1297,6 +1338,14 @@
 
   // General password protection function for manager features
   function requirePasswordFor(featureName, callback) {
+    // Check if we have a valid session first
+    if (isManagerSessionValid()) {
+      // Session is valid, proceed directly
+      callback();
+      return;
+    }
+    
+    // No valid session, show password modal
     showManagerPasswordModal(featureName, callback);
   }
 
@@ -1390,8 +1439,10 @@
     const modal = document.getElementById('passwordModal');
     
     if (password === ADMIN_PASSWORD) {
-      // Success - execute the protected function
+      // Success - set manager session and execute the protected function
+      setManagerSession();
       modal.remove();
+      showMessage('Manager access granted for 1 hour', 'success');
       window.managerPasswordCallback();
     } else {
       showMessage('Incorrect manager password. Access denied.', 'error');
@@ -1404,6 +1455,74 @@
     modal.remove();
     // Don't call callback on cancel
   }
+  
+  function logoutManager() {
+    clearManagerSession();
+    updateSessionStatus();
+    showMessage('Manager session ended', 'success');
+  }
+  
+  function updateSessionStatus() {
+    const statusElement = document.getElementById('sessionStatus');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (!statusElement || !logoutBtn) return; // Elements not ready yet
+    
+    if (isManagerSessionValid()) {
+      const sessionExpiry = localStorage.getItem('managerSession');
+      const expiryTime = parseInt(sessionExpiry);
+      const now = new Date().getTime();
+      const remainingMinutes = Math.ceil((expiryTime - now) / (60 * 1000));
+      
+      statusElement.textContent = `Manager access: ${remainingMinutes} min remaining`;
+      statusElement.style.color = '#28a745';
+      logoutBtn.style.display = 'inline-block';
+    } else {
+      statusElement.textContent = 'Staff access mode';
+      statusElement.style.color = '#666';
+      logoutBtn.style.display = 'none';
+    }
+  }
+  
+  // Update session status every minute
+  setInterval(updateSessionStatus, 60000);
+  
+  // Initialize session status when page loads
+  window.addEventListener('load', function() {
+    setTimeout(updateSessionStatus, 100); // Small delay to ensure DOM is ready
+  });
+  
+  function logoutManager() {
+    clearManagerSession();
+    updateSessionStatus();
+    showMessage('Manager session ended', 'success');
+  }
+  
+  function updateSessionStatus() {
+    const statusElement = document.getElementById('sessionStatus');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (isManagerSessionValid()) {
+      const sessionExpiry = localStorage.getItem('managerSession');
+      const expiryTime = parseInt(sessionExpiry);
+      const now = new Date().getTime();
+      const remainingMinutes = Math.ceil((expiryTime - now) / (60 * 1000));
+      
+      statusElement.textContent = `Manager access: ${remainingMinutes} min remaining`;
+      statusElement.style.color = '#28a745';
+      logoutBtn.style.display = 'inline-block';
+    } else {
+      statusElement.textContent = 'Staff access mode';
+      statusElement.style.color = '#666';
+      logoutBtn.style.display = 'none';
+    }
+  }
+  
+  // Update session status every minute
+  setInterval(updateSessionStatus, 60000);
+  
+  // Update session status on page load
+  document.addEventListener('DOMContentLoaded', updateSessionStatus);
 
   function hideAllSections() {
     console.log('hideAllSections() called - this might be hiding tip pool results!');
