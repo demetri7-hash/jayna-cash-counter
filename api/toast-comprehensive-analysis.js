@@ -56,13 +56,14 @@ export default async function handler(req, res) {
       const pageSize = 100;
       
       while (hasMorePages) {
-        const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?restaurantGuid=${TOAST_CONFIG.restaurantGuid}&businessDate=${businessDate}&page=${page}&pageSize=${pageSize}`;
+        const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&page=${page}&pageSize=${pageSize}`;
         
         const ordersResponse = await fetch(ordersUrl, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
-            'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid
+            'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+            'Content-Type': 'application/json'
           }
         });
 
@@ -100,17 +101,8 @@ export default async function handler(req, res) {
       totalOrders: allOrders.length,
       dateRange: { startDate, endDate },
       
-      // Complete field analysis
-      fieldAnalysis: {
-        serverGuids: {},
-        diningOptions: {},
-        sources: {},
-        revenueCenters: {},
-        serviceAreas: {},
-        channels: {},
-        devices: {},
-        pricingFeatures: {}
-      },
+      // Complete field analysis (will be populated dynamically)
+      fieldAnalysis: {},
       
       // Tip analysis by various criteria
       tipAnalysisByField: {
@@ -175,10 +167,10 @@ export default async function handler(req, res) {
           entityType: order.diningOption?.entityType || null
         },
         
-        // Location info
-        revenueCenter: order.revenueCenter || null,
-        serviceArea: order.serviceArea || null,
-        table: order.table || null,
+        // Location info (these are objects with guid property according to API docs)
+        revenueCenter: order.revenueCenter?.guid || null,
+        serviceArea: order.serviceArea?.guid || null,
+        table: order.table?.guid || null,
         channelGuid: order.channelGuid || null,
         
         // Delivery info
@@ -243,46 +235,42 @@ export default async function handler(req, res) {
       orderData.tips.total = orderData.tips.paymentTips + orderData.tips.serviceChargeTips;
       analysis.totalTips += orderData.tips.total;
 
-      // Track field occurrences
-      const fields = {
-        serverGuid: orderData.server.guid,
-        diningOption: orderData.diningOption.guid,
-        source: orderData.source,
-        revenueCenter: orderData.revenueCenter?.guid,
-        serviceArea: orderData.serviceArea?.guid,
-        channel: orderData.channelGuid,
-        hour: orderData.hour,
-        paymentTypes: orderData.tips.paymentDetails.map(p => p.type)
-      };
-
-      Object.entries(fields).forEach(([fieldName, value]) => {
-        if (value !== null && value !== undefined) {
-          if (Array.isArray(value)) {
-            value.forEach(v => {
-              if (!analysis.fieldAnalysis[fieldName + 's']) analysis.fieldAnalysis[fieldName + 's'] = {};
-              if (!analysis.fieldAnalysis[fieldName + 's'][v]) analysis.fieldAnalysis[fieldName + 's'][v] = 0;
-              analysis.fieldAnalysis[fieldName + 's'][v]++;
-              
-              if (!analysis.tipAnalysisByField['by' + fieldName.charAt(0).toUpperCase() + fieldName.slice(1)][v]) {
-                analysis.tipAnalysisByField['by' + fieldName.charAt(0).toUpperCase() + fieldName.slice(1)][v] = { orders: 0, tips: 0 };
-              }
-              analysis.tipAnalysisByField['by' + fieldName.charAt(0).toUpperCase() + fieldName.slice(1)][v].orders++;
-              analysis.tipAnalysisByField['by' + fieldName.charAt(0).toUpperCase() + fieldName.slice(1)][v].tips += orderData.tips.total;
-            });
-          } else {
-            if (!analysis.fieldAnalysis[fieldName + 's']) analysis.fieldAnalysis[fieldName + 's'] = {};
-            if (!analysis.fieldAnalysis[fieldName + 's'][value]) analysis.fieldAnalysis[fieldName + 's'][value] = 0;
-            analysis.fieldAnalysis[fieldName + 's'][value]++;
-            
-            const tipField = 'by' + fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
-            if (!analysis.tipAnalysisByField[tipField]) analysis.tipAnalysisByField[tipField] = {};
-            if (!analysis.tipAnalysisByField[tipField][value]) {
-              analysis.tipAnalysisByField[tipField][value] = { orders: 0, tips: 0 };
-            }
-            analysis.tipAnalysisByField[tipField][value].orders++;
-            analysis.tipAnalysisByField[tipField][value].tips += orderData.tips.total;
+      // Track field occurrences with safe field analysis
+      const trackField = (fieldType, fieldValue, tipAmount) => {
+        if (fieldValue !== null && fieldValue !== undefined) {
+          // Initialize field analysis if needed
+          if (!analysis.fieldAnalysis[fieldType]) {
+            analysis.fieldAnalysis[fieldType] = {};
           }
+          if (!analysis.fieldAnalysis[fieldType][fieldValue]) {
+            analysis.fieldAnalysis[fieldType][fieldValue] = 0;
+          }
+          analysis.fieldAnalysis[fieldType][fieldValue]++;
+          
+          // Initialize tip analysis if needed
+          if (!analysis.tipAnalysisByField[fieldType]) {
+            analysis.tipAnalysisByField[fieldType] = {};
+          }
+          if (!analysis.tipAnalysisByField[fieldType][fieldValue]) {
+            analysis.tipAnalysisByField[fieldType][fieldValue] = { orders: 0, tips: 0 };
+          }
+          analysis.tipAnalysisByField[fieldType][fieldValue].orders++;
+          analysis.tipAnalysisByField[fieldType][fieldValue].tips += tipAmount;
         }
+      };
+      
+      // Track all relevant fields
+      trackField('byServerGuid', orderData.server.guid, orderData.tips.total);
+      trackField('byDiningOption', orderData.diningOption.guid, orderData.tips.total);
+      trackField('bySource', orderData.source, orderData.tips.total);
+      trackField('byRevenueCenter', orderData.revenueCenter?.guid, orderData.tips.total);
+      trackField('byServiceArea', orderData.serviceArea?.guid, orderData.tips.total);
+      trackField('byChannel', orderData.channelGuid, orderData.tips.total);
+      trackField('byHour', orderData.hour, orderData.tips.total);
+      
+      // Track payment types (array handling)
+      orderData.tips.paymentDetails.forEach(payment => {
+        trackField('byPaymentType', payment.type, orderData.tips.total);
       });
 
       // Categorize orders
