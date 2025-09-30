@@ -801,7 +801,7 @@
           <label for="calculatedCashTips">Cash Tips (Auto-Calculated):</label>
           <input type="number" id="calculatedCashTips" class="form-input" step="0.01" readonly style="background: #f8f9fa; color: #666;">
           <div style="font-size: 12px; color: #007bff; margin-top: 5px;">
-            <strong>Formula:</strong> Real Envelope Deposit - Toast Cash Sales
+            <strong>Formula:</strong> Real Envelope Deposit - Toast Cash Sales (from saved PM data)
           </div>
         </div>
         
@@ -1161,11 +1161,15 @@
           if (success) {
             // Only load AM data if date change was authorized
             loadAMData();
+            // Also reload Toast cash sales for the new date
+            fetchToastCashSalesForDate(this.value);
           }
         });
       } else if (result) {
         // Synchronous case (current date selected)
         loadAMData();
+        // Also reload Toast cash sales for the new date
+        fetchToastCashSalesForDate(this.value);
       }
     });
     
@@ -1591,14 +1595,28 @@
   let autoCalculatedToastAmount = 0;
   
   async function fetchToastCashSales() {
+    // Use today's date by default
+    const today = new Date();
+    const businessDate = formatDateForToast(today);
+    await fetchToastCashSalesForDate(businessDate);
+  }
+
+  async function fetchToastCashSalesForDate(dateInput) {
     // Show loading state
     document.getElementById('autoToastAmount').textContent = 'Loading...';
     document.getElementById('autoToastDetails').textContent = 'Fetching live data from Toast API...';
     
     try {
-      // Get today's date in the format the business expects
-      const today = new Date();
-      const businessDate = formatDateForToast(today);
+      // Handle both date string (YYYY-MM-DD) and formatted date (YYYYMMDD)
+      let businessDate;
+      if (dateInput.includes('-')) {
+        // Convert YYYY-MM-DD to YYYYMMDD
+        const dateObj = new Date(dateInput + 'T12:00:00'); // Add time to avoid timezone issues
+        businessDate = formatDateForToast(dateObj);
+      } else {
+        // Already in YYYYMMDD format
+        businessDate = dateInput;
+      }
       
       console.log('Auto-fetching Toast cash sales for:', businessDate);
       
