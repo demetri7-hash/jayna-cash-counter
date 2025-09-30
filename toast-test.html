@@ -133,13 +133,11 @@
     </div>
 
     <script>
-        // Toast API Configuration from the guide
-        const TOAST_CONFIG = {
-            baseUrl: 'https://ws-api.toasttab.com',
-            clientId: '3g0R0NFYjHIQcVe9bYP8eTbJjwRTvCNV',
-            clientSecret: 'dClMNN5GmpgCZYU8BtTK9NGCVT4eAmZtE0E4EkJO4CFpPJx2rXP26PTptwSe--Sa',
-            restaurantGuid: 'd3efae34-7c2e-4107-a442-49081e624706',
-            userAccessType: 'TOAST_MACHINE_CLIENT'
+        // Toast API Configuration - now using our proxy endpoints
+        const API_CONFIG = {
+            authEndpoint: '/api/toast-auth',
+            ordersEndpoint: '/api/toast-orders', 
+            restaurantEndpoint: '/api/toast-restaurant'
         };
 
         let authToken = null;
@@ -163,37 +161,33 @@
             }
         }
 
-        // Step 1: Test Authentication with Toast API
+        // Step 1: Test Authentication with our proxy endpoint
         async function testAuthentication() {
             try {
-                displayResult('authResult', 'Testing Authentication', 'Attempting to authenticate with Toast API...');
+                displayResult('authResult', 'Testing Authentication', 'Attempting to authenticate with Toast API via proxy...');
                 
-                const response = await fetch(`${TOAST_CONFIG.baseUrl}/authentication/v1/authentication/login`, {
+                const response = await fetch(API_CONFIG.authEndpoint, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        clientId: TOAST_CONFIG.clientId,
-                        clientSecret: TOAST_CONFIG.clientSecret,
-                        userAccessType: TOAST_CONFIG.userAccessType
-                    })
+                    body: JSON.stringify({}) // No body needed, credentials are on server
                 });
 
                 const data = await response.json();
                 
-                if (response.ok && data.token?.accessToken) {
-                    authToken = data.token.accessToken;
+                if (response.ok && data.success && data.data?.accessToken) {
+                    authToken = data.data.accessToken;
                     displayResult('authResult', 'Authentication Successful', {
                         status: 'AUTHENTICATED',
-                        tokenType: data.token.tokenType,
-                        expiresIn: data.token.expiresIn,
-                        scopes: data.token.scope?.split(' ') || [],
-                        tokenPreview: authToken.substring(0, 50) + '...'
+                        tokenType: data.data.tokenType,
+                        expiresIn: data.data.expiresIn,
+                        scopes: data.data.scopes || [],
+                        tokenPreview: authToken.substring(0, 50) + '...',
+                        message: data.message
                     });
                 } else {
-                    throw new Error(`Authentication failed: ${data.message || 'Unknown error'}`);
+                    throw new Error(`Authentication failed: ${data.error || 'Unknown error'}`);
                 }
             } catch (error) {
                 displayResult('authResult', 'Authentication Failed', error.message, true);
@@ -207,7 +201,7 @@
             displayResult('ordersResult', 'Reference Date Set', `Using ${date} for testing. Expected cash sales: $${expectedAmount} (from our manual records)`);
         }
 
-        // Step 3: Fetch orders for the selected date
+        // Step 3: Fetch orders for the selected date via proxy
         async function fetchOrdersForDate() {
             if (!authToken) {
                 displayResult('ordersResult', 'Authentication Required', 'Please authenticate first!', true);
@@ -220,36 +214,44 @@
                     throw new Error('Please select a date first');
                 }
 
-                displayResult('ordersResult', 'Fetching Orders', `Getting orders for ${selectedDate}...`);
+                displayResult('ordersResult', 'Fetching Orders', `Getting orders for ${selectedDate} via proxy...`);
 
-                // Toast API expects dates in specific format and timezone
-                const startDate = `${selectedDate}T00:00:00.000`;
-                const endDate = `${selectedDate}T23:59:59.999`;
-
-                const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/orders?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
-
-                const response = await fetch(ordersUrl, {
-                    method: 'GET',
+                const response = await fetch(API_CONFIG.ordersEndpoint, {
+                    method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({
+                        accessToken: authToken,
+                        date: selectedDate
+                    })
                 });
-
-                if (!response.ok) {
-                    throw new Error(`Orders API failed: ${response.status} ${response.statusText}`);
-                }
 
                 const data = await response.json();
-                allOrders = data || [];
 
-                displayResult('ordersResult', 'Orders Retrieved', {
-                    date: selectedDate,
-                    totalOrders: allOrders.length,
-                    firstOrderSample: allOrders[0] || 'No orders found',
-                    orderStructure: allOrders[0] ? Object.keys(allOrders[0]) : []
-                });
+                if (response.ok && data.success) {
+                    allOrders = data.data.rawOrders || [];
+                    const cashAnalysis = data.data.cashAnalysis;
+
+                    // Display cash total immediately
+                    if (cashAnalysis) {
+                        document.getElementById('cashTotal').style.display = 'block';
+                        document.getElementById('cashAmount').textContent = cashAnalysis.totalCashSalesDollars;
+                    }
+
+                    displayResult('ordersResult', 'Orders Retrieved & Cash Calculated', {
+                        date: selectedDate,
+                        totalOrders: data.data.totalOrders,
+                        cashSalesTotal: `$${cashAnalysis?.totalCashSalesDollars || '0.00'}`,
+                        cashOrderCount: cashAnalysis?.cashOrderCount || 0,
+                        rejectedOrders: cashAnalysis?.rejectedOrdersCount || 0,
+                        message: data.message,
+                        firstOrderSample: allOrders[0] || 'No orders found'
+                    });
+
+                } else {
+                    throw new Error(`Orders fetch failed: ${data.error || 'Unknown error'}`);
+                }
 
             } catch (error) {
                 displayResult('ordersResult', 'Orders Fetch Failed', error.message, true);
@@ -378,7 +380,7 @@
             }
         }
 
-        // Step 5: Explore restaurant and menu data for context
+        // Step 5: Explore restaurant data via proxy
         async function exploreRestaurantData() {
             if (!authToken) {
                 displayResult('exploreResult', 'Authentication Required', 'Please authenticate first!', true);
@@ -386,27 +388,29 @@
             }
 
             try {
-                const response = await fetch(`${TOAST_CONFIG.baseUrl}/restaurants/v1/restaurants/${TOAST_CONFIG.restaurantGuid}`, {
-                    method: 'GET',
+                const response = await fetch(API_CONFIG.restaurantEndpoint, {
+                    method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({
+                        accessToken: authToken
+                    })
                 });
-
-                if (!response.ok) {
-                    throw new Error(`Restaurant API failed: ${response.status}`);
-                }
 
                 const data = await response.json();
-                displayResult('exploreResult', 'Restaurant Data Retrieved', {
-                    name: data.general?.name,
-                    location: data.location,
-                    timeZone: data.general?.timeZone,
-                    schedules: data.schedules ? 'Present' : 'Not found',
-                    operatingHours: data.schedules?.daySchedules || 'Not available'
-                });
+
+                if (response.ok && data.success) {
+                    displayResult('exploreResult', 'Restaurant Data Retrieved', {
+                        name: data.data.name,
+                        location: data.data.location,
+                        timeZone: data.data.timeZone,
+                        schedules: data.data.schedules,
+                        message: data.message
+                    });
+                } else {
+                    throw new Error(`Restaurant data failed: ${data.error || 'Unknown error'}`);
+                }
 
             } catch (error) {
                 displayResult('exploreResult', 'Restaurant Data Failed', error.message, true);
@@ -448,11 +452,7 @@
         // Initialize the page
         window.addEventListener('load', function() {
             console.log('Toast API Cash Sales Calculator loaded');
-            console.log('Configuration:', {
-                restaurantGuid: TOAST_CONFIG.restaurantGuid,
-                baseUrl: TOAST_CONFIG.baseUrl,
-                clientId: TOAST_CONFIG.clientId
-            });
+            console.log('Using proxy endpoints:', API_CONFIG);
         });
     </script>
 </body>
