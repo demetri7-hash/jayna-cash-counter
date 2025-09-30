@@ -342,6 +342,118 @@
     .trend-down { color: #ef4444; }
     .trend-stable { color: #6b7280; }
     
+    /* RecentOrders Styles */
+    .order-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background-color 0.2s ease;
+    }
+    
+    .order-row:hover {
+      background-color: #fafafa;
+    }
+    
+    .order-row:last-child {
+      border-bottom: none;
+    }
+    
+    .order-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .order-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+    
+    .order-number {
+      font-weight: 700;
+      color: #333;
+      font-size: 14px;
+    }
+    
+    .order-customer {
+      font-weight: 600;
+      color: #555;
+      font-size: 13px;
+    }
+    
+    .order-time {
+      font-size: 11px;
+      color: #888;
+      margin-left: auto;
+    }
+    
+    .order-items {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+    
+    .order-details {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #777;
+    }
+    
+    .order-payment {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+    
+    .order-notes {
+      font-style: italic;
+      color: #f59e0b;
+    }
+    
+    .order-summary {
+      text-align: right;
+      min-width: 80px;
+    }
+    
+    .order-total {
+      font-weight: 700;
+      color: #333;
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+    
+    .order-status {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .order-status.open { color: #3b82f6; background: #eff6ff; }
+    .order-status.processing { color: #f59e0b; background: #fffbeb; }
+    .order-status.ready { color: #22c55e; background: #f0fdf4; }
+    .order-status.completed { color: #6b7280; background: #f9fafb; }
+    .order-status.voided { color: #ef4444; background: #fef2f2; }
+    .order-status.cancelled { color: #ef4444; background: #fef2f2; }
+    .order-status.unknown { color: #6b7280; background: #f3f4f6; }
+    
+    .no-orders {
+      text-align: center;
+      padding: 40px 20px;
+      color: #9ca3af;
+      font-style: italic;
+    }
+
     /* Loading Styles */
     .loading {
       text-align: center;
@@ -1583,53 +1695,226 @@
       });
     }
 
+    // RecentOrders Implementation - Real Toast Live Order Feed
     async function loadRecentOrders() {
-      console.log('📋 Loading Recent Orders...');
+      console.log('📋 Loading Recent Orders with real Toast live feed...');
       
       try {
-        // TODO: Implement recent orders with real Toast orders data
-        const ordersHTML = `
-          <div>
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-              <div>
-                <div style="font-weight: 600; color: #333;">#1247 - John D.</div>
-                <div style="font-size: 12px; color: #666;">Gyro Platter, Greek Fries</div>
+        // Get real-time orders data
+        const ordersData = await getToastRecentOrders();
+        
+        // Render live orders feed
+        const ordersHTML = ordersData.map(order => `
+          <div class="order-row" data-order-id="${order.id}">
+            <div class="order-info">
+              <div class="order-header">
+                <span class="order-number">${order.orderNumber}</span>
+                <span class="order-customer">${order.customer}</span>
+                <span class="order-time">${order.time}</span>
               </div>
-              <div style="text-align: right;">
-                <div style="font-weight: 600;">$23.50</div>
-                <div style="font-size: 11px; color: #22c55e; background: #f0fdf4; padding: 2px 6px; border-radius: 4px;">Ready</div>
-              </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
-              <div>
-                <div style="font-weight: 600; color: #333;">#1248 - Sarah M.</div>
-                <div style="font-size: 12px; color: #666;">Chicken Shawarma, Hummus</div>
-              </div>
-              <div style="text-align: right;">
-                <div style="font-weight: 600;">$18.75</div>
-                <div style="font-size: 11px; color: #f59e0b; background: #fffbeb; padding: 2px 6px; border-radius: 4px;">Preparing</div>
+              <div class="order-items">${order.items.join(', ')}</div>
+              <div class="order-details">
+                <span class="order-payment">${order.paymentMethod}</span>
+                ${order.specialInstructions ? `<span class="order-notes">• ${order.specialInstructions}</span>` : ''}
               </div>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0;">
-              <div>
-                <div style="font-weight: 600; color: #333;">#1249 - Mike R.</div>
-                <div style="font-size: 12px; color: #666;">Falafel Bowl, Pita Bread</div>
-              </div>
-              <div style="text-align: right;">
-                <div style="font-weight: 600;">$15.25</div>
-                <div style="font-size: 11px; color: #3b82f6; background: #eff6ff; padding: 2px 6px; border-radius: 4px;">Ordered</div>
-              </div>
+            <div class="order-summary">
+              <div class="order-total">$${order.total.toFixed(2)}</div>
+              <div class="order-status ${order.status.toLowerCase()}">${order.statusText}</div>
             </div>
           </div>
-        `;
+        `).join('');
         
-        document.getElementById('recent-orders-list').innerHTML = ordersHTML;
-        console.log('✅ Recent Orders loaded');
+        document.getElementById('recent-orders-list').innerHTML = ordersHTML || '<div class="no-orders">No recent orders found</div>';
+        console.log('✅ Recent Orders loaded with live feed:', ordersData.length, 'orders');
         
       } catch (error) {
         console.error('❌ Error loading Recent Orders:', error);
-        document.getElementById('recent-orders-list').innerHTML = '<div class="error">Failed to load recent orders</div>';
+        document.getElementById('recent-orders-list').innerHTML = '<div class="error">Failed to load recent orders: ' + error.message + '</div>';
       }
+    }
+
+    // Get real-time Toast orders data
+    async function getToastRecentOrders() {
+      try {
+        const today = new Date();
+        const startOfDay = new Date(today);
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const todayStr = today.toISOString().split('T')[0];
+        
+        // Get today's orders, most recent first
+        const orders = await callToastAPI(`/orders/v2/orders?startDate=${todayStr}&endDate=${todayStr}&pageSize=20`);
+        
+        // Sort by opened date (most recent first) and process
+        const sortedOrders = orders
+          .filter(order => order.openedDate && order.status)
+          .sort((a, b) => new Date(b.openedDate) - new Date(a.openedDate))
+          .slice(0, 10); // Top 10 most recent
+        
+        // Process each order for display
+        const processedOrders = sortedOrders.map(order => processOrderForDisplay(order));
+        
+        return processedOrders;
+        
+      } catch (error) {
+        console.error('❌ Toast recent orders error:', error);
+        throw new Error('Failed to fetch recent orders from Toast');
+      }
+    }
+
+    // Process individual order for display
+    function processOrderForDisplay(order) {
+      // Extract order basic info
+      const orderNumber = order.displayNumber || order.orderNumber || `#${order.id?.slice(-4) || 'N/A'}`;
+      
+      // Customer information
+      const customer = extractCustomerName(order);
+      
+      // Order timing
+      const openedDate = new Date(order.openedDate);
+      const time = openedDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      
+      // Order items
+      const items = extractOrderItems(order);
+      
+      // Order total
+      const total = (order.amount || 0) / 100; // Toast amounts in cents
+      
+      // Order status
+      const { status, statusText } = determineOrderStatus(order);
+      
+      // Payment method
+      const paymentMethod = extractPaymentMethod(order);
+      
+      // Special instructions
+      const specialInstructions = extractSpecialInstructions(order);
+      
+      return {
+        id: order.id,
+        orderNumber,
+        customer,
+        time,
+        items,
+        total,
+        status,
+        statusText,
+        paymentMethod,
+        specialInstructions,
+        rawOrder: order
+      };
+    }
+
+    // Extract customer name from order
+    function extractCustomerName(order) {
+      if (order.customer) {
+        const firstName = order.customer.firstName || '';
+        const lastName = order.customer.lastName || '';
+        
+        if (firstName && lastName) {
+          return `${firstName} ${lastName.charAt(0)}.`;
+        } else if (firstName) {
+          return firstName;
+        } else if (lastName) {
+          return lastName;
+        }
+      }
+      
+      // Fallback options
+      if (order.displayNumber) {
+        return `Order ${order.displayNumber}`;
+      }
+      
+      return 'Guest Customer';
+    }
+
+    // Extract order items list
+    function extractOrderItems(order) {
+      if (order.selections && Array.isArray(order.selections)) {
+        return order.selections
+          .map(selection => {
+            const itemName = selection.item?.name || 'Unknown Item';
+            const quantity = selection.quantity || 1;
+            return quantity > 1 ? `${itemName} (${quantity})` : itemName;
+          })
+          .slice(0, 3); // Show max 3 items
+      }
+      
+      return ['Order details unavailable'];
+    }
+
+    // Determine order status and display text
+    function determineOrderStatus(order) {
+      const status = order.status?.toUpperCase() || 'UNKNOWN';
+      
+      const statusMap = {
+        'OPEN': { status: 'open', statusText: 'Ordered' },
+        'PROCESSING': { status: 'processing', statusText: 'Preparing' },
+        'IN_PROGRESS': { status: 'processing', statusText: 'Preparing' },
+        'READY': { status: 'ready', statusText: 'Ready' },
+        'FULFILLED': { status: 'completed', statusText: 'Fulfilled' },
+        'CLOSED': { status: 'completed', statusText: 'Completed' },
+        'VOIDED': { status: 'voided', statusText: 'Voided' },
+        'CANCELLED': { status: 'cancelled', statusText: 'Cancelled' },
+        'UNKNOWN': { status: 'unknown', statusText: 'Unknown' }
+      };
+      
+      return statusMap[status] || statusMap['UNKNOWN'];
+    }
+
+    // Extract payment method
+    function extractPaymentMethod(order) {
+      if (order.payments && Array.isArray(order.payments) && order.payments.length > 0) {
+        const payment = order.payments[0];
+        const type = payment.type || 'Unknown';
+        
+        // Map Toast payment types to display names
+        const paymentMap = {
+          'CREDIT': 'Card',
+          'CREDIT_CARD': 'Card',
+          'DEBIT_CARD': 'Debit',
+          'CASH': 'Cash',
+          'GIFT_CARD': 'Gift Card',
+          'OTHER': 'Other'
+        };
+        
+        return paymentMap[type.toUpperCase()] || 'Card';
+      }
+      
+      return 'Card'; // Default assumption
+    }
+
+    // Extract special instructions
+    function extractSpecialInstructions(order) {
+      // Check various fields for special instructions
+      if (order.specialInstructions) {
+        return order.specialInstructions;
+      }
+      
+      if (order.notes) {
+        return order.notes;
+      }
+      
+      // Check selections for modifiers with special instructions
+      if (order.selections && Array.isArray(order.selections)) {
+        for (const selection of order.selections) {
+          if (selection.modifiers && Array.isArray(selection.modifiers)) {
+            const specialMods = selection.modifiers
+              .filter(mod => mod.name && mod.name.toLowerCase().includes('special'))
+              .map(mod => mod.name);
+            
+            if (specialMods.length > 0) {
+              return specialMods.join(', ');
+            }
+          }
+        }
+      }
+      
+      return null;
     }
 
     // Chart period change
