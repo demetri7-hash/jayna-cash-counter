@@ -169,6 +169,19 @@
             animation: pulse 2s infinite;
         }
         
+        .close-match {
+            background: #ffc107;
+            color: black;
+        }
+        
+        .voided-tips, .refunded-tips {
+            background: #dc3545;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }
+        
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
@@ -373,9 +386,12 @@
                                 <div class="field-name">${match.fieldType}: ${match.fieldValue}</div>
                                 <div class="field-stats">
                                     <span class="orders-count">${match.orders} orders</span>
-                                    <span class="tips-amount">$${match.tips.toFixed(2)}</span>
-                                    <span class="match-indicator ${match.accuracy > 95 ? 'exact-match' : 'close-match'}">
-                                        ${match.accuracy.toFixed(1)}% match
+                                    <span class="tips-amount">Gross: $${match.grossTips.toFixed(2)}</span>
+                                    <span class="tips-amount">Net: $${match.netTips.toFixed(2)}</span>
+                                    ${match.voidedTips > 0 ? `<span class="voided-tips">Voided: $${match.voidedTips.toFixed(2)}</span>` : ''}
+                                    ${match.refundedTips > 0 ? `<span class="refunded-tips">Refunded: $${match.refundedTips.toFixed(2)}</span>` : ''}
+                                    <span class="match-indicator ${match.netAccuracy > 95 ? 'exact-match' : 'close-match'}">
+                                        ${match.isNetMatch ? 'NET' : 'GROSS'} ${Math.max(match.netAccuracy, match.grossAccuracy).toFixed(1)}% match
                                     </span>
                                 </div>
                             </div>
@@ -396,23 +412,26 @@
             fieldAnalysis.innerHTML = fieldTypes.map(fieldType => {
                 const fieldData = data.analysis.tipAnalysisByField[fieldType.key] || {};
                 const sortedEntries = Object.entries(fieldData)
-                    .sort((a, b) => b[1].tips - a[1].tips)
+                    .sort((a, b) => b[1].netTips - a[1].netTips)
                     .slice(0, 10);
                     
                 return `
                     <div class="result-card">
                         <h4>${fieldType.title}</h4>
                         ${sortedEntries.map(([fieldValue, stats]) => {
-                            const isClose = Math.abs(stats.tips - 481.83) <= 50;
-                            const matchClass = isClose ? (Math.abs(stats.tips - 481.83) <= 10 ? 'exact-match' : 'close-match') : '';
+                            const isClose = Math.abs(stats.netTips - 481.83) <= 50;
+                            const matchClass = isClose ? (Math.abs(stats.netTips - 481.83) <= 10 ? 'exact-match' : 'close-match') : '';
                             
                             return `
                                 <div class="field-item">
                                     <div class="field-name">${fieldValue || 'null'}</div>
                                     <div class="field-stats">
                                         <span class="orders-count">${stats.orders} orders</span>
-                                        <span class="tips-amount">$${stats.tips.toFixed(2)}</span>
-                                        ${isClose ? `<span class="match-indicator ${matchClass}">MATCH!</span>` : ''}
+                                        <span class="tips-amount">Gross: $${(stats.tips || 0).toFixed(2)}</span>
+                                        <span class="tips-amount">Net: $${(stats.netTips || 0).toFixed(2)}</span>
+                                        ${stats.voidedTips > 0 ? `<span class="voided-tips">-$${stats.voidedTips.toFixed(2)} voided</span>` : ''}
+                                        ${stats.refundedTips > 0 ? `<span class="refunded-tips">-$${stats.refundedTips.toFixed(2)} refunded</span>` : ''}
+                                        ${isClose ? `<span class="match-indicator ${matchClass}">NET MATCH!</span>` : ''}
                                     </div>
                                 </div>
                             `;
