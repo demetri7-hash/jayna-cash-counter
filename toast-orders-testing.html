@@ -433,10 +433,10 @@
                 return;
             }
             
-            displayResult('dateResult', `Testing ${selectedDate}...`, 'Fetching orders...', 'info');
+            displayResult('dateResult', `Testing ${selectedDate}...`, 'Fetching orders with comprehensive delivery analysis...', 'info');
             
             try {
-                const response = await fetch('/api/toast-orders', {
+                const response = await fetch('/api/toast-delivery-analysis', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -450,16 +450,17 @@
                 if (data.success) {
                     dailyResults[selectedDate] = data.data;
                     
-                    // Analyze delivery orders
-                    const deliveryAnalysis = analyzeDeliveryOrders(data.data.rawOrders || []);
-                    
                     displayResult('dateResult', `📊 ${selectedDate} Analysis`, {
-                        totalOrders: data.data.totalOrders,
-                        deliveryOrders: deliveryAnalysis.deliveryCount,
-                        deliveryTips: deliveryAnalysis.totalTips,
-                        deliveryPercentage: ((deliveryAnalysis.deliveryCount / data.data.totalOrders) * 100).toFixed(1) + '%',
-                        sampleDeliveryOrders: deliveryAnalysis.samples.slice(0, 3)
+                        totalOrders: data.data.deliveryAnalysis.totalOrders,
+                        deliveryOrders: data.data.deliveryAnalysis.deliveryOrders.length,
+                        deliveryTips: data.data.deliveryAnalysis.totalDeliveryTips,
+                        deliveryDetectionMethods: data.data.deliveryAnalysis.deliveryDetectionMethods,
+                        tipExtractionMethods: data.data.deliveryAnalysis.tipExtractionMethods,
+                        sampleDeliveryOrders: data.data.deliveryAnalysis.deliveryOrders.slice(0, 3)
                     }, 'success');
+                    
+                    // Update progress with this day's tips
+                    updateProgress(data.data.deliveryAnalysis.totalDeliveryTips);
                 } else {
                     throw new Error(data.error || 'Failed to fetch orders');
                 }
@@ -475,7 +476,7 @@
                 return;
             }
             
-            displayResult('dateResult', 'Testing All Days...', 'Processing week of 9/22-9/28...', 'info');
+            displayResult('dateResult', 'Testing All Days...', 'Processing week of 9/22-9/28 with comprehensive delivery analysis...', 'info');
             
             let results = {};
             let totalTips = 0;
@@ -483,7 +484,7 @@
             
             for (const date of TARGET_DATES) {
                 try {
-                    const response = await fetch('/api/toast-orders', {
+                    const response = await fetch('/api/toast-delivery-analysis', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -495,17 +496,18 @@
                     const data = await response.json();
                     
                     if (data.success) {
-                        const deliveryAnalysis = analyzeDeliveryOrders(data.data.rawOrders || []);
+                        const analysis = data.data.deliveryAnalysis;
                         
                         results[date] = {
-                            totalOrders: data.data.totalOrders,
-                            deliveryOrders: deliveryAnalysis.deliveryCount,
-                            deliveryTips: deliveryAnalysis.totalTips,
-                            deliveryOrdersList: deliveryAnalysis.orders
+                            totalOrders: analysis.totalOrders,
+                            deliveryOrders: analysis.deliveryOrders.length,
+                            deliveryTips: analysis.totalDeliveryTips,
+                            detectionMethods: analysis.deliveryDetectionMethods,
+                            tipMethods: analysis.tipExtractionMethods
                         };
                         
-                        totalTips += deliveryAnalysis.totalTips;
-                        totalDeliveryOrders += deliveryAnalysis.deliveryCount;
+                        totalTips += analysis.totalDeliveryTips;
+                        totalDeliveryOrders += analysis.deliveryOrders.length;
                         dailyResults[date] = data.data;
                     } else {
                         results[date] = { error: data.error };
@@ -522,10 +524,16 @@
                     totalDeliveryTips: totalTips.toFixed(2),
                     totalDeliveryOrders: totalDeliveryOrders,
                     targetAmount: TARGET_AMOUNT,
-                    targetMatch: ((totalTips / TARGET_AMOUNT) * 100).toFixed(1) + '%'
+                    targetMatch: ((totalTips / TARGET_AMOUNT) * 100).toFixed(1) + '%',
+                    gap: (TARGET_AMOUNT - totalTips).toFixed(2)
                 },
-                dailyBreakdown: results
-            }, totalTips > (TARGET_AMOUNT * 0.8) ? 'success' : 'info');
+                dailyBreakdown: results,
+                insights: [
+                    totalTips < TARGET_AMOUNT ? `Missing $${(TARGET_AMOUNT - totalTips).toFixed(2)} - may need broader detection` : 'Target achieved!',
+                    `Average per day: $${(totalTips / 7).toFixed(2)}`,
+                    `Delivery order coverage: ${totalDeliveryOrders} orders found`
+                ]
+            }, totalTips > (TARGET_AMOUNT * 0.8) ? 'success' : 'error');
         }
         
         // Step 3: Delivery Filtering

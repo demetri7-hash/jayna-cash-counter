@@ -1,0 +1,250 @@
+// Vercel API function specifically for delivery order analysis and tip extraction
+// Separate from toast-orders.js to avoid affecting existing functionality
+
+export default async function handler(req, res) {
+  // Enable CORS for your domain
+  res.setHeader('Access-Control-Allow-Origin', 'https://jayna-cash-counter.vercel.app');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { accessToken, date } = req.body;
+
+    if (!accessToken || !date) {
+      return res.status(400).json({
+        success: false,
+        error: 'Access token and date are required'
+      });
+    }
+
+    console.log(`Fetching Toast delivery orders for date: ${date}`);
+
+    // Toast API configuration
+    const TOAST_CONFIG = {
+      baseUrl: process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com',
+      restaurantGuid: process.env.TOAST_RESTAURANT_GUID || 'd3efae34-7c2e-4107-a442-49081e624706'
+    };
+
+    // Use businessDate format (yyyymmdd)
+    const businessDate = date.replace(/-/g, '');
+    console.log(`Business date format: ${businessDate}`);
+
+    // Use the ordersBulk endpoint with businessDate parameter
+    const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=100`;
+    console.log(`Orders URL: ${ordersUrl}`);
+
+    // Make the orders request to Toast API
+    const ordersResponse = await fetch(ordersUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!ordersResponse.ok) {
+      let errorText;
+      try {
+        errorText = await ordersResponse.text();
+        console.error('Toast orders API failed:', ordersResponse.status, errorText);
+      } catch (e) {
+        errorText = 'Could not read error response';
+        console.error('Toast orders API failed:', ordersResponse.status, 'Error reading response:', e);
+      }
+      
+      return res.status(ordersResponse.status).json({
+        success: false,
+        error: `Toast orders API failed: ${ordersResponse.status} ${ordersResponse.statusText}`,
+        details: errorText
+      });
+    }
+
+    const ordersData = await ordersResponse.json();
+    console.log(`Retrieved ${ordersData.length || 0} orders for ${date}`);
+
+    // COMPREHENSIVE DELIVERY ORDER ANALYSIS
+    let deliveryAnalysis = {
+      totalOrders: ordersData.length || 0,
+      deliveryOrders: [],
+      totalDeliveryTips: 0,
+      deliveryDetectionMethods: {
+        deliveryInfo: 0,
+        diningOption: 0, 
+        source: 0,
+        estimatedFulfillment: 0,
+        serviceCharges: 0
+      },
+      tipExtractionMethods: {
+        paymentTipAmount: 0,
+        serviceChargeGratuity: 0,
+        deliveryCharges: 0
+      },
+      rejectedOrders: []
+    };
+
+    if (Array.isArray(ordersData)) {
+      ordersData.forEach((order, index) => {
+        // Skip voided/deleted orders
+        if (order.voided || order.deleted) {
+          deliveryAnalysis.rejectedOrders.push({
+            index,
+            reason: `Order voided: ${order.voided}, deleted: ${order.deleted}`,
+            orderGuid: order.guid
+          });
+          return;
+        }
+
+        // COMPREHENSIVE DELIVERY DETECTION
+        let isDelivery = false;
+        let deliveryIndicators = [];
+        
+        // Method 1: deliveryInfo object (strongest indicator)
+        if (order.deliveryInfo && Object.keys(order.deliveryInfo).length > 0) {
+          isDelivery = true;
+          deliveryIndicators.push('deliveryInfo');
+          deliveryAnalysis.deliveryDetectionMethods.deliveryInfo++;
+        }
+
+        // Method 2: estimatedFulfillmentDate (delivery/takeout orders have this)
+        if (order.estimatedFulfillmentDate) {
+          isDelivery = true;
+          deliveryIndicators.push('estimatedFulfillmentDate');
+          deliveryAnalysis.deliveryDetectionMethods.estimatedFulfillment++;
+        }
+
+        // Method 3: source analysis (delivery platforms)
+        if (order.source) {
+          const deliverySources = ['delivery', 'doordash', 'ubereats', 'grubhub', 'postmates', 'seamless'];
+          if (deliverySources.some(source => order.source.toLowerCase().includes(source))) {
+            isDelivery = true;
+            deliveryIndicators.push('source');
+            deliveryAnalysis.deliveryDetectionMethods.source++;
+          }
+        }
+
+        // Method 4: diningOption analysis (would need to cross-reference with dining options API)
+        if (order.diningOption && order.diningOption.guid) {
+          // For now, assume certain GUIDs are delivery - would need dining options lookup
+          deliveryIndicators.push('diningOption');
+          deliveryAnalysis.deliveryDetectionMethods.diningOption++;
+        }
+
+        // Method 5: service charges analysis (delivery fees often indicate delivery)
+        let hasDeliveryCharges = false;
+        if (order.checks && Array.isArray(order.checks)) {
+          order.checks.forEach(check => {
+            if (check.appliedServiceCharges && Array.isArray(check.appliedServiceCharges)) {
+              check.appliedServiceCharges.forEach(charge => {
+                if (charge.delivery || (charge.name && charge.name.toLowerCase().includes('delivery'))) {
+                  hasDeliveryCharges = true;
+                  isDelivery = true;
+                  deliveryIndicators.push('serviceCharges');
+                  deliveryAnalysis.deliveryDetectionMethods.serviceCharges++;
+                }
+              });
+            }
+          });
+        }
+
+        // If any delivery indicators found, analyze tips
+        if (isDelivery) {
+          let orderTips = {
+            paymentTips: 0,
+            serviceChargeTips: 0,
+            deliveryCharges: 0,
+            total: 0
+          };
+
+          // TIP EXTRACTION from payments
+          if (order.checks && Array.isArray(order.checks)) {
+            order.checks.forEach(check => {
+              // Method 1: Payment tipAmount (primary)
+              if (check.payments && Array.isArray(check.payments)) {
+                check.payments.forEach(payment => {
+                  if (payment.tipAmount && payment.tipAmount > 0) {
+                    orderTips.paymentTips += payment.tipAmount / 100; // Convert cents to dollars
+                    deliveryAnalysis.tipExtractionMethods.paymentTipAmount++;
+                  }
+                });
+              }
+
+              // Method 2: Service charge gratuity
+              if (check.appliedServiceCharges && Array.isArray(check.appliedServiceCharges)) {
+                check.appliedServiceCharges.forEach(charge => {
+                  if (charge.gratuity && charge.chargeAmount > 0) {
+                    orderTips.serviceChargeTips += charge.chargeAmount / 100;
+                    deliveryAnalysis.tipExtractionMethods.serviceChargeGratuity++;
+                  }
+                  
+                  // Method 3: Delivery charges (may include tips)
+                  if (charge.delivery && charge.chargeAmount > 0) {
+                    orderTips.deliveryCharges += charge.chargeAmount / 100;
+                    deliveryAnalysis.tipExtractionMethods.deliveryCharges++;
+                  }
+                });
+              }
+            });
+          }
+
+          // Calculate total tips (avoid double counting)
+          orderTips.total = Math.max(
+            orderTips.paymentTips,
+            orderTips.serviceChargeTips + orderTips.deliveryCharges
+          );
+
+          if (orderTips.total > 0) {
+            deliveryAnalysis.deliveryOrders.push({
+              orderGuid: order.guid,
+              openedDate: order.openedDate,
+              businessDate: order.businessDate,
+              deliveryIndicators: deliveryIndicators,
+              deliveryInfo: order.deliveryInfo || null,
+              source: order.source || null,
+              tips: orderTips,
+              estimatedFulfillmentDate: order.estimatedFulfillmentDate || null
+            });
+
+            deliveryAnalysis.totalDeliveryTips += orderTips.total;
+          }
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Analyzed ${ordersData.length || 0} orders for delivery tips on ${businessDate}`,
+      data: {
+        date: date,
+        businessDate: businessDate,
+        deliveryAnalysis: deliveryAnalysis,
+        rawOrdersSample: ordersData.slice(0, 2), // First 2 orders for structure analysis
+        summary: {
+          totalDeliveryOrders: deliveryAnalysis.deliveryOrders.length,
+          totalDeliveryTips: deliveryAnalysis.totalDeliveryTips.toFixed(2),
+          averageTipPerOrder: deliveryAnalysis.deliveryOrders.length > 0 ? 
+            (deliveryAnalysis.totalDeliveryTips / deliveryAnalysis.deliveryOrders.length).toFixed(2) : '0.00'
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Delivery orders fetch error:', error);
+    
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error during delivery orders fetch',
+      details: error.message
+    });
+  }
+}
