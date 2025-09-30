@@ -1129,17 +1129,18 @@
           const endDate = urlParams.get('endDate');
           const pageSize = urlParams.get('pageSize') || '100';
           
-          // Convert dates to Toast format (YYYYMMDD)
-          const formatDateForToast = (dateStr) => {
+          // Keep dates in ISO-8601 format (YYYY-MM-DD) for Toast orders API
+          // The backend toast-orders-flexible.js will convert YYYYMMDD to proper ISO-8601 with timezone
+          const formatDateToYYYYMMDD = (dateStr) => {
             if (!dateStr) return null;
-            return dateStr.replace(/-/g, ''); // Convert YYYY-MM-DD to YYYYMMDD
+            return dateStr.replace(/-/g, ''); // Convert YYYY-MM-DD to YYYYMMDD for backend processing
           };
           
-          // Build URL with query parameters like working APIs
+          // Build URL with query parameters - backend expects YYYYMMDD for conversion to ISO-8601
           const queryParams = new URLSearchParams({
             accessToken: toastToken,
-            startDate: formatDateForToast(startDate),
-            endDate: formatDateForToast(endDate),
+            startDate: formatDateToYYYYMMDD(startDate),
+            endDate: formatDateToYYYYMMDD(endDate),
             pageSize: pageSize
           });
           
