@@ -107,20 +107,22 @@
 
         <!-- Orders Analysis -->
         <div class="section">
-            <h2>📊 Step 3: Fetch & Analyze Orders</h2>
+            <h2>📊 Step 3: Fetch & Analyze Orders (Legacy)</h2>
             <button class="button" onclick="fetchOrdersForDate()">Fetch Orders for Date</button>
             <button class="button warning" onclick="analyzePaymentMethods()">Analyze Payment Methods</button>
             <div id="ordersResult" class="result"></div>
+            <p><em>Note: This is the old approach for reference. The new payments API below is more accurate.</em></p>
         </div>
 
         <!-- Cash Sales Calculation -->
         <div class="section">
-            <h2>💰 Step 4: Calculate Cash Sales</h2>
-            <button class="button success" onclick="calculateCashSales()">Calculate Cash Sales Total</button>
+            <h2>💰 Step 4: Calculate Cash Sales (Official Payments API)</h2>
+            <button class="button success" onclick="calculateCashSales()">Calculate Cash Sales via Payments API</button>
             <div id="cashTotal" class="cash-total" style="display: none;">
                 Total Cash Sales: $<span id="cashAmount">0.00</span>
             </div>
             <div id="cashBreakdown" class="result"></div>
+            <p><em>Uses official Toast payments API for accurate cash calculation as recommended in Toast documentation.</em></p>
         </div>
 
         <!-- API Structure Analysis -->
@@ -137,6 +139,7 @@
         const API_CONFIG = {
             authEndpoint: '/api/toast-auth',
             ordersEndpoint: '/api/toast-orders', 
+            paymentsEndpoint: '/api/toast-payments',
             restaurantEndpoint: '/api/toast-restaurant'
         };
 
@@ -305,75 +308,63 @@
             }
         }
 
-        // Step 4: Calculate total cash sales
+        // Step 4: Calculate total cash sales using Payments API
         async function calculateCashSales() {
-            if (allOrders.length === 0) {
-                displayResult('cashBreakdown', 'No Orders', 'Please fetch orders first!', true);
+            if (!authToken) {
+                displayResult('cashBreakdown', 'Authentication Required', 'Please authenticate first!', true);
                 return;
             }
 
             try {
-                let totalCashSales = 0;
-                let cashOrderCount = 0;
-                const cashDetails = [];
-                const rejectedOrders = [];
+                const selectedDate = document.getElementById('testDate').value;
+                if (!selectedDate) {
+                    throw new Error('Please select a date first');
+                }
 
-                allOrders.forEach((order, index) => {
-                    // Check if order is valid (not voided, refunded, etc.)
-                    const isValidOrder = order.state !== 'VOIDED' && order.state !== 'CANCELED';
-                    
-                    if (!isValidOrder) {
-                        rejectedOrders.push({
-                            index,
-                            reason: `Order state: ${order.state}`,
-                            amount: order.amount || 0
-                        });
-                        return;
-                    }
+                // Convert date to business date format (YYYYMMDD)
+                const businessDate = selectedDate.replace(/-/g, '');
+                
+                displayResult('cashBreakdown', 'Calculating Cash Sales', `Using official Toast Payments API for ${selectedDate} (${businessDate})...`);
 
-                    // Check if order has cash payments
-                    let orderHasCash = false;
-                    let orderCashAmount = 0;
-
-                    if (order.payments && Array.isArray(order.payments)) {
-                        order.payments.forEach(payment => {
-                            if (payment.type === 'CASH' && payment.amount) {
-                                orderHasCash = true;
-                                orderCashAmount += payment.amount;
-                            }
-                        });
-                    }
-
-                    if (orderHasCash) {
-                        cashOrderCount++;
-                        totalCashSales += orderCashAmount;
-                        cashDetails.push({
-                            orderIndex: index,
-                            orderId: order.guid || order.id,
-                            amount: orderCashAmount,
-                            totalOrderAmount: order.amount,
-                            time: order.openedDate || order.createdDate
-                        });
-                    }
-                });
-
-                // Display results
-                document.getElementById('cashTotal').style.display = 'block';
-                document.getElementById('cashAmount').textContent = (totalCashSales / 100).toFixed(2); // Convert cents to dollars
-
-                displayResult('cashBreakdown', 'Cash Sales Calculation Complete', {
-                    summary: {
-                        totalCashSales: `$${(totalCashSales / 100).toFixed(2)}`,
-                        cashOrderCount: cashOrderCount,
-                        totalOrdersAnalyzed: allOrders.length,
-                        rejectedOrdersCount: rejectedOrders.length
+                const response = await fetch(API_CONFIG.paymentsEndpoint, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
                     },
-                    cashOrderDetails: cashDetails.slice(0, 10), // Show first 10
-                    rejectedOrders: rejectedOrders.slice(0, 5), // Show first 5
-                    formula: 'SUM(order.payments[type=CASH].amount) WHERE order.state NOT IN [VOIDED, CANCELED]'
+                    params: new URLSearchParams({
+                        businessDate: businessDate,
+                        token: authToken
+                    })
                 });
 
-                cashOrders = cashDetails;
+                // Construct URL with query parameters for GET request
+                const paymentsUrl = `${API_CONFIG.paymentsEndpoint}?businessDate=${businessDate}&token=${encodeURIComponent(authToken)}`;
+                
+                const paymentsResponse = await fetch(paymentsUrl);
+                const data = await paymentsResponse.json();
+
+                if (paymentsResponse.ok && data.success) {
+                    // Display cash total immediately
+                    document.getElementById('cashTotal').style.display = 'block';
+                    document.getElementById('cashAmount').textContent = data.totalCashAmount.toFixed(2);
+
+                    displayResult('cashBreakdown', 'Cash Sales Calculation Complete', {
+                        method: 'Official Toast Payments API',
+                        businessDate: businessDate,
+                        summary: {
+                            totalCashAmount: `$${data.totalCashAmount.toFixed(2)}`,
+                            totalCashPayments: data.totalCashPayments,
+                            totalPaymentGuids: data.totalPaymentGuids,
+                            processedPayments: data.processedPayments,
+                            errorCount: data.errorCount
+                        },
+                        firstFewCashPayments: data.cashPayments.slice(0, 5), // Show first 5
+                        formula: 'Official Toast method: GET /payments?paidBusinessDate + individual payment details filtering for type=CASH and paymentStatus!=VOIDED'
+                    });
+
+                } else {
+                    throw new Error(data.error || 'Failed to calculate cash sales');
+                }
 
             } catch (error) {
                 displayResult('cashBreakdown', 'Cash Calculation Failed', error.message, true);
