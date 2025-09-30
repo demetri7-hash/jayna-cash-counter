@@ -2423,33 +2423,380 @@
       throw new Error('Database connection not available');
     }
     
-    // Query for daily breakdown data
-    const { data: dailyData, error: dailyError } = await supabase
-      .from('weekly_daily_breakdown')
-      .select(`
-        *,
-        weekly_combined_reports!inner(
-          week_start_date,
-          week_end_date,
-          generated_by,
-          total_toast_sales,
-          actual_cash_in,
-          total_discrepancy
-        )
-      `)
-      .eq('date', reportDate);
+    // Query for complete daily cash count data
+    const { data: fullData, error: dataError } = await supabase
+      .from('cash_counts')
+      .select('*')
+      .eq('date', reportDate)
+      .single();
     
-    if (dailyError) {
-      console.error('Database error details:', dailyError);
-      throw new Error(`Database query failed: ${dailyError.message}`);
+    if (dataError) {
+      console.error('Database error details:', dataError);
+      throw new Error(`Database query failed: ${dataError.message}`);
     }
     
-    if (!dailyData || dailyData.length === 0) {
-      throw new Error(`No data found for ${reportDate}. You need to generate a weekly combined report that includes this date first. The historical reports can only show data from dates that have been processed in weekly reports.`);
+    if (!fullData) {
+      throw new Error(`No cash count data found for ${reportDate}. This date may not have been processed yet.`);
     }
     
-    // Generate PDF for single day
-    await generateSingleDayPDF(dailyData[0], reportDate);
+    // Check if we have both AM and PM data
+    if (!fullData.am_total && !fullData.pm_total) {
+      throw new Error(`No AM or PM data found for ${reportDate}. This date may not have been processed yet.`);
+    }
+    
+    // Display single day report in modal using PM flow format
+    displayPMFlowSingleDayReportModal(fullData, reportDate);
+  }
+  
+  // Display Single Day Report in Modal using PM Flow Format
+  function displayPMFlowSingleDayReportModal(fullData, reportDate) {
+    console.log('=== PM FLOW SINGLE DAY REPORT MODAL ===');
+    
+    // Generate comprehensive HTML content using PM flow format
+    const reportHtml = generatePMFlowSingleDayReportHtml(fullData, reportDate);
+    
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'singleDayReportOverlay';
+    overlay.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background: rgba(0, 0, 0, 0.8) !important;
+      z-index: 99999 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      overflow: auto !important;
+    `;
+    
+    const contentBox = document.createElement('div');
+    contentBox.style.cssText = `
+      background: white !important;
+      margin: 20px !important;
+      padding: 0 !important;
+      border-radius: 12px !important;
+      max-width: 95vw !important;
+      max-height: 95vh !important;
+      overflow: hidden !important;
+      position: relative !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+      display: flex !important;
+      flex-direction: column !important;
+    `;
+    
+    // Add header with controls
+    const headerDiv = document.createElement('div');
+    headerDiv.style.cssText = `
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%) !important;
+      padding: 20px 30px !important;
+      color: white !important;
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      flex-shrink: 0 !important;
+    `;
+    
+    const titleDiv = document.createElement('div');
+    titleDiv.innerHTML = `
+      <h2 style="margin: 0; font-size: 24px; font-weight: 600;">📊 Daily Cash Report</h2>
+      <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 16px;">${new Date(reportDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    `;
+    
+    const controlsDiv = document.createElement('div');
+    controlsDiv.style.cssText = `
+      display: flex !important;
+      gap: 15px !important;
+      align-items: center !important;
+    `;
+    
+    // PDF Download button
+    const pdfBtn = document.createElement('button');
+    pdfBtn.innerHTML = '📄 Download PDF';
+    pdfBtn.style.cssText = `
+      background: rgba(255,255,255,0.2) !important;
+      color: white !important;
+      border: 2px solid rgba(255,255,255,0.4) !important;
+      padding: 10px 20px !important;
+      border-radius: 8px !important;
+      cursor: pointer !important;
+      font-size: 14px !important;
+      font-weight: 500 !important;
+      transition: all 0.3s ease !important;
+    `;
+    pdfBtn.onmouseover = () => pdfBtn.style.background = 'rgba(255,255,255,0.3)';
+    pdfBtn.onmouseout = () => pdfBtn.style.background = 'rgba(255,255,255,0.2)';
+    pdfBtn.onclick = () => generatePMFlowSingleDayPDF(fullData, reportDate);
+    
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '✕';
+    closeBtn.style.cssText = `
+      background: rgba(255,255,255,0.2) !important;
+      color: white !important;
+      border: 2px solid rgba(255,255,255,0.4) !important;
+      padding: 8px 12px !important;
+      border-radius: 50% !important;
+      cursor: pointer !important;
+      font-size: 18px !important;
+      font-weight: bold !important;
+      width: 40px !important;
+      height: 40px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      transition: all 0.3s ease !important;
+    `;
+    closeBtn.onmouseover = () => closeBtn.style.background = 'rgba(255,80,80,0.8)';
+    closeBtn.onmouseout = () => closeBtn.style.background = 'rgba(255,255,255,0.2)';
+    closeBtn.onclick = () => document.body.removeChild(overlay);
+    
+    controlsDiv.appendChild(pdfBtn);
+    controlsDiv.appendChild(closeBtn);
+    headerDiv.appendChild(titleDiv);
+    headerDiv.appendChild(controlsDiv);
+    
+    // Add content area
+    const contentDiv = document.createElement('div');
+    contentDiv.style.cssText = `
+      padding: 30px !important;
+      overflow: auto !important;
+      flex: 1 !important;
+      background: #f8f9fa !important;
+    `;
+    contentDiv.innerHTML = reportHtml;
+    
+    contentBox.appendChild(headerDiv);
+    contentBox.appendChild(contentDiv);
+    overlay.appendChild(contentBox);
+    document.body.appendChild(overlay);
+    
+    console.log('PM Flow single day report modal created and displayed');
+  }
+  
+  // Generate Enhanced Single Day Report HTML
+  function generateEnhancedSingleDayReportHtml(dayData, reportDate) {
+    const formattedDate = new Date(reportDate).toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    
+    const weekStart = new Date(dayData.weekly_combined_reports.week_start_date).toLocaleDateString();
+    const weekEnd = new Date(dayData.weekly_combined_reports.week_end_date).toLocaleDateString();
+    
+    return `
+      <div style="max-width: 1200px; margin: 0 auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        
+        <!-- Header Summary Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px;">
+          
+          <!-- Date & Staff Info Card -->
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+              <span style="font-size: 24px; margin-right: 10px;">📅</span>
+              <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Date & Staff</h3>
+            </div>
+            <div style="space-y: 8px;">
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Date:</strong> ${formattedDate}</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Report Week:</strong> ${weekStart} - ${weekEnd}</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Night Counter:</strong> ${dayData.night_counter || 'N/A'}</p>
+              <p style="margin: 8px 0; font-size: 12px; opacity: 0.9;"><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+            </div>
+          </div>
+
+          <!-- Cash Flow Summary Card -->
+          <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+              <span style="font-size: 24px; margin-right: 10px;">💰</span>
+              <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Cash Flow</h3>
+            </div>
+            <div style="space-y: 8px;">
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Toast Sales:</strong> $${dayData.toast_sales?.toFixed(2) || '0.00'}</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Actual Cash In:</strong> $${dayData.actual_cash_in?.toFixed(2) || '0.00'}</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Discrepancy:</strong> ${dayData.discrepancy >= 0 ? '+' : ''}$${Math.abs(dayData.discrepancy || 0).toFixed(2)}</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Excess:</strong> $${dayData.excess?.toFixed(2) || '0.00'}</p>
+            </div>
+          </div>
+
+          <!-- Performance Indicators Card -->
+          <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+              <span style="font-size: 24px; margin-right: 10px;">📊</span>
+              <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Performance</h3>
+            </div>
+            <div style="space-y: 8px;">
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Accuracy:</strong> ${Math.abs(dayData.discrepancy || 0) < 5 ? '✅ Excellent' : Math.abs(dayData.discrepancy || 0) < 20 ? '⚠️ Good' : '❌ Needs Review'}</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Variance:</strong> ${((Math.abs(dayData.discrepancy || 0) / (dayData.toast_sales || 1)) * 100).toFixed(1)}%</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Week Generated By:</strong> ${dayData.weekly_combined_reports.generated_by || 'N/A'}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detailed Analysis Section -->
+        <div style="background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 30px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px;">
+            <h3 style="margin: 0; font-size: 20px; font-weight: 600; display: flex; align-items: center;">
+              <span style="margin-right: 10px;">🔍</span>
+              Detailed Cash Analysis
+            </h3>
+          </div>
+          
+          <div style="padding: 30px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px;">
+              
+              <!-- Revenue Breakdown -->
+              <div>
+                <h4 style="color: #333; margin-bottom: 20px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #667eea; padding-bottom: 8px;">💵 Revenue Breakdown</h4>
+                <div style="space-y: 12px;">
+                  <div style="display: flex; justify-content: space-between; padding: 12px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #28a745;">
+                    <span style="font-weight: 500;">Toast Sales Reported</span>
+                    <span style="font-weight: 600; color: #28a745;">$${dayData.toast_sales?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 12px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #17a2b8;">
+                    <span style="font-weight: 500;">Actual Cash Collected</span>
+                    <span style="font-weight: 600; color: #17a2b8;">$${dayData.actual_cash_in?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 12px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid ${dayData.discrepancy >= 0 ? '#28a745' : '#dc3545'};">
+                    <span style="font-weight: 500;">Cash Variance</span>
+                    <span style="font-weight: 600; color: ${dayData.discrepancy >= 0 ? '#28a745' : '#dc3545'};">${dayData.discrepancy >= 0 ? '+' : ''}$${Math.abs(dayData.discrepancy || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Operational Metrics -->
+              <div>
+                <h4 style="color: #333; margin-bottom: 20px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #f093fb; padding-bottom: 8px;">⚙️ Operational Metrics</h4>
+                <div style="space-y: 12px;">
+                  <div style="display: flex; justify-content: space-between; padding: 12px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #6f42c1;">
+                    <span style="font-weight: 500;">Cash Excess to Tips</span>
+                    <span style="font-weight: 600; color: #6f42c1;">$${dayData.excess?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 12px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #fd7e14;">
+                    <span style="font-weight: 500;">Accuracy Rate</span>
+                    <span style="font-weight: 600; color: #fd7e14;">${Math.abs(dayData.discrepancy || 0) < 5 ? '98%+' : Math.abs(dayData.discrepancy || 0) < 20 ? '95%+' : '90%-'}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 12px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #20c997;">
+                    <span style="font-weight: 500;">Status</span>
+                    <span style="font-weight: 600; color: #20c997;">${Math.abs(dayData.discrepancy || 0) < 10 ? 'Balanced ✅' : 'Review Needed ⚠️'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Raw Data Section -->
+        <div style="background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 30px;">
+          <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px;">
+            <h3 style="margin: 0; font-size: 20px; font-weight: 600; display: flex; align-items: center;">
+              <span style="margin-right: 10px;">📋</span>
+              Complete Data Summary
+            </h3>
+          </div>
+          
+          <div style="padding: 30px;">
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <thead>
+                  <tr style="background: #f8f9fa;">
+                    <th style="padding: 15px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600; color: #495057;">Field</th>
+                    <th style="padding: 15px; text-align: right; border-bottom: 2px solid #dee2e6; font-weight: 600; color: #495057;">Value</th>
+                    <th style="padding: 15px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600; color: #495057;">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="padding: 12px; font-weight: 500;">Date</td>
+                    <td style="padding: 12px; text-align: right;">${formattedDate}</td>
+                    <td style="padding: 12px; color: #6c757d;">Business day for this report</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #dee2e6; background: #f8f9fa;">
+                    <td style="padding: 12px; font-weight: 500;">Night Counter</td>
+                    <td style="padding: 12px; text-align: right;">${dayData.night_counter || 'N/A'}</td>
+                    <td style="padding: 12px; color: #6c757d;">Staff member who completed closing count</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="padding: 12px; font-weight: 500;">Toast Sales</td>
+                    <td style="padding: 12px; text-align: right; color: #28a745; font-weight: 600;">$${dayData.toast_sales?.toFixed(2) || '0.00'}</td>
+                    <td style="padding: 12px; color: #6c757d;">Total sales reported by POS system</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #dee2e6; background: #f8f9fa;">
+                    <td style="padding: 12px; font-weight: 500;">Actual Cash In</td>
+                    <td style="padding: 12px; text-align: right; color: #17a2b8; font-weight: 600;">$${dayData.actual_cash_in?.toFixed(2) || '0.00'}</td>
+                    <td style="padding: 12px; color: #6c757d;">Physical cash counted in registers</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="padding: 12px; font-weight: 500;">Discrepancy</td>
+                    <td style="padding: 12px; text-align: right; color: ${dayData.discrepancy >= 0 ? '#28a745' : '#dc3545'}; font-weight: 600;">${dayData.discrepancy >= 0 ? '+' : ''}$${Math.abs(dayData.discrepancy || 0).toFixed(2)}</td>
+                    <td style="padding: 12px; color: #6c757d;">Difference between expected and actual cash</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #dee2e6; background: #f8f9fa;">
+                    <td style="padding: 12px; font-weight: 500;">Excess</td>
+                    <td style="padding: 12px; text-align: right; color: #6f42c1; font-weight: 600;">$${dayData.excess?.toFixed(2) || '0.00'}</td>
+                    <td style="padding: 12px; color: #6c757d;">Amount moved from tips to balance operations</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="padding: 12px; font-weight: 500;">Week Start</td>
+                    <td style="padding: 12px; text-align: right;">${weekStart}</td>
+                    <td style="padding: 12px; color: #6c757d;">Start of report week containing this day</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #dee2e6; background: #f8f9fa;">
+                    <td style="padding: 12px; font-weight: 500;">Week End</td>
+                    <td style="padding: 12px; text-align: right;">${weekEnd}</td>
+                    <td style="padding: 12px; color: #6c757d;">End of report week containing this day</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="padding: 12px; font-weight: 500;">Weekly Report By</td>
+                    <td style="padding: 12px; text-align: right;">${dayData.weekly_combined_reports.generated_by || 'N/A'}</td>
+                    <td style="padding: 12px; color: #6c757d;">Manager who generated the weekly report</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes Section -->
+        <div style="background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 20px;">
+          <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px;">
+            <h3 style="margin: 0; font-size: 20px; font-weight: 600; display: flex; align-items: center;">
+              <span style="margin-right: 10px;">📝</span>
+              Important Notes
+            </h3>
+          </div>
+          
+          <div style="padding: 30px;">
+            <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+              <h4 style="margin: 0 0 10px 0; color: #1976d2; font-size: 16px;">📊 Understanding the Data</h4>
+              <ul style="margin: 10px 0 0 20px; color: #424242; line-height: 1.6;">
+                <li><strong>Discrepancy:</strong> Shows cash over/under compared to expected sales (negative = short, positive = over)</li>
+                <li><strong>Excess:</strong> Amount taken from tips to balance daily operations</li>
+                <li><strong>Accuracy Rate:</strong> Calculated based on variance from expected cash amounts</li>
+              </ul>
+            </div>
+            
+            <div style="background: #f3e5f5; border-left: 4px solid #9c27b0; padding: 20px; border-radius: 8px;">
+              <h4 style="margin: 0 0 10px 0; color: #7b1fa2; font-size: 16px;">🎯 Performance Benchmarks</h4>
+              <ul style="margin: 10px 0 0 20px; color: #424242; line-height: 1.6;">
+                <li><strong>Excellent:</strong> Discrepancy under $5 (98%+ accuracy)</li>
+                <li><strong>Good:</strong> Discrepancy $5-$20 (95%+ accuracy)</li>
+                <li><strong>Review Needed:</strong> Discrepancy over $20 (requires attention)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 12px; border-top: 1px solid #dee2e6;">
+          <p style="margin: 0;">Report generated by Jayna Gyro Cash Counter v3.0+ | ${new Date().toLocaleString()}</p>
+          <p style="margin: 5px 0 0 0;">Designed and coded by Demetri Gregorakis | demetri_gregorakis@icloud.com</p>
+        </div>
+      </div>
+    `;
   }
 
   // Generate Weekly Historical Report
@@ -2751,94 +3098,650 @@
     }
   }
 
+  // Generate PM Flow Single Day Report HTML
+  function generatePMFlowSingleDayReportHtml(fullData, reportDate) {
+    // Format date with day of the week
+    const dateObj = new Date(reportDate + 'T00:00:00');
+    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    const formattedDate = dateObj.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }).toUpperCase();
+    
+    // Calculate amounts using PM flow logic
+    const amTotal = fullData.am_total || 0;
+    const pmTotal = fullData.pm_total || 0;
+    const toastSales = fullData.pm_toast_sales || 0;
+    const originalTips = fullData.pm_cash_tips || 0;
+    const actualCashIn = pmTotal - amTotal;
+    const discrepancy = actualCashIn - toastSales;
+    const discrepancySign = discrepancy >= 0 ? '+' : '-';
+    const largeDiscrepancyFlag = Math.abs(discrepancy) > 10 ? ' ⚠️ LARGE DISCREPANCY!' : '';
+    
+    // Helper function to get denomination breakdown
+    function getDenominationBreakdown(drawerData, prefix) {
+      if (!drawerData) return '';
+      
+      return `
+        <div>$100: ${drawerData.hundreds || 0} = $${((drawerData.hundreds || 0) * 100).toFixed(2)}</div>
+        <div>$50: ${drawerData.fifties || 0} = $${((drawerData.fifties || 0) * 50).toFixed(2)}</div>
+        <div>$20: ${drawerData.twenties || 0} = $${((drawerData.twenties || 0) * 20).toFixed(2)}</div>
+        <div>$10: ${drawerData.tens || 0} = $${((drawerData.tens || 0) * 10).toFixed(2)}</div>
+        <div>$5: ${drawerData.fives || 0} = $${((drawerData.fives || 0) * 5).toFixed(2)}</div>
+        <div>$1: ${drawerData.ones || 0} = $${((drawerData.ones || 0) * 1).toFixed(2)}</div>
+        <div>¢25: ${drawerData.quarters || 0} = $${((drawerData.quarters || 0) * 0.25).toFixed(2)}</div>
+        <div>¢10: ${drawerData.dimes || 0} = $${((drawerData.dimes || 0) * 0.10).toFixed(2)}</div>
+        <div>¢5: ${drawerData.nickels || 0} = $${((drawerData.nickels || 0) * 0.05).toFixed(2)}</div>
+        <div>¢1: ${drawerData.pennies || 0} = $${((drawerData.pennies || 0) * 0.01).toFixed(2)}</div>
+      `;
+    }
+    
+    return `
+      <div style="font-family: Arial, sans-serif; margin: 0; padding: 8px; font-size: 12px; line-height: 1.3; max-width: 800px;">
+        
+        <div style="text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 4px; border-bottom: 2px solid #000; padding-bottom: 6px;">
+          JAYNA GYRO DAILY CASH REPORT
+        </div>
+        
+        <div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 12px; padding-bottom: 6px;">
+          ${dayOfWeek} ${formattedDate}
+        </div>
+
+        <!-- Staff and Timing Info -->
+        <div style="border: 1px solid #000; margin: 6px 0; padding: 8px;">
+          <div style="display: table; width: 100%;">
+            <div style="display: table-cell; width: 50%; vertical-align: top; padding: 0 6px; border-right: 1px solid #ccc;">
+              <div style="display: flex; justify-content: space-between; margin: 2px 0; max-width: 180px;">
+                <span style="font-weight: bold; text-align: right; padding-right: 10px;">AM Counter:</span>
+                <span style="text-align: left; font-weight: bold;">${fullData.am_counter || 'N/A'}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin: 2px 0; max-width: 180px;">
+                <span style="font-weight: bold; text-align: right; padding-right: 10px;">AM Time:</span>
+                <span style="text-align: left; font-weight: bold;">${fullData.am_timestamp ? new Date(fullData.am_timestamp).toLocaleString() : 'N/A'}</span>
+              </div>
+            </div>
+            <div style="display: table-cell; width: 50%; vertical-align: top; padding: 0 6px;">
+              <div style="display: flex; justify-content: space-between; margin: 2px 0; max-width: 180px;">
+                <span style="font-weight: bold; text-align: right; padding-right: 10px;">PM Counter:</span>
+                <span style="text-align: left; font-weight: bold;">${fullData.pm_counter || 'N/A'}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin: 2px 0; max-width: 180px;">
+                <span style="font-weight: bold; text-align: right; padding-right: 10px;">PM Time:</span>
+                <span style="text-align: left; font-weight: bold;">${fullData.pm_timestamp ? new Date(fullData.pm_timestamp).toLocaleString() : 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        ${amTotal > 0 ? `
+        <!-- Cash Summary -->
+        <div style="border: 1px solid #000; margin: 6px 0; padding: 8px;">
+          <div style="font-weight: bold; font-size: 14px; text-align: center; margin-bottom: 6px; border-bottom: 1px solid #000; padding-bottom: 3px;">CASH FLOW SUMMARY</div>
+          <div style="display: table; width: 100%;">
+            <div style="display: table-cell; width: 50%; vertical-align: top; padding: 0 6px; border-right: 1px solid #ccc;">
+              <div style="display: flex; justify-content: space-between; margin: 2px 0; max-width: 180px;">
+                <span style="font-weight: bold; text-align: right; padding-right: 10px;">Starting Cash (AM):</span>
+                <span style="text-align: left; font-weight: bold;">$${amTotal.toFixed(2)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin: 2px 0; max-width: 180px;">
+                <span style="font-weight: bold; text-align: right; padding-right: 10px;">Ending Cash (PM):</span>
+                <span style="text-align: left; font-weight: bold;">$${pmTotal.toFixed(2)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin: 2px 0; max-width: 180px;">
+                <span style="font-weight: bold; text-align: right; padding-right: 10px;">Actual Cash In:</span>
+                <span style="text-align: left; font-weight: bold;">$${actualCashIn.toFixed(2)}</span>
+              </div>
+            </div>
+            <div style="display: table-cell; width: 50%; vertical-align: top; padding: 0 6px;">
+              <div style="display: flex; justify-content: space-between; margin: 2px 0; max-width: 180px;">
+                <span style="font-weight: bold; text-align: right; padding-right: 10px;">Toast Sales:</span>
+                <span style="text-align: left; font-weight: bold;">$${toastSales.toFixed(2)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin: 2px 0; max-width: 180px;">
+                <span style="font-weight: bold; text-align: right; padding-right: 10px;">Original Tips:</span>
+                <span style="text-align: left; font-weight: bold;">$${originalTips.toFixed(2)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin: 2px 0; max-width: 180px;">
+                <span style="font-weight: bold; text-align: right; padding-right: 10px;">Discrepancy:</span>
+                <span style="text-align: left; font-weight: bold;">${discrepancySign}$${Math.abs(discrepancy).toFixed(2)}${largeDiscrepancyFlag}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        ${fullData.pm_deposit_amount ? `
+        <!-- Deposit Instructions -->
+        <div style="background-color: #e6ffe6; border: 2px solid #000; padding: 8px; text-align: center; font-weight: bold; font-size: 13px; margin: 6px 0;">
+          DEPOSIT IN ENVELOPE: $${fullData.pm_deposit_amount}
+          <div style="font-size: 10px;">(Toast Sales $${toastSales.toFixed(2)} + Original Tips $${originalTips.toFixed(2)})</div>
+        </div>
+        <div style="background-color: #fff0e6; border: 2px solid #000; padding: 8px; text-align: center; font-weight: bold; font-size: 13px; margin: 6px 0;">
+          RETURN TO CASHBOX/SAFE: $${fullData.pm_amount_to_keep ? fullData.pm_amount_to_keep.toFixed(2) : '0.00'}
+        </div>
+        ` : ''}
+
+        <!-- Notes Section -->
+        <div style="display: table; width: 100%; margin: 6px 0;">
+          <div style="display: table-cell; width: 50%; padding: 6px; border: 1px solid #000; vertical-align: top; text-align: center; font-weight: bold; background-color: #e6f3ff;">
+            <div style="font-weight: bold; text-align: center; margin-bottom: 4px;">AM NOTES</div>
+            <div style="text-align: center; font-weight: bold;">
+              ${fullData.am_notes || 'No AM Notes'}
+            </div>
+          </div>
+          <div style="display: table-cell; width: 50%; padding: 6px; border: 1px solid #000; border-left: none; vertical-align: top; text-align: center; font-weight: bold; background-color: #fff8f0;">
+            <div style="font-weight: bold; text-align: center; margin-bottom: 4px;">PM NOTES</div>
+            <div style="text-align: center; font-weight: bold;">
+              ${fullData.pm_notes || 'No PM Notes'}
+            </div>
+          </div>
+        </div>
+
+        <!-- Manager Breakdown -->
+        <div style="border: 1px solid #000; margin: 6px 0; padding: 8px;">
+          <div style="font-weight: bold; font-size: 14px; text-align: center; margin-bottom: 6px; border-bottom: 1px solid #000; padding-bottom: 3px;">MANAGER BREAKDOWN</div>
+          <div style="display: table; width: 100%;">
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Starting Cash Total:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${amTotal.toFixed(2)}</div></div>
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Ending Cash Total:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${pmTotal.toFixed(2)}</div></div>
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Actual Cash In:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${actualCashIn.toFixed(2)}</div></div>
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Toast Sales Reported:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${toastSales.toFixed(2)}</div></div>
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Tips Reported by Staff:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${originalTips.toFixed(2)}</div></div>
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Discrepancy (Drawers vs Toast):</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">${discrepancySign}$${Math.abs(discrepancy).toFixed(2)}</div></div>
+            ${fullData.pm_deposit_amount ? `
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Owed to Restaurant:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${toastSales.toFixed(2)}</div></div>
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Cash Tips Owed to Staff:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${fullData.pm_adjusted_tips || originalTips}</div></div>
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Returned to Cashbox:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${fullData.pm_amount_to_keep ? fullData.pm_amount_to_keep.toFixed(2) : '0.00'}</div></div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- Complete Cash Count Breakdown -->
+        <div style="border: 1px solid #000; margin: 6px 0; padding: 8px;">
+          <div style="font-weight: bold; font-size: 14px; text-align: center; margin-bottom: 6px; border-bottom: 1px solid #000; padding-bottom: 3px;">COMPLETE CASH COUNT BREAKDOWN</div>
+          <div style="display: table; width: 100%;">
+            <!-- AM Counts -->
+            <div style="display: table-cell; width: 50%; vertical-align: top; padding: 0 6px; border-right: 1px solid #ccc;">
+              <div style="text-align: center; font-weight: bold; font-size: 10px; margin-bottom: 4px; background-color: #e6f3ff; padding: 3px;">AM COUNTS</div>
+              
+              <div style="font-size: 10px; line-height: 1.2;">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER 1</div>
+                ${getDenominationBreakdown(fullData.am_drawer1_data, 'am_drawer1')}
+                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.am_drawer1_total ? fullData.am_drawer1_total.toFixed(2) : '0.00'}</div>
+              </div>
+              
+              <div style="font-size: 10px; line-height: 1.2; margin-top: 6px;">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER 2</div>
+                ${getDenominationBreakdown(fullData.am_drawer2_data, 'am_drawer2')}
+                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.am_drawer2_total ? fullData.am_drawer2_total.toFixed(2) : '0.00'}</div>
+              </div>
+              
+              <div style="font-weight: bold; text-align: center; padding: 4px; border: 2px solid #000; margin-top: 6px; font-size: 10px; background-color: #e6f3ff;">TOTAL AM: $${amTotal.toFixed(2)}</div>
+            </div>
+            
+            <!-- PM Counts -->
+            <div style="display: table-cell; width: 50%; vertical-align: top; padding: 0 6px;">
+              <div style="text-align: center; font-weight: bold; font-size: 10px; margin-bottom: 4px; background-color: #fff8f0; padding: 3px;">PM COUNTS</div>
+              
+              <div style="font-size: 10px; line-height: 1.2;">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER 1</div>
+                ${getDenominationBreakdown(fullData.pm_drawer1_data, 'pm_drawer1')}
+                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.pm_drawer1_total ? fullData.pm_drawer1_total.toFixed(2) : '0.00'}</div>
+              </div>
+              
+              <div style="font-size: 10px; line-height: 1.2; margin-top: 6px;">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER 2</div>
+                ${getDenominationBreakdown(fullData.pm_drawer2_data, 'pm_drawer2')}
+                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.pm_drawer2_total ? fullData.pm_drawer2_total.toFixed(2) : '0.00'}</div>
+              </div>
+              
+              <div style="font-weight: bold; text-align: center; padding: 4px; border: 2px solid #000; margin-top: 6px; font-size: 10px; background-color: #fff8f0;">TOTAL PM: $${pmTotal.toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Generate PM Flow Single Day PDF Report
+  async function generatePMFlowSingleDayPDF(fullData, reportDate) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    let currentY = margin;
+    
+    // Helper function to check for page break and add new page if needed
+    function checkPageBreak(requiredSpace) {
+      if (currentY + requiredSpace > pageHeight - margin) {
+        doc.addPage();
+        currentY = margin;
+        return true;
+      }
+      return false;
+    }
+    
+    // Format date
+    const dateObj = new Date(reportDate + 'T00:00:00');
+    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    const formattedDate = dateObj.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }).toUpperCase();
+    
+    // Calculate amounts
+    const amTotal = fullData.am_total || 0;
+    const pmTotal = fullData.pm_total || 0;
+    const toastSales = fullData.pm_toast_sales || 0;
+    const originalTips = fullData.pm_cash_tips || 0;
+    const actualCashIn = pmTotal - amTotal;
+    const discrepancy = actualCashIn - toastSales;
+    const discrepancySign = discrepancy >= 0 ? '+' : '-';
+    
+    // Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text('JAYNA GYRO DAILY CASH REPORT', pageWidth / 2, currentY, { align: 'center' });
+    currentY += 25;
+    
+    doc.setFontSize(14);
+    doc.text(`${dayOfWeek} ${formattedDate}`, pageWidth / 2, currentY, { align: 'center' });
+    currentY += 30;
+    
+    // Staff and Timing Info
+    checkPageBreak(60);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Staff and Timing Information:', margin, currentY);
+    currentY += 20;
+    
+    doc.text(`AM Counter: ${fullData.am_counter || 'N/A'}`, margin + 20, currentY);
+    doc.text(`PM Counter: ${fullData.pm_counter || 'N/A'}`, pageWidth / 2 + 20, currentY);
+    currentY += 15;
+    
+    const amTime = fullData.am_timestamp ? new Date(fullData.am_timestamp).toLocaleString() : 'N/A';
+    const pmTime = fullData.pm_timestamp ? new Date(fullData.pm_timestamp).toLocaleString() : 'N/A';
+    doc.text(`AM Time: ${amTime}`, margin + 20, currentY);
+    doc.text(`PM Time: ${pmTime}`, pageWidth / 2 + 20, currentY);
+    currentY += 30;
+    
+    // Cash Flow Summary
+    if (amTotal > 0) {
+      checkPageBreak(120);
+      doc.setFont('helvetica', 'bold');
+      doc.text('CASH FLOW SUMMARY', margin, currentY);
+      currentY += 20;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Starting Cash (AM): $${amTotal.toFixed(2)}`, margin + 20, currentY);
+      doc.text(`Toast Sales: $${toastSales.toFixed(2)}`, pageWidth / 2 + 20, currentY);
+      currentY += 15;
+      
+      doc.text(`Ending Cash (PM): $${pmTotal.toFixed(2)}`, margin + 20, currentY);
+      doc.text(`Original Tips: $${originalTips.toFixed(2)}`, pageWidth / 2 + 20, currentY);
+      currentY += 15;
+      
+      doc.text(`Actual Cash In: $${actualCashIn.toFixed(2)}`, margin + 20, currentY);
+      doc.text(`Discrepancy: ${discrepancySign}$${Math.abs(discrepancy).toFixed(2)}`, pageWidth / 2 + 20, currentY);
+      currentY += 30;
+    }
+    
+    // Deposit Instructions
+    if (fullData.pm_deposit_amount) {
+      checkPageBreak(50);
+      doc.setFont('helvetica', 'bold');
+      doc.setFillColor(230, 255, 230);
+      doc.rect(margin, currentY - 10, pageWidth - 2 * margin, 25, 'F');
+      doc.text(`DEPOSIT IN ENVELOPE: $${fullData.pm_deposit_amount}`, pageWidth / 2, currentY + 5, { align: 'center' });
+      currentY += 30;
+      
+      doc.setFillColor(255, 240, 230);
+      doc.rect(margin, currentY - 10, pageWidth - 2 * margin, 25, 'F');
+      const returnAmount = fullData.pm_amount_to_keep ? fullData.pm_amount_to_keep.toFixed(2) : '0.00';
+      doc.text(`RETURN TO CASHBOX/SAFE: $${returnAmount}`, pageWidth / 2, currentY + 5, { align: 'center' });
+      currentY += 40;
+    }
+    
+    // Notes Section
+    checkPageBreak(80);
+    doc.setFont('helvetica', 'bold');
+    doc.text('NOTES', margin, currentY);
+    currentY += 20;
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text('AM NOTES:', margin + 20, currentY);
+    doc.text('PM NOTES:', pageWidth / 2 + 20, currentY);
+    currentY += 15;
+    
+    const amNotes = fullData.am_notes || 'No AM Notes';
+    const pmNotes = fullData.pm_notes || 'No PM Notes';
+    doc.text(amNotes, margin + 20, currentY, { maxWidth: pageWidth / 2 - 60 });
+    doc.text(pmNotes, pageWidth / 2 + 20, currentY, { maxWidth: pageWidth / 2 - 60 });
+    currentY += 50;
+    
+    // Manager Breakdown
+    checkPageBreak(150);
+    doc.setFont('helvetica', 'bold');
+    doc.text('MANAGER BREAKDOWN', margin, currentY);
+    currentY += 20;
+    
+    doc.setFont('helvetica', 'normal');
+    const managerData = [
+      ['Starting Cash Total:', `$${amTotal.toFixed(2)}`],
+      ['Ending Cash Total:', `$${pmTotal.toFixed(2)}`],
+      ['Actual Cash In:', `$${actualCashIn.toFixed(2)}`],
+      ['Toast Sales Reported:', `$${toastSales.toFixed(2)}`],
+      ['Tips Reported by Staff:', `$${originalTips.toFixed(2)}`],
+      ['Discrepancy (Drawers vs Toast):', `${discrepancySign}$${Math.abs(discrepancy).toFixed(2)}`]
+    ];
+    
+    managerData.forEach(([label, value]) => {
+      checkPageBreak(15);
+      doc.text(label, margin + 20, currentY);
+      doc.text(value, pageWidth - margin - 100, currentY);
+      currentY += 15;
+    });
+    
+    currentY += 20;
+    
+    // Cash Count Breakdown
+    checkPageBreak(200);
+    doc.setFont('helvetica', 'bold');
+    doc.text('COMPLETE CASH COUNT BREAKDOWN', margin, currentY);
+    currentY += 25;
+    
+    // AM Counts
+    doc.setFont('helvetica', 'bold');
+    doc.text('AM COUNTS', margin + 20, currentY);
+    doc.text('PM COUNTS', pageWidth / 2 + 20, currentY);
+    currentY += 15;
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text('DRAWER 1', margin + 30, currentY);
+    doc.text('DRAWER 1', pageWidth / 2 + 30, currentY);
+    currentY += 15;
+    
+    // Show drawer totals
+    doc.text(`Total: $${fullData.am_drawer1_total ? fullData.am_drawer1_total.toFixed(2) : '0.00'}`, margin + 40, currentY);
+    doc.text(`Total: $${fullData.pm_drawer1_total ? fullData.pm_drawer1_total.toFixed(2) : '0.00'}`, pageWidth / 2 + 40, currentY);
+    currentY += 20;
+    
+    doc.text('DRAWER 2', margin + 30, currentY);
+    doc.text('DRAWER 2', pageWidth / 2 + 30, currentY);
+    currentY += 15;
+    
+    doc.text(`Total: $${fullData.am_drawer2_total ? fullData.am_drawer2_total.toFixed(2) : '0.00'}`, margin + 40, currentY);
+    doc.text(`Total: $${fullData.pm_drawer2_total ? fullData.pm_drawer2_total.toFixed(2) : '0.00'}`, pageWidth / 2 + 40, currentY);
+    currentY += 25;
+    
+    // Grand totals
+    doc.setFont('helvetica', 'bold');
+    doc.setFillColor(230, 243, 255);
+    doc.rect(margin + 20, currentY - 5, 150, 20, 'F');
+    doc.text(`TOTAL AM: $${amTotal.toFixed(2)}`, margin + 25, currentY + 8);
+    
+    doc.setFillColor(255, 248, 240);
+    doc.rect(pageWidth / 2 + 20, currentY - 5, 150, 20, 'F');
+    doc.text(`TOTAL PM: $${pmTotal.toFixed(2)}`, pageWidth / 2 + 25, currentY + 8);
+    
+    // Save PDF
+    const fileName = `Jayna_Gyro_Daily_Report_${reportDate}.pdf`;
+    doc.save(fileName);
+  }
+
   // Generate Single Day PDF Report
   async function generateSingleDayPDF(dayData, reportDate) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
     
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 40;
     let currentY = margin;
     
-    // Header
+    // Helper function to check for page break and add new page if needed
+    function checkPageBreak(requiredSpace) {
+      if (currentY + requiredSpace > pageHeight - margin) {
+        doc.addPage();
+        currentY = margin;
+        return true;
+      }
+      return false;
+    }
+    
+    // Helper function to add a colored section header
+    function addSectionHeader(title, color = [102, 126, 234]) {
+      checkPageBreak(35);
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.rect(margin, currentY, pageWidth - 2 * margin, 25, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(255, 255, 255);
+      doc.text(title, margin + 10, currentY + 16);
+      currentY += 35;
+      doc.setTextColor(0, 0, 0); // Reset text color
+    }
+    
+    // Header with enhanced styling
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(0, 0, 0);
-    doc.text('JAYNA GYRO DAILY REPORT', margin, currentY + 12);
+    doc.setFontSize(20);
+    doc.setTextColor(50, 50, 50);
+    doc.text('JAYNA GYRO DAILY REPORT', margin, currentY);
     
     currentY += 30;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`DATE: ${reportDate.toUpperCase()}`, margin, currentY);
-    doc.text(`NIGHT COUNTER: ${(dayData.night_counter || 'N/A').toUpperCase()}`, margin, currentY + 12);
-    doc.text(`GENERATED: ${new Date().toLocaleString().toUpperCase()}`, margin, currentY + 24);
+    const formattedDate = new Date(reportDate).toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
     
-    // Cash reconciliation summary
-    currentY += 50;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('DAILY CASH RECONCILIATION', margin, currentY);
+    doc.setFontSize(14);
+    doc.setTextColor(102, 126, 234);
+    doc.text(`${formattedDate.toUpperCase()}`, margin, currentY);
     
     currentY += 20;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated: ${new Date().toLocaleString().toUpperCase()}`, margin, currentY);
+    doc.text(`Night Counter: ${(dayData.night_counter || 'N/A').toUpperCase()}`, margin, currentY + 12);
+    
+    currentY += 35;
+    
+    // Summary Cards Section
+    addSectionHeader('📊 FINANCIAL SUMMARY', [102, 126, 234]);
+    
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     
     const summaryData = [
-      ['TOAST SALES REPORTED:', `$${dayData.toast_sales.toFixed(2)}`],
-      ['ACTUAL CASH IN:', `$${dayData.actual_cash_in.toFixed(2)}`],
-      ['DISCREPANCY:', `$${dayData.discrepancy.toFixed(2)}`],
-      ['EXCESS:', `$${dayData.excess.toFixed(2)}`]
+      ['TOAST SALES REPORTED:', `$${dayData.toast_sales?.toFixed(2) || '0.00'}`, [40, 167, 69]],
+      ['ACTUAL CASH COLLECTED:', `$${dayData.actual_cash_in?.toFixed(2) || '0.00'}`, [23, 162, 184]],
+      ['CASH DISCREPANCY:', `${dayData.discrepancy >= 0 ? '+' : ''}$${Math.abs(dayData.discrepancy || 0).toFixed(2)}`, dayData.discrepancy >= 0 ? [40, 167, 69] : [220, 53, 69]],
+      ['EXCESS TO TIPS:', `$${dayData.excess?.toFixed(2) || '0.00'}`, [111, 66, 193]]
     ];
     
     summaryData.forEach((row, index) => {
-      doc.text(row[0], margin, currentY + (index * 15));
-      doc.text(row[1], margin + 200, currentY + (index * 15));
+      checkPageBreak(20);
+      
+      // Background color for alternating rows
+      if (index % 2 === 0) {
+        doc.setFillColor(248, 249, 250);
+        doc.rect(margin, currentY - 5, pageWidth - 2 * margin, 18, 'F');
+      }
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(73, 80, 87);
+      doc.text(row[0], margin + 10, currentY + 8);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(row[2][0], row[2][1], row[2][2]);
+      const valueWidth = doc.getTextWidth(row[1]);
+      doc.text(row[1], pageWidth - margin - valueWidth - 10, currentY + 8);
+      
+      currentY += 18;
     });
     
-    // Add explanatory notes
-    currentY += 100;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(80, 80, 80);
-    doc.text('DAILY REPORT NOTES', margin, currentY);
+    currentY += 20;
     
-    currentY += 15;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(100, 100, 100);
+    // Performance Analysis Section
+    addSectionHeader('🎯 PERFORMANCE ANALYSIS', [240, 147, 251]);
     
-    const notes = [
-      'This daily report shows cash reconciliation for a single day.',
-      'DISCREPANCY: Actual Cash In - Expected Toast Sales (negative = short, positive = over)',
-      'EXCESS: Cash taken from tips to balance operations and account for discrepancies'
+    const variance = ((Math.abs(dayData.discrepancy || 0) / (dayData.toast_sales || 1)) * 100);
+    const accuracyStatus = Math.abs(dayData.discrepancy || 0) < 5 ? 'EXCELLENT (98%+)' : 
+                          Math.abs(dayData.discrepancy || 0) < 20 ? 'GOOD (95%+)' : 
+                          'NEEDS REVIEW (90%-)';
+    const statusColor = Math.abs(dayData.discrepancy || 0) < 5 ? [40, 167, 69] : 
+                       Math.abs(dayData.discrepancy || 0) < 20 ? [255, 193, 7] : 
+                       [220, 53, 69];
+    
+    const performanceData = [
+      ['ACCURACY RATING:', accuracyStatus, statusColor],
+      ['VARIANCE PERCENTAGE:', `${variance.toFixed(2)}%`, [108, 117, 125]],
+      ['OPERATIONAL STATUS:', Math.abs(dayData.discrepancy || 0) < 10 ? 'BALANCED ✓' : 'REVIEW NEEDED ⚠', Math.abs(dayData.discrepancy || 0) < 10 ? [40, 167, 69] : [255, 193, 7]]
     ];
     
-    notes.forEach((note, index) => {
-      doc.text(note, margin, currentY + (index * 10));
+    performanceData.forEach((row, index) => {
+      checkPageBreak(20);
+      
+      if (index % 2 === 0) {
+        doc.setFillColor(248, 249, 250);
+        doc.rect(margin, currentY - 5, pageWidth - 2 * margin, 18, 'F');
+      }
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(73, 80, 87);
+      doc.text(row[0], margin + 10, currentY + 8);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(row[2][0], row[2][1], row[2][2]);
+      const valueWidth = doc.getTextWidth(row[1]);
+      doc.text(row[1], pageWidth - margin - valueWidth - 10, currentY + 8);
+      
+      currentY += 18;
     });
     
-    // Developer credit
-    currentY += 50;
-    if (currentY < 700) {
+    currentY += 20;
+    
+    // Detailed Data Table Section
+    addSectionHeader('📋 COMPLETE DATA SUMMARY', [79, 172, 254]);
+    
+    const weekStart = new Date(dayData.weekly_combined_reports.week_start_date).toLocaleDateString();
+    const weekEnd = new Date(dayData.weekly_combined_reports.week_end_date).toLocaleDateString();
+    
+    const detailedData = [
+      ['Report Date:', formattedDate],
+      ['Night Counter:', dayData.night_counter || 'N/A'],
+      ['Toast Sales:', `$${dayData.toast_sales?.toFixed(2) || '0.00'}`],
+      ['Actual Cash In:', `$${dayData.actual_cash_in?.toFixed(2) || '0.00'}`],
+      ['Discrepancy:', `${dayData.discrepancy >= 0 ? '+' : ''}$${Math.abs(dayData.discrepancy || 0).toFixed(2)}`],
+      ['Excess Amount:', `$${dayData.excess?.toFixed(2) || '0.00'}`],
+      ['Report Week:', `${weekStart} - ${weekEnd}`],
+      ['Weekly Report By:', dayData.weekly_combined_reports.generated_by || 'N/A']
+    ];
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    
+    // Table headers
+    checkPageBreak(25);
+    doc.setFillColor(52, 58, 64);
+    doc.rect(margin, currentY, (pageWidth - 2 * margin) * 0.6, 20, 'F');
+    doc.rect(margin + (pageWidth - 2 * margin) * 0.6, currentY, (pageWidth - 2 * margin) * 0.4, 20, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.text('FIELD', margin + 10, currentY + 13);
+    doc.text('VALUE', margin + (pageWidth - 2 * margin) * 0.6 + 10, currentY + 13);
+    currentY += 20;
+    
+    // Table data
+    detailedData.forEach((row, index) => {
+      checkPageBreak(18);
+      
+      // Alternating row colors
+      const bgColor = index % 2 === 0 ? [248, 249, 250] : [255, 255, 255];
+      doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+      doc.rect(margin, currentY, pageWidth - 2 * margin, 18, 'F');
+      
+      // Border lines
+      doc.setDrawColor(222, 226, 230);
+      doc.setLineWidth(0.5);
+      doc.line(margin, currentY + 18, pageWidth - margin, currentY + 18);
+      doc.line(margin + (pageWidth - 2 * margin) * 0.6, currentY, margin + (pageWidth - 2 * margin) * 0.6, currentY + 18);
+      
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(0, 0, 0);
-      const creditText = 'Report Generation App designed and coded by Demetri Gregorakis';
-      const emailText = 'demetri_gregorakis@icloud.com for troubleshooting';
+      doc.setTextColor(73, 80, 87);
+      doc.text(row[0], margin + 10, currentY + 12);
       
-      const creditWidth = doc.getTextWidth(creditText);
-      const emailWidth = doc.getTextWidth(emailText);
-      const centerXCredit = (pageWidth - creditWidth) / 2;
-      const centerXEmail = (pageWidth - emailWidth) / 2;
-      
-      doc.text(creditText, centerXCredit, currentY);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.text(emailText, centerXEmail, currentY + 12);
+      doc.setTextColor(33, 37, 41);
+      doc.text(row[1], margin + (pageWidth - 2 * margin) * 0.6 + 10, currentY + 12);
+      
+      currentY += 18;
+    });
+    
+    currentY += 30;
+    
+    // Performance Benchmarks Section
+    addSectionHeader('🎯 PERFORMANCE BENCHMARKS', [255, 112, 67]);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(73, 80, 87);
+    
+    const benchmarks = [
+      '• EXCELLENT: Discrepancy under $5.00 (98%+ accuracy)',
+      '• GOOD: Discrepancy $5.00-$20.00 (95%+ accuracy)', 
+      '• REVIEW NEEDED: Discrepancy over $20.00 (requires management attention)',
+      '',
+      '• DISCREPANCY: Difference between expected and actual cash (negative = short, positive = over)',
+      '• EXCESS: Amount taken from tips to balance daily operations and account for variances'
+    ];
+    
+    benchmarks.forEach(benchmark => {
+      checkPageBreak(15);
+      doc.text(benchmark, margin + 10, currentY);
+      currentY += 15;
+    });
+    
+    // Footer
+    if (currentY < pageHeight - 100) {
+      currentY = pageHeight - 80;
+    } else {
+      checkPageBreak(80);
     }
     
-    // Save PDF
-    const filename = `Daily_Report_${reportDate.replace(/-/g, '_')}.pdf`;
+    doc.setDrawColor(222, 226, 230);
+    doc.setLineWidth(1);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+    currentY += 15;
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(73, 80, 87);
+    const creditText = 'Jayna Gyro Cash Counter v3.0+ | Report Generation App';
+    const emailText = 'Designed and coded by Demetri Gregorakis | demetri_gregorakis@icloud.com';
+    
+    const creditWidth = doc.getTextWidth(creditText);
+    const emailWidth = doc.getTextWidth(emailText);
+    const centerXCredit = (pageWidth - creditWidth) / 2;
+    const centerXEmail = (pageWidth - emailWidth) / 2;
+    
+    doc.text(creditText, centerXCredit, currentY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(108, 117, 125);
+    doc.text(emailText, centerXEmail, currentY + 12);
+    
+    // Save PDF with enhanced filename
+    const filename = `Jayna_Daily_Report_${reportDate.replace(/-/g, '_')}_Enhanced.pdf`;
     doc.save(filename);
   }
 
