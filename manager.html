@@ -1133,27 +1133,46 @@
             return dateStr.replace(/-/g, ''); // Convert YYYY-MM-DD to YYYYMMDD
           };
           
-          requestBody = {
+          // Build URL with query parameters like working APIs
+          const queryParams = new URLSearchParams({
             accessToken: toastToken,
             startDate: formatDateForToast(startDate),
             endDate: formatDateForToast(endDate),
-            pageSize: parseInt(pageSize)
-          };
+            pageSize: pageSize
+          });
+          
+          apiEndpoint += `?${queryParams.toString()}`;
+          
+          const response = await fetch(apiEndpoint, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
         } else if (endpoint.includes('/restaurants/v1/restaurants')) {
           apiEndpoint = '/api/toast-restaurant';
+          
+          const response = await fetch(apiEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ accessToken: toastToken })
+          });
         } else if (endpoint.includes('/menus/v2/menus')) {
           apiEndpoint = '/api/toast-menus';
+          
+          const response = await fetch(apiEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ accessToken: toastToken })
+          });
         } else {
           throw new Error(`Unsupported Toast API endpoint: ${endpoint}`);
         }
-        
-        const response = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
-        });
 
         if (!response.ok) {
           throw new Error(`Toast API error: ${response.status}`);
@@ -1169,7 +1188,9 @@
         console.error('❌ Toast API error:', error);
         throw error;
       }
-    }    // LiveMetrics Implementation - Real Toast + Homebase Data
+    }
+
+    // LiveMetrics Implementation - Real Toast + Homebase Data
     async function loadLiveMetrics() {
       console.log('📊 Loading Live Metrics with real Toast + Homebase data...');
       
