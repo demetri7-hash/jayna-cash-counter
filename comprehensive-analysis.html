@@ -260,6 +260,12 @@
             <button class="button" onclick="authenticateFirst()" id="authBtn">
                 🔐 Authenticate First
             </button>
+            <button class="button" onclick="runDetailedTDSAnalysis()" id="detailedAnalyzeBtn" style="background: #dc3545;">
+                🔬 DETAILED TDS ANALYSIS (Debug Mode)
+            </button>
+            <button class="button" onclick="exportRawData()" id="exportBtn" style="background: #6f42c1; display: none;">
+                📥 Export Raw Data JSON
+            </button>
         </div>
         
         <div id="results" class="results-section" style="display: none;">
@@ -447,6 +453,253 @@
         window.addEventListener('load', () => {
             authenticateFirst();
         });
+
+        // Global variable to store detailed analysis data
+        let detailedAnalysisData = null;
+
+        // DETAILED TDS ANALYSIS WITH ENHANCED LOGGING
+        async function runDetailedTDSAnalysis() {
+            if (!accessToken) {
+                alert('Please authenticate first!');
+                return;
+            }
+            
+            const analyzeBtn = document.getElementById('detailedAnalyzeBtn');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const exportBtn = document.getElementById('exportBtn');
+            
+            analyzeBtn.disabled = true;
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            
+            console.log('🔬 STARTING DETAILED TDS ANALYSIS WITH ENHANCED LOGGING');
+            console.log('Target amount: $481.83');
+            console.log('Date range: 2025-09-22 to 2025-09-28');
+            
+            try {
+                const response = await fetch('/api/toast-comprehensive-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        accessToken: accessToken,
+                        startDate: '2025-09-22',
+                        endDate: '2025-09-28'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log('🎯 COMPREHENSIVE ANALYSIS RAW RESPONSE:', data);
+                    
+                    // Store for export
+                    detailedAnalysisData = data;
+                    
+                    // Find the exact server GUID match
+                    const serverMatches = data.analysis.tipAnalysisByField.byServerGuid || {};
+                    console.log('👤 ALL SERVER GUID ANALYSIS:', serverMatches);
+                    
+                    // Look for exact $481.83 matches
+                    let exactMatches = [];
+                    Object.entries(serverMatches).forEach(([serverGuid, stats]) => {
+                        const netTipsDiff = Math.abs(stats.netTips - 481.83);
+                        const grossTipsDiff = Math.abs(stats.tips - 481.83);
+                        
+                        console.log(`📊 Server ${serverGuid}:`);
+                        console.log(`   - Orders: ${stats.orders}`);
+                        console.log(`   - Gross Tips: $${stats.tips.toFixed(2)} (diff: $${grossTipsDiff.toFixed(2)})`);
+                        console.log(`   - Voided Tips: $${stats.voidedTips.toFixed(2)}`);
+                        console.log(`   - Refunded Tips: $${stats.refundedTips.toFixed(2)}`);
+                        console.log(`   - Net Tips: $${stats.netTips.toFixed(2)} (diff: $${netTipsDiff.toFixed(2)})`);
+                        
+                        if (grossTipsDiff < 0.01) {
+                            console.log(`   🎯 GROSS MATCH FOUND! Server ${serverGuid} has EXACTLY $481.83 gross tips`);
+                            exactMatches.push({
+                                type: 'GROSS',
+                                serverGuid,
+                                amount: stats.tips,
+                                stats
+                            });
+                        }
+                        
+                        if (netTipsDiff < 0.01) {
+                            console.log(`   🎯 NET MATCH FOUND! Server ${serverGuid} has EXACTLY $481.83 net tips`);
+                            exactMatches.push({
+                                type: 'NET',
+                                serverGuid,
+                                amount: stats.netTips,
+                                stats
+                            });
+                        }
+                    });
+                    
+                    console.log('🔍 EXACT MATCHES FOUND:', exactMatches);
+                    
+                    if (exactMatches.length > 0) {
+                        exactMatches.forEach(match => {
+                            console.log(`✅ PERFECT MATCH: ${match.type} tips of $${match.amount.toFixed(2)} for server ${match.serverGuid}`);
+                            console.log(`   📈 Full stats:`, match.stats);
+                        });
+                    } else {
+                        console.log('❌ NO EXACT $481.83 MATCHES FOUND');
+                    }
+                    
+                    // Check potential matches (close to target)
+                    const potentialMatches = data.analysis.potentialMatches || [];
+                    console.log('🎯 POTENTIAL MATCHES:', potentialMatches);
+                    
+                    potentialMatches.forEach((match, index) => {
+                        console.log(`🔍 Potential Match ${index + 1}:`);
+                        console.log(`   - Field: ${match.fieldType} = ${match.fieldValue}`);
+                        console.log(`   - Orders: ${match.orders}`);
+                        console.log(`   - Gross Tips: $${match.grossTips.toFixed(2)}`);
+                        console.log(`   - Net Tips: $${match.netTips.toFixed(2)}`);
+                        console.log(`   - Voided Tips: $${match.voidedTips.toFixed(2)}`);
+                        console.log(`   - Refunded Tips: $${match.refundedTips.toFixed(2)}`);
+                        console.log(`   - Gross Accuracy: ${match.grossAccuracy.toFixed(2)}%`);
+                        console.log(`   - Net Accuracy: ${match.netAccuracy.toFixed(2)}%`);
+                    });
+                    
+                    // Show export button
+                    exportBtn.style.display = 'inline-block';
+                    
+                    // Display results with enhanced info
+                    displayDetailedResults(data, exactMatches);
+                } else {
+                    throw new Error(data.error || 'Analysis failed');
+                }
+            } catch (error) {
+                console.error('❌ DETAILED ANALYSIS ERROR:', error);
+                alert('Analysis failed: ' + error.message);
+            } finally {
+                analyzeBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        // Export raw data function
+        function exportRawData() {
+            if (!detailedAnalysisData) {
+                alert('No data to export. Run the detailed analysis first.');
+                return;
+            }
+            
+            const dataStr = JSON.stringify(detailedAnalysisData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `tds-comprehensive-analysis-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            console.log('📥 Raw data exported successfully');
+        }
+
+        // Enhanced results display
+        function displayDetailedResults(data, exactMatches) {
+            const results = document.getElementById('results');
+            const summaryStats = document.getElementById('summaryStats');
+            const potentialMatches = document.getElementById('potentialMatches');
+            const fieldAnalysis = document.getElementById('fieldAnalysis');
+            
+            // Enhanced summary with exact matches
+            summaryStats.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${data.analysis.totalOrders}</div>
+                    <div class="stat-label">Total Orders</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">$${data.actualTotal.toFixed(2)}</div>
+                    <div class="stat-label">Total Tips Found</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${exactMatches.length}</div>
+                    <div class="stat-label">EXACT $481.83 Matches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.analysis.potentialMatches.length}</div>
+                    <div class="stat-label">Potential Matches</div>
+                </div>
+            `;
+            
+            // Show exact matches prominently
+            if (exactMatches.length > 0) {
+                potentialMatches.innerHTML = `
+                    <div class="result-card" style="background: #d4edda; border: 2px solid #28a745;">
+                        <h4>🎯 EXACT $481.83 MATCHES FOUND!</h4>
+                        ${exactMatches.map(match => `
+                            <div class="field-item" style="background: #f8fff9; border: 1px solid #28a745; margin: 10px 0; padding: 15px; border-radius: 8px;">
+                                <div class="field-name" style="font-size: 16px; font-weight: bold; color: #28a745;">
+                                    🏆 ${match.type} MATCH: Server ${match.serverGuid}
+                                </div>
+                                <div class="field-stats" style="margin-top: 10px;">
+                                    <span class="orders-count">${match.stats.orders} orders</span>
+                                    <span class="tips-amount">Gross: $${match.stats.tips.toFixed(2)}</span>
+                                    <span class="tips-amount">Net: $${match.stats.netTips.toFixed(2)}</span>
+                                    ${match.stats.voidedTips > 0 ? `<span class="voided-tips">Voided: $${match.stats.voidedTips.toFixed(2)}</span>` : ''}
+                                    ${match.stats.refundedTips > 0 ? `<span class="refunded-tips">Refunded: $${match.stats.refundedTips.toFixed(2)}</span>` : ''}
+                                    <span class="match-indicator exact-match">PERFECT MATCH!</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                potentialMatches.innerHTML = `
+                    <div class="result-card" style="background: #fff3cd; border: 2px solid #ffc107;">
+                        <h4>⚠️ NO EXACT $481.83 MATCHES</h4>
+                        <p>No server GUID found with exactly $481.83 in tips. Check potential matches below.</p>
+                    </div>
+                `;
+            }
+            
+            // Continue with regular field analysis display
+            const fieldTypes = [
+                { key: 'byServerGuid', title: '👤 Tips by Server GUID' },
+                { key: 'byDiningOption', title: '🍽️ Tips by Dining Option' },
+                { key: 'bySource', title: '📱 Tips by Source' },
+                { key: 'byHour', title: '🕐 Tips by Hour' },
+                { key: 'byPaymentType', title: '💳 Tips by Payment Type' }
+            ];
+            
+            fieldAnalysis.innerHTML = fieldTypes.map(fieldType => {
+                const fieldData = data.analysis.tipAnalysisByField[fieldType.key] || {};
+                const sortedEntries = Object.entries(fieldData)
+                    .sort((a, b) => b[1].netTips - a[1].netTips)
+                    .slice(0, 10);
+                    
+                return `
+                    <div class="result-card">
+                        <h4>${fieldType.title}</h4>
+                        ${sortedEntries.map(([fieldValue, stats]) => {
+                            const isClose = Math.abs(stats.netTips - 481.83) <= 50;
+                            const matchClass = isClose ? (Math.abs(stats.netTips - 481.83) <= 10 ? 'exact-match' : 'close-match') : '';
+                            
+                            return `
+                                <div class="field-item">
+                                    <div class="field-name">${fieldValue || 'null'}</div>
+                                    <div class="field-stats">
+                                        <span class="orders-count">${stats.orders} orders</span>
+                                        <span class="tips-amount">Gross: $${(stats.tips || 0).toFixed(2)}</span>
+                                        <span class="tips-amount">Net: $${(stats.netTips || 0).toFixed(2)}</span>
+                                        ${stats.voidedTips > 0 ? `<span class="voided-tips">-$${stats.voidedTips.toFixed(2)} voided</span>` : ''}
+                                        ${stats.refundedTips > 0 ? `<span class="refunded-tips">-$${stats.refundedTips.toFixed(2)} refunded</span>` : ''}
+                                        ${isClose ? `<span class="match-indicator ${matchClass}">NET MATCH!</span>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }).join('');
+            
+            results.style.display = 'block';
+        }
     </script>
 </body>
 </html>
