@@ -23,14 +23,8 @@ export default async function handler(req, res) {
             });
         }
         
-        const restaurantId = process.env.TOAST_RESTAURANT_ID;
-        const toastApiUrl = process.env.TOAST_API_URL;
-        
-        if (!restaurantId || !toastApiUrl) {
-            return res.status(500).json({ 
-                error: 'Missing Toast API configuration' 
-            });
-        }
+        const restaurantId = process.env.TOAST_RESTAURANT_GUID || 'd3efae34-7c2e-4107-a442-49081e624706';
+        const toastApiUrl = process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com';
         
         console.log(`Starting cash calculation for business date: ${businessDate}`);
         
