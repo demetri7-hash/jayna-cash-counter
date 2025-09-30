@@ -35,14 +35,26 @@ export default async function handler(req, res) {
       restaurantGuid: process.env.TOAST_RESTAURANT_GUID || '9ac790ee-e6af-4c96-ae73-93d442db6810'
     };
 
+    // Convert YYYYMMDD format to ISO-8601 format required by Toast orders API
+    const formatToISO8601 = (yyyymmdd) => {
+      if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd;
+      const year = yyyymmdd.substring(0, 4);
+      const month = yyyymmdd.substring(4, 6);
+      const day = yyyymmdd.substring(6, 8);
+      return `${year}-${month}-${day}T00:00:00.000-0800`; // Using Pacific Time
+    };
+
     // Build the API URL with parameters
     let ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/orders?pageSize=${pageSize}`;
     
     if (startDate) {
-      ordersUrl += `&startDate=${startDate}`;
+      const isoStartDate = encodeURIComponent(formatToISO8601(startDate));
+      ordersUrl += `&startDate=${isoStartDate}`;
     }
     if (endDate) {
-      ordersUrl += `&endDate=${endDate}`;
+      // For end date, set to end of day to include all orders for that date
+      const isoEndDate = encodeURIComponent(formatToISO8601(endDate).replace('T00:00:00', 'T23:59:59'));
+      ordersUrl += `&endDate=${isoEndDate}`;
     }
 
     console.log(`Orders URL: ${ordersUrl}`);
