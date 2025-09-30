@@ -614,6 +614,14 @@
           <input type="hidden" id="toastSales" value="0">
         </div>
         
+        <!-- Discrepancy Validation Section -->
+        <div id="discrepancySection" class="form-group" style="display: none;">
+          <label>Cash Count vs Toast Sales Validation:</label>
+          <div id="discrepancyDisplay" style="border-radius: 12px; padding: 20px; margin-bottom: 10px;">
+            <!-- Dynamic content will be inserted here -->
+          </div>
+        </div>
+        
         <div class="form-group">
           <label for="cashTips">Cash Tips (whole number):</label>
           <input type="number" id="cashTips" class="currency-input" placeholder="0" step="1" min="0" inputmode="numeric" pattern="[0-9]*" onfocus="this.select()">
@@ -1661,6 +1669,13 @@
       
       console.log('Toast cash sales auto-fetched successfully:', autoCalculatedToastAmount);
       
+      // Trigger discrepancy validation if we're in PM mode
+      const pmGrandTotal = document.getElementById('pmGrandTotal');
+      if (pmGrandTotal && pmGrandTotal.textContent !== '$0.00') {
+        const pmTotal = parseFloat(pmGrandTotal.textContent.replace('$', '').replace(',', '')) || 0;
+        validatePMDiscrepancy(pmTotal);
+      }
+      
     } catch (error) {
       console.error('Toast API auto-fetch error:', error);
       
@@ -2090,6 +2105,110 @@
     
     const grandTotal = drawer1Total + drawer2Total;
     document.getElementById(`${shift}GrandTotal`).textContent = `$${grandTotal.toFixed(2)}`;
+    
+    // Add discrepancy validation for PM shift only
+    if (shift === 'pm') {
+      validatePMDiscrepancy(grandTotal);
+    }
+  }
+
+  function validatePMDiscrepancy(pmTotal) {
+    const discrepancySection = document.getElementById('discrepancySection');
+    const discrepancyDisplay = document.getElementById('discrepancyDisplay');
+    
+    // Get AM total and Toast sales
+    const amTotalText = document.getElementById('pmAmTotal').textContent;
+    const toastSales = autoCalculatedToastAmount || 0;
+    
+    // Only validate if we have all necessary data
+    if (!amTotalText || amTotalText === 'Loading...' || amTotalText === 'Please select a date' || toastSales === 0) {
+      discrepancySection.style.display = 'none';
+      return;
+    }
+    
+    const amTotal = parseFloat(amTotalText.replace('$', '').replace(',', '')) || 0;
+    const netCashChange = pmTotal - amTotal; // This should equal Toast sales
+    const discrepancy = netCashChange - toastSales;
+    const absDiscrepancy = Math.abs(discrepancy);
+    
+    // Show the section
+    discrepancySection.style.display = 'block';
+    
+    // Determine warning level and styling
+    let borderColor, backgroundColor, textColor, warningLevel, warningMessage, warningIcon;
+    
+    if (absDiscrepancy <= 3) {
+      // Good - within $3
+      borderColor = '#28a745';
+      backgroundColor = '#d4edda';
+      textColor = '#155724';
+      warningLevel = '✅ GOOD';
+      warningMessage = 'Cash count matches Toast sales within acceptable range.';
+      warningIcon = '✅';
+    } else if (absDiscrepancy <= 10) {
+      // Warning - $3-$10
+      borderColor = '#ffc107';
+      backgroundColor = '#fff3cd';
+      textColor = '#856404';
+      warningLevel = '⚠️ SUGGESTION';
+      warningMessage = 'Consider recounting your cash to ensure accuracy, but you may proceed if confident.';
+      warningIcon = '⚠️';
+    } else {
+      // Severe - over $10
+      borderColor = '#dc3545';
+      backgroundColor = '#f8d7da';
+      textColor = '#721c24';
+      warningLevel = '🚨 IMPORTANT';
+      warningMessage = 'Significant discrepancy detected. Please recount everything carefully or confirm you want to proceed.';
+      warningIcon = '🚨';
+    }
+    
+    // Add special message for negative discrepancies
+    let negativeWarning = '';
+    if (discrepancy < 0) {
+      negativeWarning = `<div style="background: rgba(220, 53, 69, 0.1); padding: 8px; border-radius: 6px; font-size: 13px; margin-top: 10px;">
+        <strong>💰 Cash Tips Impact:</strong> This ${Math.abs(discrepancy).toFixed(2)} shortage will be deducted from cash tips. Please verify your count is accurate.
+      </div>`;
+    }
+    
+    discrepancyDisplay.style.border = `2px solid ${borderColor}`;
+    discrepancyDisplay.style.background = backgroundColor;
+    discrepancyDisplay.style.color = textColor;
+    
+    discrepancyDisplay.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <span style="font-weight: 700; font-size: 16px;">${warningIcon} Cash vs Toast Validation</span>
+        <span style="background: ${borderColor}; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;">
+          ${warningLevel}
+        </span>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 15px 0; text-align: center;">
+        <div>
+          <div style="font-size: 12px; opacity: 0.8;">Net Cash Change</div>
+          <div style="font-size: 24px; font-weight: bold;">$${netCashChange.toFixed(2)}</div>
+          <div style="font-size: 11px; opacity: 0.7;">PM Total - AM Total</div>
+        </div>
+        <div>
+          <div style="font-size: 12px; opacity: 0.8;">Toast Sales</div>
+          <div style="font-size: 24px; font-weight: bold;">$${toastSales.toFixed(2)}</div>
+          <div style="font-size: 11px; opacity: 0.7;">Expected Amount</div>
+        </div>
+        <div>
+          <div style="font-size: 12px; opacity: 0.8;">Discrepancy</div>
+          <div style="font-size: 24px; font-weight: bold; color: ${discrepancy >= 0 ? borderColor : '#dc3545'};">
+            ${discrepancy >= 0 ? '+' : ''}$${discrepancy.toFixed(2)}
+          </div>
+          <div style="font-size: 11px; opacity: 0.7;">${discrepancy >= 0 ? 'Overage' : 'Shortage'}</div>
+        </div>
+      </div>
+      
+      <div style="background: rgba(${borderColor === '#28a745' ? '40, 167, 69' : borderColor === '#ffc107' ? '255, 193, 7' : '220, 53, 69'}, 0.1); padding: 10px; border-radius: 6px; font-size: 13px; text-align: center;">
+        <strong>${warningMessage}</strong>
+      </div>
+      
+      ${negativeWarning}
+    `;
   }
   
   async function loadAMData() {
