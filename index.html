@@ -5997,14 +5997,15 @@
           
           const deliveryData = await deliveryResponse.json();
           if (deliveryData.success && deliveryData.data) {
-            // Extract net tips from delivery analysis data
+            // Extract net tips from delivery analysis data - use the raw number like comprehensive test
             const dayTips = deliveryData.data.deliveryAnalysis?.totalDeliveryTips || 0;
             const dayOrders = deliveryData.data.deliveryAnalysis?.totalOrders || 0;
             
             totalNetTips += dayTips;
             totalOrderCount += dayOrders;
             
-            console.log(`${dateStr}: ${dayOrders} orders, $${dayTips} tips`);
+            console.log(`${dateStr}: ${dayOrders} orders, $${dayTips} tips (running total: $${totalNetTips})`);
+            console.log(`Full response for ${dateStr}:`, deliveryData.data.deliveryAnalysis);
           }
         } catch (dayError) {
           console.warn(`Failed to fetch TDS data for ${dateStr}:`, dayError.message);
