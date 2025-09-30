@@ -1022,48 +1022,177 @@
       return ((current - previous) / previous) * 100;
     }
 
+    // TopItems Implementation - Real Toast Menu Analytics
     async function loadTopItems() {
-      console.log('🏆 Loading Top Items...');
+      console.log('🏆 Loading Top Items with real Toast menu analytics...');
       
       try {
-        // TODO: Implement top items with real Toast menu data
-        const itemsHTML = `
+        // Get comprehensive menu performance data
+        const menuAnalytics = await getToastMenuAnalytics();
+        
+        // Analyze and rank top items
+        const topItems = analyzeTopSellingItems(menuAnalytics);
+        
+        // Render top items list
+        const itemsHTML = topItems.map(item => `
           <div class="item-row">
             <div class="item-info">
-              <div class="item-name">Gyro Platter</div>
-              <div class="item-stats">23 orders • $347.00</div>
+              <div class="item-name">${item.name}</div>
+              <div class="item-stats">${item.orders} orders • $${item.revenue.toFixed(2)}</div>
             </div>
-            <div class="item-trend trend-up">↗️ +15%</div>
+            <div class="item-trend ${item.trend.class}">${item.trend.icon} ${item.trend.text}</div>
           </div>
-          <div class="item-row">
-            <div class="item-info">
-              <div class="item-name">Chicken Shawarma</div>
-              <div class="item-stats">18 orders • $234.00</div>
-            </div>
-            <div class="item-trend trend-up">↗️ +8%</div>
-          </div>
-          <div class="item-row">
-            <div class="item-info">
-              <div class="item-name">Falafel Bowl</div>
-              <div class="item-stats">15 orders • $195.00</div>
-            </div>
-            <div class="item-trend trend-stable">→ 0%</div>
-          </div>
-          <div class="item-row">
-            <div class="item-info">
-              <div class="item-name">Greek Salad</div>
-              <div class="item-stats">12 orders • $144.00</div>
-            </div>
-            <div class="item-trend trend-down">↘️ -5%</div>
-          </div>
-        `;
+        `).join('');
         
         document.getElementById('top-items-list').innerHTML = itemsHTML;
-        console.log('✅ Top Items loaded');
+        console.log('✅ Top Items loaded with real menu analytics:', topItems);
         
       } catch (error) {
         console.error('❌ Error loading Top Items:', error);
-        document.getElementById('top-items-list').innerHTML = '<div class="error">Failed to load top items</div>';
+        document.getElementById('top-items-list').innerHTML = '<div class="error">Failed to load top items: ' + error.message + '</div>';
+      }
+    }
+
+    // Get Toast menu analytics with order performance
+    async function getToastMenuAnalytics() {
+      try {
+        const today = new Date();
+        const weekAgo = new Date(today);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const twoWeeksAgo = new Date(today);
+        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+        
+        // Format dates
+        const todayStr = today.toISOString().split('T')[0];
+        const weekAgoStr = weekAgo.toISOString().split('T')[0];
+        const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
+        
+        // Fetch menu data and recent orders with selections
+        const [menuData, recentOrders, previousWeekOrders] = await Promise.all([
+          callToastAPI('/menus/v2/menus'),
+          callToastAPI(`/orders/v2/orders?startDate=${weekAgoStr}&endDate=${todayStr}&pageSize=500`),
+          callToastAPI(`/orders/v2/orders?startDate=${twoWeeksAgoStr}&endDate=${weekAgoStr}&pageSize=500`)
+        ]);
+        
+        return {
+          menus: menuData,
+          recentOrders: recentOrders,
+          previousWeekOrders: previousWeekOrders
+        };
+        
+      } catch (error) {
+        console.error('❌ Toast menu analytics error:', error);
+        throw new Error('Failed to fetch menu analytics data');
+      }
+    }
+
+    // Analyze top-selling items from orders data
+    function analyzeTopSellingItems(analytics) {
+      // Create menu item lookup map
+      const menuItemMap = createMenuItemMap(analytics.menus);
+      
+      // Analyze recent week performance
+      const recentPerformance = analyzeOrderItems(analytics.recentOrders, menuItemMap);
+      
+      // Analyze previous week for trend comparison
+      const previousPerformance = analyzeOrderItems(analytics.previousWeekOrders, menuItemMap);
+      
+      // Create top items with trends
+      const topItems = Object.values(recentPerformance)
+        .sort((a, b) => b.orders - a.orders) // Sort by order count
+        .slice(0, 5) // Top 5 items
+        .map(item => {
+          const previousItem = previousPerformance[item.guid] || { orders: 0, revenue: 0 };
+          const trend = calculateItemTrend(item, previousItem);
+          
+          return {
+            ...item,
+            trend
+          };
+        });
+      
+      return topItems;
+    }
+
+    // Create menu item lookup map from Toast menu data
+    function createMenuItemMap(menuData) {
+      const itemMap = {};
+      
+      if (!menuData || !Array.isArray(menuData)) return itemMap;
+      
+      menuData.forEach(menu => {
+        if (menu.items && Array.isArray(menu.items)) {
+          menu.items.forEach(item => {
+            itemMap[item.guid] = {
+              guid: item.guid,
+              name: item.name || 'Unknown Item',
+              price: item.price || 0,
+              category: menu.name || 'Uncategorized'
+            };
+          });
+        }
+      });
+      
+      return itemMap;
+    }
+
+    // Analyze items from orders data
+    function analyzeOrderItems(orders, menuItemMap) {
+      const itemPerformance = {};
+      
+      orders.forEach(order => {
+        if (order.selections && Array.isArray(order.selections)) {
+          order.selections.forEach(selection => {
+            if (selection.item && selection.item.guid) {
+              const itemGuid = selection.item.guid;
+              const menuItem = menuItemMap[itemGuid];
+              
+              if (menuItem) {
+                if (!itemPerformance[itemGuid]) {
+                  itemPerformance[itemGuid] = {
+                    guid: itemGuid,
+                    name: menuItem.name,
+                    category: menuItem.category,
+                    orders: 0,
+                    revenue: 0,
+                    quantity: 0
+                  };
+                }
+                
+                const quantity = selection.quantity || 1;
+                const price = (selection.price || menuItem.price || 0) / 100; // Toast prices in cents
+                
+                itemPerformance[itemGuid].orders += 1;
+                itemPerformance[itemGuid].quantity += quantity;
+                itemPerformance[itemGuid].revenue += price * quantity;
+              }
+            }
+          });
+        }
+      });
+      
+      return itemPerformance;
+    }
+
+    // Calculate trend for an item compared to previous period
+    function calculateItemTrend(currentItem, previousItem) {
+      const currentOrders = currentItem.orders;
+      const previousOrders = previousItem.orders;
+      
+      if (previousOrders === 0) {
+        return currentOrders > 0 ? 
+          { class: 'trend-up', icon: '↗️', text: 'NEW!' } :
+          { class: 'trend-stable', icon: '→', text: '0%' };
+      }
+      
+      const changePercent = ((currentOrders - previousOrders) / previousOrders) * 100;
+      
+      if (changePercent > 10) {
+        return { class: 'trend-up', icon: '↗️', text: `+${changePercent.toFixed(0)}%` };
+      } else if (changePercent < -10) {
+        return { class: 'trend-down', icon: '↘️', text: `${changePercent.toFixed(0)}%` };
+      } else {
+        return { class: 'trend-stable', icon: '→', text: `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(0)}%` };
       }
     }
 
