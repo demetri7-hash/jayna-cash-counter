@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     // Homebase API credentials from environment variables
     const HOMEBASE_CONFIG = {
       baseUrl: process.env.HOMEBASE_BASE_URL || 'https://app.joinhomebase.com/api/public',
-      apiKey: process.env.HOMEBASE_API_KEY || 'your_homebase_api_key_here'
+      apiKey: process.env.HOMEBASE_API_KEY || 'xRHgIepMv-XB58UK8D1hoJwh1ALNPoH1PvPiwrLhoTM'
     };
 
     // Parse endpoint if it contains query parameters
