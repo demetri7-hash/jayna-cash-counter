@@ -13,8 +13,7 @@
   <!-- Chart.js for SalesChart component -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
-  <!-- Supabase Client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- API Integration - Uses Vercel endpoints like index.html -->
   
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -301,7 +300,9 @@
     
     /* TopItems Styles */
     .items-list {
-      space-y: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
     
     .item-row {
@@ -996,16 +997,13 @@
       HOMEBASE_LOCATION_UUID: '0b6c1af3-4904-4b84-ae5f-d1172d77de27',
       HOMEBASE_BASE_URL: 'https://app.joinhomebase.com/api/public',
       
-      // Supabase (from existing app)
-      SUPABASE_URL: 'https://poxfcqjmdivnfftqccjq.supabase.co',
-      SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBveGZjcWptZGl2bmZmdHFjY2pxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjczNzI2ODIsImV4cCI6MjA0Mjk0ODY4Mn0.j9zlgzFNLWkJ4zqYS0TCMBDVKFtVyRnJcdWYgpEpGWU'
+      // API Endpoints (uses Vercel functions like index.html)
+      API_BASE: '/api'
     };
-
-    // Initialize Supabase client
-    const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
     // Global state
     let toastToken = null;
+    let tokenExpiry = null;
     let salesChart = null;
     let laborChart = null;
     let currentPeriod = 'day';
@@ -1040,84 +1038,132 @@
       }
     }
 
-    // Toast API Authentication
+    // Toast Authentication - Using Vercel API like index.html
     async function getToastToken() {
-      if (toastToken) return toastToken;
-      
       try {
-        const response = await fetch(`${CONFIG.TOAST_BASE_URL}/authentication/v1/authentication/login`, {
+        // Check if we have a valid cached token
+        if (toastToken && tokenExpiry && Date.now() < tokenExpiry) {
+          return toastToken;
+        }
+        
+        console.log('🔐 Authenticating with Toast API via Vercel endpoint...');
+        
+        const response = await fetch('/api/toast-auth', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            clientId: CONFIG.TOAST_CLIENT_ID,
-            clientSecret: CONFIG.TOAST_CLIENT_SECRET,
-            userAccessType: 'TOAST_MACHINE_CLIENT'
-          })
+            'Content-Type': 'application/json'
+          }
         });
 
-        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(`Authentication failed: ${response.status}`);
+        }
+
+        const authData = await response.json();
         
-        if (data.status === 'SUCCESS' && data.token) {
-          toastToken = data.token.accessToken;
+        if (authData.success && authData.data && authData.data.accessToken) {
+          toastToken = authData.data.accessToken;
+          // Tokens typically expire in 1 hour
+          tokenExpiry = Date.now() + (50 * 60 * 1000); // 50 minutes for safety
           console.log('✅ Toast authentication successful');
           return toastToken;
         } else {
-          throw new Error('Toast authentication failed');
+          throw new Error('Invalid authentication response');
         }
       } catch (error) {
-        console.error('❌ Toast authentication error:', error);
+        console.error('❌ Toast authentication failed:', error);
         throw error;
       }
     }
 
-    // Homebase API Helper
+    // Homebase API Helper - Using Vercel API
     async function callHomebaseAPI(endpoint) {
       try {
-        const response = await fetch(`${CONFIG.HOMEBASE_BASE_URL}${endpoint}`, {
+        console.log('🏠 Calling Homebase API via Vercel:', endpoint);
+        
+        const response = await fetch('/api/homebase-proxy', {
+          method: 'POST',
           headers: {
-            'Authorization': `Bearer ${CONFIG.HOMEBASE_API_KEY}`,
-            'Accept': 'application/vnd.homebase-v1+json'
-          }
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            endpoint: endpoint
+          })
         });
 
         if (!response.ok) {
           throw new Error(`Homebase API error: ${response.status}`);
         }
 
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.error || 'Homebase API request failed');
+        }
+
+        return result.data;
       } catch (error) {
         console.error('❌ Homebase API error:', error);
         throw error;
       }
     }
 
-    // Toast API Helper
+    // Toast API Helper - Using Vercel API
     async function callToastAPI(endpoint) {
       try {
         await getToastToken();
         
-        const response = await fetch(`${CONFIG.TOAST_BASE_URL}${endpoint}`, {
+        console.log('🍞 Calling Toast API via Vercel:', endpoint);
+        
+        // Use different endpoints based on the API call
+        let apiEndpoint;
+        let requestBody = { accessToken: toastToken };
+        
+        if (endpoint.includes('/orders/v2/orders')) {
+          apiEndpoint = '/api/toast-orders-flexible';
+          
+          // Extract date parameters from endpoint
+          const urlParams = new URLSearchParams(endpoint.split('?')[1] || '');
+          const startDate = urlParams.get('startDate');
+          const endDate = urlParams.get('endDate');
+          const pageSize = urlParams.get('pageSize') || '100';
+          
+          requestBody = {
+            accessToken: toastToken,
+            startDate: startDate,
+            endDate: endDate,
+            pageSize: parseInt(pageSize)
+          };
+        } else if (endpoint.includes('/restaurants/v1/restaurants')) {
+          apiEndpoint = '/api/toast-restaurant';
+        } else if (endpoint.includes('/menus/v2/menus')) {
+          apiEndpoint = '/api/toast-menus';
+        } else {
+          throw new Error(`Unsupported Toast API endpoint: ${endpoint}`);
+        }
+        
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
           headers: {
-            'Authorization': `Bearer ${toastToken}`,
-            'Toast-Restaurant-External-ID': CONFIG.TOAST_RESTAURANT_GUID
-          }
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
           throw new Error(`Toast API error: ${response.status}`);
         }
 
-        return await response.json();
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.error || 'Toast API request failed');
+        }
+
+        return result.data;
       } catch (error) {
         console.error('❌ Toast API error:', error);
         throw error;
       }
-    }
-
-    // LiveMetrics Implementation - Real Toast + Homebase Data
+    }    // LiveMetrics Implementation - Real Toast + Homebase Data
     async function loadLiveMetrics() {
       console.log('📊 Loading Live Metrics with real Toast + Homebase data...');
       
