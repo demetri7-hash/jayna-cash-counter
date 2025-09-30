@@ -5950,12 +5950,25 @@
       let totalNetTips = 0;
       let totalOrderCount = 0;
       
-      // Process each date in the range
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      // Process each date in the range with proper Pacific timezone handling
+      const dates = [];
+      const start = new Date(startDate + 'T00:00:00-07:00'); // Pacific timezone
+      const end = new Date(endDate + 'T00:00:00-07:00');     // Pacific timezone
       
-      for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
-        const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      // Generate exact date strings to match comprehensive test
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        // Format as YYYY-MM-DD in Pacific timezone
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        dates.push(dateStr);
+      }
+      
+      console.log('Processing dates for TDS fetch:', dates);
+      
+      // Process each date individually like the comprehensive test
+      for (const dateStr of dates) {
         
         try {
           // Use the delivery analysis API with POST method and proper authentication
