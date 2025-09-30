@@ -858,41 +858,168 @@
       return timecards.length * 15; // Placeholder: $15/hour average
     }
 
+    // StatsCards Implementation - Real Toast Analytics Data
     async function loadStatsCards() {
-      console.log('📈 Loading Stats Cards...');
+      console.log('📈 Loading Stats Cards with real Toast analytics...');
       
       try {
-        // TODO: Implement stats cards with real Toast data
+        // Get comprehensive Toast analytics data
+        const analyticsData = await getToastAnalyticsData();
+        
+        // Calculate trend comparisons
+        const stats = calculateStatsWithTrends(analyticsData);
+        
+        // Render stats cards
         const statsHTML = `
           <div class="stat-card">
-            <div class="stat-value">$1,247.50</div>
+            <div class="stat-value">${stats.revenue.value}</div>
             <div class="stat-label">Today's Revenue</div>
-            <div class="stat-change positive">+5.2% vs yesterday</div>
+            <div class="stat-change ${stats.revenue.changeType}">${stats.revenue.change}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-value">87</div>
+            <div class="stat-value">${stats.orders.value}</div>
             <div class="stat-label">Orders Today</div>
-            <div class="stat-change positive">+12% vs yesterday</div>
+            <div class="stat-change ${stats.orders.changeType}">${stats.orders.change}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-value">$14.34</div>
+            <div class="stat-value">${stats.avgOrder.value}</div>
             <div class="stat-label">Avg Order Value</div>
-            <div class="stat-change negative">-2.1% vs last week</div>
+            <div class="stat-change ${stats.avgOrder.changeType}">${stats.avgOrder.change}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-value">156</div>
-            <div class="stat-label">Menu Items</div>
-            <div class="stat-change positive">3 new items</div>
+            <div class="stat-value">${stats.menuItems.value}</div>
+            <div class="stat-label">Active Items</div>
+            <div class="stat-change ${stats.menuItems.changeType}">${stats.menuItems.change}</div>
           </div>
         `;
         
         document.getElementById('stats-cards-grid').innerHTML = statsHTML;
-        console.log('✅ Stats Cards loaded');
+        console.log('✅ Stats Cards loaded with real analytics:', stats);
         
       } catch (error) {
         console.error('❌ Error loading Stats Cards:', error);
-        document.getElementById('stats-cards-grid').innerHTML = '<div class="error">Failed to load revenue stats</div>';
+        document.getElementById('stats-cards-grid').innerHTML = '<div class="error">Failed to load revenue stats: ' + error.message + '</div>';
       }
+    }
+
+    // Get comprehensive Toast analytics data
+    async function getToastAnalyticsData() {
+      try {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const lastWeek = new Date(today);
+        lastWeek.setDate(lastWeek.getDate() - 7);
+        
+        // Format dates for Toast API
+        const todayStr = today.toISOString().split('T')[0];
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const lastWeekStr = lastWeek.toISOString().split('T')[0];
+        
+        // Fetch data in parallel
+        const [todayOrders, yesterdayOrders, lastWeekOrders, menuItems] = await Promise.all([
+          callToastAPI(`/orders/v2/orders?startDate=${todayStr}&endDate=${todayStr}&pageSize=200`),
+          callToastAPI(`/orders/v2/orders?startDate=${yesterdayStr}&endDate=${yesterdayStr}&pageSize=200`),
+          callToastAPI(`/orders/v2/orders?startDate=${lastWeekStr}&endDate=${lastWeekStr}&pageSize=200`),
+          callToastAPI('/menus/v2/menus')
+        ]);
+        
+        return {
+          today: analyzeOrders(todayOrders),
+          yesterday: analyzeOrders(yesterdayOrders),
+          lastWeek: analyzeOrders(lastWeekOrders),
+          menuItems: analyzeMenuItems(menuItems)
+        };
+        
+      } catch (error) {
+        console.error('❌ Toast analytics error:', error);
+        throw new Error('Failed to fetch Toast analytics data');
+      }
+    }
+
+    // Analyze orders data for revenue and metrics
+    function analyzeOrders(orders) {
+      const validOrders = orders.filter(order => 
+        order.status && !['VOIDED', 'CANCELLED'].includes(order.status)
+      );
+      
+      const totalRevenue = validOrders.reduce((sum, order) => {
+        return sum + ((order.amount || 0) / 100); // Toast amounts are in cents
+      }, 0);
+      
+      const avgOrderValue = validOrders.length > 0 ? totalRevenue / validOrders.length : 0;
+      
+      return {
+        count: validOrders.length,
+        revenue: totalRevenue,
+        avgOrderValue: avgOrderValue,
+        rawOrders: validOrders
+      };
+    }
+
+    // Analyze menu items for active count
+    function analyzeMenuItems(menuData) {
+      if (!menuData || !Array.isArray(menuData)) {
+        return { activeCount: 0, totalCount: 0 };
+      }
+      
+      let activeCount = 0;
+      let totalCount = 0;
+      
+      menuData.forEach(menu => {
+        if (menu.items && Array.isArray(menu.items)) {
+          menu.items.forEach(item => {
+            totalCount++;
+            if (item.visibility === 'VISIBLE' || item.visibility === 'AVAILABLE') {
+              activeCount++;
+            }
+          });
+        }
+      });
+      
+      return { activeCount, totalCount };
+    }
+
+    // Calculate stats with trend comparisons
+    function calculateStatsWithTrends(analyticsData) {
+      // Revenue comparison
+      const revenueChange = calculatePercentChange(analyticsData.today.revenue, analyticsData.yesterday.revenue);
+      const revenue = {
+        value: `$${analyticsData.today.revenue.toFixed(2)}`,
+        change: `${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}% vs yesterday`,
+        changeType: revenueChange >= 0 ? 'positive' : 'negative'
+      };
+      
+      // Orders comparison
+      const ordersChange = calculatePercentChange(analyticsData.today.count, analyticsData.yesterday.count);
+      const orders = {
+        value: analyticsData.today.count.toString(),
+        change: `${ordersChange >= 0 ? '+' : ''}${ordersChange.toFixed(1)}% vs yesterday`,
+        changeType: ordersChange >= 0 ? 'positive' : 'negative'
+      };
+      
+      // Average order value comparison (vs last week for more stable comparison)
+      const avgOrderChange = calculatePercentChange(analyticsData.today.avgOrderValue, analyticsData.lastWeek.avgOrderValue);
+      const avgOrder = {
+        value: `$${analyticsData.today.avgOrderValue.toFixed(2)}`,
+        change: `${avgOrderChange >= 0 ? '+' : ''}${avgOrderChange.toFixed(1)}% vs last week`,
+        changeType: avgOrderChange >= 0 ? 'positive' : 'negative'
+      };
+      
+      // Menu items status
+      const menuItems = {
+        value: analyticsData.menuItems.activeCount.toString(),
+        change: `of ${analyticsData.menuItems.totalCount} total items`,
+        changeType: 'positive' // Neutral display
+      };
+      
+      return { revenue, orders, avgOrder, menuItems };
+    }
+
+    // Calculate percentage change between two values
+    function calculatePercentChange(current, previous) {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
     }
 
     async function loadTopItems() {
