@@ -1254,30 +1254,35 @@
     // Get real-time data from Homebase API
     async function getHomebaseLiveData() {
       try {
-        // Get current employees
-        const employeesResponse = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`);
-        
-        // Get today's timecards to see who's clocked in
         const today = new Date().toISOString().split('T')[0];
-        const timecardsResponse = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?date=${today}`);
         
-        // Get today's shifts for scheduling comparison
-        const shiftsResponse = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?date=${today}`);
+        // Get current employees and today's data
+        const [employeesResponse, timecardsResponse, shiftsResponse, todayLaborByEmployee, todayLaborByRole] = await Promise.all([
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`),
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`),
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${today}&end_date=${today}`),
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_employee?start_date=${today}&end_date=${today}`),
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_role?start_date=${today}&end_date=${today}`)
+        ]);
         
         // Calculate who's currently on duty (clocked in)
         const currentlyWorking = timecardsResponse.filter(timecard => 
           timecard.clock_in && !timecard.clock_out
         );
         
-        // Calculate labor costs
-        const laborCosts = calculateLaborCosts(timecardsResponse, employeesResponse);
+        // Calculate labor costs using aggregated data if available
+        const laborCosts = todayLaborByEmployee.length > 0 ? 
+          calculateLaborCostsFromAggregated(todayLaborByEmployee) :
+          calculateLaborCosts(timecardsResponse, employeesResponse);
         
         return {
           employees: employeesResponse,
           timecards: timecardsResponse,
           shifts: shiftsResponse,
           currentlyWorking: currentlyWorking,
-          laborCosts: laborCosts
+          laborCosts: laborCosts,
+          laborByEmployee: todayLaborByEmployee,
+          laborByRole: todayLaborByRole
         };
         
       } catch (error) {
@@ -1368,6 +1373,18 @@
     function calculateLaborCosts(timecards, employees) {
       // TODO: Calculate actual labor costs if hourly rates are available
       return timecards.length * 15; // Placeholder: $15/hour average
+    }
+
+    // Calculate labor costs from Homebase aggregated labor data
+    function calculateLaborCostsFromAggregated(laborByEmployee) {
+      if (!Array.isArray(laborByEmployee)) return 0;
+      
+      return laborByEmployee.reduce((total, employee) => {
+        if (employee.labor && employee.labor.costs) {
+          return total + employee.labor.costs;
+        }
+        return total;
+      }, 0);
     }
 
     // StatsCards Implementation - Real Toast Analytics Data
@@ -1803,14 +1820,24 @@
         const startDateStr = dateRange.startDate.toISOString().split('T')[0];
         const endDateStr = dateRange.endDate.toISOString().split('T')[0];
         
-        // Get timecards and shifts for the period
-        const [timecards, shifts] = await Promise.all([
+        // Get both detailed timecards/shifts and aggregated labor data
+        const [timecards, shifts, laborByEmployee, laborByRole, aggregateLabor] = await Promise.all([
           callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${startDateStr}&end_date=${endDateStr}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${startDateStr}&end_date=${endDateStr}`)
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_employee?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_role?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor?start_date=${startDateStr}&end_date=${endDateStr}&group_by=${dateRange.granularity === 'hour' ? 'hour' : 'day'}`)
         ]);
         
-        // Group labor data by time period
+        // Group labor data by time period using both detailed and aggregated data
         const laborByPeriod = groupLaborByPeriod(timecards, shifts, dateRange.granularity);
+        
+        // Add aggregated labor insights
+        laborByPeriod.aggregatedData = {
+          byEmployee: laborByEmployee,
+          byRole: laborByRole,
+          aggregate: aggregateLabor
+        };
         
         return laborByPeriod;
         
