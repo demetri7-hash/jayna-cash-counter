@@ -69,7 +69,7 @@ export default async function handler(req, res) {
     const fetchOptions = {
       method,
       headers: {
-        'Authorization': `Token token=${HOMEBASE_CONFIG.apiKey}`,
+        'Authorization': `Bearer ${HOMEBASE_CONFIG.apiKey}`,
         'Accept': 'application/vnd.homebase-v1+json'
       }
     };
