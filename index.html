@@ -3355,14 +3355,38 @@
       doc.text(title, startX + 3, y);
       y += 12;
       
-      if (!drawerData || !drawerData.counts) {
+      if (!drawerData) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
-        doc.text('No data available', startX + 3, y);
+        doc.text('(Detailed counts not available)', startX + 3, y);
         return y + 15;
       }
       
-      const counts = drawerData.counts;
+      // Handle JSON string data from database
+      let counts = drawerData;
+      if (typeof drawerData === 'string') {
+        try {
+          counts = JSON.parse(drawerData);
+        } catch (e) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
+          doc.text('(Detailed counts not available)', startX + 3, y);
+          return y + 15;
+        }
+      }
+      
+      // Access counts property if it exists, otherwise use the object directly
+      if (counts && counts.counts) {
+        counts = counts.counts;
+      }
+      
+      if (!counts || typeof counts !== 'object') {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.text('(Detailed counts not available)', startX + 3, y);
+        return y + 15;
+      }
+      
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       
@@ -3380,14 +3404,24 @@
         { name: '¢1', field: 'pennies', value: 0.01 }
       ];
       
+      let hasAnyData = false;
       denominations.forEach(denom => {
         const count = counts[denom.field] || 0;
         if (count > 0) {
+          hasAnyData = true;
           const total = (count * denom.value).toFixed(2);
           doc.text(`${denom.name}: ${count} = $${total}`, startX + 3, y);
           y += 9;
         }
       });
+      
+      // If no denomination data, show fallback message
+      if (!hasAnyData) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.text('(Detailed counts not available)', startX + 3, y);
+        y += 12;
+      }
       
       return y;
     }
@@ -3409,6 +3443,13 @@
     const actualCashIn = pmTotal - amTotal;
     const discrepancy = actualCashIn - toastSales;
     const discrepancySign = discrepancy >= 0 ? '+' : '-';
+    
+    // Debug: Log the drawer data structure
+    console.log('PDF Generation - Drawer Data Debug:');
+    console.log('AM Drawer 1:', fullData.am_drawer1_data);
+    console.log('AM Drawer 2:', fullData.am_drawer2_data); 
+    console.log('PM Drawer 1:', fullData.pm_drawer1_data);
+    console.log('PM Drawer 2:', fullData.pm_drawer2_data);
     
     const tipAdjustment = (originalTips - (fullData.pm_adjusted_tips || originalTips));
     const rawDepositAmount = fullData.pm_deposit_amount ? (toastSales + originalTips) : 0;
@@ -3569,7 +3610,7 @@
     currentY += 15;
     
     // Breakdown content - tight format
-    const breakdownHeight = 280;
+    const breakdownHeight = 200; // Reduced from 280
     drawBorderedSection(margin, currentY, pageWidth - 2 * margin, breakdownHeight);
     
     const halfWidth = (pageWidth - 2 * margin) / 2;
@@ -3585,10 +3626,10 @@
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.text(`TOTAL: $${fullData.am_drawer1_total ? fullData.am_drawer1_total.toFixed(2) : '0.00'}`, margin + 3, amY1 + 10);
-    doc.text(`TOTAL: $${fullData.pm_drawer1_total ? fullData.pm_drawer1_total.toFixed(2) : '0.00'}`, margin + halfWidth + 3, pmY1 + 10);
+    doc.text(`TOTAL: $${fullData.am_drawer1_total ? fullData.am_drawer1_total.toFixed(2) : '0.00'}`, margin + 3, amY1 + 8);
+    doc.text(`TOTAL: $${fullData.pm_drawer1_total ? fullData.pm_drawer1_total.toFixed(2) : '0.00'}`, margin + halfWidth + 3, pmY1 + 8);
     
-    let drawerMidY = Math.max(amY1, pmY1) + 25;
+    let drawerMidY = Math.max(amY1, pmY1) + 18; // Reduced spacing
     
     // Drawer 2 breakdowns
     let amY2 = drawDenominationBreakdown(fullData.am_drawer2_data, margin, drawerMidY, halfWidth, 'DRAWER 2');
@@ -3596,8 +3637,8 @@
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.text(`TOTAL: $${fullData.am_drawer2_total ? fullData.am_drawer2_total.toFixed(2) : '0.00'}`, margin + 3, amY2 + 10);
-    doc.text(`TOTAL: $${fullData.pm_drawer2_total ? fullData.pm_drawer2_total.toFixed(2) : '0.00'}`, margin + halfWidth + 3, pmY2 + 10);
+    doc.text(`TOTAL: $${fullData.am_drawer2_total ? fullData.am_drawer2_total.toFixed(2) : '0.00'}`, margin + 3, amY2 + 8);
+    doc.text(`TOTAL: $${fullData.pm_drawer2_total ? fullData.pm_drawer2_total.toFixed(2) : '0.00'}`, margin + halfWidth + 3, pmY2 + 8);
     
     currentY += breakdownHeight;
     
