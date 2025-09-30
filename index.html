@@ -589,52 +589,28 @@
         </div>
         
         <div class="form-group">
-          <label for="toastSales">Toast Cash Sales:</label>
+          <label for="toastSales">Toast Cash Sales (Auto-Calculated):</label>
           
-          <!-- Auto-fetch section -->
-          <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <span style="font-weight: 600; color: #495057;">🤖 Auto-Calculate from Toast API</span>
-              <button type="button" id="fetchToastSalesBtn" onclick="fetchToastCashSales()" 
-                      style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 12px;">
-                Fetch Today's Cash Sales
-              </button>
+          <!-- Auto-calculated display section -->
+          <div style="background: #d4edda; border: 2px solid #28a745; border-radius: 12px; padding: 20px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+              <span style="font-weight: 700; color: #155724; font-size: 16px;">🤖 Auto-Fetched from Toast API</span>
+              <span style="background: #28a745; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;">
+                LIVE DATA
+              </span>
             </div>
             
-            <div id="toastApiResult" style="display: none;">
-              <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 10px; margin-bottom: 10px;">
-                <div style="font-weight: 600; color: #155724; margin-bottom: 5px;">✅ Auto-calculated Toast Cash Sales:</div>
-                <div style="font-size: 20px; font-weight: bold; color: #155724;" id="autoToastAmount">$0.00</div>
-                <div style="font-size: 12px; color: #155724; margin-top: 5px;" id="autoToastDetails">0 cash payments processed</div>
-              </div>
+            <div style="text-align: center; margin: 15px 0;">
+              <div style="font-size: 32px; font-weight: bold; color: #155724; margin-bottom: 8px;" id="autoToastAmount">Loading...</div>
+              <div style="font-size: 14px; color: #155724; font-weight: 500;" id="autoToastDetails">Fetching today's cash sales automatically...</div>
             </div>
             
-            <div id="toastApiError" style="display: none;">
-              <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px; color: #721c24;">
-                <div style="font-weight: 600; margin-bottom: 5px;">❌ Auto-fetch failed</div>
-                <div style="font-size: 12px;" id="toastErrorMessage">Please use manual entry below</div>
-              </div>
+            <div style="background: rgba(21, 87, 36, 0.1); padding: 10px; border-radius: 6px; font-size: 13px; color: #155724;">
+              <strong>ℹ️ Fully Automated:</strong> This amount is automatically calculated from today's Toast POS cash transactions. No manual entry required.
             </div>
           </div>
           
-          <!-- Manual override section -->
-          <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px;">
-            <div style="font-weight: 600; color: #856404; margin-bottom: 10px;">📋 Verification & Override</div>
-            <div style="font-size: 13px; color: #856404; margin-bottom: 10px; line-height: 1.4;">
-              <strong>Instructions:</strong> Compare the auto-calculated amount above with your printed Z-Report. 
-              If they don't match, enter the correct amount from your Z-Report below. Otherwise, leave blank to use the auto-calculated amount.
-            </div>
-            
-            <label for="toastSalesOverride" style="font-size: 14px; font-weight: 600; color: #856404;">
-              Manual Override (only if auto-calculation is wrong):
-            </label>
-            <input type="number" id="toastSalesOverride" class="currency-input" 
-                   placeholder="Leave blank to use auto-calculated amount" 
-                   step="0.01" min="0" inputmode="decimal" onfocus="this.select()"
-                   style="border: 2px solid #ffeaa7;">
-          </div>
-          
-          <!-- Hidden field for backward compatibility -->
+          <!-- Hidden field for form processing -->
           <input type="hidden" id="toastSales" value="0">
         </div>
         
@@ -835,8 +811,29 @@
         </div>
         
         <div class="form-group">
-          <label for="tdsDriverTips">TDS Driver Tips for the Week ($):</label>
-          <input type="number" id="tdsDriverTips" class="form-input" step="0.01" placeholder="e.g., 617.69">
+          <label for="tdsDriverTips">TDS Driver Tips for the Week (Auto-Calculated):</label>
+          
+          <!-- Auto-calculated display section -->
+          <div style="background: #d4edda; border: 2px solid #28a745; border-radius: 12px; padding: 20px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+              <span style="font-weight: 700; color: #155724; font-size: 16px;">🤖 Auto-Calculated from Toast API</span>
+              <span style="background: #28a745; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;">
+                NET TIPS
+              </span>
+            </div>
+            
+            <div style="text-align: center; margin: 15px 0;">
+              <div style="font-size: 32px; font-weight: bold; color: #155724; margin-bottom: 8px;" id="autoTdsAmount">Click "Calculate Tip Pool" to fetch</div>
+              <div style="font-size: 14px; color: #155724; font-weight: 500;" id="autoTdsDetails">Will auto-calculate when you process tip pool</div>
+            </div>
+            
+            <div style="background: rgba(21, 87, 36, 0.1); padding: 10px; border-radius: 6px; font-size: 13px; color: #155724;">
+              <strong>ℹ️ Smart Calculation:</strong> Automatically fetches TDS Driver delivery tips for your selected date range, excluding voided/refunded orders for accurate net amounts.
+            </div>
+          </div>
+          
+          <!-- Hidden field for form processing -->
+          <input type="hidden" id="tdsDriverTips" value="0">
         </div>
         
         <div class="form-group">
@@ -1594,25 +1591,16 @@
   let autoCalculatedToastAmount = 0;
   
   async function fetchToastCashSales() {
-    const fetchBtn = document.getElementById('fetchToastSalesBtn');
-    const resultDiv = document.getElementById('toastApiResult');
-    const errorDiv = document.getElementById('toastApiError');
-    
-    // Reset displays
-    resultDiv.style.display = 'none';
-    errorDiv.style.display = 'none';
-    
-    // Update button state
-    fetchBtn.disabled = true;
-    fetchBtn.textContent = 'Fetching...';
-    fetchBtn.style.background = '#6c757d';
+    // Show loading state
+    document.getElementById('autoToastAmount').textContent = 'Loading...';
+    document.getElementById('autoToastDetails').textContent = 'Fetching live data from Toast API...';
     
     try {
       // Get today's date in the format the business expects
       const today = new Date();
       const businessDate = formatDateForToast(today);
       
-      console.log('Fetching Toast cash sales for:', businessDate);
+      console.log('Auto-fetching Toast cash sales for:', businessDate);
       
       // First authenticate with Toast
       const authResponse = await fetch('/api/toast-auth', {
@@ -1645,35 +1633,30 @@
       // Store the auto-calculated amount
       autoCalculatedToastAmount = paymentsData.totalCashAmount;
       
-      // Update the hidden field for backward compatibility
+      // Update the hidden field for form processing
       document.getElementById('toastSales').value = autoCalculatedToastAmount.toFixed(2);
       
       // Show success result
       document.getElementById('autoToastAmount').textContent = `$${autoCalculatedToastAmount.toFixed(2)}`;
       document.getElementById('autoToastDetails').textContent = 
-        `${paymentsData.totalCashPayments} cash payments from ${paymentsData.totalPaymentGuids} total payments`;
-      resultDiv.style.display = 'block';
+        `${paymentsData.totalCashPayments} cash payments • ${paymentsData.totalPaymentGuids} total transactions • Auto-synced`;
       
-      console.log('Toast cash sales fetched successfully:', autoCalculatedToastAmount);
+      console.log('Toast cash sales auto-fetched successfully:', autoCalculatedToastAmount);
       
     } catch (error) {
-      console.error('Toast API fetch error:', error);
+      console.error('Toast API auto-fetch error:', error);
       
-      // Show error
-      document.getElementById('toastErrorMessage').textContent = error.message;
-      errorDiv.style.display = 'block';
+      // Show error state but don't provide fallback
+      document.getElementById('autoToastAmount').textContent = 'API Error';
+      document.getElementById('autoToastDetails').textContent = 
+        `Failed to fetch: ${error.message} • Please check internet connection and try again`;
       
       // Reset auto amount
       autoCalculatedToastAmount = 0;
       document.getElementById('toastSales').value = '0';
     }
-    
-    // Reset button state
-    fetchBtn.disabled = false;
-    fetchBtn.textContent = 'Fetch Today\'s Cash Sales';
-    fetchBtn.style.background = '#28a745';
   }
-  
+
   function formatDateForToast(date) {
     // Convert to YYYYMMDD format for Toast API
     const year = date.getFullYear();
@@ -1696,6 +1679,15 @@
     setupDenominations('pm');
     
     await loadAMData();
+    
+    // Automatically fetch Toast cash sales when PM section loads
+    console.log('PM Count started - automatically fetching Toast cash sales...');
+    try {
+      await fetchToastCashSales();
+    } catch (error) {
+      console.error('Auto-fetch Toast sales failed:', error);
+      // Don't block the UI - user can still proceed manually if needed
+    }
   }
   
   function showReports() {
@@ -2172,20 +2164,16 @@
     };
     
     if (shift === 'pm') {
-      // Use override field if provided, otherwise use auto-calculated amount
-      const toastSalesOverride = parseFloat(document.getElementById('toastSalesOverride').value);
-      const toastSales = toastSalesOverride || autoCalculatedToastAmount || 
-                        parseFloat(document.getElementById('toastSales').value) || 0;
-      
+      // Use auto-calculated Toast amount (no manual override)
+      const toastSales = autoCalculatedToastAmount || 0;
       const cashTips = parseInt(document.getElementById('cashTips').value) || 0;
       
       data.toastSales = toastSales;
       data.cashTips = cashTips;
       data.amTotal = currentAMData ? currentAMData.total : 0;
       
-      // Store which method was used for reporting
-      data.toastSalesMethod = toastSalesOverride ? 'manual_override' : 
-                             (autoCalculatedToastAmount > 0 ? 'auto_calculated' : 'manual_entry');
+      // Always indicate auto-calculated method
+      data.toastSalesMethod = 'auto_calculated';
     }
     
     return data;
@@ -5813,7 +5801,6 @@
     const endDate = document.getElementById('tipPoolEndDate').value;
     const realEnvelopeDeposit = parseFloat(document.getElementById('realEnvelopeDeposit').value) || 0;
     const ezcaterTips = parseFloat(document.getElementById('ezcaterTips').value) || 0;
-    const tdsDriverTips = parseFloat(document.getElementById('tdsDriverTips').value) || 0;
     const calculatedByName = document.getElementById('calculatedByName').value.trim();
 
     if (!laborFile || !salesFile) {
@@ -5837,8 +5824,58 @@
     }
 
     try {
-      showLoading('Calculating Tip Pool', 'Processing payroll, sales data, and fetching cash sales...');
+      showLoading('Calculating Tip Pool', 'Processing payroll, sales data, and auto-fetching TDS Driver tips...');
 
+      // Automatically fetch TDS Driver tips for the date range
+      console.log('Auto-fetching TDS Driver tips for date range:', startDate, 'to', endDate);
+      
+      // Update UI to show fetching
+      document.getElementById('autoTdsAmount').textContent = 'Fetching...';
+      document.getElementById('autoTdsDetails').textContent = 'Auto-calculating TDS Driver tips for selected date range...';
+      
+      let tdsDriverTips = 0;
+      
+      try {
+        // Use the delivery analysis API with date range
+        const deliveryUrl = `/api/toast-delivery-analysis?startDate=${startDate}&endDate=${endDate}`;
+        const deliveryResponse = await fetch(deliveryUrl);
+        
+        if (!deliveryResponse.ok) {
+          throw new Error('Failed to fetch TDS Driver tips from Toast API');
+        }
+        
+        const deliveryData = await deliveryResponse.json();
+        if (!deliveryData.success) {
+          throw new Error(deliveryData.error || 'TDS Driver API returned an error');
+        }
+        
+        // Extract net tips (excluding voids/refunds)
+        const netTips = deliveryData.netTips || deliveryData.totalTips || 0;
+        const orderCount = deliveryData.totalOrders || 0;
+        
+        tdsDriverTips = netTips;
+        
+        // Update the hidden field and UI
+        document.getElementById('tdsDriverTips').value = tdsDriverTips.toFixed(2);
+        document.getElementById('autoTdsAmount').textContent = `$${tdsDriverTips.toFixed(2)}`;
+        document.getElementById('autoTdsDetails').textContent = 
+          `${orderCount} TDS Driver orders • Net tips (after voids/refunds) • Auto-calculated`;
+        
+        console.log('TDS Driver tips auto-fetched successfully:', tdsDriverTips);
+        
+      } catch (tdsError) {
+        console.error('TDS Driver auto-fetch error:', tdsError);
+        
+        // Update UI to show error but continue with calculation
+        document.getElementById('autoTdsAmount').textContent = 'API Error';
+        document.getElementById('autoTdsDetails').textContent = `Failed to auto-fetch: ${tdsError.message}`;
+        
+        // Use 0 for TDS tips if auto-fetch fails
+        tdsDriverTips = 0;
+        document.getElementById('tdsDriverTips').value = '0';
+      }
+
+      // Continue with tip pool calculation using the fetched (or fallback) TDS tips
       // First, get Toast Cash Sales from Supabase for the date range
       const start = new Date(startDate + 'T12:00:00');
       const end = new Date(endDate + 'T12:00:00');
