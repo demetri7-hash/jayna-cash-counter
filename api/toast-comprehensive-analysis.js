@@ -132,8 +132,9 @@ export default async function handler(req, res) {
 
     // Process each order
     allOrders.forEach((order, index) => {
-      if (order.voided || order.deleted) return;
-
+      // Track ALL orders including voided/deleted for discrepancy analysis
+      const isVoidedOrDeleted = order.voided || order.deleted;
+      
       // Extract ALL possible fields
       const orderData = {
         index,
@@ -195,28 +196,53 @@ export default async function handler(req, res) {
         hour: order.openedDate ? new Date(order.openedDate).getUTCHours() : null,
         dayOfWeek: order.openedDate ? new Date(order.openedDate).getUTCDay() : null,
         
-        // Tip calculation
+        // Tip calculation with refund tracking
         tips: {
           paymentTips: 0,
           serviceChargeTips: 0,
           total: 0,
-          paymentDetails: []
+          refundedTips: 0,  // Track refunded tip amounts
+          voidedTips: 0,    // Track voided tip amounts
+          paymentDetails: [],
+          refundDetails: []
         }
       };
 
-      // Calculate tips
+      // Calculate tips INCLUDING refund analysis
       if (order.checks && Array.isArray(order.checks)) {
         order.checks.forEach(check => {
           if (check.payments && Array.isArray(check.payments)) {
             check.payments.forEach(payment => {
               const tipAmount = payment.tipAmount || 0;
+              
+              // Track payment details regardless of void status
+              orderData.tips.paymentDetails.push({
+                type: payment.type,
+                amount: payment.amount,
+                tipAmount: tipAmount,
+                cardType: payment.cardType,
+                refundStatus: payment.refundStatus || 'NONE',
+                paymentStatus: payment.paymentStatus || null,
+                voided: payment.voided || false
+              });
+              
               if (tipAmount > 0) {
-                orderData.tips.paymentTips += tipAmount;
-                orderData.tips.paymentDetails.push({
-                  type: payment.type,
-                  amount: payment.amount,
-                  tipAmount: tipAmount,
-                  cardType: payment.cardType
+                // Check if this payment was refunded or voided
+                if (payment.refundStatus === 'FULL' || payment.refundStatus === 'PARTIAL') {
+                  orderData.tips.refundedTips += tipAmount;
+                } else if (payment.voided || payment.paymentStatus === 'VOIDED') {
+                  orderData.tips.voidedTips += tipAmount;
+                } else {
+                  orderData.tips.paymentTips += tipAmount;
+                }
+              }
+              
+              // Track refund details if present
+              if (payment.refund && payment.refund.tipAmount) {
+                orderData.tips.refundDetails.push({
+                  originalTip: tipAmount,
+                  refundedTip: payment.refund.tipAmount,
+                  refundReason: payment.refund.reason || 'Unknown'
                 });
               }
             });
@@ -233,9 +259,11 @@ export default async function handler(req, res) {
       }
       
       orderData.tips.total = orderData.tips.paymentTips + orderData.tips.serviceChargeTips;
+      
+      // Add to total tips regardless of void status for analysis
       analysis.totalTips += orderData.tips.total;
 
-      // Track field occurrences with safe field analysis
+      // Track field occurrences with safe field analysis (including voided orders for discrepancy analysis)
       const trackField = (fieldType, fieldValue, tipAmount) => {
         if (fieldValue !== null && fieldValue !== undefined) {
           // Initialize field analysis if needed
@@ -252,10 +280,19 @@ export default async function handler(req, res) {
             analysis.tipAnalysisByField[fieldType] = {};
           }
           if (!analysis.tipAnalysisByField[fieldType][fieldValue]) {
-            analysis.tipAnalysisByField[fieldType][fieldValue] = { orders: 0, tips: 0 };
+            analysis.tipAnalysisByField[fieldType][fieldValue] = { 
+              orders: 0, 
+              tips: 0, 
+              voidedTips: 0, 
+              refundedTips: 0,
+              netTips: 0 
+            };
           }
           analysis.tipAnalysisByField[fieldType][fieldValue].orders++;
           analysis.tipAnalysisByField[fieldType][fieldValue].tips += tipAmount;
+          analysis.tipAnalysisByField[fieldType][fieldValue].voidedTips += orderData.tips.voidedTips;
+          analysis.tipAnalysisByField[fieldType][fieldValue].refundedTips += orderData.tips.refundedTips;
+          analysis.tipAnalysisByField[fieldType][fieldValue].netTips += (tipAmount - orderData.tips.voidedTips - orderData.tips.refundedTips);
         }
       };
       
@@ -273,7 +310,7 @@ export default async function handler(req, res) {
         trackField('byPaymentType', payment.type, orderData.tips.total);
       });
 
-      // Categorize orders
+      // Categorize orders (including voided for analysis)
       if (orderData.tips.total > 0) {
         analysis.ordersWithTips.push(orderData);
         analysis.ordersWithTipsCount++;
@@ -281,27 +318,50 @@ export default async function handler(req, res) {
         analysis.ordersWithoutTips.push(orderData);
         analysis.ordersWithoutTipsCount++;
       }
+      
+      // Separate tracking for voided/deleted orders
+      if (isVoidedOrDeleted) {
+        if (!analysis.voidedDeletedOrders) {
+          analysis.voidedDeletedOrders = [];
+        }
+        analysis.voidedDeletedOrders.push(orderData);
+      }
     });
 
-    // Find potential matches for TDS Driver (close to $481.83)
+    // Find potential matches for TDS Driver (close to $481.83) using NET tips
     const tolerance = 50; // $50 tolerance
     Object.entries(analysis.tipAnalysisByField).forEach(([fieldType, fieldData]) => {
       Object.entries(fieldData).forEach(([fieldValue, data]) => {
-        if (Math.abs(data.tips - 481.83) <= tolerance) {
+        // Check both gross and net tips for matches
+        const grossMatch = Math.abs(data.tips - 481.83) <= tolerance;
+        const netMatch = Math.abs(data.netTips - 481.83) <= tolerance;
+        
+        if (grossMatch || netMatch) {
           analysis.potentialMatches.push({
             fieldType,
             fieldValue,
-            tips: data.tips,
+            grossTips: data.tips,
+            netTips: data.netTips,
+            voidedTips: data.voidedTips,
+            refundedTips: data.refundedTips,
             orders: data.orders,
-            difference: Math.abs(data.tips - 481.83),
-            accuracy: ((481.83 - Math.abs(data.tips - 481.83)) / 481.83) * 100
+            grossDifference: Math.abs(data.tips - 481.83),
+            netDifference: Math.abs(data.netTips - 481.83),
+            grossAccuracy: ((481.83 - Math.abs(data.tips - 481.83)) / 481.83) * 100,
+            netAccuracy: ((481.83 - Math.abs(data.netTips - 481.83)) / 481.83) * 100,
+            isNetMatch: netMatch,
+            isGrossMatch: grossMatch
           });
         }
       });
     });
 
-    // Sort potential matches by accuracy
-    analysis.potentialMatches.sort((a, b) => b.accuracy - a.accuracy);
+    // Sort potential matches by net accuracy first, then gross accuracy
+    analysis.potentialMatches.sort((a, b) => {
+      if (a.isNetMatch && !b.isNetMatch) return -1;
+      if (!a.isNetMatch && b.isNetMatch) return 1;
+      return b.netAccuracy - a.netAccuracy;
+    });
 
     return res.json({
       success: true,
