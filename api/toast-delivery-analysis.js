@@ -225,15 +225,15 @@ export default async function handler(req, res) {
               // Method 1: Payment tipAmount (primary) - INCLUDE ALL PAYMENT TYPES
               if (check.payments && Array.isArray(check.payments)) {
                 check.payments.forEach(payment => {
-                  // Extract tips from ALL payment types, not just specific ones
+                  // Extract tips from ALL payment types - amounts likely already in dollars
                   if (payment.tipAmount && payment.tipAmount > 0) {
-                    orderTips.paymentTips += payment.tipAmount / 100; // Convert cents to dollars
+                    orderTips.paymentTips += payment.tipAmount; // Keep as-is, likely already dollars
                     deliveryAnalysis.tipExtractionMethods.paymentTipAmount++;
                   }
                   
                   // Also check for tips in different payment structures
                   if (payment.tip && payment.tip > 0) {
-                    orderTips.paymentTips += payment.tip / 100;
+                    orderTips.paymentTips += payment.tip; // Keep as-is, likely already dollars
                     deliveryAnalysis.tipExtractionMethods.paymentTipAmount++;
                   }
                 });
@@ -244,13 +244,13 @@ export default async function handler(req, res) {
                 check.appliedServiceCharges.forEach(charge => {
                   // Any service charge marked as gratuity
                   if (charge.gratuity && charge.chargeAmount > 0) {
-                    orderTips.serviceChargeTips += charge.chargeAmount / 100;
+                    orderTips.serviceChargeTips += charge.chargeAmount; // Keep as-is, likely already dollars
                     deliveryAnalysis.tipExtractionMethods.serviceChargeGratuity++;
                   }
                   
                   // Delivery charges (may include tips)
                   if (charge.delivery && charge.chargeAmount > 0) {
-                    orderTips.deliveryCharges += charge.chargeAmount / 100;
+                    orderTips.deliveryCharges += charge.chargeAmount; // Keep as-is, likely already dollars
                     deliveryAnalysis.tipExtractionMethods.deliveryCharges++;
                   }
                   
@@ -258,7 +258,7 @@ export default async function handler(req, res) {
                   if (charge.name && charge.chargeAmount > 0) {
                     const tipKeywords = ['tip', 'gratuity', 'service', 'auto'];
                     if (tipKeywords.some(keyword => charge.name.toLowerCase().includes(keyword))) {
-                      orderTips.serviceChargeTips += charge.chargeAmount / 100;
+                      orderTips.serviceChargeTips += charge.chargeAmount; // Keep as-is, likely already dollars
                       deliveryAnalysis.tipExtractionMethods.serviceChargeGratuity++;
                     }
                   }
@@ -267,7 +267,7 @@ export default async function handler(req, res) {
               
               // Method 3: Check-level tip amounts (if exists)
               if (check.tipAmount && check.tipAmount > 0) {
-                orderTips.paymentTips += check.tipAmount / 100;
+                orderTips.paymentTips += check.tipAmount; // Keep as-is, likely already dollars
                 deliveryAnalysis.tipExtractionMethods.paymentTipAmount++;
               }
             });
