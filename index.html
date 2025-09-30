@@ -1124,6 +1124,10 @@
     loadTipPoolData();
     loadCombinedReportData();
     
+    // Initialize TDS data and button state
+    resetTdsData();
+    updateCalculateButtonState();
+    
     // Removed "App ready" message to prevent page bouncing
   });
   
@@ -5885,6 +5889,14 @@
     }
   }
 
+  // Global variable to store TDS fetch status
+  let tdsDataStatus = {
+    isFetching: false,
+    hasData: false,
+    data: 0,
+    error: null
+  };
+
   async function calculateCashTips() {
     const startDate = document.getElementById('tipPoolStartDate').value;
     const endDate = document.getElementById('tipPoolEndDate').value;
@@ -5892,6 +5904,9 @@
 
     if (!startDate || !endDate) {
       document.getElementById('calculatedCashTips').value = '';
+      // Reset TDS data when dates are cleared
+      resetTdsData();
+      updateCalculateButtonState();
       return;
     }
 
@@ -5925,10 +5940,127 @@
       // Update the display
       document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
 
+      // Auto-fetch TDS Driver tips when both dates are available
+      await autoFetchTdsDriverTips(startDate, endDate);
+
     } catch (error) {
       console.error('Error calculating cash tips:', error);
       document.getElementById('calculatedCashTips').value = '';
     }
+  }
+
+  function resetTdsData() {
+    tdsDataStatus = {
+      isFetching: false,
+      hasData: false,
+      data: 0,
+      error: null
+    };
+    
+    // Reset UI
+    document.getElementById('autoTdsAmount').textContent = 'Not calculated';
+    document.getElementById('autoTdsDetails').textContent = 'Enter date range to auto-calculate TDS Driver tips';
+    document.getElementById('tdsDriverTips').value = '0';
+  }
+
+  function updateCalculateButtonState() {
+    const calculateBtn = document.querySelector('button[onclick="calculateTipPool()"]');
+    const startDate = document.getElementById('tipPoolStartDate').value;
+    const endDate = document.getElementById('tipPoolEndDate').value;
+    
+    if (!startDate || !endDate) {
+      calculateBtn.disabled = true;
+      calculateBtn.textContent = 'Calculate Tip Pool';
+      calculateBtn.style.background = '#6c757d';
+    } else if (tdsDataStatus.isFetching) {
+      calculateBtn.disabled = true;
+      calculateBtn.textContent = 'Fetching TDS Data...';
+      calculateBtn.style.background = '#ffc107';
+    } else if (tdsDataStatus.hasData || tdsDataStatus.error) {
+      calculateBtn.disabled = false;
+      calculateBtn.textContent = 'Calculate Tip Pool';
+      calculateBtn.style.background = '#28a745';
+    } else {
+      calculateBtn.disabled = true;
+      calculateBtn.textContent = 'Calculate Tip Pool';
+      calculateBtn.style.background = '#6c757d';
+    }
+  }
+
+  async function autoFetchTdsDriverTips(startDate, endDate, retryCount = 0) {
+    // Only fetch if not already fetching for these dates
+    if (tdsDataStatus.isFetching) {
+      return;
+    }
+
+    console.log('Auto-fetching TDS Driver tips for date range:', startDate, 'to', endDate);
+    
+    tdsDataStatus.isFetching = true;
+    tdsDataStatus.hasData = false;
+    tdsDataStatus.error = null;
+    
+    // Update UI to show fetching
+    document.getElementById('autoTdsAmount').textContent = 'Fetching...';
+    document.getElementById('autoTdsDetails').textContent = 'Auto-calculating TDS Driver tips for selected date range...';
+    updateCalculateButtonState();
+    
+    try {
+      // Use the delivery analysis API with date range
+      const deliveryUrl = `/api/toast-delivery-analysis?startDate=${startDate}&endDate=${endDate}`;
+      const deliveryResponse = await fetch(deliveryUrl);
+      
+      if (!deliveryResponse.ok) {
+        if (deliveryResponse.status === 405) {
+          // For 405 errors, try once more after a short delay
+          if (retryCount === 0) {
+            console.log('405 error encountered, retrying in 2 seconds...');
+            tdsDataStatus.isFetching = false;
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return await autoFetchTdsDriverTips(startDate, endDate, 1);
+          }
+          throw new Error('TDS Driver API temporarily unavailable (405 error)');
+        }
+        throw new Error(`Failed to fetch TDS Driver tips: ${deliveryResponse.status}`);
+      }
+      
+      const deliveryData = await deliveryResponse.json();
+      if (!deliveryData.success) {
+        throw new Error(deliveryData.error || 'TDS Driver API returned an error');
+      }
+      
+      // Extract net tips (excluding voids/refunds)
+      const netTips = deliveryData.netTips || deliveryData.totalTips || 0;
+      const orderCount = deliveryData.totalOrders || 0;
+      
+      // Store successful data
+      tdsDataStatus.isFetching = false;
+      tdsDataStatus.hasData = true;
+      tdsDataStatus.data = netTips;
+      
+      // Update the hidden field and UI
+      document.getElementById('tdsDriverTips').value = netTips.toFixed(2);
+      document.getElementById('autoTdsAmount').textContent = `$${netTips.toFixed(2)}`;
+      document.getElementById('autoTdsDetails').textContent = 
+        `${orderCount} TDS Driver orders • Net tips (after voids/refunds) • Auto-calculated`;
+      
+      console.log('TDS Driver tips auto-fetched successfully:', netTips);
+      
+    } catch (tdsError) {
+      console.error('TDS Driver auto-fetch error:', tdsError);
+      
+      tdsDataStatus.isFetching = false;
+      tdsDataStatus.error = tdsError.message;
+      
+      // Update UI to show error but allow calculation to proceed with 0
+      document.getElementById('autoTdsAmount').textContent = 'API Error';
+      document.getElementById('autoTdsDetails').textContent = `Failed to auto-fetch: ${tdsError.message}`;
+      
+      // Use 0 for TDS tips if auto-fetch fails
+      document.getElementById('tdsDriverTips').value = '0';
+    }
+    
+    // Update button state regardless of success/failure
+    updateCalculateButtonState();
   }
 
   async function calculateTipPool() {
@@ -5961,59 +6093,14 @@
     }
 
     try {
-      showLoading('Calculating Tip Pool', 'Processing payroll, sales data, and auto-fetching TDS Driver tips...');
+      showLoading('Calculating Tip Pool', 'Processing payroll and sales data...');
 
-      // Automatically fetch TDS Driver tips for the date range
-      console.log('Auto-fetching TDS Driver tips for date range:', startDate, 'to', endDate);
+      // Use the already-fetched TDS Driver tips from global state
+      const tdsDriverTips = tdsDataStatus.hasData ? tdsDataStatus.data : 0;
       
-      // Update UI to show fetching
-      document.getElementById('autoTdsAmount').textContent = 'Fetching...';
-      document.getElementById('autoTdsDetails').textContent = 'Auto-calculating TDS Driver tips for selected date range...';
-      
-      let tdsDriverTips = 0;
-      
-      try {
-        // Use the delivery analysis API with date range
-        const deliveryUrl = `/api/toast-delivery-analysis?startDate=${startDate}&endDate=${endDate}`;
-        const deliveryResponse = await fetch(deliveryUrl);
-        
-        if (!deliveryResponse.ok) {
-          throw new Error('Failed to fetch TDS Driver tips from Toast API');
-        }
-        
-        const deliveryData = await deliveryResponse.json();
-        if (!deliveryData.success) {
-          throw new Error(deliveryData.error || 'TDS Driver API returned an error');
-        }
-        
-        // Extract net tips (excluding voids/refunds)
-        const netTips = deliveryData.netTips || deliveryData.totalTips || 0;
-        const orderCount = deliveryData.totalOrders || 0;
-        
-        tdsDriverTips = netTips;
-        
-        // Update the hidden field and UI
-        document.getElementById('tdsDriverTips').value = tdsDriverTips.toFixed(2);
-        document.getElementById('autoTdsAmount').textContent = `$${tdsDriverTips.toFixed(2)}`;
-        document.getElementById('autoTdsDetails').textContent = 
-          `${orderCount} TDS Driver orders • Net tips (after voids/refunds) • Auto-calculated`;
-        
-        console.log('TDS Driver tips auto-fetched successfully:', tdsDriverTips);
-        
-      } catch (tdsError) {
-        console.error('TDS Driver auto-fetch error:', tdsError);
-        
-        // Update UI to show error but continue with calculation
-        document.getElementById('autoTdsAmount').textContent = 'API Error';
-        document.getElementById('autoTdsDetails').textContent = `Failed to auto-fetch: ${tdsError.message}`;
-        
-        // Use 0 for TDS tips if auto-fetch fails
-        tdsDriverTips = 0;
-        document.getElementById('tdsDriverTips').value = '0';
-      }
+      console.log('Using TDS Driver tips from cache:', tdsDriverTips);
 
-      // Continue with tip pool calculation using the fetched (or fallback) TDS tips
-      // First, get Toast Cash Sales from Supabase for the date range
+      // Get Toast Cash Sales from Supabase for the date range
       const start = new Date(startDate + 'T12:00:00');
       const end = new Date(endDate + 'T12:00:00');
 
