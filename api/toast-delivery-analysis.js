@@ -123,23 +123,31 @@ export default async function handler(req, res) {
         deliveryCharges: 0
       },
       rejectedOrders: [],
-      serverGuidAnalysis: {} // Track all server GUIDs and their order counts
+      tdsDriverMatches: 0 // Track confirmed TDS Driver matches
     };
 
     if (Array.isArray(allOrders)) {
-      // TEMPORARILY DISABLE SERVER FILTERING TO TEST HYPOTHESIS
-      // TDS Driver might not be a server-level filter but rather a reporting/operational filter
+      // 🎯 CONFIRMED TDS DRIVER GUID from comprehensive analysis!
+      // Server GUID: 5ffaae6f-4238-477d-979b-3da88d45b8e2
+      // - 535 orders (matches TDS report exactly!)  
+      // - $485.30 tips (99.3% match to $481.83 target!)
+      const TDS_DRIVER_GUID = '5ffaae6f-4238-477d-979b-3da88d45b8e2';
       
-      // Let's process ALL orders and see if we can match the $481.83 through other means
-      console.log(`Processing ALL ${allOrders.length} orders without server filtering for debugging...`);
+      console.log(`Filtering orders for TDS Driver: ${TDS_DRIVER_GUID}`);
       
       allOrders.forEach((order, index) => {
-        // Track server GUIDs for analysis
-        const serverGuid = order.server?.guid || 'null';
-        if (!deliveryAnalysis.serverGuidAnalysis[serverGuid]) {
-          deliveryAnalysis.serverGuidAnalysis[serverGuid] = 0;
+        // CONFIRMED TDS DRIVER FILTER
+        if (order.server?.guid !== TDS_DRIVER_GUID) {
+          deliveryAnalysis.rejectedOrders.push({
+            index,
+            reason: `Not TDS Driver - server GUID: ${order.server?.guid || 'null'}`,
+            orderGuid: order.guid
+          });
+          return;
         }
-        deliveryAnalysis.serverGuidAnalysis[serverGuid]++;
+        
+        // Track TDS Driver matches
+        deliveryAnalysis.tdsDriverMatches++;
         
         // Skip voided/deleted orders
         if (order.voided || order.deleted) {
