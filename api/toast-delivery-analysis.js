@@ -39,43 +39,75 @@ export default async function handler(req, res) {
     const businessDate = date.replace(/-/g, '');
     console.log(`Business date format: ${businessDate}`);
 
-    // Use the ordersBulk endpoint with businessDate parameter
-    const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=100`;
-    console.log(`Orders URL: ${ordersUrl}`);
+    // Use the ordersBulk endpoint with pagination to get ALL orders
+    let allOrders = [];
+    let page = 1;
+    let hasMorePages = true;
+    const pageSize = 100; // Maximum allowed by Toast API
+    
+    console.log(`Starting pagination to fetch all orders for ${businessDate}`);
+    
+    while (hasMorePages) {
+      const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=${pageSize}&page=${page}`;
+      console.log(`Fetching page ${page}: ${ordersUrl}`);
 
-    // Make the orders request to Toast API
-    const ordersResponse = await fetch(ordersUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
-        'Content-Type': 'application/json'
+      // Make the orders request to Toast API
+      const ordersResponse = await fetch(ordersUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!ordersResponse.ok) {
+        let errorText;
+        try {
+          errorText = await ordersResponse.text();
+          console.error('Toast orders API failed:', ordersResponse.status, errorText);
+        } catch (e) {
+          errorText = 'Could not read error response';
+          console.error('Toast orders API failed:', ordersResponse.status, 'Error reading response:', e);
+        }
+        
+        return res.status(ordersResponse.status).json({
+          success: false,
+          error: `Toast orders API failed: ${ordersResponse.status} ${ordersResponse.statusText}`,
+          details: errorText,
+          page: page
+        });
       }
-    });
 
-    if (!ordersResponse.ok) {
-      let errorText;
-      try {
-        errorText = await ordersResponse.text();
-        console.error('Toast orders API failed:', ordersResponse.status, errorText);
-      } catch (e) {
-        errorText = 'Could not read error response';
-        console.error('Toast orders API failed:', ordersResponse.status, 'Error reading response:', e);
+      const pageOrders = await ordersResponse.json();
+      
+      if (Array.isArray(pageOrders) && pageOrders.length > 0) {
+        allOrders = allOrders.concat(pageOrders);
+        console.log(`Page ${page}: Retrieved ${pageOrders.length} orders (Total: ${allOrders.length})`);
+        
+        // Check if we got a full page (indicating there might be more)
+        if (pageOrders.length === pageSize) {
+          page++;
+        } else {
+          hasMorePages = false;
+        }
+      } else {
+        hasMorePages = false;
       }
       
-      return res.status(ordersResponse.status).json({
-        success: false,
-        error: `Toast orders API failed: ${ordersResponse.status} ${ordersResponse.statusText}`,
-        details: errorText
-      });
+      // Safety check to prevent infinite loops
+      if (page > 50) {
+        console.warn('Reached maximum page limit (50), stopping pagination');
+        hasMorePages = false;
+      }
     }
 
-    const ordersData = await ordersResponse.json();
-    console.log(`Retrieved ${ordersData.length || 0} orders for ${date}`);
+    console.log(`Pagination complete: Retrieved ${allOrders.length} total orders across ${page} pages for ${date}`);
 
     // COMPREHENSIVE DELIVERY ORDER ANALYSIS
     let deliveryAnalysis = {
-      totalOrders: ordersData.length || 0,
+      totalOrders: allOrders.length,
+      totalPages: page,
       deliveryOrders: [],
       totalDeliveryTips: 0,
       deliveryDetectionMethods: {
@@ -93,8 +125,8 @@ export default async function handler(req, res) {
       rejectedOrders: []
     };
 
-    if (Array.isArray(ordersData)) {
-      ordersData.forEach((order, index) => {
+    if (Array.isArray(allOrders)) {
+      allOrders.forEach((order, index) => {
         // Skip voided/deleted orders
         if (order.voided || order.deleted) {
           deliveryAnalysis.rejectedOrders.push({
@@ -223,12 +255,17 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: `Analyzed ${ordersData.length || 0} orders for delivery tips on ${businessDate}`,
+      message: `Analyzed ${allOrders.length} orders across ${page} pages for delivery tips on ${businessDate}`,
       data: {
         date: date,
         businessDate: businessDate,
+        pagination: {
+          totalPages: page,
+          totalOrders: allOrders.length,
+          pageSize: pageSize
+        },
         deliveryAnalysis: deliveryAnalysis,
-        rawOrdersSample: ordersData.slice(0, 2), // First 2 orders for structure analysis
+        rawOrdersSample: allOrders.slice(0, 2), // First 2 orders for structure analysis
         summary: {
           totalDeliveryOrders: deliveryAnalysis.deliveryOrders.length,
           totalDeliveryTips: deliveryAnalysis.totalDeliveryTips.toFixed(2),
