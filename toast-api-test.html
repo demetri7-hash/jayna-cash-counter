@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toast API Cash Sales Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 14px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .success { background: #28a745; }
+        .warning { background: #ffc107; color: #333; }
+        .danger { background: #dc3545; }
+        .result {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input {
+            width: 200px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .cash-total {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+            background: #d4edda;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍞 Toast API Cash Sales Calculator</h1>
+        <p>Testing Toast API integration to automatically calculate daily cash sales</p>
+
+        <!-- Authentication Section -->
+        <div class="section">
+            <h2>🔐 Step 1: Authentication</h2>
+            <button class="button" onclick="testAuthentication()">Test Toast Authentication</button>
+            <div id="authResult" class="result"></div>
+        </div>
+
+        <!-- Date Selection -->
+        <div class="section">
+            <h2>📅 Step 2: Select Test Date</h2>
+            <div class="input-group">
+                <label for="testDate">Date to analyze (YYYY-MM-DD):</label>
+                <input type="date" id="testDate" value="2025-09-28">
+                <button class="button" onclick="setReferenceDate('2025-09-28', 178.46)">Sep 28 ($178.46)</button>
+                <button class="button" onclick="setReferenceDate('2025-09-24', 395.54)">Sep 24 ($395.54)</button>
+            </div>
+            <div id="expectedCash" style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 10px 0;">
+                <strong>Expected Cash Sales:</strong> <span id="expectedAmount">$178.46</span> (from manual entry)
+            </div>
+            <p><em>Testing against known dates where we have manual cash sales data for comparison</em></p>
+        </div>
+
+        <!-- Orders Analysis -->
+        <div class="section">
+            <h2>📊 Step 3: Fetch & Analyze Orders</h2>
+            <button class="button" onclick="fetchOrdersForDate()">Fetch Orders for Date</button>
+            <button class="button warning" onclick="analyzePaymentMethods()">Analyze Payment Methods</button>
+            <div id="ordersResult" class="result"></div>
+        </div>
+
+        <!-- Cash Sales Calculation -->
+        <div class="section">
+            <h2>💰 Step 4: Calculate Cash Sales</h2>
+            <button class="button success" onclick="calculateCashSales()">Calculate Cash Sales Total</button>
+            <div id="cashTotal" class="cash-total" style="display: none;">
+                Total Cash Sales: $<span id="cashAmount">0.00</span>
+            </div>
+            <div id="cashBreakdown" class="result"></div>
+        </div>
+
+        <!-- API Structure Analysis -->
+        <div class="section">
+            <h2>🔍 Step 5: API Structure Research</h2>
+            <button class="button" onclick="exploreRestaurantData()">Explore Restaurant Data</button>
+            <button class="button" onclick="exploreMenuData()">Explore Menu Data</button>
+            <div id="exploreResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // Toast API Configuration from the guide
+        const TOAST_CONFIG = {
+            baseUrl: 'https://ws-api.toasttab.com',
+            clientId: '3g0R0NFYjHIQcVe9bYP8eTbJjwRTvCNV',
+            clientSecret: 'dClMNN5GmpgCZYU8BtTK9NGCVT4eAmZtE0E4EkJO4CFpPJx2rXP26PTptwSe--Sa',
+            restaurantGuid: 'd3efae34-7c2e-4107-a442-49081e624706',
+            userAccessType: 'TOAST_MACHINE_CLIENT'
+        };
+
+        let authToken = null;
+        let allOrders = [];
+        let cashOrders = [];
+
+        // Utility function to display results
+        function displayResult(elementId, title, data, isError = false) {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const status = isError ? '❌ ERROR' : '✅ SUCCESS';
+            
+            element.innerHTML = `[${timestamp}] ${status} - ${title}\n\n${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}`;
+            
+            if (isError) {
+                element.style.background = '#f8d7da';
+                element.style.color = '#721c24';
+            } else {
+                element.style.background = '#d4edda';
+                element.style.color = '#155724';
+            }
+        }
+
+        // Step 1: Test Authentication with Toast API
+        async function testAuthentication() {
+            try {
+                displayResult('authResult', 'Testing Authentication', 'Attempting to authenticate with Toast API...');
+                
+                const response = await fetch(`${TOAST_CONFIG.baseUrl}/authentication/v1/authentication/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        clientId: TOAST_CONFIG.clientId,
+                        clientSecret: TOAST_CONFIG.clientSecret,
+                        userAccessType: TOAST_CONFIG.userAccessType
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.token?.accessToken) {
+                    authToken = data.token.accessToken;
+                    displayResult('authResult', 'Authentication Successful', {
+                        status: 'AUTHENTICATED',
+                        tokenType: data.token.tokenType,
+                        expiresIn: data.token.expiresIn,
+                        scopes: data.token.scope?.split(' ') || [],
+                        tokenPreview: authToken.substring(0, 50) + '...'
+                    });
+                } else {
+                    throw new Error(`Authentication failed: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                displayResult('authResult', 'Authentication Failed', error.message, true);
+            }
+        }
+
+        // Step 2: Set a reference date for testing
+        function setReferenceDate(date, expectedAmount) {
+            document.getElementById('testDate').value = date;
+            document.getElementById('expectedAmount').textContent = `$${expectedAmount}`;
+            displayResult('ordersResult', 'Reference Date Set', `Using ${date} for testing. Expected cash sales: $${expectedAmount} (from our manual records)`);
+        }
+
+        // Step 3: Fetch orders for the selected date
+        async function fetchOrdersForDate() {
+            if (!authToken) {
+                displayResult('ordersResult', 'Authentication Required', 'Please authenticate first!', true);
+                return;
+            }
+
+            try {
+                const selectedDate = document.getElementById('testDate').value;
+                if (!selectedDate) {
+                    throw new Error('Please select a date first');
+                }
+
+                displayResult('ordersResult', 'Fetching Orders', `Getting orders for ${selectedDate}...`);
+
+                // Toast API expects dates in specific format and timezone
+                const startDate = `${selectedDate}T00:00:00.000`;
+                const endDate = `${selectedDate}T23:59:59.999`;
+
+                const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/orders?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+
+                const response = await fetch(ordersUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Orders API failed: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                allOrders = data || [];
+
+                displayResult('ordersResult', 'Orders Retrieved', {
+                    date: selectedDate,
+                    totalOrders: allOrders.length,
+                    firstOrderSample: allOrders[0] || 'No orders found',
+                    orderStructure: allOrders[0] ? Object.keys(allOrders[0]) : []
+                });
+
+            } catch (error) {
+                displayResult('ordersResult', 'Orders Fetch Failed', error.message, true);
+            }
+        }
+
+        // Step 3.5: Analyze payment methods in the orders
+        async function analyzePaymentMethods() {
+            if (allOrders.length === 0) {
+                displayResult('ordersResult', 'No Orders', 'Please fetch orders first!', true);
+                return;
+            }
+
+            try {
+                const paymentMethods = new Set();
+                const orderStatuses = new Set();
+                const samplePayments = [];
+
+                allOrders.forEach((order, index) => {
+                    // Collect order statuses
+                    if (order.state) orderStatuses.add(order.state);
+
+                    // Look for payment information in various possible locations
+                    if (order.payments) {
+                        order.payments.forEach(payment => {
+                            if (payment.type) paymentMethods.add(payment.type);
+                            if (index < 3) { // Sample first 3 orders
+                                samplePayments.push({
+                                    orderIndex: index,
+                                    payment: payment
+                                });
+                            }
+                        });
+                    }
+
+                    // Check other possible payment locations
+                    if (order.paymentStatus) paymentMethods.add(`paymentStatus: ${order.paymentStatus}`);
+                    if (order.paymentType) paymentMethods.add(`paymentType: ${order.paymentType}`);
+                });
+
+                displayResult('ordersResult', 'Payment Methods Analysis', {
+                    totalOrders: allOrders.length,
+                    uniquePaymentMethods: Array.from(paymentMethods),
+                    orderStatuses: Array.from(orderStatuses),
+                    samplePaymentStructures: samplePayments,
+                    recommendedApproach: 'Look for orders.payments array with type="CASH"'
+                });
+
+            } catch (error) {
+                displayResult('ordersResult', 'Payment Analysis Failed', error.message, true);
+            }
+        }
+
+        // Step 4: Calculate total cash sales
+        async function calculateCashSales() {
+            if (allOrders.length === 0) {
+                displayResult('cashBreakdown', 'No Orders', 'Please fetch orders first!', true);
+                return;
+            }
+
+            try {
+                let totalCashSales = 0;
+                let cashOrderCount = 0;
+                const cashDetails = [];
+                const rejectedOrders = [];
+
+                allOrders.forEach((order, index) => {
+                    // Check if order is valid (not voided, refunded, etc.)
+                    const isValidOrder = order.state !== 'VOIDED' && order.state !== 'CANCELED';
+                    
+                    if (!isValidOrder) {
+                        rejectedOrders.push({
+                            index,
+                            reason: `Order state: ${order.state}`,
+                            amount: order.amount || 0
+                        });
+                        return;
+                    }
+
+                    // Check if order has cash payments
+                    let orderHasCash = false;
+                    let orderCashAmount = 0;
+
+                    if (order.payments && Array.isArray(order.payments)) {
+                        order.payments.forEach(payment => {
+                            if (payment.type === 'CASH' && payment.amount) {
+                                orderHasCash = true;
+                                orderCashAmount += payment.amount;
+                            }
+                        });
+                    }
+
+                    if (orderHasCash) {
+                        cashOrderCount++;
+                        totalCashSales += orderCashAmount;
+                        cashDetails.push({
+                            orderIndex: index,
+                            orderId: order.guid || order.id,
+                            amount: orderCashAmount,
+                            totalOrderAmount: order.amount,
+                            time: order.openedDate || order.createdDate
+                        });
+                    }
+                });
+
+                // Display results
+                document.getElementById('cashTotal').style.display = 'block';
+                document.getElementById('cashAmount').textContent = (totalCashSales / 100).toFixed(2); // Convert cents to dollars
+
+                displayResult('cashBreakdown', 'Cash Sales Calculation Complete', {
+                    summary: {
+                        totalCashSales: `$${(totalCashSales / 100).toFixed(2)}`,
+                        cashOrderCount: cashOrderCount,
+                        totalOrdersAnalyzed: allOrders.length,
+                        rejectedOrdersCount: rejectedOrders.length
+                    },
+                    cashOrderDetails: cashDetails.slice(0, 10), // Show first 10
+                    rejectedOrders: rejectedOrders.slice(0, 5), // Show first 5
+                    formula: 'SUM(order.payments[type=CASH].amount) WHERE order.state NOT IN [VOIDED, CANCELED]'
+                });
+
+                cashOrders = cashDetails;
+
+            } catch (error) {
+                displayResult('cashBreakdown', 'Cash Calculation Failed', error.message, true);
+            }
+        }
+
+        // Step 5: Explore restaurant and menu data for context
+        async function exploreRestaurantData() {
+            if (!authToken) {
+                displayResult('exploreResult', 'Authentication Required', 'Please authenticate first!', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${TOAST_CONFIG.baseUrl}/restaurants/v1/restaurants/${TOAST_CONFIG.restaurantGuid}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Restaurant API failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayResult('exploreResult', 'Restaurant Data Retrieved', {
+                    name: data.general?.name,
+                    location: data.location,
+                    timeZone: data.general?.timeZone,
+                    schedules: data.schedules ? 'Present' : 'Not found',
+                    operatingHours: data.schedules?.daySchedules || 'Not available'
+                });
+
+            } catch (error) {
+                displayResult('exploreResult', 'Restaurant Data Failed', error.message, true);
+            }
+        }
+
+        async function exploreMenuData() {
+            if (!authToken) {
+                displayResult('exploreResult', 'Authentication Required', 'Please authenticate first!', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${TOAST_CONFIG.baseUrl}/menus/v1/menus`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Menu API failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayResult('exploreResult', 'Menu Data Retrieved', {
+                    menuCount: data.length || 0,
+                    firstMenu: data[0] || 'No menus found',
+                    menuStructure: data[0] ? Object.keys(data[0]) : []
+                });
+
+            } catch (error) {
+                displayResult('exploreResult', 'Menu Data Failed', error.message, true);
+            }
+        }
+
+        // Initialize the page
+        window.addEventListener('load', function() {
+            console.log('Toast API Cash Sales Calculator loaded');
+            console.log('Configuration:', {
+                restaurantGuid: TOAST_CONFIG.restaurantGuid,
+                baseUrl: TOAST_CONFIG.baseUrl,
+                clientId: TOAST_CONFIG.clientId
+            });
+        });
+    </script>
+</body>
+</html>
