@@ -5950,35 +5950,19 @@
       let totalNetTips = 0;
       let totalOrderCount = 0;
       
-      // Process each date in the range with proper Pacific timezone handling
-      const dates = [];
-      const start = new Date(startDate + 'T00:00:00-07:00'); // Pacific timezone
-      const end = new Date(endDate + 'T00:00:00-07:00');     // Pacific timezone
+      // Use the TDS-specific API for the entire date range (single call)
+      console.log('Processing TDS fetch for entire date range:', startDate, 'to', endDate);
       
-      // Generate exact date strings to match comprehensive test
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        // Format as YYYY-MM-DD in Pacific timezone
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
-        dates.push(dateStr);
-      }
-      
-      console.log('Processing dates for TDS fetch:', dates);
-      
-      // Process each date individually like the comprehensive test
-      for (const dateStr of dates) {
-        
-        try {
-          // Use the delivery analysis API with POST method and proper authentication
-          console.log(`Making API call for ${dateStr} with accessToken:`, authData.data.accessToken.substring(0, 20) + '...');
-          const deliveryResponse = await fetch('/api/toast-delivery-analysis', {
+      try {
+          // Use the TDS-specific API that matches comprehensive analysis exactly
+          console.log(`Making TDS API call for date range with accessToken:`, authData.data.accessToken.substring(0, 20) + '...');
+          const deliveryResponse = await fetch('/api/toast-tds-driver-tips', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               accessToken: authData.data.accessToken,
-              date: dateStr
+              startDate: startDate,
+              endDate: endDate
             })
           });
           
@@ -5998,21 +5982,32 @@
           
           const deliveryData = await deliveryResponse.json();
           if (deliveryData.success && deliveryData.data) {
-            // Extract net tips from delivery analysis data - use the raw number like comprehensive test
-            const dayTips = deliveryData.data.deliveryAnalysis?.totalDeliveryTips || 0;
-            const dayOrders = deliveryData.data.deliveryAnalysis?.totalOrders || 0;
+            // Extract tips from comprehensive analysis response (single call for all dates)
+            const netTips = deliveryData.data.netTips || 0;
+            const grossTips = deliveryData.data.grossTips || 0;
+            const voidedTips = deliveryData.data.voidedTips || 0;
+            const refundedTips = deliveryData.data.refundedTips || 0;
+            const orderCount = deliveryData.data.tdsDriverOrders || 0;
             
-            totalNetTips += dayTips;
-            totalOrderCount += dayOrders;
+            totalNetTips = netTips; // Use NET tips (after voids/refunds)
+            totalOrderCount = orderCount;
             
-            console.log(`${dateStr}: ${dayOrders} orders, $${dayTips} tips (running total: $${totalNetTips})`);
-            console.log(`Full response for ${dateStr}:`, deliveryData.data.deliveryAnalysis);
+            console.log('TDS Driver tips fetched successfully using comprehensive analysis method:');
+            console.log(`- Gross Tips: $${grossTips.toFixed(2)}`);
+            console.log(`- Voided Tips: $${voidedTips.toFixed(2)}`);
+            console.log(`- Refunded Tips: $${refundedTips.toFixed(2)}`);
+            console.log(`- Net Tips: $${netTips.toFixed(2)}`);
+            console.log(`- Orders: ${orderCount}`);
+            console.log(`- Expected: $481.83 (gross) or $478.36 (net)`);
+            
+            // Data retrieved successfully from single comprehensive call
           }
         } catch (dayError) {
-          console.warn(`Failed to fetch TDS data for ${dateStr}:`, dayError.message);
-          // Continue with other dates even if one fails
+          console.warn(`Failed to fetch TDS data:`, dayError.message);
+          // Set defaults if API fails
+          totalNetTips = 0;
+          totalOrderCount = 0;
         }
-      }
       
       // Store successful data
       tdsDataStatus.isFetching = false;
@@ -6023,7 +6018,7 @@
       document.getElementById('tdsDriverTips').value = totalNetTips.toFixed(2);
       document.getElementById('autoTdsAmount').textContent = `$${totalNetTips.toFixed(2)}`;
       document.getElementById('autoTdsDetails').textContent = 
-        `${totalOrderCount} TDS Driver orders • Net tips (after voids/refunds) • Auto-calculated`;
+        `${totalOrderCount} TDS Driver orders • Server GUID filtering • Net: $${totalNetTips.toFixed(2)} • Comprehensive analysis method`;
       
       console.log('TDS Driver tips auto-fetched successfully:', totalNetTips);
       
