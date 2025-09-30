@@ -3119,21 +3119,32 @@
     const discrepancySign = discrepancy >= 0 ? '+' : '-';
     const largeDiscrepancyFlag = Math.abs(discrepancy) > 10 ? ' ⚠️ LARGE DISCREPANCY!' : '';
     
+    // Additional PM flow calculations
+    const tipAdjustment = (originalTips - (fullData.pm_adjusted_tips || originalTips));
+    const rawDepositAmount = fullData.pm_deposit_amount ? (toastSales + originalTips) : 0;
+    const roundedDepositAmount = fullData.pm_deposit_amount || 0;
+    const depositRoundingAdjustment = rawDepositAmount - roundedDepositAmount;
+    const depositTipAdjustment = fullData.pm_adjusted_tips ? (originalTips - fullData.pm_adjusted_tips) : 0;
+    const depositExcessToCashbox = Math.abs(depositRoundingAdjustment);
+    const returnBreakdown = fullData.pm_amount_to_keep ? (fullData.pm_amount_to_keep - amTotal) : 0;
+    
     // Helper function to get denomination breakdown
     function getDenominationBreakdown(drawerData, prefix) {
-      if (!drawerData) return '';
+      if (!drawerData) return `<div style="color: #999; font-style: italic;">No data available</div>`;
+      
+      const counts = drawerData.counts || drawerData;
       
       return `
-        <div>$100: ${drawerData.hundreds || 0} = $${((drawerData.hundreds || 0) * 100).toFixed(2)}</div>
-        <div>$50: ${drawerData.fifties || 0} = $${((drawerData.fifties || 0) * 50).toFixed(2)}</div>
-        <div>$20: ${drawerData.twenties || 0} = $${((drawerData.twenties || 0) * 20).toFixed(2)}</div>
-        <div>$10: ${drawerData.tens || 0} = $${((drawerData.tens || 0) * 10).toFixed(2)}</div>
-        <div>$5: ${drawerData.fives || 0} = $${((drawerData.fives || 0) * 5).toFixed(2)}</div>
-        <div>$1: ${drawerData.ones || 0} = $${((drawerData.ones || 0) * 1).toFixed(2)}</div>
-        <div>¢25: ${drawerData.quarters || 0} = $${((drawerData.quarters || 0) * 0.25).toFixed(2)}</div>
-        <div>¢10: ${drawerData.dimes || 0} = $${((drawerData.dimes || 0) * 0.10).toFixed(2)}</div>
-        <div>¢5: ${drawerData.nickels || 0} = $${((drawerData.nickels || 0) * 0.05).toFixed(2)}</div>
-        <div>¢1: ${drawerData.pennies || 0} = $${((drawerData.pennies || 0) * 0.01).toFixed(2)}</div>
+        <div>$100: ${counts.hundreds || 0} = $${((counts.hundreds || 0) * 100).toFixed(2)}</div>
+        <div>$50: ${counts.fifties || 0} = $${((counts.fifties || 0) * 50).toFixed(2)}</div>
+        <div>$20: ${counts.twenties || 0} = $${((counts.twenties || 0) * 20).toFixed(2)}</div>
+        <div>$10: ${counts.tens || 0} = $${((counts.tens || 0) * 10).toFixed(2)}</div>
+        <div>$5: ${counts.fives || 0} = $${((counts.fives || 0) * 5).toFixed(2)}</div>
+        <div>$1: ${counts.ones || 0} = $${((counts.ones || 0) * 1).toFixed(2)}</div>
+        <div>¢25: ${counts.quarters || 0} = $${((counts.quarters || 0) * 0.25).toFixed(2)}</div>
+        <div>¢10: ${counts.dimes || 0} = $${((counts.dimes || 0) * 0.10).toFixed(2)}</div>
+        <div>¢5: ${counts.nickels || 0} = $${((counts.nickels || 0) * 0.05).toFixed(2)}</div>
+        <div>¢1: ${counts.pennies || 0} = $${((counts.pennies || 0) * 0.01).toFixed(2)}</div>
       `;
     }
     
@@ -3248,10 +3259,20 @@
             <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Toast Sales Reported:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${toastSales.toFixed(2)}</div></div>
             <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Tips Reported by Staff:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${originalTips.toFixed(2)}</div></div>
             <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Discrepancy (Drawers vs Toast):</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">${discrepancySign}$${Math.abs(discrepancy).toFixed(2)}</div></div>
+            ${tipAdjustment > 0 ? `
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Cash Tip Adjustment:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">-$${tipAdjustment.toFixed(2)}</div></div>
+            ` : ''}
+            ${Math.abs(depositRoundingAdjustment) > 0.001 ? `
+            <div style="display: table-row; background-color: #fff3cd;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Raw Deposit Amount:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${rawDepositAmount.toFixed(2)}</div></div>
+            <div style="display: table-row; background-color: #fff3cd;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Rounded Deposit Amount:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${roundedDepositAmount}</div></div>
+            <div style="display: table-row; background-color: #fff3cd;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Rounding Adjustment Needed:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${depositRoundingAdjustment.toFixed(2)}</div></div>
+            <div style="display: table-row; background-color: #fff3cd;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Taken from Tips (Whole $):</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">${depositTipAdjustment > 0 ? `-$${depositTipAdjustment.toFixed(2)}` : '-$'}</div></div>
+            <div style="display: table-row; background-color: #fff3cd;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Excess to Cashbox:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">+$${depositExcessToCashbox.toFixed(2)}</div></div>
+            ` : ''}
             ${fullData.pm_deposit_amount ? `
             <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Owed to Restaurant:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${toastSales.toFixed(2)}</div></div>
             <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Cash Tips Owed to Staff:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${fullData.pm_adjusted_tips || originalTips}</div></div>
-            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Returned to Cashbox:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${fullData.pm_amount_to_keep ? fullData.pm_amount_to_keep.toFixed(2) : '0.00'}</div></div>
+            <div style="display: table-row;"><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; font-weight: bold; width: 50%; text-align: right; padding-right: 10px;">Returned to Cashbox:</div><div style="display: table-cell; padding: 3px 6px; border-bottom: 1px dotted #ccc; text-align: left; font-weight: bold; width: 50%; padding-left: 10px;">$${returnBreakdown.toFixed(2)} + AM Total</div></div>
             ` : ''}
           </div>
         </div>
@@ -3265,15 +3286,15 @@
               <div style="text-align: center; font-weight: bold; font-size: 10px; margin-bottom: 4px; background-color: #e6f3ff; padding: 3px;">AM COUNTS</div>
               
               <div style="font-size: 10px; line-height: 1.2;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER 1</div>
-                ${getDenominationBreakdown(fullData.am_drawer1_data, 'am_drawer1')}
-                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.am_drawer1_total ? fullData.am_drawer1_total.toFixed(2) : '0.00'}</div>
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER A</div>
+                ${getDenominationBreakdown(fullData.am_drawer_a_data, 'am_drawer_a')}
+                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.am_drawer_a_total ? fullData.am_drawer_a_total.toFixed(2) : '0.00'}</div>
               </div>
               
               <div style="font-size: 10px; line-height: 1.2; margin-top: 6px;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER 2</div>
-                ${getDenominationBreakdown(fullData.am_drawer2_data, 'am_drawer2')}
-                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.am_drawer2_total ? fullData.am_drawer2_total.toFixed(2) : '0.00'}</div>
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER B</div>
+                ${getDenominationBreakdown(fullData.am_drawer_b_data, 'am_drawer_b')}
+                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.am_drawer_b_total ? fullData.am_drawer_b_total.toFixed(2) : '0.00'}</div>
               </div>
               
               <div style="font-weight: bold; text-align: center; padding: 4px; border: 2px solid #000; margin-top: 6px; font-size: 10px; background-color: #e6f3ff;">TOTAL AM: $${amTotal.toFixed(2)}</div>
@@ -3284,15 +3305,15 @@
               <div style="text-align: center; font-weight: bold; font-size: 10px; margin-bottom: 4px; background-color: #fff8f0; padding: 3px;">PM COUNTS</div>
               
               <div style="font-size: 10px; line-height: 1.2;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER 1</div>
-                ${getDenominationBreakdown(fullData.pm_drawer1_data, 'pm_drawer1')}
-                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.pm_drawer1_total ? fullData.pm_drawer1_total.toFixed(2) : '0.00'}</div>
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER A</div>
+                ${getDenominationBreakdown(fullData.pm_drawer_a_data, 'pm_drawer_a')}
+                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.pm_drawer_a_total ? fullData.pm_drawer_a_total.toFixed(2) : '0.00'}</div>
               </div>
               
               <div style="font-size: 10px; line-height: 1.2; margin-top: 6px;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER 2</div>
-                ${getDenominationBreakdown(fullData.pm_drawer2_data, 'pm_drawer2')}
-                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.pm_drawer2_total ? fullData.pm_drawer2_total.toFixed(2) : '0.00'}</div>
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">DRAWER B</div>
+                ${getDenominationBreakdown(fullData.pm_drawer_b_data, 'pm_drawer_b')}
+                <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 3px; padding-top: 3px;">TOTAL: $${fullData.pm_drawer_b_total ? fullData.pm_drawer_b_total.toFixed(2) : '0.00'}</div>
               </div>
               
               <div style="font-weight: bold; text-align: center; padding: 4px; border: 2px solid #000; margin-top: 6px; font-size: 10px; background-color: #fff8f0;">TOTAL PM: $${pmTotal.toFixed(2)}</div>
