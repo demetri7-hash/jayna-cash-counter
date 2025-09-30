@@ -3460,6 +3460,37 @@
       ['Discrepancy (Drawers vs Toast):', `${discrepancySign}$${Math.abs(discrepancy).toFixed(2)}`]
     ];
     
+    // Add conditional sections to match HTML display
+    const tipAdjustment = (originalTips - (fullData.pm_adjusted_tips || originalTips));
+    const rawDepositAmount = fullData.pm_deposit_amount ? (toastSales + originalTips) : 0;
+    const roundedDepositAmount = fullData.pm_deposit_amount || 0;
+    const depositRoundingAdjustment = rawDepositAmount - roundedDepositAmount;
+    const depositTipAdjustment = fullData.pm_adjusted_tips ? (originalTips - fullData.pm_adjusted_tips) : 0;
+    const depositExcessToCashbox = Math.abs(depositRoundingAdjustment);
+    const returnBreakdown = fullData.pm_amount_to_keep ? (fullData.pm_amount_to_keep - amTotal) : 0;
+    
+    if (tipAdjustment > 0) {
+      managerData.push(['Cash Tip Adjustment:', `-$${tipAdjustment.toFixed(2)}`]);
+    }
+    
+    if (Math.abs(depositRoundingAdjustment) > 0.001) {
+      managerData.push(
+        ['Raw Deposit Amount:', `$${rawDepositAmount.toFixed(2)}`],
+        ['Rounded Deposit Amount:', `$${roundedDepositAmount}`],
+        ['Rounding Adjustment Needed:', `$${depositRoundingAdjustment.toFixed(2)}`],
+        ['Taken from Tips (Whole $):', depositTipAdjustment > 0 ? `-$${depositTipAdjustment.toFixed(2)}` : '-$'],
+        ['Excess to Cashbox:', `+$${depositExcessToCashbox.toFixed(2)}`]
+      );
+    }
+    
+    if (fullData.pm_deposit_amount) {
+      managerData.push(
+        ['Owed to Restaurant:', `$${toastSales.toFixed(2)}`],
+        ['Cash Tips Owed to Staff:', `$${fullData.pm_adjusted_tips || originalTips}`],
+        ['Returned to Cashbox:', `$${returnBreakdown.toFixed(2)} + AM Total`]
+      );
+    }
+    
     managerData.forEach(([label, value]) => {
       checkPageBreak(15);
       doc.text(label, margin + 20, currentY);
@@ -3469,35 +3500,109 @@
     
     currentY += 20;
     
-    // Cash Count Breakdown
-    checkPageBreak(200);
+    // Cash Count Breakdown with detailed denominations
+    checkPageBreak(300);
     doc.setFont('helvetica', 'bold');
     doc.text('COMPLETE CASH COUNT BREAKDOWN', margin, currentY);
     currentY += 25;
     
-    // AM Counts
+    // Helper function to draw denomination breakdown
+    function drawDenominationBreakdown(drawerData, startX, startY, title) {
+      let y = startY;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text(title, startX, y);
+      y += 12;
+      
+      if (!drawerData) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.text('No data available', startX, y);
+        return y + 15;
+      }
+      
+      const counts = drawerData.counts || drawerData;
+      if (!counts) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.text('No data available', startX, y);
+        return y + 15;
+      }
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      
+      // Bills
+      const bills = [
+        { name: '$100', field: 'hundreds', value: 100 },
+        { name: '$50', field: 'fifties', value: 50 },
+        { name: '$20', field: 'twenties', value: 20 },
+        { name: '$10', field: 'tens', value: 10 },
+        { name: '$5', field: 'fives', value: 5 },
+        { name: '$1', field: 'ones', value: 1 }
+      ];
+      
+      bills.forEach(bill => {
+        const count = counts[bill.field] || 0;
+        if (count > 0) {
+          const total = (count * bill.value).toFixed(2);
+          doc.text(`${bill.name}: ${count} = $${total}`, startX, y);
+          y += 9;
+        }
+      });
+      
+      // Coins
+      const coins = [
+        { name: '¢25', field: 'quarters', value: 0.25 },
+        { name: '¢10', field: 'dimes', value: 0.10 },
+        { name: '¢5', field: 'nickels', value: 0.05 },
+        { name: '¢1', field: 'pennies', value: 0.01 }
+      ];
+      
+      coins.forEach(coin => {
+        const count = counts[coin.field] || 0;
+        if (count > 0) {
+          const total = (count * coin.value).toFixed(2);
+          doc.text(`${coin.name}: ${count} = $${total}`, startX, y);
+          y += 9;
+        }
+      });
+      
+      return y + 5;
+    }
+    
+    // AM Counts Header
     doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
     doc.text('AM COUNTS', margin + 20, currentY);
     doc.text('PM COUNTS', pageWidth / 2 + 20, currentY);
     currentY += 15;
     
-    doc.setFont('helvetica', 'normal');
-    doc.text('DRAWER 1', margin + 30, currentY);
-    doc.text('DRAWER 1', pageWidth / 2 + 30, currentY);
-    currentY += 15;
+    // Drawer A/1 Breakdown
+    let amY = drawDenominationBreakdown(fullData.am_drawer1_data, margin + 20, currentY, 'DRAWER A');
+    let pmY = drawDenominationBreakdown(fullData.pm_drawer1_data, pageWidth / 2 + 20, currentY, 'DRAWER A');
     
-    // Show drawer totals
-    doc.text(`Total: $${fullData.am_drawer1_total ? fullData.am_drawer1_total.toFixed(2) : '0.00'}`, margin + 40, currentY);
-    doc.text(`Total: $${fullData.pm_drawer1_total ? fullData.pm_drawer1_total.toFixed(2) : '0.00'}`, pageWidth / 2 + 40, currentY);
-    currentY += 20;
+    // Drawer A Totals
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text(`TOTAL: $${fullData.am_drawer1_total ? fullData.am_drawer1_total.toFixed(2) : '0.00'}`, margin + 20, amY);
+    doc.text(`TOTAL: $${fullData.pm_drawer1_total ? fullData.pm_drawer1_total.toFixed(2) : '0.00'}`, pageWidth / 2 + 20, pmY);
     
-    doc.text('DRAWER 2', margin + 30, currentY);
-    doc.text('DRAWER 2', pageWidth / 2 + 30, currentY);
-    currentY += 15;
+    let maxY = Math.max(amY, pmY) + 20;
+    currentY = maxY;
     
-    doc.text(`Total: $${fullData.am_drawer2_total ? fullData.am_drawer2_total.toFixed(2) : '0.00'}`, margin + 40, currentY);
-    doc.text(`Total: $${fullData.pm_drawer2_total ? fullData.pm_drawer2_total.toFixed(2) : '0.00'}`, pageWidth / 2 + 40, currentY);
-    currentY += 25;
+    // Drawer B/2 Breakdown
+    amY = drawDenominationBreakdown(fullData.am_drawer2_data, margin + 20, currentY, 'DRAWER B');
+    pmY = drawDenominationBreakdown(fullData.pm_drawer2_data, pageWidth / 2 + 20, currentY, 'DRAWER B');
+    
+    // Drawer B Totals
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text(`TOTAL: $${fullData.am_drawer2_total ? fullData.am_drawer2_total.toFixed(2) : '0.00'}`, margin + 20, amY);
+    doc.text(`TOTAL: $${fullData.pm_drawer2_total ? fullData.pm_drawer2_total.toFixed(2) : '0.00'}`, pageWidth / 2 + 20, pmY);
+    
+    maxY = Math.max(amY, pmY) + 25;
+    currentY = maxY;
     
     // Grand totals
     doc.setFont('helvetica', 'bold');
