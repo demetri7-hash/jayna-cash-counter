@@ -122,51 +122,24 @@ export default async function handler(req, res) {
         serviceChargeGratuity: 0,
         deliveryCharges: 0
       },
-      rejectedOrders: []
+      rejectedOrders: [],
+      serverGuidAnalysis: {} // Track all server GUIDs and their order counts
     };
 
     if (Array.isArray(allOrders)) {
-      // TDS Driver identification - multiple potential filters
-      const TDS_DRIVER_SERVER_GUID = '7863337c-16f2-4d9e-a855-e83953bbb016';
-      const TDS_DRIVER_USER_GUID = '0789eaf5-afc9-4c6c-86c3-8b16683a6ee6';
+      // TEMPORARILY DISABLE SERVER FILTERING TO TEST HYPOTHESIS
+      // TDS Driver might not be a server-level filter but rather a reporting/operational filter
       
-      // Enhanced filtering function for TDS Driver orders
-      const isTDSDriverOrder = (order) => {
-        // Method 1: Check server GUID
-        if (order.server?.guid === TDS_DRIVER_SERVER_GUID) {
-          return { method: 'serverGuid', guid: order.server.guid };
-        }
-        
-        // Method 2: Check for user GUID in externalId
-        if (order.server?.externalId === TDS_DRIVER_USER_GUID) {
-          return { method: 'externalId', guid: order.server.externalId };
-        }
-        
-        // Method 3: Check if email contains the TDS Driver GUID
-        if (order.diningOption?.externalId === TDS_DRIVER_USER_GUID) {
-          return { method: 'diningOptionExternal', guid: order.diningOption.externalId };
-        }
-        
-        return null;
-      };
+      // Let's process ALL orders and see if we can match the $481.83 through other means
+      console.log(`Processing ALL ${allOrders.length} orders without server filtering for debugging...`);
       
       allOrders.forEach((order, index) => {
-        // ENHANCED FILTER: Check multiple ways to identify TDS Driver
-        const tdsMatch = isTDSDriverOrder(order);
-        if (!tdsMatch) {
-          deliveryAnalysis.rejectedOrders.push({
-            index,
-            reason: `Not TDS Driver order - server GUID: ${order.server?.guid || 'null'}, externalId: ${order.server?.externalId || 'null'}`,
-            orderGuid: order.guid
-          });
-          return;
+        // Track server GUIDs for analysis
+        const serverGuid = order.server?.guid || 'null';
+        if (!deliveryAnalysis.serverGuidAnalysis[serverGuid]) {
+          deliveryAnalysis.serverGuidAnalysis[serverGuid] = 0;
         }
-        
-        // Track which method identified the TDS Driver order
-        if (!deliveryAnalysis.tdsDriverMatches) {
-          deliveryAnalysis.tdsDriverMatches = {};
-        }
-        deliveryAnalysis.tdsDriverMatches[tdsMatch.method] = (deliveryAnalysis.tdsDriverMatches[tdsMatch.method] || 0) + 1;
+        deliveryAnalysis.serverGuidAnalysis[serverGuid]++;
         
         // Skip voided/deleted orders
         if (order.voided || order.deleted) {
