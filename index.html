@@ -3499,10 +3499,12 @@
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     
-    doc.text(`Starting Cash (AM): $${amTotal.toFixed(2)}`, margin + 5, currentY + 12);
-    doc.text(`Ending Cash (PM): $${pmTotal.toFixed(2)}`, margin + 5, currentY + 24);
-    doc.text(`Actual Cash In: $${actualCashIn.toFixed(2)}`, margin + 5, currentY + 36);
+    // Left column - right aligned
+    doc.text(`Starting Cash (AM): $${amTotal.toFixed(2)}`, pageWidth / 2 - 5, currentY + 12, { align: 'right' });
+    doc.text(`Ending Cash (PM): $${pmTotal.toFixed(2)}`, pageWidth / 2 - 5, currentY + 24, { align: 'right' });
+    doc.text(`Actual Cash In: $${actualCashIn.toFixed(2)}`, pageWidth / 2 - 5, currentY + 36, { align: 'right' });
     
+    // Right column - left aligned
     doc.text(`Toast Sales: $${toastSales.toFixed(2)}`, pageWidth / 2 + 5, currentY + 12);
     doc.text(`Original Tips: $${originalTips.toFixed(2)}`, pageWidth / 2 + 5, currentY + 24);
     doc.text(`Discrepancy: ${discrepancySign}$${Math.abs(discrepancy).toFixed(2)}`, pageWidth / 2 + 5, currentY + 36);
@@ -3536,8 +3538,9 @@
     doc.setFontSize(8);
     const amNotes = fullData.am_notes || 'No AM Notes';
     const pmNotes = fullData.pm_notes || 'No PM Notes';
-    doc.text(amNotes, margin + 5, currentY + 15, { maxWidth: (pageWidth - 2 * margin) / 2 - 10 });
-    doc.text(pmNotes, pageWidth / 2 + 5, currentY + 15, { maxWidth: (pageWidth - 2 * margin) / 2 - 10 });
+    // Center-align notes content
+    doc.text(amNotes, margin + (pageWidth - 2 * margin) / 4, currentY + 15, { align: 'center', maxWidth: (pageWidth - 2 * margin) / 2 - 10 });
+    doc.text(pmNotes, margin + 3 * (pageWidth - 2 * margin) / 4, currentY + 15, { align: 'center', maxWidth: (pageWidth - 2 * margin) / 2 - 10 });
     currentY += 25;
     
     // Manager Breakdown header
@@ -3586,9 +3589,15 @@
     doc.setFontSize(8);
     let managerY = currentY + 12;
     
+    // Calculate center point with small gap
+    const centerPoint = pageWidth / 2;
+    const gapSize = 5; // Small gap between label and value
+    
     managerItems.forEach(([label, value]) => {
-      doc.text(label, margin + 5, managerY);
-      doc.text(value, pageWidth - margin - 5, managerY, { align: 'right' });
+      // Right-align labels to center minus gap
+      doc.text(label, centerPoint - gapSize, managerY, { align: 'right' });
+      // Left-align values from center plus gap
+      doc.text(value, centerPoint + gapSize, managerY);
       managerY += 10;
     });
     
@@ -3609,11 +3618,44 @@
     doc.text('PM COUNTS', margin + 3 * (pageWidth - 2 * margin) / 4, currentY + 11, { align: 'center' });
     currentY += 15;
     
-    // Breakdown content - tight format
-    const breakdownHeight = 200; // Reduced from 280
-    drawBorderedSection(margin, currentY, pageWidth - 2 * margin, breakdownHeight);
-    
+    // Calculate dynamic breakdown section height
     const halfWidth = (pageWidth - 2 * margin) / 2;
+    
+    // First, calculate the content without drawing to get the height
+    let tempY = currentY + 10;
+    let amY1 = tempY + 25; // Estimate for Drawer 1 start
+    let pmY1 = tempY + 25;
+    
+    // Estimate heights based on data availability
+    const estimateDrawerHeight = (drawerData) => {
+      if (!drawerData) return 25;
+      let count = 0;
+      
+      // Parse and count denominations
+      let counts = drawerData;
+      if (typeof drawerData === 'string') {
+        try { counts = JSON.parse(drawerData); } catch (e) { return 25; }
+      }
+      if (counts && counts.counts) counts = counts.counts;
+      if (!counts) return 25;
+      
+      const denominations = ['hundreds', 'fifties', 'twenties', 'tens', 'fives', 'ones', 'quarters', 'dimes', 'nickels', 'pennies'];
+      denominations.forEach(field => { if ((counts[field] || 0) > 0) count++; });
+      
+      return Math.max(25, count * 9 + 20); // 9px per line + header
+    };
+    
+    const am1Height = estimateDrawerHeight(fullData.am_drawer1_data);
+    const pm1Height = estimateDrawerHeight(fullData.pm_drawer1_data);
+    const am2Height = estimateDrawerHeight(fullData.am_drawer2_data);
+    const pm2Height = estimateDrawerHeight(fullData.pm_drawer2_data);
+    
+    const drawer1MaxHeight = Math.max(am1Height, pm1Height);
+    const drawer2MaxHeight = Math.max(am2Height, pm2Height);
+    const breakdownHeight = drawer1MaxHeight + drawer2MaxHeight + 40; // Extra padding
+    
+    // Now draw the actual section
+    drawBorderedSection(margin, currentY, pageWidth - 2 * margin, breakdownHeight);
     
     // Draw vertical divider
     doc.setDrawColor(0, 0, 0);
@@ -3621,24 +3663,24 @@
     doc.line(margin + halfWidth, currentY, margin + halfWidth, currentY + breakdownHeight);
     
     // Drawer 1 breakdowns
-    let amY1 = drawDenominationBreakdown(fullData.am_drawer1_data, margin, currentY, halfWidth, 'DRAWER 1');
-    let pmY1 = drawDenominationBreakdown(fullData.pm_drawer1_data, margin + halfWidth, currentY, halfWidth, 'DRAWER 1');
+    let amY1Actual = drawDenominationBreakdown(fullData.am_drawer1_data, margin, currentY, halfWidth, 'DRAWER 1');
+    let pmY1Actual = drawDenominationBreakdown(fullData.pm_drawer1_data, margin + halfWidth, currentY, halfWidth, 'DRAWER 1');
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.text(`TOTAL: $${fullData.am_drawer1_total ? fullData.am_drawer1_total.toFixed(2) : '0.00'}`, margin + 3, amY1 + 8);
-    doc.text(`TOTAL: $${fullData.pm_drawer1_total ? fullData.pm_drawer1_total.toFixed(2) : '0.00'}`, margin + halfWidth + 3, pmY1 + 8);
+    doc.text(`TOTAL: $${fullData.am_drawer1_total ? fullData.am_drawer1_total.toFixed(2) : '0.00'}`, margin + 3, amY1Actual + 8);
+    doc.text(`TOTAL: $${fullData.pm_drawer1_total ? fullData.pm_drawer1_total.toFixed(2) : '0.00'}`, margin + halfWidth + 3, pmY1Actual + 8);
     
-    let drawerMidY = Math.max(amY1, pmY1) + 18; // Reduced spacing
+    let drawerMidY = Math.max(amY1Actual, pmY1Actual) + 18;
     
     // Drawer 2 breakdowns
-    let amY2 = drawDenominationBreakdown(fullData.am_drawer2_data, margin, drawerMidY, halfWidth, 'DRAWER 2');
-    let pmY2 = drawDenominationBreakdown(fullData.pm_drawer2_data, margin + halfWidth, drawerMidY, halfWidth, 'DRAWER 2');
+    let amY2Actual = drawDenominationBreakdown(fullData.am_drawer2_data, margin, drawerMidY, halfWidth, 'DRAWER 2');
+    let pmY2Actual = drawDenominationBreakdown(fullData.pm_drawer2_data, margin + halfWidth, drawerMidY, halfWidth, 'DRAWER 2');
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.text(`TOTAL: $${fullData.am_drawer2_total ? fullData.am_drawer2_total.toFixed(2) : '0.00'}`, margin + 3, amY2 + 8);
-    doc.text(`TOTAL: $${fullData.pm_drawer2_total ? fullData.pm_drawer2_total.toFixed(2) : '0.00'}`, margin + halfWidth + 3, pmY2 + 8);
+    doc.text(`TOTAL: $${fullData.am_drawer2_total ? fullData.am_drawer2_total.toFixed(2) : '0.00'}`, margin + 3, amY2Actual + 8);
+    doc.text(`TOTAL: $${fullData.pm_drawer2_total ? fullData.pm_drawer2_total.toFixed(2) : '0.00'}`, margin + halfWidth + 3, pmY2Actual + 8);
     
     currentY += breakdownHeight;
     
