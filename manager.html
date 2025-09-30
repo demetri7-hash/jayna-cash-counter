@@ -1196,81 +1196,391 @@
       }
     }
 
+    // SalesChart Implementation - Real Toast + Homebase Analytics with Chart.js
     async function loadSalesChart() {
-      console.log('📊 Loading Sales Chart...');
+      console.log('📊 Loading Sales Chart with comprehensive Toast + Homebase analytics...');
       
       try {
+        // Get comprehensive analytics data for current period
+        const chartAnalytics = await getSalesChartData(currentPeriod);
+        
+        // Create or update the chart
+        if (salesChart) {
+          salesChart.destroy();
+        }
+        
         const ctx = document.getElementById('sales-chart').getContext('2d');
+        salesChart = createSalesChart(ctx, chartAnalytics);
         
-        // Sample data - TODO: Replace with real Toast analytics
-        const chartData = {
-          labels: ['6AM', '8AM', '10AM', '12PM', '2PM', '4PM', '6PM', '8PM', '10PM'],
-          datasets: [
-            {
-              label: 'Revenue ($)',
-              data: [45, 78, 123, 234, 189, 156, 245, 198, 87],
-              borderColor: '#667eea',
-              backgroundColor: 'rgba(102, 126, 234, 0.1)',
-              fill: true,
-              tension: 0.4
-            },
-            {
-              label: 'Orders',
-              data: [3, 6, 9, 16, 13, 11, 17, 14, 6],
-              borderColor: '#22c55e',
-              backgroundColor: 'rgba(34, 197, 94, 0.1)',
-              fill: true,
-              tension: 0.4,
-              yAxisID: 'y1'
-            }
-          ]
-        };
-        
-        salesChart = new Chart(ctx, {
-          type: 'line',
-          data: chartData,
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              title: {
-                display: false
-              },
-              legend: {
-                position: 'top'
-              }
-            },
-            scales: {
-              y: {
-                type: 'linear',
-                display: true,
-                position: 'left',
-                title: {
-                  display: true,
-                  text: 'Revenue ($)'
-                }
-              },
-              y1: {
-                type: 'linear',
-                display: true,
-                position: 'right',
-                title: {
-                  display: true,
-                  text: 'Orders'
-                },
-                grid: {
-                  drawOnChartArea: false,
-                }
-              }
-            }
-          }
-        });
-        
-        console.log('✅ Sales Chart loaded');
+        console.log('✅ Sales Chart loaded with real analytics:', chartAnalytics);
         
       } catch (error) {
         console.error('❌ Error loading Sales Chart:', error);
+        const ctx = document.getElementById('sales-chart').getContext('2d');
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Failed to load sales chart: ' + error.message, ctx.canvas.width/2, ctx.canvas.height/2);
       }
+    }
+
+    // Get comprehensive sales chart data with labor correlation
+    async function getSalesChartData(period) {
+      try {
+        const dateRange = calculateDateRange(period);
+        
+        // Fetch Toast sales data and Homebase labor data in parallel
+        const [salesData, laborData] = await Promise.all([
+          getToastSalesData(dateRange),
+          getHomebaseLaborData(dateRange)
+        ]);
+        
+        // Combine and analyze data
+        const combinedAnalytics = combineToastHomebaseData(salesData, laborData, period);
+        
+        return combinedAnalytics;
+        
+      } catch (error) {
+        console.error('❌ Sales chart data error:', error);
+        throw new Error('Failed to fetch comprehensive sales analytics');
+      }
+    }
+
+    // Calculate date range based on period selection
+    function calculateDateRange(period) {
+      const endDate = new Date();
+      const startDate = new Date();
+      
+      switch (period) {
+        case 'day':
+          // Last 24 hours by hour
+          startDate.setDate(startDate.getDate() - 1);
+          return { startDate, endDate, granularity: 'hour' };
+        case 'week':
+          // Last 7 days by day
+          startDate.setDate(startDate.getDate() - 7);
+          return { startDate, endDate, granularity: 'day' };
+        case 'month':
+          // Last 30 days by day
+          startDate.setDate(startDate.getDate() - 30);
+          return { startDate, endDate, granularity: 'day' };
+        default:
+          startDate.setDate(startDate.getDate() - 7);
+          return { startDate, endDate, granularity: 'day' };
+      }
+    }
+
+    // Get Toast sales data for the date range
+    async function getToastSalesData(dateRange) {
+      const startDateStr = dateRange.startDate.toISOString().split('T')[0];
+      const endDateStr = dateRange.endDate.toISOString().split('T')[0];
+      
+      // Get all orders in the date range
+      const orders = await callToastAPI(`/orders/v2/orders?startDate=${startDateStr}&endDate=${endDateStr}&pageSize=1000`);
+      
+      // Group orders by time period
+      const salesByPeriod = groupOrdersByPeriod(orders, dateRange.granularity);
+      
+      return salesByPeriod;
+    }
+
+    // Get Homebase labor data for the date range
+    async function getHomebaseLaborData(dateRange) {
+      try {
+        const startDateStr = dateRange.startDate.toISOString().split('T')[0];
+        const endDateStr = dateRange.endDate.toISOString().split('T')[0];
+        
+        // Get timecards and shifts for the period
+        const [timecards, shifts] = await Promise.all([
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${startDateStr}&end_date=${endDateStr}`)
+        ]);
+        
+        // Group labor data by time period
+        const laborByPeriod = groupLaborByPeriod(timecards, shifts, dateRange.granularity);
+        
+        return laborByPeriod;
+        
+      } catch (error) {
+        console.error('❌ Homebase labor data error:', error);
+        return {}; // Return empty object if Homebase fails
+      }
+    }
+
+    // Group orders by time period (hour/day)
+    function groupOrdersByPeriod(orders, granularity) {
+      const grouped = {};
+      
+      orders.forEach(order => {
+        if (order.openedDate && order.status && !['VOIDED', 'CANCELLED'].includes(order.status)) {
+          const orderDate = new Date(order.openedDate);
+          const periodKey = granularity === 'hour' ? 
+            `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}-${String(orderDate.getDate()).padStart(2, '0')} ${String(orderDate.getHours()).padStart(2, '0')}:00` :
+            `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}-${String(orderDate.getDate()).padStart(2, '0')}`;
+          
+          if (!grouped[periodKey]) {
+            grouped[periodKey] = {
+              revenue: 0,
+              orders: 0,
+              avgOrderValue: 0
+            };
+          }
+          
+          const revenue = (order.amount || 0) / 100; // Toast amounts in cents
+          grouped[periodKey].revenue += revenue;
+          grouped[periodKey].orders += 1;
+          grouped[periodKey].avgOrderValue = grouped[periodKey].revenue / grouped[periodKey].orders;
+        }
+      });
+      
+      return grouped;
+    }
+
+    // Group labor data by time period
+    function groupLaborByPeriod(timecards, shifts, granularity) {
+      const grouped = {};
+      
+      // Process timecards (actual hours)
+      timecards.forEach(timecard => {
+        if (timecard.clock_in) {
+          const clockInDate = new Date(timecard.clock_in);
+          const periodKey = granularity === 'hour' ? 
+            `${clockInDate.getFullYear()}-${String(clockInDate.getMonth() + 1).padStart(2, '0')}-${String(clockInDate.getDate()).padStart(2, '0')} ${String(clockInDate.getHours()).padStart(2, '0')}:00` :
+            `${clockInDate.getFullYear()}-${String(clockInDate.getMonth() + 1).padStart(2, '0')}-${String(clockInDate.getDate()).padStart(2, '0')}`;
+          
+          if (!grouped[periodKey]) {
+            grouped[periodKey] = {
+              actualHours: 0,
+              scheduledHours: 0,
+              laborCost: 0,
+              staffCount: 0
+            };
+          }
+          
+          // Calculate actual hours worked
+          const clockOut = timecard.clock_out ? new Date(timecard.clock_out) : new Date();
+          const hoursWorked = Math.max(0, (clockOut - clockInDate) / (1000 * 60 * 60));
+          
+          grouped[periodKey].actualHours += hoursWorked;
+          grouped[periodKey].laborCost += hoursWorked * 15; // Assume $15/hour average
+          grouped[periodKey].staffCount += 1;
+        }
+      });
+      
+      // Process shifts (scheduled hours)
+      shifts.forEach(shift => {
+        if (shift.start_date) {
+          const shiftDate = new Date(shift.start_date);
+          const periodKey = granularity === 'hour' ? 
+            `${shiftDate.getFullYear()}-${String(shiftDate.getMonth() + 1).padStart(2, '0')}-${String(shiftDate.getDate()).padStart(2, '0')} ${String(shiftDate.getHours()).padStart(2, '0')}:00` :
+            `${shiftDate.getFullYear()}-${String(shiftDate.getMonth() + 1).padStart(2, '0')}-${String(shiftDate.getDate()).padStart(2, '0')}`;
+          
+          if (!grouped[periodKey]) {
+            grouped[periodKey] = {
+              actualHours: 0,
+              scheduledHours: 0,
+              laborCost: 0,
+              staffCount: 0
+            };
+          }
+          
+          // Calculate scheduled hours
+          const endDate = shift.end_date ? new Date(shift.end_date) : new Date(shiftDate.getTime() + 8 * 60 * 60 * 1000);
+          const scheduledHours = Math.max(0, (endDate - shiftDate) / (1000 * 60 * 60));
+          
+          grouped[periodKey].scheduledHours += scheduledHours;
+        }
+      });
+      
+      return grouped;
+    }
+
+    // Combine Toast and Homebase data for comprehensive analytics
+    function combineToastHomebaseData(salesData, laborData, period) {
+      const labels = [];
+      const revenueData = [];
+      const ordersData = [];
+      const laborHoursData = [];
+      const laborEfficiencyData = [];
+      
+      // Get all unique time periods
+      const allPeriods = new Set([...Object.keys(salesData), ...Object.keys(laborData)]);
+      const sortedPeriods = Array.from(allPeriods).sort();
+      
+      sortedPeriods.forEach(periodKey => {
+        const sales = salesData[periodKey] || { revenue: 0, orders: 0 };
+        const labor = laborData[periodKey] || { actualHours: 0, scheduledHours: 0, laborCost: 0 };
+        
+        // Format label based on period
+        const label = formatChartLabel(periodKey, period);
+        labels.push(label);
+        
+        revenueData.push(sales.revenue);
+        ordersData.push(sales.orders);
+        laborHoursData.push(labor.actualHours);
+        
+        // Calculate labor efficiency (revenue per labor hour)
+        const efficiency = labor.actualHours > 0 ? sales.revenue / labor.actualHours : 0;
+        laborEfficiencyData.push(efficiency);
+      });
+      
+      return {
+        labels,
+        datasets: {
+          revenue: revenueData,
+          orders: ordersData,
+          laborHours: laborHoursData,
+          efficiency: laborEfficiencyData
+        }
+      };
+    }
+
+    // Format chart label based on period
+    function formatChartLabel(periodKey, period) {
+      if (period === 'day') {
+        // Hour format: "2025-09-30 14:00" -> "2:00 PM"
+        const [datePart, timePart] = periodKey.split(' ');
+        const hour = parseInt(timePart.split(':')[0]);
+        return hour === 0 ? '12:00 AM' : 
+               hour < 12 ? `${hour}:00 AM` : 
+               hour === 12 ? '12:00 PM' : 
+               `${hour - 12}:00 PM`;
+      } else {
+        // Day format: "2025-09-30" -> "Sep 30"
+        const date = new Date(periodKey + 'T00:00:00');
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+    }
+
+    // Create Chart.js sales chart with multi-axis support
+    function createSalesChart(ctx, analytics) {
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: analytics.labels,
+          datasets: [
+            {
+              label: 'Revenue ($)',
+              data: analytics.datasets.revenue,
+              borderColor: '#667eea',
+              backgroundColor: 'rgba(102, 126, 234, 0.1)',
+              fill: true,
+              tension: 0.4,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Orders',
+              data: analytics.datasets.orders,
+              borderColor: '#22c55e',
+              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+              fill: false,
+              tension: 0.4,
+              yAxisID: 'y1'
+            },
+            {
+              label: 'Labor Hours',
+              data: analytics.datasets.laborHours,
+              borderColor: '#f59e0b',
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              fill: false,
+              tension: 0.4,
+              yAxisID: 'y2'
+            },
+            {
+              label: 'Efficiency ($/hr)',
+              data: analytics.datasets.efficiency,
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              fill: false,
+              tension: 0.4,
+              yAxisID: 'y3'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: `${currentPeriod === 'day' ? '24-Hour' : currentPeriod === 'week' ? '7-Day' : '30-Day'} Revenue vs Labor Analysis`
+            },
+            legend: {
+              position: 'top'
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                label: function(context) {
+                  const label = context.dataset.label || '';
+                  if (label.includes('Revenue')) {
+                    return `${label}: $${context.parsed.y.toFixed(2)}`;
+                  } else if (label.includes('Efficiency')) {
+                    return `${label}: $${context.parsed.y.toFixed(2)}/hr`;
+                  } else if (label.includes('Hours')) {
+                    return `${label}: ${context.parsed.y.toFixed(1)} hrs`;
+                  } else {
+                    return `${label}: ${context.parsed.y}`;
+                  }
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              display: true,
+              title: {
+                display: true,
+                text: currentPeriod === 'day' ? 'Hour' : 'Date'
+              }
+            },
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: 'Revenue ($)'
+              },
+              grid: {
+                color: 'rgba(102, 126, 234, 0.1)'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: 'Orders'
+              },
+              grid: {
+                drawOnChartArea: false,
+              },
+              ticks: {
+                color: '#22c55e'
+              }
+            },
+            y2: {
+              type: 'linear',
+              display: false,
+              position: 'right'
+            },
+            y3: {
+              type: 'linear',
+              display: false,
+              position: 'right'
+            }
+          },
+          interaction: {
+            mode: 'nearest',
+            axis: 'x',
+            intersect: false
+          }
+        }
+      });
     }
 
     async function loadRecentOrders() {
