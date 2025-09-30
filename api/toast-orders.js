@@ -35,11 +35,13 @@ export default async function handler(req, res) {
       restaurantGuid: process.env.TOAST_RESTAURANT_GUID || 'd3efae34-7c2e-4107-a442-49081e624706'
     };
 
-    // Format dates for Toast API (they expect specific timezone format)
-    const startDate = `${date}T00:00:00.000`;
-    const endDate = `${date}T23:59:59.999`;
+    // Use businessDate format (yyyymmdd) - much simpler and more reliable
+    const businessDate = date.replace(/-/g, ''); // Convert 2025-09-28 to 20250928
+    console.log(`Business date format: ${businessDate}`);
 
-    const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/orders?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+    // Use the correct ordersBulk endpoint with businessDate parameter
+    const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=100`;
+    console.log(`Orders URL: ${ordersUrl}`);
 
     // Make the orders request to Toast API
     const ordersResponse = await fetch(ordersUrl, {
@@ -52,13 +54,24 @@ export default async function handler(req, res) {
     });
 
     if (!ordersResponse.ok) {
-      const errorText = await ordersResponse.text();
-      console.error('Toast orders API failed:', ordersResponse.status, errorText);
+      let errorText;
+      try {
+        errorText = await ordersResponse.text();
+        console.error('Toast orders API failed:', ordersResponse.status, errorText);
+      } catch (e) {
+        errorText = 'Could not read error response';
+        console.error('Toast orders API failed:', ordersResponse.status, 'Error reading response:', e);
+      }
       
       return res.status(ordersResponse.status).json({
         success: false,
         error: `Toast orders API failed: ${ordersResponse.status} ${ordersResponse.statusText}`,
-        details: errorText
+        details: errorText,
+        requestUrl: ordersUrl,
+        requestHeaders: {
+          'Authorization': `Bearer ${accessToken.substring(0, 20)}...`,
+          'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid
+        }
       });
     }
 
@@ -70,30 +83,48 @@ export default async function handler(req, res) {
     let cashOrderCount = 0;
     const cashDetails = [];
     const rejectedOrders = [];
+    const paymentAnalysis = [];
 
     if (Array.isArray(ordersData)) {
       ordersData.forEach((order, index) => {
         // Check if order is valid (not voided, refunded, etc.)
-        const isValidOrder = order.state !== 'VOIDED' && order.state !== 'CANCELED';
+        const isValidOrder = !order.voided && !order.deleted;
         
         if (!isValidOrder) {
           rejectedOrders.push({
             index,
-            reason: `Order state: ${order.state}`,
-            amount: order.amount || 0
+            reason: `Order voided: ${order.voided}, deleted: ${order.deleted}`,
+            orderGuid: order.guid
           });
           return;
         }
 
-        // Check if order has cash payments
+        // Look for payments in checks (Toast structure: order.checks[].payments[])
         let orderHasCash = false;
         let orderCashAmount = 0;
 
-        if (order.payments && Array.isArray(order.payments)) {
-          order.payments.forEach(payment => {
-            if (payment.type === 'CASH' && payment.amount) {
-              orderHasCash = true;
-              orderCashAmount += payment.amount;
+        if (order.checks && Array.isArray(order.checks)) {
+          order.checks.forEach((check, checkIndex) => {
+            if (check.payments && Array.isArray(check.payments)) {
+              check.payments.forEach((payment, paymentIndex) => {
+                // Collect payment info for analysis
+                paymentAnalysis.push({
+                  orderIndex: index,
+                  checkIndex: checkIndex,
+                  paymentIndex: paymentIndex,
+                  paymentStructure: Object.keys(payment),
+                  payment: payment
+                });
+
+                // Look for cash payments - might be type 'CASH' or different field
+                if (payment.type === 'CASH' && payment.amount) {
+                  orderHasCash = true;
+                  orderCashAmount += payment.amount;
+                } else if (payment.paidAmount && payment.type === 'CASH') {
+                  orderHasCash = true;
+                  orderCashAmount += payment.paidAmount;
+                }
+              });
             }
           });
         }
@@ -103,10 +134,10 @@ export default async function handler(req, res) {
           totalCashSales += orderCashAmount;
           cashDetails.push({
             orderIndex: index,
-            orderId: order.guid || order.id,
+            orderId: order.guid,
             amount: orderCashAmount,
-            totalOrderAmount: order.amount,
-            time: order.openedDate || order.createdDate
+            openedDate: order.openedDate,
+            businessDate: order.businessDate
           });
         }
       });
@@ -114,9 +145,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: `Retrieved ${ordersData.length || 0} orders for ${date}`,
+      message: `Retrieved ${ordersData.length || 0} orders for business date ${businessDate}`,
       data: {
         date: date,
+        businessDate: businessDate,
         totalOrders: ordersData.length || 0,
         rawOrders: ordersData, // Full order data for analysis
         cashAnalysis: {
@@ -125,7 +157,8 @@ export default async function handler(req, res) {
           cashOrderCount: cashOrderCount,
           rejectedOrdersCount: rejectedOrders.length,
           cashOrderDetails: cashDetails,
-          rejectedOrders: rejectedOrders
+          rejectedOrders: rejectedOrders,
+          paymentAnalysis: paymentAnalysis.slice(0, 10) // First 10 payments for debugging
         }
       }
     });
