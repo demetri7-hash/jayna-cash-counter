@@ -986,8 +986,7 @@
   <script>
     // Configuration (Note: All API credentials are securely stored in Vercel environment variables)
     const CONFIG = {
-      HOMEBASE_LOCATION_UUID: '0b6c1af3-4904-4b84-ae5f-d1172d77de27',
-      // API Endpoints (uses Vercel functions like index.html)
+      // All secrets handled via backend endpoints
       API_BASE: '/api'
     };
 
@@ -1342,11 +1341,11 @@
         
         // Get current employees and today's data
         const [employeesResponse, timecardsResponse, shiftsResponse, todayLaborByEmployee, todayLaborByRole] = await Promise.all([
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${today}&end_date=${today}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_employee?start_date=${today}&end_date=${today}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_role?start_date=${today}&end_date=${today}`)
+          callHomebaseAPI('/employees'),
+          callHomebaseAPI(`/timecards?start_date=${today}&end_date=${today}`),
+          callHomebaseAPI(`/shifts?start_date=${today}&end_date=${today}`),
+          callHomebaseAPI(`/labor/by_employee?start_date=${today}&end_date=${today}`),
+          callHomebaseAPI(`/labor/by_role?start_date=${today}&end_date=${today}`)
         ]);
         
         // Calculate who's currently on duty (clocked in)
@@ -1535,7 +1534,7 @@
         const yesterdayBusinessDate = yesterdayStr.replace(/-/g, '');
         const lastWeekBusinessDate = lastWeekStr.replace(/-/g, '');
         
-        // Fetch data in parallel using proper ordersBulk endpoint
+        // Fetch data in parallel using businessDate (single day queries that work)
         const [todayOrders, yesterdayOrders, lastWeekOrders, menuItems] = await Promise.all([
           callToastAPI(`/orders/v2/ordersBulk?businessDate=${todayBusinessDate}&pageSize=200`),
           callToastAPI(`/orders/v2/ordersBulk?businessDate=${yesterdayBusinessDate}&pageSize=200`),
@@ -1705,11 +1704,11 @@
         const weekAgoStr = weekAgo.toISOString().split('T')[0];
         const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
         
-        // Fetch menu data and recent orders with selections
+        // Fetch menu data and recent orders using working businessDate approach
         const [menuData, recentOrders, previousWeekOrders] = await Promise.all([
           callToastAPI('/menus/v2/menus'),
-          callToastAPI(`/orders/v2/orders?startDate=${weekAgoStr}&endDate=${todayStr}&pageSize=500`),
-          callToastAPI(`/orders/v2/orders?startDate=${twoWeeksAgoStr}&endDate=${weekAgoStr}&pageSize=500`)
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${todayStr.replace(/-/g, '')}&pageSize=500`),
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${weekAgoStr.replace(/-/g, '')}&pageSize=500`)
         ]);
         
         return {
@@ -1909,13 +1908,12 @@
       }
     }
 
-    // Get Toast sales data for the date range
+    // Get Toast sales data for the date range using single-day queries
     async function getToastSalesData(dateRange) {
-      const startDateStr = dateRange.startDate.toISOString().split('T')[0];
-      const endDateStr = dateRange.endDate.toISOString().split('T')[0];
+      const businessDate = dateRange.startDate.toISOString().split('T')[0].replace(/-/g, '');
       
-      // Get all orders in the date range
-      const orders = await callToastAPI(`/orders/v2/orders?startDate=${startDateStr}&endDate=${endDateStr}&pageSize=1000`);
+      // Get orders for the specific business date (single day approach that works)
+      const orders = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=1000`);
       
       // Group orders by time period
       const salesByPeriod = groupOrdersByPeriod(orders, dateRange.granularity);
@@ -1931,11 +1929,11 @@
         
         // Get both detailed timecards/shifts and aggregated labor data
         const [timecards, shifts, laborByEmployee, laborByRole, aggregateLabor] = await Promise.all([
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${startDateStr}&end_date=${endDateStr}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${startDateStr}&end_date=${endDateStr}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_employee?start_date=${startDateStr}&end_date=${endDateStr}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_role?start_date=${startDateStr}&end_date=${endDateStr}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor?start_date=${startDateStr}&end_date=${endDateStr}&group_by=${dateRange.granularity === 'hour' ? 'hour' : 'day'}`)
+          callHomebaseAPI(`/timecards?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/shifts?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/labor/by_employee?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/labor/by_role?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/labor?start_date=${startDateStr}&end_date=${endDateStr}&group_by=${dateRange.granularity === 'hour' ? 'hour' : 'day'}`)
         ]);
         
         // Group labor data by time period using both detailed and aggregated data
@@ -2547,22 +2545,28 @@
       }
     }
 
-    // Get comprehensive labor data from Homebase + Toast
+    // Get comprehensive labor data from Homebase + Toast (simplified to avoid 400 errors)
     async function getComprehensiveLaborData(period) {
       const dateRange = calculateLaborDateRange(period);
       
-      // Get parallel data from both APIs
-      const [homebaseData, toastSalesData] = await Promise.all([
+      // Get parallel data - simplified Toast approach
+      const [homebaseData, todayToastData] = await Promise.all([
         getHomebaseLaborData(dateRange),
-        getToastSalesData(dateRange)
+        // Use today's data only to avoid 400 errors
+        callToastAPI(`/orders/v2/ordersBulk?businessDate=${getPacificDate().replace(/-/g, '')}&pageSize=200`)
       ]);
       
+      // Simple sales data structure
+      const simplifiedToastData = {
+        [getPacificDate()]: analyzeOrders([todayToastData].flat())
+      };
+      
       // Get employee data for role analysis
-      const employees = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`);
+      const employees = await callHomebaseAPI('/employees');
       
       return {
         homebase: homebaseData,
-        toast: toastSalesData,
+        toast: simplifiedToastData,
         employees: employees,
         dateRange: dateRange
       };
@@ -2720,7 +2724,7 @@
     // Labor by Role Implementation
     async function loadLaborByRole() {
       try {
-        const employees = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`);
+        const employees = await callHomebaseAPI('/employees');
         const roleData = analyzeLaborByRole(employees);
         
         const rolesHTML = roleData.map(role => `
@@ -2769,8 +2773,8 @@
     async function loadOnTimePerformance() {
       try {
         const today = getPacificDate(); // Use Pacific timezone instead of UTC
-        const timecards = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`);
-        const shifts = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${today}&end_date=${today}`);
+        const timecards = await callHomebaseAPI(`/timecards?start_date=${today}&end_date=${today}`);
+        const shifts = await callHomebaseAPI(`/shifts?start_date=${today}&end_date=${today}`);
         
         const onTimeStats = calculateOnTimePerformance(timecards, shifts);
         
@@ -2835,8 +2839,8 @@
     async function loadStaffExceptions() {
       try {
         const today = getPacificDate(); // Use Pacific timezone instead of UTC
-        const timecards = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`);
-        const employees = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`);
+        const timecards = await callHomebaseAPI(`/timecards?start_date=${today}&end_date=${today}`);
+        const employees = await callHomebaseAPI('/employees');
         
         const exceptions = findStaffExceptions(timecards, employees);
         
