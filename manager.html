@@ -1010,11 +1010,10 @@
 
     // Initialize the manager portal
     async function initManagerPortal() {
-      console.log('🚀 Initializing Manager Portal with Homebase environment variables...');
+      console.log('🚀 Initializing Manager Portal with real-time data...');
       
       try {
-        // Get Toast authentication token
-        await getToastToken();
+        // Authentication is handled per-request in API calls
         
         // Load all components
         await Promise.all([
@@ -1242,63 +1241,26 @@
         if (!authData.success || !authData.data?.accessToken) throw new Error('Toast authentication failed');
         const accessToken = authData.data.accessToken;
 
-        // Paginate Toast payments API (pageSize=100)
-        let allCashPayments = [];
-        let totalCashAmount = 0;
-        let totalCashPayments = 0;
-        let totalPaymentGuids = 0;
-        let page = 1;
-        let morePages = true;
-        const pageSize = 100;
-
-        while (morePages) {
-          const paymentsUrl = `/api/toast-payments?businessDate=${businessDate}&token=${encodeURIComponent(accessToken)}&page=${page}&pageSize=${pageSize}`;
-          const paymentsResponse = await fetch(paymentsUrl);
-          if (!paymentsResponse.ok) throw new Error('Failed to fetch Toast payments data');
-          const paymentsData = await paymentsResponse.json();
-          if (!paymentsData.success) throw new Error(paymentsData.error || 'Toast payments API returned an error');
-
-          // Defensive: support both array and object
-          const cashPayments = Array.isArray(paymentsData.cashPayments) ? paymentsData.cashPayments : [];
-          allCashPayments = allCashPayments.concat(cashPayments);
-          totalCashAmount += paymentsData.totalCashAmount || 0;
-          totalCashPayments += paymentsData.totalCashPayments || 0;
-          totalPaymentGuids = paymentsData.totalPaymentGuids || totalPaymentGuids;
-
-          // If less than pageSize, we're done
-          if (cashPayments.length < pageSize) {
-            morePages = false;
-          } else {
-            page++;
-          }
-        }
+        // Fetch cash payments using proven payments API (handles internal pagination)
+        const paymentsUrl = `/api/toast-payments?businessDate=${businessDate}&token=${encodeURIComponent(accessToken)}`;
+        const paymentsResponse = await fetch(paymentsUrl);
+        if (!paymentsResponse.ok) throw new Error('Failed to fetch Toast payments data');
+        const paymentsData = await paymentsResponse.json();
+        if (!paymentsData.success) throw new Error(paymentsData.error || 'Toast payments API returned an error');
 
         // Get restaurant info for operational status
         const restaurantResponse = await callToastAPI('/restaurants/v1/restaurants');
 
-        // For queue analysis, fetch all active orders (paginated)
+        // For queue analysis, fetch active orders (use simple approach for now)
         let activeOrders = [];
         try {
-          let allOrders = [];
-          let orderPage = 1;
-          let ordersMorePages = true;
-          while (ordersMorePages) {
-            const ordersResponse = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=${pageSize}&page=${orderPage}`);
-            if (Array.isArray(ordersResponse)) {
-              allOrders = allOrders.concat(ordersResponse);
-              if (ordersResponse.length < pageSize) {
-                ordersMorePages = false;
-              } else {
-                orderPage++;
-              }
-            } else {
-              ordersMorePages = false;
-            }
+          const ordersResponse = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=100`);
+          if (Array.isArray(ordersResponse)) {
+            activeOrders = ordersResponse.filter(order =>
+              !order.voided && !order.deleted &&
+              order.state && !['CLOSED', 'VOIDED', 'CANCELLED'].includes(order.state)
+            );
           }
-          activeOrders = allOrders.filter(order =>
-            !order.voided && !order.deleted &&
-            order.state && !['CLOSED', 'VOIDED', 'CANCELLED'].includes(order.state)
-          );
         } catch (orderError) {
           console.warn('Could not fetch order queue data:', orderError.message);
         }
@@ -1307,8 +1269,8 @@
         const avgPrepTime = activeOrders.length > 0 ? 15 : 10;
 
         return {
-          revenue: totalCashAmount,
-          ordersCount: totalCashPayments,
+          revenue: paymentsData.totalCashAmount || 0,
+          ordersCount: paymentsData.totalCashPayments || 0,
           queueLength: activeOrders.length,
           avgPrepTime: avgPrepTime,
           restaurant: restaurantResponse,
