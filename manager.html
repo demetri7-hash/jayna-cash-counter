@@ -992,7 +992,8 @@
     };
 
     // Global state
-  // No secrets or tokens stored in frontend
+    let toastToken = null;
+    let tokenExpiry = null;
     let salesChart = null;
     let laborChart = null;
     let currentPeriod = 'day';
@@ -1013,7 +1014,8 @@
       console.log('🚀 Initializing Manager Portal with real-time data...');
       
       try {
-        // Authentication is handled per-request in API calls
+        // Get Toast authentication token
+        await getToastToken();
         
         // Load all components
         await Promise.all([
@@ -1037,7 +1039,42 @@
     }
 
     // Toast Authentication - Using Vercel API like index.html
-    // No direct Toast token logic in frontend. All authentication is handled via /api/toast-auth endpoint per request.
+    async function getToastToken() {
+      try {
+        // Check if we have a valid cached token
+        if (toastToken && tokenExpiry && Date.now() < tokenExpiry) {
+          return toastToken;
+        }
+        
+        console.log('🔐 Authenticating with Toast API via Vercel endpoint...');
+        
+        const response = await fetch('/api/toast-auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Authentication failed: ${response.status}`);
+        }
+
+        const authData = await response.json();
+        
+        if (authData.success && authData.data && authData.data.accessToken) {
+          toastToken = authData.data.accessToken;
+          // Tokens typically expire in 1 hour
+          tokenExpiry = Date.now() + (50 * 60 * 1000); // 50 minutes for safety
+          console.log('✅ Toast authentication successful');
+          return toastToken;
+        } else {
+          throw new Error('Invalid authentication response');
+        }
+      } catch (error) {
+        console.error('❌ Toast authentication failed:', error);
+        throw error;
+      }
+    }
 
     // Homebase API Helper - Using Vercel API
     async function callHomebaseAPI(endpoint) {
