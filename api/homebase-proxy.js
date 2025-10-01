@@ -85,9 +85,11 @@ export default async function handler(req, res) {
     }
 
     // Inject location UUID into endpoint path if needed
-    if (baseEndpoint.includes('/locations/LOCATION_UUID/')) {
-      console.log(`🔄 Replacing LOCATION_UUID with: ${HOMEBASE_CONFIG.locationUuid}`);
-      baseEndpoint = baseEndpoint.replace('/locations/LOCATION_UUID/', `/locations/${HOMEBASE_CONFIG.locationUuid}/`);
+    // Replace any /locations/{something}/ with /locations/{locationUuid}/
+    const locationPattern = /\/locations\/[^/]+\//;
+    if (locationPattern.test(baseEndpoint)) {
+      console.log(`🔄 Replacing location UUID in endpoint with: ${HOMEBASE_CONFIG.locationUuid}`);
+      baseEndpoint = baseEndpoint.replace(locationPattern, `/locations/${HOMEBASE_CONFIG.locationUuid}/`);
       console.log(`📍 Final endpoint: ${baseEndpoint}`);
     }
 
