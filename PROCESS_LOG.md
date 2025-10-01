@@ -1,5 +1,28 @@
 # Process Log
 
+## 2025-10-01 - Toast Orders Pagination Fix for Accurate Analytics
+
+### What was changed
+- Removed pageSize=100 default limit in manager.html callToastAPI function
+- Enhanced toast-orders-flexible.js to detect when no pageSize is provided and enable full pagination
+- Modified backend to fetch ALL orders across multiple pages instead of just first 100 orders
+- Updated pagination logic to continue fetching until all orders are retrieved
+
+### Why it was changed
+- Revenue Analytics was showing $31.18 (only 100 orders) vs Live Metrics $240 (all orders)
+- Manager portal was only getting first page of orders due to pageSize=100 limit
+- Need complete data for accurate analytics, not just partial data from single page
+- Following user requirement to get ALL orders with proper pagination
+
+### Files modified
+- manager.html: Removed pageSize default, let backend handle pagination
+- api/toast-orders-flexible.js: Enhanced pagination logic for complete data fetch
+
+### Expected result
+- Revenue Analytics should show significantly higher revenue (closer to Live Metrics)
+- Console should show "full pagination mode" and multiple pages fetched
+- Analytics should be based on ALL orders, not just first 100
+
 ## 2025-10-01 - Comprehensive Homebase API Security & Accuracy Fixes
 
 ### What was changed

@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { accessToken, startDate, endDate, pageSize } = req.query;
+    const { accessToken, startDate, endDate, pageSize, page } = req.query;
 
     if (!accessToken) {
       return res.status(400).json({
@@ -27,12 +27,24 @@ export default async function handler(req, res) {
       });
     }
 
+    // Convert YYYYMMDD format to proper ISO-8601 format for date ranges
+    const formatToISO8601 = (yyyymmdd) => {
+      if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd;
+      
+      // Convert YYYYMMDD to YYYY-MM-DDTHH:MM:SSZ
+      const year = yyyymmdd.substring(0, 4);
+      const month = yyyymmdd.substring(4, 6);
+      const day = yyyymmdd.substring(6, 8);
+      return `${year}-${month}-${day}T00:00:00Z`;
+    };
+
     // If no pageSize provided, use maximum (100) and enable pagination to get ALL orders
     // If pageSize is provided, use it as a limit (for specific page requests)
-    const shouldPaginateAll = !pageSize; // Get ALL orders if no pageSize specified
+    const shouldPaginateAll = !pageSize && !page; // Get ALL orders if no pageSize or page specified
     const validatedPageSize = pageSize ? Math.min(parseInt(pageSize) || 100, 100) : 100;
+    const startPage = page ? parseInt(page) : 1;
     
-    console.log(`Fetching Toast orders from ${startDate} to ${endDate}, pageSize: ${validatedPageSize}${shouldPaginateAll ? ' (with full pagination)' : ''}`);
+    console.log(`Fetching Toast orders from ${startDate} to ${endDate}, pageSize: ${validatedPageSize}${shouldPaginateAll ? ' (with full pagination)' : ` page: ${startPage}`}`);
 
     // Toast API configuration
     const TOAST_CONFIG = {
@@ -40,15 +52,175 @@ export default async function handler(req, res) {
       restaurantGuid: process.env.TOAST_RESTAURANT_GUID || 'd3efae34-7c2e-4107-a442-49081e624706'
     };
 
-    // Check if we can use businessDate for single-day queries (more reliable)
+    // Use businessDate for single-day queries (more reliable according to Toast docs)
     if (startDate === endDate && startDate && startDate.length === 8) {
-      // Use businessDate parameter for single-day queries (YYYYMMDD format)
-      const businessDate = startDate;
-      let ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=${pageSize}`;
-      
-      console.log(`Using businessDate approach: ${ordersUrl}`);
-      
-      const ordersResponse = await fetch(ordersUrl, {
+      // Single business date query - use businessDate parameter
+      const businessDate = startDate; // Already in YYYYMMDD format
+
+      if (shouldPaginateAll) {
+        // Fetch ALL orders across all pages for this business date
+        let allOrders = [];
+        let currentPage = 1;
+        const maxPages = 50; // Safety limit
+
+        while (currentPage <= maxPages) {
+          const pageUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=${validatedPageSize}&page=${currentPage}`;
+          console.log(`Fetching page ${currentPage} from: ${pageUrl}`);
+
+          const response = await fetch(pageUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+              'Accept': 'application/json'
+            }
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Toast API error:', response.status, errorText);
+            return res.status(response.status).json({
+              success: false,
+              error: `Toast API error: ${response.status} - ${errorText}`
+            });
+          }
+
+          const pageData = await response.json();
+          
+          if (!Array.isArray(pageData) || pageData.length === 0) {
+            // No more data
+            break;
+          }
+
+          allOrders.push(...pageData);
+          console.log(`Page ${currentPage}: ${pageData.length} orders, total: ${allOrders.length}`);
+
+          // If we got less than pageSize, this was the last page
+          if (pageData.length < validatedPageSize) {
+            break;
+          }
+
+          currentPage++;
+        }
+
+        console.log(`✅ Successfully fetched ${allOrders.length} total orders across ${currentPage} pages for businessDate ${businessDate}`);
+
+        return res.status(200).json({
+          success: true,
+          data: allOrders,
+          totalCount: allOrders.length,
+          pagesFetched: currentPage,
+          method: 'businessDate with full pagination'
+        });
+
+      } else {
+        // Single page request for businessDate
+        const pageUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=${validatedPageSize}&page=${startPage}`;
+        console.log(`Fetching single page from: ${pageUrl}`);
+
+        const response = await fetch(pageUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Toast API error:', response.status, errorText);
+          return res.status(response.status).json({
+            success: false,
+            error: `Toast API error: ${response.status} - ${errorText}`
+          });
+        }
+
+        const ordersData = await response.json();
+        console.log(`Successfully fetched ${ordersData.length || 0} orders using businessDate page ${startPage}`);
+
+        return res.status(200).json({
+          success: true,
+          data: ordersData,
+          totalCount: ordersData.length || 0,
+          method: 'businessDate single page'
+        });
+      }
+    }
+
+    // Use startDate/endDate range queries with proper Toast API pagination
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'startDate and endDate are required for date range queries'
+      });
+    }
+
+    const isoStartDate = formatToISO8601(startDate);
+    const isoEndDate = formatToISO8601(endDate).replace('T00:00:00', 'T23:59:59'); // End of day
+
+    if (shouldPaginateAll) {
+      // Fetch ALL orders across all pages for this date range
+      let allOrders = [];
+      let currentPage = 1;
+      const maxPages = 50; // Safety limit
+
+      while (currentPage <= maxPages) {
+        const pageUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?startDate=${encodeURIComponent(isoStartDate)}&endDate=${encodeURIComponent(isoEndDate)}&pageSize=${validatedPageSize}&page=${currentPage}`;
+        console.log(`Fetching page ${currentPage} from date range: ${pageUrl}`);
+
+        const response = await fetch(pageUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Toast API error:', response.status, errorText);
+          return res.status(response.status).json({
+            success: false,
+            error: `Toast API error: ${response.status} - ${errorText}`
+          });
+        }
+
+        const pageData = await response.json();
+        
+        if (!Array.isArray(pageData) || pageData.length === 0) {
+          // No more data
+          break;
+        }
+
+        allOrders.push(...pageData);
+        console.log(`Page ${currentPage}: ${pageData.length} orders, total: ${allOrders.length}`);
+
+        // If we got less than pageSize, this was the last page
+        if (pageData.length < validatedPageSize) {
+          break;
+        }
+
+        currentPage++;
+      }
+
+      console.log(`✅ Successfully fetched ${allOrders.length} total orders across ${currentPage} pages for range ${isoStartDate} to ${isoEndDate}`);
+
+      return res.status(200).json({
+        success: true,
+        data: allOrders,
+        totalCount: allOrders.length,
+        pagesFetched: currentPage,
+        method: 'dateRange with full pagination'
+      });
+
+    } else {
+      // Single page request for date range
+      const pageUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?startDate=${encodeURIComponent(isoStartDate)}&endDate=${encodeURIComponent(isoEndDate)}&pageSize=${validatedPageSize}&page=${startPage}`;
+      console.log(`Fetching single page from date range: ${pageUrl}`);
+
+      const response = await fetch(pageUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -57,125 +229,25 @@ export default async function handler(req, res) {
         }
       });
 
-      if (!ordersResponse.ok) {
-        const errorText = await ordersResponse.text();
-        console.error('Toast API error:', ordersResponse.status, errorText);
-        return res.status(ordersResponse.status).json({
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Toast API error:', response.status, errorText);
+        return res.status(response.status).json({
           success: false,
-          error: `Toast API error: ${ordersResponse.status} - ${errorText}`
+          error: `Toast API error: ${response.status} - ${errorText}`
         });
       }
 
-      const ordersData = await ordersResponse.json();
-      console.log(`Successfully fetched ${ordersData.length || 0} orders using businessDate`);
+      const ordersData = await response.json();
+      console.log(`Successfully fetched ${ordersData.length || 0} orders using dateRange page ${startPage}`);
 
       return res.status(200).json({
         success: true,
         data: ordersData,
         totalCount: ordersData.length || 0,
-        method: 'businessDate'
+        method: 'dateRange single page'
       });
     }
-
-    // Convert YYYYMMDD format to proper ISO-8601 format for date ranges
-    const formatToISO8601 = (yyyymmdd) => {
-      if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd;
-      const year = yyyymmdd.substring(0, 4);
-      const month = yyyymmdd.substring(4, 6);
-      const day = yyyymmdd.substring(6, 8);
-      
-      // Use UTC timezone to avoid timezone issues
-      return `${year}-${month}-${day}T00:00:00.000+0000`;
-    };
-
-    // Use ordersBulk endpoint (correct endpoint from documentation)
-    let ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?pageSize=${pageSize}`;
-    
-    if (startDate) {
-      const isoStartDate = encodeURIComponent(formatToISO8601(startDate));
-      ordersUrl += `&startDate=${isoStartDate}`;
-    }
-    if (endDate) {
-      // For end date, set to end of day to include all orders for that date
-      const isoEndDate = encodeURIComponent(formatToISO8601(endDate).replace('T00:00:00', 'T23:59:59'));
-      ordersUrl += `&endDate=${isoEndDate}`;
-    }
-
-    console.log(`Orders URL: ${ordersUrl}`);
-
-    // Make the orders request to Toast API
-    let allOrders = [];
-    let currentUrl = ordersUrl;
-    let pageCount = 0;
-    const maxPages = shouldPaginateAll ? 50 : 10; // Allow more pages when getting ALL orders
-
-    do {
-      console.log(`Fetching page ${pageCount + 1}${shouldPaginateAll ? ' (full pagination mode)' : ''}...`);
-      
-      const ordersResponse = await fetch(currentUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!ordersResponse.ok) {
-        const errorText = await ordersResponse.text();
-        console.error('Toast API error:', ordersResponse.status, errorText);
-        return res.status(ordersResponse.status).json({
-          success: false,
-          error: `Toast API error: ${ordersResponse.status} - ${errorText}`
-        });
-      }
-
-      const ordersData = await ordersResponse.json();
-      
-      if (ordersData && Array.isArray(ordersData)) {
-        allOrders.push(...ordersData);
-        console.log(`Fetched ${ordersData.length} orders on page ${pageCount + 1}, total: ${allOrders.length}`);
-        
-        // If not paginating all, or got less than full page, stop
-        if (!shouldPaginateAll || ordersData.length < validatedPageSize) {
-          break;
-        }
-        
-        // Continue pagination for full data fetch
-        if (ordersData.length === validatedPageSize && pageCount < maxPages - 1) {
-          const lastOrder = ordersData[ordersData.length - 1];
-          if (lastOrder && lastOrder.openedDate) {
-            // Use the last order's date to continue pagination
-            const lastDate = new Date(lastOrder.openedDate);
-            lastDate.setMilliseconds(lastDate.getMilliseconds() + 1); // Move 1ms forward
-            const nextStartDate = lastDate.toISOString();
-            
-            // Update the URL for the next page
-            const urlObj = new URL(currentUrl);
-            urlObj.searchParams.set('startDate', encodeURIComponent(nextStartDate));
-            currentUrl = urlObj.toString();
-          } else {
-            break; // No valid date to continue pagination
-          }
-        } else {
-          break; // Reached max pages or got less than full page
-        }
-      } else {
-        break; // Invalid response format
-      }
-      
-      pageCount++;
-    } while (pageCount < maxPages);
-
-    console.log(`Successfully fetched ${allOrders.length} total orders across ${pageCount + 1} pages`);
-
-    return res.status(200).json({
-      success: true,
-      data: allOrders,
-      totalCount: allOrders.length,
-      pages: pageCount + 1,
-      fullPagination: shouldPaginateAll
-    });
 
   } catch (error) {
     console.error('Error fetching Toast orders:', error);
