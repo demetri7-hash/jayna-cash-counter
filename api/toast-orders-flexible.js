@@ -35,17 +35,56 @@ export default async function handler(req, res) {
       restaurantGuid: process.env.TOAST_RESTAURANT_GUID || '9ac790ee-e6af-4c96-ae73-93d442db6810'
     };
 
-    // Convert YYYYMMDD format to ISO-8601 format required by Toast orders API
+    // Check if we can use businessDate for single-day queries (more reliable)
+    if (startDate === endDate && startDate && startDate.length === 8) {
+      // Use businessDate parameter for single-day queries (YYYYMMDD format)
+      const businessDate = startDate;
+      let ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=${pageSize}`;
+      
+      console.log(`Using businessDate approach: ${ordersUrl}`);
+      
+      const ordersResponse = await fetch(ordersUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!ordersResponse.ok) {
+        const errorText = await ordersResponse.text();
+        console.error('Toast API error:', ordersResponse.status, errorText);
+        return res.status(ordersResponse.status).json({
+          success: false,
+          error: `Toast API error: ${ordersResponse.status} - ${errorText}`
+        });
+      }
+
+      const ordersData = await ordersResponse.json();
+      console.log(`Successfully fetched ${ordersData.length || 0} orders using businessDate`);
+
+      return res.status(200).json({
+        success: true,
+        data: ordersData,
+        totalCount: ordersData.length || 0,
+        method: 'businessDate'
+      });
+    }
+
+    // Convert YYYYMMDD format to proper ISO-8601 format for date ranges
     const formatToISO8601 = (yyyymmdd) => {
       if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd;
       const year = yyyymmdd.substring(0, 4);
       const month = yyyymmdd.substring(4, 6);
       const day = yyyymmdd.substring(6, 8);
-      return `${year}-${month}-${day}T00:00:00.000-0800`; // Using Pacific Time
+      
+      // Use UTC timezone to avoid timezone issues
+      return `${year}-${month}-${day}T00:00:00.000+0000`;
     };
 
-    // Build the API URL with parameters
-    let ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/orders?pageSize=${pageSize}`;
+    // Use ordersBulk endpoint (correct endpoint from documentation)
+    let ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?pageSize=${pageSize}`;
     
     if (startDate) {
       const isoStartDate = encodeURIComponent(formatToISO8601(startDate));
