@@ -1009,6 +1009,16 @@
     let currentPeriod = 'day';
     let currentLaborPeriod = 'today';
 
+    // Pacific timezone date helper (same as working index.html)
+    function getPacificDate() {
+      const now = new Date();
+      const pacific = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
+      const year = pacific.getFullYear();
+      const month = String(pacific.getMonth() + 1).padStart(2, '0');
+      const day = String(pacific.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
     // Initialize the manager portal
     async function initManagerPortal() {
       console.log('🚀 Initializing Manager Portal with Homebase environment variables...');
@@ -1135,7 +1145,7 @@
         
         let response;
         
-        if (endpoint.includes('/orders/v2/orders')) {
+        if (endpoint.includes('/orders/v2/orders') || endpoint.includes('/orders/v2/ordersBulk')) {
           apiEndpoint = '/api/toast-orders-flexible';
           
           // Extract date parameters from endpoint
@@ -1258,26 +1268,48 @@
     // Get real-time data from Toast API
     async function getToastLiveData() {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getPacificDate(); // Use Pacific timezone instead of UTC
+        const businessDate = today.replace(/-/g, ''); // Convert to YYYYMMDD format
         
-        // Get today's orders for queue analysis
-        const ordersResponse = await callToastAPI(`/orders/v2/orders?startDate=${today}&endDate=${today}&pageSize=50`);
+        // Get today's orders using proper ordersBulk endpoint
+        const ordersResponse = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=100`);
         
         // Get restaurant info for operational status
         const restaurantResponse = await callToastAPI('/restaurants/v1/restaurants/' + CONFIG.TOAST_RESTAURANT_GUID);
         
-        // Calculate revenue from today's orders
-        const todayRevenue = ordersResponse.reduce((sum, order) => {
-          if (order.status !== 'VOIDED' && order.status !== 'CANCELLED') {
-            return sum + (order.amount || 0);
-          }
-          return sum;
-        }, 0) / 100; // Toast amounts are in cents
+        // Calculate revenue from actual payments (like toast-orders.js pattern)
+        let todayRevenue = 0;
+        let totalOrders = 0;
+        
+        if (Array.isArray(ordersResponse)) {
+          ordersResponse.forEach(order => {
+            // Skip voided/deleted orders
+            if (order.voided || order.deleted) return;
+            
+            totalOrders++;
+            
+            // Calculate revenue from payments in checks
+            if (order.checks && Array.isArray(order.checks)) {
+              order.checks.forEach(check => {
+                if (check.payments && Array.isArray(check.payments)) {
+                  check.payments.forEach(payment => {
+                    if (payment.amount && payment.paymentStatus !== 'VOIDED') {
+                      todayRevenue += (payment.amount || 0);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+        
+        todayRevenue = todayRevenue / 100; // Convert from cents to dollars
         
         // Analyze order queue (orders not yet closed/delivered)
-        const activeOrders = ordersResponse.filter(order => 
-          order.status && !['CLOSED', 'VOIDED', 'CANCELLED'].includes(order.status)
-        );
+        const activeOrders = Array.isArray(ordersResponse) ? ordersResponse.filter(order => 
+          !order.voided && !order.deleted && 
+          order.state && !['CLOSED', 'VOIDED', 'CANCELLED'].includes(order.state)
+        ) : [];
         
         // Calculate average preparation time
         const avgPrepTime = calculateAveragePreparationTime(ordersResponse);
@@ -1285,7 +1317,8 @@
         return {
           orders: ordersResponse,
           activeOrders: activeOrders,
-          todayRevenue: todayRevenue,
+          revenue: todayRevenue, // Use consistent naming
+          ordersCount: totalOrders, // Use proper count
           avgPrepTime: avgPrepTime,
           restaurant: restaurantResponse
         };
@@ -1299,7 +1332,7 @@
     // Get real-time data from Homebase API
     async function getHomebaseLiveData() {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getPacificDate(); // Use Pacific timezone instead of UTC
         
         // Get current employees and today's data
         const [employeesResponse, timecardsResponse, shiftsResponse, todayLaborByEmployee, todayLaborByRole] = await Promise.all([
@@ -1479,22 +1512,26 @@
     // Get comprehensive Toast analytics data
     async function getToastAnalyticsData() {
       try {
-        const today = new Date();
+        // Use Pacific timezone for all date calculations
+        const todayStr = getPacificDate();
+        
+        // Calculate yesterday and last week in Pacific timezone
+        const today = new Date(todayStr + 'T12:00:00'); // Use noon to avoid timezone issues
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
         const lastWeek = new Date(today);
         lastWeek.setDate(lastWeek.getDate() - 7);
         
-        // Format dates for Toast API
-        const todayStr = today.toISOString().split('T')[0];
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
-        const lastWeekStr = lastWeek.toISOString().split('T')[0];
+        // Format dates for Toast API (businessDate format YYYYMMDD)
+        const todayBusinessDate = todayStr.replace(/-/g, '');
+        const yesterdayBusinessDate = yesterdayStr.replace(/-/g, '');
+        const lastWeekBusinessDate = lastWeekStr.replace(/-/g, '');
         
-        // Fetch data in parallel
+        // Fetch data in parallel using proper ordersBulk endpoint
         const [todayOrders, yesterdayOrders, lastWeekOrders, menuItems] = await Promise.all([
-          callToastAPI(`/orders/v2/orders?startDate=${todayStr}&endDate=${todayStr}&pageSize=200`),
-          callToastAPI(`/orders/v2/orders?startDate=${yesterdayStr}&endDate=${yesterdayStr}&pageSize=200`),
-          callToastAPI(`/orders/v2/orders?startDate=${lastWeekStr}&endDate=${lastWeekStr}&pageSize=200`),
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${todayBusinessDate}&pageSize=200`),
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${yesterdayBusinessDate}&pageSize=200`),
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${lastWeekBusinessDate}&pageSize=200`),
           callToastAPI('/menus/v2/menus')
         ]);
         
@@ -1511,16 +1548,32 @@
       }
     }
 
-    // Analyze orders data for revenue and metrics
+    // Analyze orders data for revenue and metrics (using payment analysis like toast-orders.js)
     function analyzeOrders(orders) {
+      if (!Array.isArray(orders)) return { count: 0, revenue: 0, avgOrderValue: 0, rawOrders: [] };
+      
       const validOrders = orders.filter(order => 
-        order.status && !['VOIDED', 'CANCELLED'].includes(order.status)
+        !order.voided && !order.deleted // Use proper voided/deleted checks
       );
       
-      const totalRevenue = validOrders.reduce((sum, order) => {
-        return sum + ((order.amount || 0) / 100); // Toast amounts are in cents
-      }, 0);
+      let totalRevenue = 0;
       
+      // Calculate revenue from actual payments (like toast-orders.js pattern)
+      validOrders.forEach(order => {
+        if (order.checks && Array.isArray(order.checks)) {
+          order.checks.forEach(check => {
+            if (check.payments && Array.isArray(check.payments)) {
+              check.payments.forEach(payment => {
+                if (payment.amount && payment.paymentStatus !== 'VOIDED') {
+                  totalRevenue += (payment.amount || 0);
+                }
+              });
+            }
+          });
+        }
+      });
+      
+      totalRevenue = totalRevenue / 100; // Convert from cents to dollars
       const avgOrderValue = validOrders.length > 0 ? totalRevenue / validOrders.length : 0;
       
       return {
@@ -1630,14 +1683,17 @@
     // Get Toast menu analytics with order performance
     async function getToastMenuAnalytics() {
       try {
-        const today = new Date();
+        // Use Pacific timezone for all date calculations
+        const todayStr = getPacificDate();
+        
+        // Calculate week ago and two weeks ago in Pacific timezone
+        const today = new Date(todayStr + 'T12:00:00'); // Use noon to avoid timezone issues
         const weekAgo = new Date(today);
         weekAgo.setDate(weekAgo.getDate() - 7);
         const twoWeeksAgo = new Date(today);
         twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
         
         // Format dates
-        const todayStr = today.toISOString().split('T')[0];
         const weekAgoStr = weekAgo.toISOString().split('T')[0];
         const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
         
@@ -2209,14 +2265,10 @@
     // Get real-time Toast orders data
     async function getToastRecentOrders() {
       try {
-        const today = new Date();
-        const startOfDay = new Date(today);
-        startOfDay.setHours(0, 0, 0, 0);
-        
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = getPacificDate(); // Use Pacific timezone instead of UTC
         
         // Get today's orders, most recent first
-        const orders = await callToastAPI(`/orders/v2/orders?startDate=${todayStr}&endDate=${todayStr}&pageSize=20`);
+        const orders = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${todayStr.replace(/-/g, '')}&pageSize=20`);
         
         // Sort by opened date (most recent first) and process
         const sortedOrders = orders
@@ -2708,7 +2760,7 @@
     // On-Time Performance Implementation  
     async function loadOnTimePerformance() {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getPacificDate(); // Use Pacific timezone instead of UTC
         const timecards = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`);
         const shifts = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${today}&end_date=${today}`);
         
@@ -2774,7 +2826,7 @@
     // Staff Exceptions Implementation
     async function loadStaffExceptions() {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getPacificDate(); // Use Pacific timezone instead of UTC
         const timecards = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`);
         const employees = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`);
         
