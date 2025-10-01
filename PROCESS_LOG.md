@@ -1,5 +1,54 @@
 # Process Log
 
+## 2025-10-01 - Toast API pageSize Fix
+
+### What was changed
+- Fixed Toast API pageSize parameter issue causing 400 errors
+- Updated api/toast-orders-flexible.js to cap pageSize at 100 (Toast API maximum)
+- Changed all manager.html Toast API calls from pageSize=200 to pageSize=100
+
+### Why it was changed
+- Toast ordersBulk API was returning 400 errors when pageSize=200
+- Root cause: Toast API has a maximum pageSize limit of 100
+- Following AI_CODING_INSTRUCTIONS.md: fix real API connections instead of using workarounds
+
+### Files modified
+- api/toast-orders-flexible.js: Added pageSize validation and capping
+- manager.html: Updated all Toast API calls to use pageSize=100
+
+### Next step
+- Test Analytics Dashboard with corrected pageSize parameters
+- Re-enable disabled components one at a time
+
+## 2025-10-01 - Manager Dashboard API Troubleshooting
+
+### What was changed
+- Temporarily disabled broken components (Stats Cards, Top Items, Sales Chart, Recent Orders)
+- Focused on working Live Metrics and Labor Analytics
+- Restored HOMEBASE_LOCATION_UUID for proper API calls
+
+### Why it was changed
+- Toast ordersBulk API returns 400 errors when pageSize=200
+- Same endpoint works with pageSize=100
+- Following emergency fix approach instead of proper troubleshooting
+
+### Commands executed
+```bash
+git add manager.html
+git commit -m "Emergency fix: disable broken components, fix Homebase endpoints"
+git push origin main
+```
+
+### Deployment result
+- URL: https://jayna-cash-counter.vercel.app/manager.html
+- Status: Partially working - Live Metrics and Labor Analytics only
+- Testing: Live Metrics shows $204 revenue, 100 orders (REAL DATA ✅)
+
+### Issue Analysis
+- **Working**: Toast ordersBulk with pageSize=100
+- **Failing**: Toast ordersBulk with pageSize=200 (400 error)
+- **Root cause**: Parameter validation issue in `/api/toast-orders-flexible.js`
+
 ## September 30, 2025 - TDS Driver Auto-Fetch Fix Implementation
 
 ### What was changed

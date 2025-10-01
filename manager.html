@@ -1029,8 +1029,8 @@
         
         // Disable broken components temporarily
         setTimeout(() => {
-          console.log('⚠️ Skipping Stats Cards, Top Items, Sales Chart, Recent Orders due to API limitations');
-          // TODO: Fix these components later
+          console.log('📈 Re-enabling Stats Cards with pageSize fix...');
+          loadStatsCards(); // Fixed pageSize=100 instead of 200
         }, 5000);
         
         console.log('✅ Manager Portal initialized successfully');
@@ -1542,9 +1542,9 @@
         
         // Fetch data in parallel using businessDate (single day queries that work)
         const [todayOrders, yesterdayOrders, lastWeekOrders, menuItems] = await Promise.all([
-          callToastAPI(`/orders/v2/ordersBulk?businessDate=${todayBusinessDate}&pageSize=200`),
-          callToastAPI(`/orders/v2/ordersBulk?businessDate=${yesterdayBusinessDate}&pageSize=200`),
-          callToastAPI(`/orders/v2/ordersBulk?businessDate=${lastWeekBusinessDate}&pageSize=200`),
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${todayBusinessDate}&pageSize=100`),
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${yesterdayBusinessDate}&pageSize=100`),
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${lastWeekBusinessDate}&pageSize=100`),
           callToastAPI('/menus/v2/menus')
         ]);
         
@@ -2559,7 +2559,7 @@
       const [homebaseData, todayToastData] = await Promise.all([
         getHomebaseLaborData(dateRange),
         // Use today's data only to avoid 400 errors
-        callToastAPI(`/orders/v2/ordersBulk?businessDate=${getPacificDate().replace(/-/g, '')}&pageSize=200`)
+        callToastAPI(`/orders/v2/ordersBulk?businessDate=${getPacificDate().replace(/-/g, '')}&pageSize=100`)
       ]);
       
       // Simple sales data structure

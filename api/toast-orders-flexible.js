@@ -27,7 +27,10 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`Fetching Toast orders from ${startDate} to ${endDate}, pageSize: ${pageSize}`);
+    // Toast API has a maximum pageSize limit of 100
+    const validatedPageSize = Math.min(parseInt(pageSize) || 100, 100);
+    
+    console.log(`Fetching Toast orders from ${startDate} to ${endDate}, pageSize: ${validatedPageSize} (requested: ${pageSize})`);
 
     // Toast API configuration
     const TOAST_CONFIG = {
