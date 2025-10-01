@@ -1079,6 +1079,7 @@
     // Homebase API Helper - Using Vercel API
     async function callHomebaseAPI(endpoint) {
       try {
+        await rateLimitedDelay();
         console.log('🏠 Calling Homebase API via Vercel:', endpoint);
         
         const response = await fetch('/api/homebase-proxy', {
@@ -1107,9 +1108,23 @@
       }
     }
 
+    // Rate limiting for API calls
+    let lastApiCall = 0;
+    const API_DELAY = 100; // 100ms between calls
+    
+    async function rateLimitedDelay() {
+      const now = Date.now();
+      const timeSinceLastCall = now - lastApiCall;
+      if (timeSinceLastCall < API_DELAY) {
+        await new Promise(resolve => setTimeout(resolve, API_DELAY - timeSinceLastCall));
+      }
+      lastApiCall = Date.now();
+    }
+
     // Toast API Helper - Using Vercel API
     async function callToastAPI(endpoint) {
       try {
+        await rateLimitedDelay();
         await getToastToken();
         
         console.log('🍞 Calling Toast API via Vercel:', endpoint);
@@ -2694,8 +2709,8 @@
     async function loadOnTimePerformance() {
       try {
         const today = new Date().toISOString().split('T')[0];
-        const timecards = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?date=${today}`);
-        const shifts = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?date=${today}`);
+        const timecards = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`);
+        const shifts = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${today}&end_date=${today}`);
         
         const onTimeStats = calculateOnTimePerformance(timecards, shifts);
         
@@ -2760,7 +2775,7 @@
     async function loadStaffExceptions() {
       try {
         const today = new Date().toISOString().split('T')[0];
-        const timecards = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?date=${today}`);
+        const timecards = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`);
         const employees = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`);
         
         const exceptions = findStaffExceptions(timecards, employees);
