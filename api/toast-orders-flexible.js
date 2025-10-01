@@ -2,8 +2,22 @@
 // This avoids CORS issues by making the request server-side
 
 export default async function handler(req, res) {
-  // Enable CORS for your domain
-  res.setHeader('Access-Control-Allow-Origin', 'https://jayna-cash-counter.vercel.app');
+  // Enable CORS for your domain - allow multiple origins for debugging
+  const allowedOrigins = [
+    'https://jayna-cash-counter.vercel.app',
+    'https://provincial-rhianon-restaurantintelligence-b8a4dd49.koyeb.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:5500',
+    'https://demetri7-hash.github.io'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow all for debugging
+  }
+  
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -65,35 +79,47 @@ export default async function handler(req, res) {
 
         while (currentPage <= maxPages) {
           const pageUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=${validatedPageSize}&page=${currentPage}`;
-          console.log(`Fetching page ${currentPage} from: ${pageUrl}`);
+          console.log(`🍞 Fetching page ${currentPage} from: ${pageUrl}`);
 
-          const response = await fetch(pageUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
-              'Accept': 'application/json'
+          try {
+            const response = await fetch(pageUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+                'Accept': 'application/json'
+              }
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`❌ Toast API error on page ${currentPage}:`, response.status, errorText);
+              return res.status(response.status).json({
+                success: false,
+                error: `Toast API error: ${response.status} - ${errorText}`,
+                url: pageUrl
+              });
             }
-          });
 
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Toast API error:', response.status, errorText);
-            return res.status(response.status).json({
+            const pageData = await response.json();
+            console.log(`✅ Page ${currentPage} response:`, typeof pageData, Array.isArray(pageData) ? `${pageData.length} orders` : 'non-array response');
+            
+            if (!Array.isArray(pageData) || pageData.length === 0) {
+              // No more data
+              console.log(`📄 No more data on page ${currentPage}, stopping pagination`);
+              break;
+            }
+
+            allOrders.push(...pageData);
+            console.log(`📊 Page ${currentPage}: ${pageData.length} orders, total: ${allOrders.length}`);
+          } catch (fetchError) {
+            console.error(`💥 Network error fetching page ${currentPage}:`, fetchError.message);
+            return res.status(500).json({
               success: false,
-              error: `Toast API error: ${response.status} - ${errorText}`
+              error: `Network error: ${fetchError.message}`,
+              url: pageUrl
             });
           }
-
-          const pageData = await response.json();
-          
-          if (!Array.isArray(pageData) || pageData.length === 0) {
-            // No more data
-            break;
-          }
-
-          allOrders.push(...pageData);
-          console.log(`Page ${currentPage}: ${pageData.length} orders, total: ${allOrders.length}`);
 
           // If we got less than pageSize, this was the last page
           if (pageData.length < validatedPageSize) {

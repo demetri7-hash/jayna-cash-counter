@@ -2,8 +2,22 @@
 // This avoids CORS issues by making the request server-side
 
 export default async function handler(req, res) {
-  // Enable CORS for your domain
-  res.setHeader('Access-Control-Allow-Origin', 'https://jayna-cash-counter.vercel.app');
+  // Enable CORS for your domain - allow multiple origins for debugging
+  const allowedOrigins = [
+    'https://jayna-cash-counter.vercel.app',
+    'https://provincial-rhianon-restaurantintelligence-b8a4dd49.koyeb.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:5500',
+    'https://demetri7-hash.github.io'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow all for debugging
+  }
+  
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
@@ -27,7 +41,8 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`Fetching Homebase data from: ${endpoint} using ${method}`);
+    console.log(`🏠 Fetching Homebase data from: ${endpoint} using ${method}`);
+    console.log(`📍 Original endpoint: ${endpoint}`);
 
     // Homebase API credentials from environment variables
     const HOMEBASE_CONFIG = {
@@ -35,6 +50,12 @@ export default async function handler(req, res) {
       apiKey: process.env.HOMEBASE_API_KEY,
       locationUuid: process.env.HOMEBASE_LOCATION_UUID
     };
+
+    console.log(`🔐 Homebase Config Debug:`, {
+      baseUrl: HOMEBASE_CONFIG.baseUrl,
+      apiKey: HOMEBASE_CONFIG.apiKey ? `${HOMEBASE_CONFIG.apiKey.substring(0, 10)}...` : 'MISSING',
+      locationUuid: HOMEBASE_CONFIG.locationUuid || 'MISSING'
+    });
 
     // Validate required environment variables
     if (!HOMEBASE_CONFIG.apiKey) {
