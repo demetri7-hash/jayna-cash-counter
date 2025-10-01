@@ -1150,9 +1150,16 @@
           
           // Extract date parameters from endpoint
           const urlParams = new URLSearchParams(endpoint.split('?')[1] || '');
-          const startDate = urlParams.get('startDate');
-          const endDate = urlParams.get('endDate');
+          let startDate = urlParams.get('startDate');
+          let endDate = urlParams.get('endDate');
+          const businessDate = urlParams.get('businessDate');
           const pageSize = urlParams.get('pageSize') || '100';
+          
+          // Handle businessDate parameter (for single-day queries)
+          if (businessDate && !startDate && !endDate) {
+            startDate = businessDate;
+            endDate = businessDate;
+          }
           
           // Keep dates in ISO-8601 format (YYYY-MM-DD) for Toast orders API
           // The backend toast-orders-flexible.js will convert YYYYMMDD to proper ISO-8601 with timezone
@@ -1523,6 +1530,8 @@
         lastWeek.setDate(lastWeek.getDate() - 7);
         
         // Format dates for Toast API (businessDate format YYYYMMDD)
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const lastWeekStr = lastWeek.toISOString().split('T')[0];
         const todayBusinessDate = todayStr.replace(/-/g, '');
         const yesterdayBusinessDate = yesterdayStr.replace(/-/g, '');
         const lastWeekBusinessDate = lastWeekStr.replace(/-/g, '');
