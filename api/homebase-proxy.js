@@ -31,7 +31,7 @@ export default async function handler(req, res) {
 
     // Homebase API credentials from environment variables
     const HOMEBASE_CONFIG = {
-      baseUrl: process.env.HOMEBASE_BASE_URL || 'https://app.joinhomebase.com/api/public',
+      baseUrl: process.env.HOMEBASE_BASE_URL || 'https://api.joinhomebase.com',
       apiKey: process.env.HOMEBASE_API_KEY || 'xRHgIepMv-XB58UK8D1hoJwh1ALNPoH1PvPiwrLhoTM'
     };
 
