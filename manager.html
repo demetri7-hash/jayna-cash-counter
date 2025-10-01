@@ -1036,7 +1036,7 @@
         // Disable broken components temporarily
         setTimeout(() => {
           console.log('📈 Re-enabling Stats Cards with pageSize fix...');
-          loadStatsCards(); // Fixed pageSize=100 instead of 200
+          loadStatsCards(); // Removed pageSize limit to fetch ALL orders
         }, 5000);
         
         console.log('✅ Manager Portal initialized successfully');
@@ -1326,7 +1326,7 @@
         let allOrders = [];
         let totalOrderCount = 0;
         try {
-          const ordersResponse = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=100`);
+          const ordersResponse = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${businessDate}`);
           if (Array.isArray(ordersResponse)) {
             allOrders = ordersResponse.filter(order => !order.voided && !order.deleted);
             totalOrderCount = allOrders.length;
@@ -1936,7 +1936,7 @@
       const businessDate = dateRange.startDate.toISOString().split('T')[0].replace(/-/g, '');
       
       // Get orders for the specific business date (single day approach that works)
-      const orders = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=1000`);
+      const orders = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${businessDate}`);
       
       // Group orders by time period
       const salesByPeriod = groupOrdersByPeriod(orders, dateRange.granularity);
@@ -2576,7 +2576,7 @@
       const [homebaseData, todayToastData] = await Promise.all([
         getHomebaseLaborData(dateRange),
         // Use today's data only to avoid 400 errors
-        callToastAPI(`/orders/v2/ordersBulk?businessDate=${getPacificDate().replace(/-/g, '')}&pageSize=100`)
+        callToastAPI(`/orders/v2/ordersBulk?businessDate=${getPacificDate().replace(/-/g, '')}`)
       ]);
       
       // Simple sales data structure
