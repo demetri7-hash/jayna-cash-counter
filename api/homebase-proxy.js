@@ -51,6 +51,28 @@ export default async function handler(req, res) {
     // Merge params from body with parsed query params
     const allParams = { ...queryParams, ...params };
 
+    // Convert date parameters to ISO 8601 format for Homebase API
+    const formatDateForHomebase = (dateStr) => {
+      if (!dateStr) return dateStr;
+      
+      // If already in ISO format, return as-is
+      if (dateStr.includes('T') || dateStr.includes('Z')) return dateStr;
+      
+      // Convert YYYY-MM-DD to YYYY-MM-DDTHH:MM:SSZ format
+      if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return `${dateStr}T00:00:00Z`;
+      }
+      
+      return dateStr;
+    };
+
+    // Apply date formatting to common date parameters
+    Object.keys(allParams).forEach(key => {
+      if (['start_date', 'end_date', 'date'].includes(key)) {
+        allParams[key] = formatDateForHomebase(allParams[key]);
+      }
+    });
+
     // Build URL with query parameters if needed
     let url = `${HOMEBASE_CONFIG.baseUrl}${baseEndpoint}`;
     if (Object.keys(allParams).length > 0 && method === 'GET') {
