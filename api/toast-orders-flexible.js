@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     // Toast API configuration
     const TOAST_CONFIG = {
       baseUrl: process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com',
-      restaurantGuid: process.env.TOAST_RESTAURANT_GUID || '9ac790ee-e6af-4c96-ae73-93d442db6810'
+      restaurantGuid: process.env.TOAST_RESTAURANT_GUID || 'd3efae34-7c2e-4107-a442-49081e624706'
     };
 
     // Check if we can use businessDate for single-day queries (more reliable)

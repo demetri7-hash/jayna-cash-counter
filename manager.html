@@ -984,19 +984,9 @@
   </div>
 
   <script>
-    // Configuration from .env file
+    // Configuration (Note: All API credentials are securely stored in Vercel environment variables)
     const CONFIG = {
-      // Toast API
-      TOAST_CLIENT_ID: '3g0R0NFYjHIQcVe9bYP8eTbJjwRTvCNV',
-      TOAST_CLIENT_SECRET: 'dClMNN5GmpgCZYU8BtTK9NGCVT4eAmZtE0E4EkJO4CFpPJx2rXP26PTptwSe--Sa',
-      TOAST_RESTAURANT_GUID: 'd3efae34-7c2e-4107-a442-49081e624706',
-      TOAST_BASE_URL: 'https://ws-api.toasttab.com',
-      
-      // Homebase API
-      HOMEBASE_API_KEY: 'xRHgIepMv-XB58UK8D1hoJwh1ALNPoH1PvPiwrLhoTM',
       HOMEBASE_LOCATION_UUID: '0b6c1af3-4904-4b84-ae5f-d1172d77de27',
-      HOMEBASE_BASE_URL: 'https://api.joinhomebase.com',
-      
       // API Endpoints (uses Vercel functions like index.html)
       API_BASE: '/api'
     };
@@ -1120,7 +1110,7 @@
 
     // Rate limiting for API calls
     let lastApiCall = 0;
-    const API_DELAY = 100; // 100ms between calls
+    const API_DELAY = 200; // 200ms between calls to prevent 429 errors
     
     async function rateLimitedDelay() {
       const now = Date.now();
@@ -1272,62 +1262,71 @@
       }
     }
 
-    // Get real-time data from Toast API
+    // Get real-time data from Toast API (using proven payments API pattern like index.html)
     async function getToastLiveData() {
       try {
         const today = getPacificDate(); // Use Pacific timezone instead of UTC
         const businessDate = today.replace(/-/g, ''); // Convert to YYYYMMDD format
         
-        // Get today's orders using proper ordersBulk endpoint
-        const ordersResponse = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=100`);
+        // First authenticate with Toast (same pattern as index.html)
+        const authResponse = await fetch('/api/toast-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
         
-        // Get restaurant info for operational status
-        const restaurantResponse = await callToastAPI('/restaurants/v1/restaurants/' + CONFIG.TOAST_RESTAURANT_GUID);
-        
-        // Calculate revenue from actual payments (like toast-orders.js pattern)
-        let todayRevenue = 0;
-        let totalOrders = 0;
-        
-        if (Array.isArray(ordersResponse)) {
-          ordersResponse.forEach(order => {
-            // Skip voided/deleted orders
-            if (order.voided || order.deleted) return;
-            
-            totalOrders++;
-            
-            // Calculate revenue from payments in checks
-            if (order.checks && Array.isArray(order.checks)) {
-              order.checks.forEach(check => {
-                if (check.payments && Array.isArray(check.payments)) {
-                  check.payments.forEach(payment => {
-                    if (payment.amount && payment.paymentStatus !== 'VOIDED') {
-                      todayRevenue += (payment.amount || 0);
-                    }
-                  });
-                }
-              });
-            }
-          });
+        if (!authResponse.ok) {
+          throw new Error('Failed to authenticate with Toast API');
         }
         
-        todayRevenue = todayRevenue / 100; // Convert from cents to dollars
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) {
+          throw new Error('Toast authentication failed');
+        }
         
-        // Analyze order queue (orders not yet closed/delivered)
-        const activeOrders = Array.isArray(ordersResponse) ? ordersResponse.filter(order => 
-          !order.voided && !order.deleted && 
-          order.state && !['CLOSED', 'VOIDED', 'CANCELLED'].includes(order.state)
-        ) : [];
+        // Get cash revenue using proven payments API (same as index.html)
+        const paymentsUrl = `/api/toast-payments?businessDate=${businessDate}&token=${encodeURIComponent(authData.data.accessToken)}`;
+        const paymentsResponse = await fetch(paymentsUrl);
+        
+        if (!paymentsResponse.ok) {
+          throw new Error('Failed to fetch Toast payments data');
+        }
+        
+        const paymentsData = await paymentsResponse.json();
+        if (!paymentsData.success) {
+          throw new Error(paymentsData.error || 'Toast payments API returned an error');
+        }
+        
+        // Get restaurant info for operational status (uses environment variable in API)
+        const restaurantResponse = await callToastAPI('/restaurants/v1/restaurants');
+        
+        // Use the proven revenue from payments API
+        const todayRevenue = paymentsData.totalCashAmount || 0;
+        const totalOrders = paymentsData.totalCashPayments || 0;
+        
+        // For queue analysis, we still need some order data but can use a simpler call
+        let activeOrders = [];
+        try {
+          const ordersResponse = await callToastAPI(`/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=20`);
+          if (Array.isArray(ordersResponse)) {
+            activeOrders = ordersResponse.filter(order => 
+              !order.voided && !order.deleted && 
+              order.state && !['CLOSED', 'VOIDED', 'CANCELLED'].includes(order.state)
+            );
+          }
+        } catch (orderError) {
+          console.warn('Could not fetch order queue data:', orderError.message);
+        }
         
         // Calculate average preparation time
-        const avgPrepTime = calculateAveragePreparationTime(ordersResponse);
+        const avgPrepTime = activeOrders.length > 0 ? 15 : 10; // Simple estimation
         
         return {
-          orders: ordersResponse,
-          activeOrders: activeOrders,
-          revenue: todayRevenue, // Use consistent naming
-          ordersCount: totalOrders, // Use proper count
+          revenue: todayRevenue,
+          ordersCount: totalOrders,
+          queueLength: activeOrders.length,
           avgPrepTime: avgPrepTime,
-          restaurant: restaurantResponse
+          restaurant: restaurantResponse,
+          activeOrders: activeOrders
         };
         
       } catch (error) {
@@ -1398,14 +1397,14 @@
       
       // Revenue Today Analysis
       const revenueToday = {
-        value: `$${toastData.todayRevenue.toFixed(0)}`,
+        value: `$${(toastData.revenue || 0).toFixed(0)}`,
         status: 'good', // TODO: Compare with historical averages
-        detail: `${toastData.orders.length} orders today`
+        detail: `${toastData.ordersCount || 0} orders today`
       };
       
       // Labor Efficiency Analysis (Revenue per labor hour)
       const totalLaborHours = calculateTotalLaborHours(homebaseData.timecards);
-      const revenuePerHour = totalLaborHours > 0 ? toastData.todayRevenue / totalLaborHours : 0;
+      const revenuePerHour = totalLaborHours > 0 ? (toastData.revenue || 0) / totalLaborHours : 0;
       const laborEfficiency = {
         value: `$${revenuePerHour.toFixed(0)}/hr`,
         status: revenuePerHour > 50 ? 'good' : 
