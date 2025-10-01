@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { accessToken, startDate, endDate, pageSize = 100 } = req.query;
+    const { accessToken, startDate, endDate, pageSize } = req.query;
 
     if (!accessToken) {
       return res.status(400).json({
@@ -27,10 +27,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // Toast API has a maximum pageSize limit of 100
-    const validatedPageSize = Math.min(parseInt(pageSize) || 100, 100);
+    // If no pageSize provided, use maximum (100) and enable pagination to get ALL orders
+    // If pageSize is provided, use it as a limit (for specific page requests)
+    const shouldPaginateAll = !pageSize; // Get ALL orders if no pageSize specified
+    const validatedPageSize = pageSize ? Math.min(parseInt(pageSize) || 100, 100) : 100;
     
-    console.log(`Fetching Toast orders from ${startDate} to ${endDate}, pageSize: ${validatedPageSize} (requested: ${pageSize})`);
+    console.log(`Fetching Toast orders from ${startDate} to ${endDate}, pageSize: ${validatedPageSize}${shouldPaginateAll ? ' (with full pagination)' : ''}`);
 
     // Toast API configuration
     const TOAST_CONFIG = {
@@ -105,10 +107,10 @@ export default async function handler(req, res) {
     let allOrders = [];
     let currentUrl = ordersUrl;
     let pageCount = 0;
-    const maxPages = 10; // Prevent infinite loops
+    const maxPages = shouldPaginateAll ? 50 : 10; // Allow more pages when getting ALL orders
 
     do {
-      console.log(`Fetching page ${pageCount + 1}...`);
+      console.log(`Fetching page ${pageCount + 1}${shouldPaginateAll ? ' (full pagination mode)' : ''}...`);
       
       const ordersResponse = await fetch(currentUrl, {
         method: 'GET',
@@ -132,22 +134,26 @@ export default async function handler(req, res) {
       
       if (ordersData && Array.isArray(ordersData)) {
         allOrders.push(...ordersData);
-        console.log(`Fetched ${ordersData.length} orders on page ${pageCount + 1}`);
+        console.log(`Fetched ${ordersData.length} orders on page ${pageCount + 1}, total: ${allOrders.length}`);
         
-        // Check if we got a full page (indicating there might be more)
-        if (ordersData.length < pageSize) {
-          break; // No more pages
+        // If not paginating all, or got less than full page, stop
+        if (!shouldPaginateAll || ordersData.length < validatedPageSize) {
+          break;
         }
         
-        // For pagination, we'll use the last order's date as a starting point for the next page
-        // This is a simplified approach - Toast API pagination is complex
-        if (ordersData.length === pageSize && pageCount < maxPages - 1) {
+        // Continue pagination for full data fetch
+        if (ordersData.length === validatedPageSize && pageCount < maxPages - 1) {
           const lastOrder = ordersData[ordersData.length - 1];
           if (lastOrder && lastOrder.openedDate) {
             // Use the last order's date to continue pagination
             const lastDate = new Date(lastOrder.openedDate);
-            const nextStartDate = lastDate.toISOString().split('T')[0];
-            currentUrl = ordersUrl.replace(`startDate=${startDate}`, `startDate=${nextStartDate}`);
+            lastDate.setMilliseconds(lastDate.getMilliseconds() + 1); // Move 1ms forward
+            const nextStartDate = lastDate.toISOString();
+            
+            // Update the URL for the next page
+            const urlObj = new URL(currentUrl);
+            urlObj.searchParams.set('startDate', encodeURIComponent(nextStartDate));
+            currentUrl = urlObj.toString();
           } else {
             break; // No valid date to continue pagination
           }
@@ -167,7 +173,8 @@ export default async function handler(req, res) {
       success: true,
       data: allOrders,
       totalCount: allOrders.length,
-      pages: pageCount + 1
+      pages: pageCount + 1,
+      fullPagination: shouldPaginateAll
     });
 
   } catch (error) {

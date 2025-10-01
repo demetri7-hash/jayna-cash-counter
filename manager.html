@@ -1173,7 +1173,7 @@
           let startDate = urlParams.get('startDate');
           let endDate = urlParams.get('endDate');
           const businessDate = urlParams.get('businessDate');
-          const pageSize = urlParams.get('pageSize') || '100';
+          const pageSize = urlParams.get('pageSize'); // Don't set default, let backend handle pagination
           
           // Handle businessDate parameter (for single-day queries)
           if (businessDate && !startDate && !endDate) {
@@ -1192,9 +1192,13 @@
           const queryParams = new URLSearchParams({
             accessToken: toastToken,
             startDate: formatDateToYYYYMMDD(startDate),
-            endDate: formatDateToYYYYMMDD(endDate),
-            pageSize: pageSize
+            endDate: formatDateToYYYYMMDD(endDate)
           });
+          
+          // Only add pageSize if explicitly provided (for pagination control)
+          if (pageSize) {
+            queryParams.append('pageSize', pageSize);
+          }
           
           apiEndpoint += `?${queryParams.toString()}`;
           
@@ -1553,11 +1557,11 @@
         const yesterdayBusinessDate = yesterdayStr.replace(/-/g, '');
         const lastWeekBusinessDate = lastWeekStr.replace(/-/g, '');
         
-        // Fetch data in parallel using businessDate (single day queries that work)
+        // Fetch ALL orders with pagination handled by backend (remove pageSize limit)
         const [todayOrders, yesterdayOrders, lastWeekOrders, menuItems] = await Promise.all([
-          callToastAPI(`/orders/v2/ordersBulk?businessDate=${todayBusinessDate}&pageSize=100`),
-          callToastAPI(`/orders/v2/ordersBulk?businessDate=${yesterdayBusinessDate}&pageSize=100`),
-          callToastAPI(`/orders/v2/ordersBulk?businessDate=${lastWeekBusinessDate}&pageSize=100`),
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${todayBusinessDate}`), // No pageSize = gets ALL orders
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${yesterdayBusinessDate}`),
+          callToastAPI(`/orders/v2/ordersBulk?businessDate=${lastWeekBusinessDate}`),
           callToastAPI('/menus/v2/menus')
         ]);
         
