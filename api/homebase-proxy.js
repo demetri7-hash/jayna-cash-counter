@@ -32,8 +32,24 @@ export default async function handler(req, res) {
     // Homebase API credentials from environment variables
     const HOMEBASE_CONFIG = {
       baseUrl: process.env.HOMEBASE_BASE_URL || 'https://api.joinhomebase.com',
-      apiKey: process.env.HOMEBASE_API_KEY || 'xRHgIepMv-XB58UK8D1hoJwh1ALNPoH1PvPiwrLhoTM'
+      apiKey: process.env.HOMEBASE_API_KEY,
+      locationUuid: process.env.HOMEBASE_LOCATION_UUID
     };
+
+    // Validate required environment variables
+    if (!HOMEBASE_CONFIG.apiKey) {
+      return res.status(500).json({
+        success: false,
+        error: 'Homebase API key not configured'
+      });
+    }
+
+    if (!HOMEBASE_CONFIG.locationUuid) {
+      return res.status(500).json({
+        success: false,
+        error: 'Homebase location UUID not configured'
+      });
+    }
 
     // Parse endpoint if it contains query parameters
     let baseEndpoint = endpoint;
@@ -46,6 +62,11 @@ export default async function handler(req, res) {
       for (const [key, value] of urlParams.entries()) {
         queryParams[key] = value;
       }
+    }
+
+    // Inject location UUID into endpoint path if needed
+    if (baseEndpoint.includes('/locations/LOCATION_UUID/')) {
+      baseEndpoint = baseEndpoint.replace('/locations/LOCATION_UUID/', `/locations/${HOMEBASE_CONFIG.locationUuid}/`);
     }
 
     // Merge params from body with parsed query params
@@ -116,9 +137,36 @@ export default async function handler(req, res) {
     if (!homebaseResponse.ok) {
       const errorText = await homebaseResponse.text();
       console.error('Homebase API error:', homebaseResponse.status, errorText);
+      
+      // Enhanced error handling based on Homebase API documentation
+      let errorMessage;
+      switch (homebaseResponse.status) {
+        case 400:
+          errorMessage = 'Bad Request: Invalid parameters or malformed request';
+          break;
+        case 401:
+          errorMessage = 'Unauthorized: Invalid or missing API key';
+          break;
+        case 403:
+          errorMessage = 'Forbidden: Insufficient permissions for this resource';
+          break;
+        case 404:
+          errorMessage = 'Not Found: Resource does not exist';
+          break;
+        case 429:
+          errorMessage = 'Rate Limit Exceeded: Too many requests (60/minute max)';
+          break;
+        case 500:
+          errorMessage = 'Internal Server Error: Homebase API server error';
+          break;
+        default:
+          errorMessage = `Homebase API error: ${homebaseResponse.status} - ${errorText}`;
+      }
+      
       return res.status(homebaseResponse.status).json({
         success: false,
-        error: `Homebase API error: ${homebaseResponse.status} - ${errorText}`
+        error: errorMessage,
+        details: errorText
       });
     }
 

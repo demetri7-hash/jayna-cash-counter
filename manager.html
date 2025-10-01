@@ -984,9 +984,8 @@
   </div>
 
   <script>
-    // Configuration (Note: All API credentials are securely stored in Vercel environment variables)
+    // Configuration (Note: All API credentials and UUIDs are securely stored in Vercel environment variables)
     const CONFIG = {
-      HOMEBASE_LOCATION_UUID: '0b6c1af3-4904-4b84-ae5f-d1172d77de27', // Required for Homebase API calls
       // API Endpoints (uses Vercel functions like index.html)
       API_BASE: '/api'
     };
@@ -1007,6 +1006,13 @@
       const month = String(pacific.getMonth() + 1).padStart(2, '0');
       const day = String(pacific.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
+    }
+
+    // Get Pacific date in ISO 8601 format for Homebase API (YYYY-MM-DDTHH:MM:SSZ)
+    function getPacificDateISO() {
+      const now = new Date();
+      const pacific = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
+      return pacific.toISOString().split('T')[0] + 'T00:00:00Z';
     }
 
     // Initialize the manager portal
@@ -1099,11 +1105,18 @@
         });
 
         if (!response.ok) {
-          throw new Error(`Homebase API error: ${response.status}`);
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(errorData.error || `Homebase API error: ${response.status}`);
         }
 
         const result = await response.json();
         if (!result.success) {
+          // Enhanced error handling for specific Homebase API errors
+          if (result.error && result.error.includes('Rate Limit Exceeded')) {
+            console.warn('⚠️ Homebase rate limit hit, retrying in 60 seconds...');
+            await new Promise(resolve => setTimeout(resolve, 60000));
+            // Could implement retry logic here
+          }
           throw new Error(result.error || 'Homebase API request failed');
         }
 
@@ -1347,11 +1360,11 @@
         
         // Get current employees and today's data
         const [employeesResponse, timecardsResponse, shiftsResponse, todayLaborByEmployee, todayLaborByRole] = await Promise.all([
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${today}&end_date=${today}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_employee?start_date=${today}&end_date=${today}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_role?start_date=${today}&end_date=${today}`)
+          callHomebaseAPI(`/locations/LOCATION_UUID/employees`),
+          callHomebaseAPI(`/locations/LOCATION_UUID/timecards?start_date=${today}&end_date=${today}`),
+          callHomebaseAPI(`/locations/LOCATION_UUID/shifts?start_date=${today}&end_date=${today}`),
+          callHomebaseAPI(`/locations/LOCATION_UUID/labor/by_employee?start_date=${today}&end_date=${today}`),
+          callHomebaseAPI(`/locations/LOCATION_UUID/labor/by_role?start_date=${today}&end_date=${today}`)
         ]);
         
         // Calculate who's currently on duty (clocked in)
@@ -1935,11 +1948,11 @@
         
         // Get both detailed timecards/shifts and aggregated labor data
         const [timecards, shifts, laborByEmployee, laborByRole, aggregateLabor] = await Promise.all([
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${startDateStr}&end_date=${endDateStr}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${startDateStr}&end_date=${endDateStr}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_employee?start_date=${startDateStr}&end_date=${endDateStr}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor/by_role?start_date=${startDateStr}&end_date=${endDateStr}`),
-          callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/labor?start_date=${startDateStr}&end_date=${endDateStr}&group_by=${dateRange.granularity === 'hour' ? 'hour' : 'day'}`)
+          callHomebaseAPI(`/locations/LOCATION_UUID/timecards?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/locations/LOCATION_UUID/shifts?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/locations/LOCATION_UUID/labor/by_employee?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/locations/LOCATION_UUID/labor/by_role?start_date=${startDateStr}&end_date=${endDateStr}`),
+          callHomebaseAPI(`/locations/LOCATION_UUID/labor?start_date=${startDateStr}&end_date=${endDateStr}&group_by=${dateRange.granularity === 'hour' ? 'hour' : 'day'}`)
         ]);
         
         // Group labor data by time period using both detailed and aggregated data
@@ -2568,7 +2581,7 @@
       };
       
       // Get employee data for role analysis
-      const employees = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`);
+      const employees = await callHomebaseAPI(`/locations/LOCATION_UUID/employees`);
       
       return {
         homebase: homebaseData,
@@ -2730,7 +2743,7 @@
     // Labor by Role Implementation
     async function loadLaborByRole() {
       try {
-        const employees = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`);
+        const employees = await callHomebaseAPI(`/locations/LOCATION_UUID/employees`);
         const roleData = analyzeLaborByRole(employees);
         
         const rolesHTML = roleData.map(role => `
@@ -2779,8 +2792,8 @@
     async function loadOnTimePerformance() {
       try {
         const today = getPacificDate(); // Use Pacific timezone instead of UTC
-        const timecards = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`);
-        const shifts = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/shifts?start_date=${today}&end_date=${today}`);
+        const timecards = await callHomebaseAPI(`/locations/LOCATION_UUID/timecards?start_date=${today}&end_date=${today}`);
+        const shifts = await callHomebaseAPI(`/locations/LOCATION_UUID/shifts?start_date=${today}&end_date=${today}`);
         
         const onTimeStats = calculateOnTimePerformance(timecards, shifts);
         
@@ -2845,8 +2858,8 @@
     async function loadStaffExceptions() {
       try {
         const today = getPacificDate(); // Use Pacific timezone instead of UTC
-        const timecards = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/timecards?start_date=${today}&end_date=${today}`);
-        const employees = await callHomebaseAPI(`/locations/${CONFIG.HOMEBASE_LOCATION_UUID}/employees`);
+        const timecards = await callHomebaseAPI(`/locations/LOCATION_UUID/timecards?start_date=${today}&end_date=${today}`);
+        const employees = await callHomebaseAPI(`/locations/LOCATION_UUID/employees`);
         
         const exceptions = findStaffExceptions(timecards, employees);
         
