@@ -103,7 +103,7 @@ export default async function handler(req, res) {
       
       // Convert YYYY-MM-DD to YYYY-MM-DDTHH:MM:SSZ format
       if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        return `${dateStr}T00:00:00Z`;
+        return `${dateStr}T00:00:00.000Z`;
       }
       
       return dateStr;
@@ -135,22 +135,14 @@ export default async function handler(req, res) {
       method,
       headers: {
         'Authorization': `Bearer ${HOMEBASE_CONFIG.apiKey}`,
-        'Accept': 'application/vnd.homebase-v1+json'
+        'Accept': 'application/vnd.homebase-v1+json',
+        'Content-Type': 'application/json'
       }
     };
 
-    // For POST requests, add body
-    if (method === 'POST' && Object.keys(params).length > 0) {
-      fetchOptions.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      const formData = new URLSearchParams();
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== null && value !== undefined) {
-          formData.append(key, value);
-        }
-      });
-      fetchOptions.body = formData.toString();
-    } else if (method === 'GET') {
-      fetchOptions.headers['Content-Type'] = 'application/json';
+    // For POST requests, add body as JSON (not form data)
+    if (method === 'POST' && Object.keys(allParams).length > 0) {
+      fetchOptions.body = JSON.stringify(allParams);
     }
 
     // Fetch data from Homebase API
