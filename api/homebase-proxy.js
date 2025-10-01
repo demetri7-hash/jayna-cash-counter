@@ -5,7 +5,6 @@ export default async function handler(req, res) {
   // Enable CORS for your domain - allow multiple origins for debugging
   const allowedOrigins = [
     'https://jayna-cash-counter.vercel.app',
-    'https://provincial-rhianon-restaurantintelligence-b8a4dd49.koyeb.app',
     'http://localhost:3000',
     'http://127.0.0.1:5500',
     'https://demetri7-hash.github.io'
