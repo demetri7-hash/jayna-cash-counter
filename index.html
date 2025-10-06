@@ -1008,12 +1008,30 @@
           <label for="laborFile">Labor Summary CSV File:</label>
           <input type="file" id="laborFile" class="form-input" accept=".csv" style="padding: 8px;">
         </div>
-        
+
         <div class="form-group">
           <label for="salesFile">Sales Summary ZIP File:</label>
           <input type="file" id="salesFile" class="form-input" accept=".zip" style="padding: 8px;">
         </div>
-        
+
+        <!-- Fetch from API button -->
+        <div style="background: var(--light-blue); border: 2px solid var(--primary-blue); padding: 20px; margin: 20px 0;">
+          <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-size: 18px; font-weight: 600; color: var(--primary-blue); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+              🚀 NEW: Auto-Fetch Data from Toast API
+            </div>
+            <div style="font-size: 13px; color: var(--gray-medium);">
+              Skip manual file uploads - fetch labor and sales data directly from Toast!
+            </div>
+          </div>
+          <button class="submit-btn" onclick="fetchTipPoolDataFromAPI()" style="background: var(--secondary-blue); margin-top: 0;">
+            Fetch Data from Toast API
+          </button>
+          <div style="font-size: 11px; color: var(--gray-medium); margin-top: 10px; text-align: center;">
+            <strong>Note:</strong> Select date range below first, then click to auto-fill labor/sales data
+          </div>
+        </div>
+
         <div class="form-group">
           <label for="tipPoolDateRange">Date Range for Cash Sales Calculation:</label>
           <div style="display: flex; gap: 15px; margin: 10px 0;">
@@ -6377,6 +6395,83 @@
     updateCalculateButtonState();
   }
 
+  // Global storage for API-fetched data
+  let apiFetchedData = {
+    laborData: null,
+    salesData: null
+  };
+
+  async function fetchTipPoolDataFromAPI() {
+    const startDate = document.getElementById('tipPoolStartDate').value;
+    const endDate = document.getElementById('tipPoolEndDate').value;
+
+    if (!startDate || !endDate) {
+      showMessage('Please select start and end dates first!', 'error');
+      return;
+    }
+
+    // Check if we have a Toast access token
+    if (!accessToken) {
+      showMessage('Toast API access token not available. Please ensure you are logged in.', 'error');
+      return;
+    }
+
+    try {
+      showLoading('Fetching Data from Toast API', 'Retrieving labor and sales data for your selected date range...');
+
+      // Fetch labor data from Toast
+      console.log('Fetching labor data from Toast API...');
+      const laborResponse = await fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${accessToken}`);
+
+      if (!laborResponse.ok) {
+        const errorData = await laborResponse.json();
+        throw new Error(`Labor API failed: ${errorData.error || laborResponse.statusText}`);
+      }
+
+      const laborResult = await laborResponse.json();
+      console.log('Labor data fetched:', laborResult);
+
+      // Fetch sales data from Toast
+      console.log('Fetching sales data from Toast API...');
+      const salesResponse = await fetch(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${accessToken}`);
+
+      if (!salesResponse.ok) {
+        const errorData = await salesResponse.json();
+        throw new Error(`Sales API failed: ${errorData.error || salesResponse.statusText}`);
+      }
+
+      const salesResult = await salesResponse.json();
+      console.log('Sales data fetched:', salesResult);
+
+      // Store the fetched data globally
+      apiFetchedData.laborData = laborResult.employees;
+      apiFetchedData.laborData.totalLaborCost = laborResult.totalLaborCost;
+      apiFetchedData.salesData = {
+        creditTips: salesResult.creditTips,
+        cashSales: salesResult.cashSales,
+        netSales: salesResult.netSales
+      };
+
+      hideLoading();
+
+      // Show success message with details
+      showMessage(
+        `✅ Data fetched successfully!<br>` +
+        `<strong>Labor:</strong> ${laborResult.employeesCount} employees, $${laborResult.totalLaborCost.toFixed(2)} total cost<br>` +
+        `<strong>Sales:</strong> Credit Tips: $${salesResult.creditTips.toFixed(2)}, Cash Sales: $${salesResult.cashSales.toFixed(2)}, Net Sales: $${salesResult.netSales.toFixed(2)}<br>` +
+        `<br><strong>Ready to calculate!</strong> Enter EZCater tips and Real Envelope Deposit, then click "Calculate Tip Pool"`,
+        'success'
+      );
+
+      console.log('API data stored successfully. Ready for tip pool calculation.');
+
+    } catch (error) {
+      hideLoading();
+      console.error('API fetch error:', error);
+      showMessage(`Failed to fetch data from Toast API: ${error.message}`, 'error');
+    }
+  }
+
   async function calculateTipPool() {
     const laborFile = document.getElementById('laborFile').files[0];
     const salesFile = document.getElementById('salesFile').files[0];
@@ -6386,8 +6481,12 @@
     const ezcaterTips = parseFloat(document.getElementById('ezcaterTips').value) || 0;
     const calculatedByName = document.getElementById('calculatedByName').value.trim();
 
-    if (!laborFile || !salesFile) {
-      showErrorMessage('Please select both Labor Summary CSV and Sales Summary ZIP files.');
+    // Check if we have either files OR API-fetched data
+    const hasFiles = laborFile && salesFile;
+    const hasAPIData = apiFetchedData.laborData && apiFetchedData.salesData;
+
+    if (!hasFiles && !hasAPIData) {
+      showErrorMessage('Please either upload files OR click "Fetch Data from Toast API" first.');
       return;
     }
 
@@ -6448,13 +6547,29 @@
 
       // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
       const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
-      
+
       // Update the cash tips display
       document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
 
-      // Parse files
-      const payrollData = await parsePayrollCSV(laborFile);
-      const { creditTips, cashSales, netSales } = await parseSalesZip(salesFile);
+      // Get data from either files OR API
+      let payrollData, creditTips, cashSales, netSales;
+
+      if (hasFiles) {
+        // Parse uploaded files
+        console.log('Using uploaded files...');
+        payrollData = await parsePayrollCSV(laborFile);
+        const salesData = await parseSalesZip(salesFile);
+        creditTips = salesData.creditTips;
+        cashSales = salesData.cashSales;
+        netSales = salesData.netSales;
+      } else {
+        // Use API-fetched data
+        console.log('Using API-fetched data...');
+        payrollData = apiFetchedData.laborData;
+        creditTips = apiFetchedData.salesData.creditTips;
+        cashSales = apiFetchedData.salesData.cashSales;
+        netSales = apiFetchedData.salesData.netSales;
+      }
 
       // Calculate labor metrics
       const baseLaborCost = payrollData.totalLaborCost || 0;
@@ -6479,8 +6594,17 @@
       // Store global state
       tipPoolRecords = result.records;
 
-      // Parse date range from filename
-      const dateRange = parseDateRange(laborFile.name) || parseDateRange(salesFile.name);
+      // Parse date range from filename or use form dates
+      let dateRange;
+      if (hasFiles) {
+        dateRange = parseDateRange(laborFile.name) || parseDateRange(salesFile.name);
+      }
+      if (!dateRange) {
+        // Format: "09/29/2025 - 10/05/2025"
+        const startFormatted = new Date(startDate).toLocaleDateString();
+        const endFormatted = new Date(endDate).toLocaleDateString();
+        dateRange = `${startFormatted} - ${endFormatted}`;
+      }
 
       tipPoolSummary = {
         creditTips: creditTips,
