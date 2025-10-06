@@ -6410,18 +6410,36 @@
       return;
     }
 
-    // Check if we have a Toast access token
-    if (!accessToken) {
-      showMessage('Toast API access token not available. Please ensure you are logged in.', 'error');
-      return;
-    }
-
     try {
-      showLoading('Fetching Data from Toast API', 'Retrieving labor and sales data for your selected date range...');
+      showLoading('Fetching Data from Toast API', 'Authenticating with Toast API...');
 
-      // Fetch labor data from Toast
+      // Step 1: Get Toast API access token
+      console.log('Authenticating with Toast API...');
+      const authResponse = await fetch('/api/toast-auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!authResponse.ok) {
+        throw new Error('Toast authentication failed');
+      }
+
+      const authData = await authResponse.json();
+      console.log('Auth response:', authData);
+
+      if (!authData.success || !authData.data?.accessToken) {
+        throw new Error('Failed to get Toast access token');
+      }
+
+      const token = authData.data.accessToken;
+      console.log('Successfully authenticated with Toast API');
+
+      // Step 2: Fetch labor data from Toast
+      showLoading('Fetching Data from Toast API', 'Retrieving labor data for your selected date range...');
       console.log('Fetching labor data from Toast API...');
-      const laborResponse = await fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${accessToken}`);
+      const laborResponse = await fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`);
 
       if (!laborResponse.ok) {
         const errorData = await laborResponse.json();
@@ -6431,9 +6449,10 @@
       const laborResult = await laborResponse.json();
       console.log('Labor data fetched:', laborResult);
 
-      // Fetch sales data from Toast
+      // Step 3: Fetch sales data from Toast
+      showLoading('Fetching Data from Toast API', 'Retrieving sales data for your selected date range...');
       console.log('Fetching sales data from Toast API...');
-      const salesResponse = await fetch(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${accessToken}`);
+      const salesResponse = await fetch(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`);
 
       if (!salesResponse.ok) {
         const errorData = await salesResponse.json();
