@@ -5625,6 +5625,109 @@
             </table>
           </div>
         </div>
+
+        <!-- Notes and Labor Summary Section (2 columns) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
+
+          <!-- Left Column: Daily Notes -->
+          <div style="border: 2px solid #000; border-radius: 8px; overflow: hidden;">
+            <div style="background: #f0f0f0; padding: 10px; border-bottom: 2px solid #000;">
+              <h4 style="margin: 0; text-align: center; font-size: 14px;">DAILY NOTES</h4>
+            </div>
+            <div style="padding: 12px; max-height: 300px; overflow-y: auto;">
+              ${data.map(day => {
+                const hasNotes = (day.am_notes && day.am_notes.trim()) || (day.pm_notes && day.pm_notes.trim());
+                if (!hasNotes) return '';
+                return `
+                  <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-left: 4px solid #667eea; border-radius: 4px;">
+                    <div style="font-weight: bold; color: #1e3c72; margin-bottom: 5px;">
+                      ${new Date(day.date + 'T12:00:00').toLocaleDateString()}
+                    </div>
+                    ${day.am_notes && day.am_notes.trim() ? `
+                      <div style="margin: 5px 0; font-size: 12px;">
+                        <span style="font-weight: bold; color: #666;">AM:</span> ${day.am_notes}
+                      </div>
+                    ` : ''}
+                    ${day.pm_notes && day.pm_notes.trim() ? `
+                      <div style="margin: 5px 0; font-size: 12px;">
+                        <span style="font-weight: bold; color: #666;">PM:</span> ${day.pm_notes}
+                      </div>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('') || '<p style="text-align: center; color: #999; padding: 20px;">No notes for this period</p>'}
+            </div>
+          </div>
+
+          <!-- Right Column: Labor Summary -->
+          <div style="border: 2px solid #000; border-radius: 8px; overflow: hidden;">
+            <div style="background: #f0f0f0; padding: 10px; border-bottom: 2px solid #000;">
+              <h4 style="margin: 0; text-align: center; font-size: 14px;">WEEKLY LABOR SUMMARY</h4>
+            </div>
+            <div style="padding: 12px;">
+              ${typeof tipPoolSummary !== 'undefined' && tipPoolSummary.laborData ? `
+                <!-- Labor Breakdown -->
+                <div style="margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #ddd; font-size: 12px;">
+                    <span>Base Labor Cost:</span>
+                    <span style="font-weight: bold;">$${tipPoolSummary.laborData.baseLaborCost.toFixed(2)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #ddd; font-size: 12px;">
+                    <span>Manager Salary (prorated):</span>
+                    <span style="font-weight: bold;">$${tipPoolSummary.laborData.demetriSalary.toFixed(2)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #ddd; font-size: 12px;">
+                    <span>Subtotal:</span>
+                    <span style="font-weight: bold;">$${tipPoolSummary.laborData.subtotalLabor.toFixed(2)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 2px solid #000; font-size: 12px;">
+                    <span>Payroll Burden (33%):</span>
+                    <span style="font-weight: bold;">$${tipPoolSummary.laborData.payrollBurden.toFixed(2)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px;">
+                    <span style="font-weight: bold;">True Total Labor Cost:</span>
+                    <span style="font-weight: bold; color: #1e3c72;">$${tipPoolSummary.laborData.trueTotalLaborCost.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <!-- Labor Percentage Analysis -->
+                <div style="background: ${tipPoolSummary.laborData.laborVariance > 0 ? '#ffe6e6' : '#e8f5e8'}; padding: 12px; border-radius: 6px; border: 2px solid ${tipPoolSummary.laborData.laborVariance > 0 ? '#dc3545' : '#28a745'}; margin-top: 12px;">
+                  <div style="text-align: center; margin-bottom: 8px;">
+                    <div style="font-size: 11px; color: #666; margin-bottom: 4px;">NET SALES</div>
+                    <div style="font-size: 16px; font-weight: bold;">$${tipPoolSummary.laborData.netSales.toFixed(2)}</div>
+                  </div>
+                  <div style="text-align: center; margin-bottom: 8px;">
+                    <div style="font-size: 11px; color: #666; margin-bottom: 4px;">LABOR PERCENTAGE</div>
+                    <div style="font-size: 24px; font-weight: bold; color: ${tipPoolSummary.laborData.laborVariance > 0 ? '#dc3545' : '#28a745'};">
+                      ${tipPoolSummary.laborData.laborPercentage.toFixed(2)}%
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid #ddd; font-size: 11px;">
+                    <span>Industry Benchmark:</span>
+                    <span style="font-weight: bold;">${tipPoolSummary.laborData.industryBenchmark.toFixed(1)}%</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 11px;">
+                    <span>Variance:</span>
+                    <span style="font-weight: bold; color: ${tipPoolSummary.laborData.laborVariance > 0 ? '#dc3545' : '#28a745'};">
+                      ${tipPoolSummary.laborData.laborVariance > 0 ? '+' : ''}${tipPoolSummary.laborData.laborVariance.toFixed(2)}%
+                      ${tipPoolSummary.laborData.laborVariance > 0 ? '⚠️ OVER' : '✅ UNDER'}
+                    </span>
+                  </div>
+                </div>
+
+                <div style="margin-top: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px; font-size: 10px; text-align: center; color: #666;">
+                  <strong>Note:</strong> Includes $85k annual manager salary ($1,634.62/week) + 33% payroll burden
+                </div>
+              ` : `
+                <p style="text-align: center; color: #999; padding: 20px; font-size: 12px;">
+                  Labor data not available.<br>
+                  Calculate tip pool first to see labor summary.
+                </p>
+              `}
+            </div>
+          </div>
+
+        </div>
       </div>
     `;
   }
@@ -6117,7 +6220,17 @@
 
       // Parse files
       const payrollData = await parsePayrollCSV(laborFile);
-      const { creditTips, cashSales } = await parseSalesZip(salesFile);
+      const { creditTips, cashSales, netSales } = await parseSalesZip(salesFile);
+
+      // Calculate labor metrics
+      const baseLaborCost = payrollData.totalLaborCost || 0;
+      const demetriSalary = 85000 / 52; // $85k annual salary / 52 weeks
+      const subtotalLabor = baseLaborCost + demetriSalary;
+      const payrollBurden = subtotalLabor * 0.33; // 33% for taxes, insurance, etc.
+      const trueTotalLaborCost = subtotalLabor + payrollBurden;
+      const laborPercentage = netSales > 0 ? (trueTotalLaborCost / netSales) * 100 : 0;
+      const industryBenchmark = 30.0;
+      const laborVariance = laborPercentage - industryBenchmark;
 
       // Compute tip pool using calculated cash tips
       const result = computeTipPool(
@@ -6131,10 +6244,10 @@
 
       // Store global state
       tipPoolRecords = result.records;
-      
+
       // Parse date range from filename
       const dateRange = parseDateRange(laborFile.name) || parseDateRange(salesFile.name);
-      
+
       tipPoolSummary = {
         creditTips: creditTips,
         cashSales: cashSales,
@@ -6150,7 +6263,19 @@
         cashNeeded: result.cashNeeded,
         dateRange: dateRange,
         calculatedByName: calculatedByName,
-        generatedAt: new Date().toLocaleString()
+        generatedAt: new Date().toLocaleString(),
+        // Labor metrics for combined report
+        laborData: {
+          baseLaborCost: baseLaborCost,
+          demetriSalary: demetriSalary,
+          subtotalLabor: subtotalLabor,
+          payrollBurden: payrollBurden,
+          trueTotalLaborCost: trueTotalLaborCost,
+          netSales: netSales,
+          laborPercentage: laborPercentage,
+          industryBenchmark: industryBenchmark,
+          laborVariance: laborVariance
+        }
       };
 
       // Display results for user to review
@@ -6333,34 +6458,42 @@
         complete: function(results) {
           const data = results.data;
           const employeeMap = {};
-          
+          let totalLaborCost = 0;
+
           data.forEach(row => {
             const emp = row['Employee'];
             if (!emp) return;
-            
+
             const regHours = parseFloat(row['Regular Hours']) || 0;
             const otHours = parseFloat(row['Overtime Hours']) || 0;
             const total = regHours + otHours;
-            
+            const totalPay = parseFloat(row['Total Pay']?.replace(',', '')) || 0;
+
+            // Accumulate total labor cost
+            totalLaborCost += totalPay;
+
             if (!employeeMap[emp]) {
               employeeMap[emp] = { hours: 0 };
             }
             employeeMap[emp].hours += total;
           });
-          
+
           const result = [];
           for (const emp in employeeMap) {
             const parts = emp.split(',');
             const last = parts[0].trim();
             const first = parts.slice(1).join(',').trim();
-            result.push({ 
-              employee: emp, 
-              first: first, 
-              last: last, 
-              hours: employeeMap[emp].hours 
+            result.push({
+              employee: emp,
+              first: first,
+              last: last,
+              hours: employeeMap[emp].hours
             });
           }
-          
+
+          // Add labor cost data to result
+          result.totalLaborCost = totalLaborCost;
+
           resolve(result);
         },
         error: function(err) {
@@ -6373,40 +6506,54 @@
   async function parseSalesZip(file) {
     const arrayBuffer = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
-    
-    // Find Payments summary CSV
+
+    // Find Payments summary CSV and Net sales summary CSV
     let paymentsFile = null;
+    let netSalesFile = null;
     zip.forEach((relativePath, zipEntry) => {
       if (relativePath.endsWith('Payments summary.csv')) {
         paymentsFile = zipEntry;
       }
+      if (relativePath.endsWith('Net sales summary.csv')) {
+        netSalesFile = zipEntry;
+      }
     });
-    
-    if (!paymentsFile) {
-      return { creditTips: 0, cashSales: 0 };
+
+    // Parse Net Sales
+    let netSales = 0;
+    if (netSalesFile) {
+      const netSalesCsv = await netSalesFile.async('string');
+      const netSalesParsed = Papa.parse(netSalesCsv, { header: true, skipEmptyLines: true });
+      if (netSalesParsed.data && netSalesParsed.data[0]) {
+        netSales = parseFloat(netSalesParsed.data[0]['Net sales']) || 0;
+      }
     }
-    
+
+    if (!paymentsFile) {
+      return { creditTips: 0, cashSales: 0, netSales: netSales };
+    }
+
     const paymentsCsv = await paymentsFile.async('string');
     const parsed = Papa.parse(paymentsCsv, { header: true, skipEmptyLines: true });
-    
+
     let creditTips = 0;
     let cashSales = 0;
-    
+
     parsed.data.forEach(row => {
       const paymentType = row['Payment type'] ? row['Payment type'].trim() : '';
       const paymentSubType = row['Payment sub type'];
-      
+
       // Credit tips from detailed card types only
       if (paymentType === 'Credit/debit' && paymentSubType && paymentSubType.trim() !== '') {
         creditTips += parseFloat(row['Tips']) || 0;
       }
-      
+
       if (paymentType === 'Cash') {
         cashSales += parseFloat(row['Amount']) || 0;
       }
     });
-    
-    return { creditTips, cashSales };
+
+    return { creditTips, cashSales, netSales };
   }
 
   function computeTipPool(payrollData, creditTips, cashTips, ezcaterTips, tdsDriverTips, cashSales) {
@@ -7201,9 +7348,10 @@
       
       // Add payday sign off sheet as page 2
       generatePaydaySignOffPage(doc, startDate, endDate);
-      
+
       // Return PDF data for potential merging, or save directly if no attachments
-      const dateStr = tipPoolSummary.dateRange || `${startDate}_to_${endDate}`.replace(/-/g, '_');
+      // Use actual form dates for filename (not CSV parsed dates which may be off by 1 day)
+      const dateStr = `${startDate}_to_${endDate}`.replace(/-/g, '_');
       const filename = `Combined_Weekly_Report_${dateStr}.pdf`;
       
       return {
