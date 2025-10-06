@@ -118,20 +118,47 @@ export default async function handler(req, res) {
 
 ---
 
-### PHASE 2: Homebase API Integration (Labor Data)
+### PHASE 2: Toast API Integration (Labor Data) - NO HOMEBASE NEEDED! ✅
 
-#### Endpoint: `/api/homebase-labor-summary` (NEW - TO CREATE)
-**Purpose**: Replace PayrollExport CSV upload
+#### Endpoint: `/api/toast-labor-summary` (NEW - TO CREATE)
+**Purpose**: Replace PayrollExport CSV upload with Toast Labor API
+
+**Toast Labor API Discovery:**
+- ✅ Toast HAS labor/employee data in their API!
+- Endpoint: `/labor/v1/timeEntries`
+- Required scope: `labor:read` (should be in your 13 scopes)
+- Additional scope for employee names: `labor.employees:read`
 
 **What it should fetch:**
-Use existing `homebase-proxy.js` with these Homebase API endpoints:
 
-1. **Timesheets endpoint**: `/v1/locations/{locationUuid}/timesheets`
-   - Query params: `start_date`, `end_date`
-   - Returns: employee work hours and pay data
+1. **Time Entries endpoint**: `GET /labor/v1/timeEntries`
+   - Query params: `startDate`, `endDate` (up to 30 days range)
+   - Optional: `includeMissedBreaks=true`
+   - Returns: Time entry records for ALL employees
 
-2. **Employees endpoint**: `/v1/locations/{locationUuid}/employees`
-   - Returns: employee names and IDs
+2. **Employees endpoint**: `GET /labor/v1/employees`
+   - Returns: Employee names, IDs, job information
+
+**TimeEntry Response Structure:**
+```javascript
+{
+  guid: "employee-guid",
+  inDate: "2025-09-29T10:00:00Z",
+  outDate: "2025-09-29T18:00:00Z",
+  regularHours: 7.5,         // Regular hours worked
+  overtimeHours: 0.5,        // Overtime hours worked
+  hourlyWage: 18.00,         // Employee hourly rate
+  employeeReference: {
+    guid: "employee-guid",
+    entityType: "Employee"
+  },
+  jobReference: {
+    guid: "job-guid",
+    entityType: "Job"
+  },
+  breaks: [...]
+}
+```
 
 **Data to extract:**
 ```javascript
@@ -141,20 +168,94 @@ Use existing `homebase-proxy.js` with these Homebase API endpoints:
       employee: "Cox, Bryan",  // Format: "Last, First"
       first: "Bryan",
       last: "Cox",
-      hours: 25.3,  // Regular + Overtime
-      totalPay: 450.75  // For labor cost calculation
+      hours: 25.3,             // Sum of (regularHours + overtimeHours)
+      totalPay: 450.75         // Sum of (regularHours * hourlyWage + overtimeHours * overtimeWage)
     },
     // ... more employees
   ],
-  totalLaborCost: 8543.21  // Sum of all totalPay
+  totalLaborCost: 8543.21  // Sum of all totalPay values
 }
 ```
 
-**Homebase API reference:**
-- Base URL: `https://api.joinhomebase.com`
-- Auth: API Key in environment variable `HOMEBASE_API_KEY`
-- Location UUID in `HOMEBASE_LOCATION_UUID`
-- **Security**: homebase-proxy already handles UUID injection (line 89-94)
+**Implementation approach:**
+```javascript
+// New endpoint: /api/toast-labor-summary.js
+export default async function handler(req, res) {
+  const { startDate, endDate, token } = req.query;
+
+  // Step 1: Fetch all employees
+  const employeesResponse = await fetch(
+    `${toastApiUrl}/labor/v1/employees`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Toast-Restaurant-External-ID': restaurantId
+      }
+    }
+  );
+  const employees = await employeesResponse.json();
+
+  // Step 2: Fetch time entries for date range
+  const timeEntriesResponse = await fetch(
+    `${toastApiUrl}/labor/v1/timeEntries?startDate=${startDate}&endDate=${endDate}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Toast-Restaurant-External-ID': restaurantId
+      }
+    }
+  );
+  const timeEntries = await timeEntriesResponse.json();
+
+  // Step 3: Aggregate by employee
+  const laborMap = {};
+
+  timeEntries.forEach(entry => {
+    const empGuid = entry.employeeReference.guid;
+    const regHours = entry.regularHours || 0;
+    const otHours = entry.overtimeHours || 0;
+    const wage = entry.hourlyWage || 0;
+
+    if (!laborMap[empGuid]) {
+      laborMap[empGuid] = {
+        hours: 0,
+        totalPay: 0
+      };
+    }
+
+    laborMap[empGuid].hours += regHours + otHours;
+    // Calculate pay (overtime typically 1.5x)
+    laborMap[empGuid].totalPay += (regHours * wage) + (otHours * wage * 1.5);
+  });
+
+  // Step 4: Match with employee names
+  const result = [];
+  let totalLaborCost = 0;
+
+  employees.forEach(emp => {
+    const labor = laborMap[emp.guid];
+    if (labor) {
+      result.push({
+        employee: `${emp.lastName}, ${emp.firstName}`,
+        first: emp.firstName,
+        last: emp.lastName,
+        hours: labor.hours,
+        totalPay: labor.totalPay
+      });
+      totalLaborCost += labor.totalPay;
+    }
+  });
+
+  result.totalLaborCost = totalLaborCost;
+
+  return res.json(result);
+}
+```
+
+**Toast API Authentication:**
+- Uses same OAuth token as other Toast endpoints
+- Already handled in frontend with `accessToken`
+- Same `Toast-Restaurant-External-ID` header
 
 ---
 
@@ -171,13 +272,14 @@ Use existing `homebase-proxy.js` with these Homebase API endpoints:
   - Credit tips: $2,675.93
   - Cash sales: $2,257.92
 
-### Step 2: Create Homebase Labor Summary Endpoint
-**File**: `/api/homebase-labor-summary.js`
+### Step 2: Create Toast Labor Summary Endpoint
+**File**: `/api/toast-labor-summary.js`
 
 **Test with**:
 - Start date: 2025-09-29
 - End date: 2025-10-05
 - Expected results: 19 employees with hours and pay matching PayrollExport CSV
+- **Required Toast API scopes**: `labor:read`, `labor.employees:read`
 
 ### Step 3: Update Frontend Tip Pool Calculator
 **File**: `index.html` - `calculateTipPool()` function
@@ -200,8 +302,8 @@ async function autoFetchTipPoolData() {
   // Fetch sales data from Toast
   const salesData = await fetch(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${accessToken}`);
 
-  // Fetch labor data from Homebase
-  const laborData = await fetch(`/api/homebase-labor-summary?startDate=${startDate}&endDate=${endDate}`);
+  // Fetch labor data from Toast
+  const laborData = await fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${accessToken}`);
 
   // Populate form with fetched data
   // Store in same format as parsePayrollCSV() and parseSalesZip()
