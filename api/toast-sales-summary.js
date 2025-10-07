@@ -247,10 +247,12 @@ export default async function handler(req, res) {
                         const tipAmount = payment.tipAmount || 0;
                         const amount = payment.amount || 0;
 
-                        // SIMPLIFIED payment void detection - only check explicit void/refund statuses
+                        // CRITICAL FIX: Check payment void/refund at PAYMENT level (not just order level)
+                        // Toast docs: paymentStatus can be 'VOIDED' even if refundStatus isn't set
                         const isPaymentVoided = payment.voided === true ||
                                                payment.refundStatus === 'FULL' ||
-                                               payment.refundStatus === 'PARTIAL';
+                                               payment.refundStatus === 'PARTIAL' ||
+                                               payment.paymentStatus === 'VOIDED';
 
                         // Categorize by payment type (not cash, not delivery platforms)
                         const isCreditCardTip = payment.type !== 'CASH' &&
@@ -385,7 +387,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v5.0-deleted-orders-gratuity-filter-20251007-0100', // CRITICAL FIXES
+      version: 'v5.1-payment-level-void-detection-20251007-0120', // CRITICAL FIX: payment.paymentStatus check
       dateRange: {
         start: startDate,
         end: endDate
