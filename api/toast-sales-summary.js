@@ -100,14 +100,9 @@ export default async function handler(req, res) {
               for (const order of orders) {
                 debugOrderCount++; // Increment for every order, regardless of void status
 
-                // Enhanced void detection per Toast documentation
-                // IMPORTANT: Check for TRUE values, not just field existence
-                const isVoided = order.voided === true ||
-                                (order.voidDate && order.voidDate !== null && order.voidDate !== '') ||
-                                order.deleted === true ||
-                                (order.deletedDate && order.deletedDate !== null && order.deletedDate !== '') ||
-                                order.guestOrderStatus === 'VOIDED' ||
-                                order.paymentStatus === 'VOIDED';
+                // SIMPLIFIED void detection - only check voided boolean
+                // Removing all other checks temporarily to isolate the issue
+                const isVoided = order.voided === true;
 
                 if (!isVoided) {
                   totalOrdersProcessed++;
@@ -147,11 +142,8 @@ export default async function handler(req, res) {
                 // Process payments within checks
                 if (order.checks && Array.isArray(order.checks)) {
                   for (const check of order.checks) {
-                    // Enhanced check void detection - check for TRUE values
-                    const isCheckVoided = check.voided === true ||
-                                         (check.voidDate && check.voidDate !== null && check.voidDate !== '') ||
-                                         check.deleted === true ||
-                                         (check.deletedDate && check.deletedDate !== null && check.deletedDate !== '');
+                    // SIMPLIFIED check void detection - only check voided boolean
+                    const isCheckVoided = check.voided === true;
 
                     // Track check-level discounts
                     let checkDiscounts = 0;
@@ -166,8 +158,8 @@ export default async function handler(req, res) {
                     // Track selection-level voids and discounts
                     if (check.selections && Array.isArray(check.selections)) {
                       for (const selection of check.selections) {
-                        // Selection void detection - check for TRUE values
-                        if (selection.voided === true || (selection.voidDate && selection.voidDate !== null && selection.voidDate !== '')) {
+                        // SIMPLIFIED selection void detection - only check voided boolean
+                        if (selection.voided === true) {
                           // Item was voided - this affects sales
                           const selectionPrice = selection.price || 0;
                           if (!isVoided && !isCheckVoided) {
@@ -192,13 +184,10 @@ export default async function handler(req, res) {
                         const tipAmount = payment.tipAmount || 0;
                         const amount = payment.amount || 0;
 
-                        // Check if payment itself is voided - check for TRUE/valid values
-                        const isPaymentVoided = payment.refundStatus === 'FULL' ||
-                                               payment.refundStatus === 'PARTIAL' ||
-                                               payment.refundStatus === 'REFUNDED' ||
-                                               payment.voided === true ||
-                                               payment.paymentStatus === 'VOIDED' ||
-                                               (payment.voidInfo && Object.keys(payment.voidInfo).length > 0);
+                        // SIMPLIFIED payment void detection - only check explicit void/refund statuses
+                        const isPaymentVoided = payment.voided === true ||
+                                               payment.refundStatus === 'FULL' ||
+                                               payment.refundStatus === 'PARTIAL';
 
                         // Categorize by payment type (not cash, not delivery platforms)
                         const isCreditCardTip = payment.type !== 'CASH' &&
