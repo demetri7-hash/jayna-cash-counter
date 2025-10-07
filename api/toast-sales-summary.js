@@ -493,9 +493,17 @@ export default async function handler(req, res) {
     console.log(`Cash Sales: $${totalCashSales.toFixed(2)}`);
     console.log(`=== END SUMMARY ===\n`);
 
+    // V6.9 DIAGNOSTIC: Calculate totals for excluded CREDIT payments
+    let totalExcludedCreditAmount = 0;
+    let totalExcludedCreditTips = 0;
+    excludedCreditPayments.forEach(excl => {
+      totalExcludedCreditAmount += excl.amount;
+      totalExcludedCreditTips += excl.tipAmount;
+    });
+
     return res.json({
       success: true,
-      version: 'v6.8-full-diagnostics-20251007-0715', // Comprehensive diagnostics to identify gift card type and over-exclusion
+      version: 'v6.9-diagnostics-in-response-20251007-0730', // Return diagnostics in JSON response for visibility
       dateRange: {
         start: startDate,
         end: endDate
@@ -526,7 +534,22 @@ export default async function handler(req, res) {
         serviceChargesGratuity: totalGratuityServiceCharges,
         netSalesFromItems: calculatedNetSales, // Legacy (broken - 3.4x inflated)
         voidedItemSales: totalVoidedItemSales,
-        paymentTypeBreakdown: paymentTypeBreakdown
+        paymentTypeBreakdown: paymentTypeBreakdown,
+        // V6.9 CRITICAL DIAGNOSTICS
+        v69_diagnostics: {
+          allPaymentTypes: Array.from(allPaymentTypes).sort(),
+          giftCardPayments: {
+            count: giftCardPaymentsFound.length,
+            payments: giftCardPaymentsFound,
+            message: giftCardPaymentsFound.length === 0 ? 'NO GIFT CARDS FOUND - This is why $40 not excluded!' : 'Gift cards found'
+          },
+          excludedCreditPayments: {
+            count: excludedCreditPayments.length,
+            totalAmount: totalExcludedCreditAmount,
+            totalTips: totalExcludedCreditTips,
+            payments: excludedCreditPayments
+          }
+        }
       }
     });
 
