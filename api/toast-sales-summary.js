@@ -47,6 +47,7 @@ export default async function handler(req, res) {
     let totalVoidedTips = 0;
     let totalDiscounts = 0;
     let totalTipsOnDiscountedChecks = 0;
+    let debugOrderCount = 0; // Separate counter for debug logging
 
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
@@ -97,6 +98,8 @@ export default async function handler(req, res) {
 
               // Process each order (INCLUDING voided orders to get gross tips)
               for (const order of orders) {
+                debugOrderCount++; // Increment for every order, regardless of void status
+
                 // Enhanced void detection per Toast documentation
                 // IMPORTANT: Check for TRUE values, not just field existence
                 const isVoided = order.voided === true ||
@@ -111,14 +114,17 @@ export default async function handler(req, res) {
                 }
 
                 // ENHANCED DEBUG: Log first 5 orders completely to see structure
-                if (totalOrdersProcessed <= 5) {
-                  console.log(`\n=== SAMPLE ORDER ${totalOrdersProcessed} (${order.orderNumber}) ===`);
+                // Use debugOrderCount to avoid logging ALL orders if none are counted
+                if (debugOrderCount <= 5) {
+                  console.log(`\n=== SAMPLE ORDER ${debugOrderCount} (${order.orderNumber}) ===`);
                   console.log('Order fields:', Object.keys(order));
                   console.log('Order voided?', order.voided);
                   console.log('Order voidDate?', order.voidDate);
                   console.log('Order deletedDate?', order.deletedDate);
                   console.log('Order deleted?', order.deleted);
-                  console.log('Order voidBusinessDate?', order.voidBusinessDate);
+                  console.log('Order guestOrderStatus?', order.guestOrderStatus);
+                  console.log('Order paymentStatus?', order.paymentStatus);
+                  console.log('isVoided result:', isVoided);
                   if (order.checks && order.checks[0]) {
                     console.log('Check fields:', Object.keys(order.checks[0]));
                     console.log('Check voided?', order.checks[0].voided);
