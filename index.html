@@ -7801,7 +7801,7 @@
           });
         }
 
-        // Right box content - Labor Summary
+        // Right box content - Labor Summary (clean and simple)
         let laborY = currentY + 30;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
@@ -7810,7 +7810,7 @@
         if (tipPoolSummary.laborData) {
           const ld = tipPoolSummary.laborData;
 
-          // Labor breakdown
+          // Compact labor breakdown
           const laborEntries = [
             ['Base Labor Cost:', `$${ld.baseLaborCost.toFixed(2)}`],
             ['Manager Salary (prorated):', `$${ld.demetriSalary.toFixed(2)}`],
@@ -7820,76 +7820,60 @@
 
           laborEntries.forEach(([label, value]) => {
             doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(0, 0, 0);
             doc.text(label, rightBoxX + 5, laborY);
             doc.setFont('helvetica', 'bold');
             doc.text(value, rightBoxX + boxWidth - 5, laborY, { align: 'right' });
-            laborY += 9;
+            laborY += 8;
           });
 
-          // Thick line before total
-          doc.setLineWidth(1.5);
-          doc.line(rightBoxX + 5, laborY, rightBoxX + boxWidth - 5, laborY);
-          laborY += 10;
+          // Line before total
+          doc.setLineWidth(0.5);
+          doc.setDrawColor(200, 200, 200);
+          doc.line(rightBoxX + 5, laborY + 2, rightBoxX + boxWidth - 5, laborY + 2);
+          laborY += 8;
 
           // True Total Labor Cost
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(8);
+          doc.setTextColor(0, 0, 0);
           doc.text('True Total Labor Cost:', rightBoxX + 5, laborY);
-          doc.setTextColor(44, 95, 141); // Primary blue
           doc.text(`$${ld.trueTotalLaborCost.toFixed(2)}`, rightBoxX + boxWidth - 5, laborY, { align: 'right' });
+          laborY += 12;
 
-          laborY += 15;
-
-          // Labor percentage box
+          // Net Sales and Labor %
           const isOverBudget = ld.laborVariance > 0;
-          const boxColor = isOverBudget ? [255, 230, 230] : [232, 245, 232]; // Light red or light green
-          const borderColor = isOverBudget ? [220, 53, 69] : [40, 167, 69]; // Red or green
+          const textColor = isOverBudget ? [220, 53, 69] : [40, 167, 69];
 
-          const percentBoxHeight = 50;
-          const percentBoxY = laborY;
+          // Background bar
+          doc.setFillColor(245, 245, 245);
+          doc.rect(rightBoxX + 5, laborY, boxWidth - 10, 24, 'F');
 
-          // Draw colored box
-          doc.setFillColor(boxColor[0], boxColor[1], boxColor[2]);
-          doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-          doc.setLineWidth(1.5);
-          doc.rect(rightBoxX + 5, percentBoxY, boxWidth - 10, percentBoxHeight, 'FD');
-
-          // Calculate center of the colored box (not the column)
-          const boxCenterX = rightBoxX + boxWidth / 2;
-
-          // Net Sales
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6);
+          doc.setFontSize(7);
+          doc.setTextColor(0, 0, 0);
+          doc.text('NET SALES', rightBoxX + 10, laborY + 7);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`$${ld.netSales.toFixed(2)}`, rightBoxX + boxWidth - 10, laborY + 7, { align: 'right' });
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
           doc.setTextColor(100, 100, 100);
-          doc.text('NET SALES', boxCenterX, percentBoxY + 8, { align: 'center' });
+          doc.text('LABOR PERCENTAGE', rightBoxX + 10, laborY + 15);
 
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(9);
-          doc.setTextColor(0, 0, 0);
-          doc.text(`$${ld.netSales.toFixed(2)}`, boxCenterX, percentBoxY + 16, { align: 'center' });
+          doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+          doc.text(`${ld.laborPercentage.toFixed(2)}%`, rightBoxX + boxWidth - 10, laborY + 15, { align: 'right' });
 
-          // Labor Percentage
+          // Variance note (smaller)
+          laborY += 26;
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(6);
           doc.setTextColor(100, 100, 100);
-          doc.text('LABOR PERCENTAGE', boxCenterX, percentBoxY + 24, { align: 'center' });
-
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(14);
-          doc.setTextColor(borderColor[0], borderColor[1], borderColor[2]);
-          doc.text(`${ld.laborPercentage.toFixed(2)}%`, boxCenterX, percentBoxY + 36, { align: 'center' });
-
-          // Variance and benchmark
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6);
-          doc.setTextColor(100, 100, 100);
-          doc.text('Target: 30.00%', boxCenterX, percentBoxY + 42, { align: 'center' });
-
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(6);
-          doc.setTextColor(0, 0, 0);
-          const varianceText = `${ld.laborVariance > 0 ? '+' : ''}${ld.laborVariance.toFixed(2)}% ${isOverBudget ? 'OVER' : 'UNDER'}`;
-          doc.text(varianceText, boxCenterX, percentBoxY + 48, { align: 'center' });
+          const varianceText = `Target: 30.00% | ${ld.laborVariance > 0 ? '+' : ''}${ld.laborVariance.toFixed(2)}% ${isOverBudget ? 'over' : 'under'}`;
+          doc.text(varianceText, rightBoxX + boxWidth / 2, laborY, { align: 'center' });
 
         } else {
           doc.setTextColor(150, 150, 150);
