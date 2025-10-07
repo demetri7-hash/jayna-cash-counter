@@ -1,193 +1,107 @@
-# SESSION SUMMARY - October 6, 2025
-## Documentation System Implementation
+# Session Summary - October 6, 2025
+## Void Detection & Discount Tracking Implementation
 
 ---
 
-## ✅ COMPLETED TASKS
+## 🎯 SESSION OBJECTIVES
 
-### 1. Comprehensive Project Analysis
-- Scanned entire codebase (8000+ lines index.html, 10 API endpoints)
-- Analyzed database schema (Supabase PostgreSQL)
-- Reviewed recent development history (git log, PROCESS_LOG.md)
-- Identified critical system components and security patterns
-
-### 2. Created CURRENT_PROJECT_DOCUMENTATION.md (400+ lines)
-**Complete technical documentation including:**
-- Executive summary and production status
-- System architecture (frontend, backend APIs, database)
-- Core business logic (cash counting, tip pool, deposit rounding)
-- Database schema with JSONB examples
-- API endpoint documentation (Toast POS, Homebase)
-- Security configuration and environment variables
-- Recent development history with fixes
-- User workflows and file processing
-- Deployment and hosting details
-- Performance metrics and business impact
-
-### 3. Created AI_PROJECT_INSTRUCTIONS.md (600+ lines)
-**Adapted from NOION template to Jayna Cash Counter specifics:**
-- Project-specific context and system overview
-- Autonomous operation mandate (full authorization)
-- Session startup protocol (read docs, create START_POINT files)
-- PROJECT_MASTER_LOG.md format and guidelines
-- Toast POS API best practices (pagination, TDS Driver GUID)
-- Homebase API security requirements (no hardcoded UUIDs)
-- Supabase database patterns
-- EmailJS integration
-- Git commit standards and deployment workflow
-- Testing checklists (before/after deployment)
-- Security rules (NEVER commit secrets)
-- Project-specific priorities
-
-### 4. Created PROJECT_MASTER_LOG.md
-**Session-based change tracking system:**
-- Newest-first format
-- Complete session documentation (October 6, 2025 entry)
-- Template for future sessions
-- Structured format (focus, context, commands, files, decisions, status)
+Fix critical issues with Toast API integration:
+1. **Voided Tips Detection:** $0 instead of expected $70.40
+2. **Net Sales Discrepancy:** ±$47-163 from expected $46,880.35  
+3. **Cash Sales Discrepancy:** $2,341.56 instead of $2,257.92
 
 ---
 
-## 📚 NEW DOCUMENTATION FILES
+## 🔍 KEY DISCOVERIES
 
-All files saved in project root:
+### Discovery 1: Discounts vs. Voids
+The **$70.40 discrepancy** is likely from **discounts on checks with tips**, not voided orders.
 
-1. **CURRENT_PROJECT_DOCUMENTATION.md**
-   - Master technical reference
-   - Complete system overview
-   - 400+ lines of detailed documentation
+**Evidence from Toast CSV exports:**
+- Net Sales Summary: $978.00 in total discounts
+- Payments Summary: $2,675.93 in credit tips (gross)
+- Expected Net: $2,605.53 (difference of $70.40)
 
-2. **AI_PROJECT_INSTRUCTIONS.md**
-   - AI assistant startup guide
-   - Project-specific instructions
-   - Autonomous operation guidelines
-   - 600+ lines of tailored guidance
+### Discovery 2: Multi-Level Void Detection Required
+Toast documentation shows void fields at multiple levels:
+- Order: `voided`, `voidDate`, `guestOrderStatus`, `paymentStatus`
+- Check: `voided`, `voidDate`, `deleted`, `deletedDate`
+- Payment: `refundStatus`, `paymentStatus`
+- Selection: `voided`, `voidDate`
 
-3. **PROJECT_MASTER_LOG.md**
-   - Session history tracking
-   - Change log with context
-   - Decision documentation
-
-4. **SESSION_SUMMARY_2025-10-06.md** (this file)
-   - Quick reference for today's work
-   - Files created and their purpose
-   - Next steps for future sessions
-
----
-
-## 🎯 KEY FINDINGS
-
-### Project Identity
-**Jayna Cash Counter** - Restaurant management platform combining:
-- Cash counting system (AM/PM dual-drawer workflows)
-- Tip pool calculator with Toast POS integration
-- Automated daily reporting via EmailJS
-- Manager analytics dashboard
-- Labor management through Homebase API
-
-### Technical Stack
-- Frontend: Vanilla JavaScript, HTML5, CSS3
-- Backend: Vercel Serverless Functions (Node.js)
-- Database: Supabase (PostgreSQL)
-- APIs: Toast POS, Homebase
-- Deployment: Vercel (https://jayna-cash-counter.vercel.app)
-
-### Critical System Components
-1. **V2.84 Deposit Rounding Logic** - Whole dollar deposits with tip adjustments
-2. **TDS Driver Integration** - GUID `5ffaae6f-4238-477d-979b-3da88d45b8e2`, $481.83 weekly
-3. **Full Order Pagination** - Fixed Oct 1, 2025 to fetch ALL orders (not just 100)
-4. **Security Architecture** - No hardcoded secrets, environment variables only
-
-### Recent Critical Fixes
-- **Oct 1:** Toast pagination (ALL orders for accurate analytics)
-- **Oct 1:** Homebase security (removed hardcoded UUIDs)
-- **Sep 30:** TDS Driver fix ($481.83 accuracy with comprehensive analysis)
-- **Sep 1:** V2.84 deposit rounding system
+### Discovery 3: Expected Values (Week 9/29-10/5)
+```
+Net Sales:    $46,880.35
+Cash Sales:   $2,257.92
+Credit Tips:  $2,675.93 (gross)
+Discounts:    $978.00
+Voids:        $713.00 (10 orders, 71 items)
+```
 
 ---
 
-## 🚀 NEXT STEPS FOR FUTURE SESSIONS
+## ✅ CHANGES IMPLEMENTED
 
-### At Start of Every Session:
-1. ✅ Read **AI_PROJECT_INSTRUCTIONS.md** (this is now your startup guide)
-2. ✅ Read **PROJECT_MASTER_LOG.md** (newest entries first)
-3. ✅ Read **CURRENT_PROJECT_DOCUMENTATION.md** (system overview)
-4. ✅ Ask user: "What are we working on today?"
-5. ✅ Create **START_POINT_[DATE].md** after user confirms
-6. ✅ Update **PROJECT_MASTER_LOG.md** with new session entry
+### Backend (`api/toast-sales-summary.js`)
+1. **Enhanced void detection** - checks 6+ fields per level
+2. **Discount tracking** - check and selection level
+3. **Selection-level voids** - individual item voids
+4. **Detailed logging** - first 5 orders, void details
+5. **New metrics** - discounts, tipsOnDiscountedChecks
 
-### Documentation Maintenance:
-- Update PROJECT_MASTER_LOG.md at start/end of each session
-- Keep CURRENT_PROJECT_DOCUMENTATION.md updated with major changes
-- Create START_POINT files for context continuity
-- Update PROCESS_LOG.md for technical change details
-
-### Optional Cleanup:
-- Remove "instructions for ai.txt" (original template, no longer needed)
-- Archive this SESSION_SUMMARY file after reviewing
+### Frontend (`index.html`)
+1. **Store new metrics** - discounts, tipsOnDiscountedChecks
+2. **Enhanced console output** - formatted sales summary
 
 ---
 
-## 🔐 CRITICAL REMINDERS
+## 🧪 TESTING INSTRUCTIONS
 
-### Security (NEVER FORGET):
-- ❌ NEVER commit .env file
-- ❌ NEVER hardcode API keys, secrets, or UUIDs in frontend
-- ✅ ALWAYS use environment variables
-- ✅ ALWAYS test locally before pushing
-- ✅ ALWAYS verify Vercel deployment after push
+1. Go to https://jayna-cash-counter.vercel.app
+2. Dates: **9/29/2025** to **10/5/2025**
+3. Authenticate with Toast
+4. Enter Real Envelope: **$2,371.00**
+5. Click "Calculate Tip Pool"
+6. **Check Console (F12)** for logs
 
-### Testing:
-- ✅ Test locally: `python3 -m http.server 8000`
-- ✅ Test production: https://jayna-cash-counter.vercel.app
-- ✅ Manual testing required (no automated tests yet)
-- ✅ This is a LIVE PRODUCTION SYSTEM used daily
-
----
-
-## 📊 SESSION STATISTICS
-
-- **Documentation Created:** 3 comprehensive files (1400+ total lines)
-- **Project Files Analyzed:** 20+ files (main app, APIs, docs)
-- **Git History Reviewed:** 15 recent commits
-- **Time Invested:** Full comprehensive analysis
-- **Status:** ✅ COMPLETE - Ready for autonomous AI operation
+### Expected Console Output:
+```
+=== SAMPLE ORDER 1 ===
+Order fields: [array of available fields]
+...
+=== SALES SUMMARY ===
+Net Sales: $46,880.35
+Total Discounts: $978.00
+Credit Tips (Gross): $2,675.93
+  - Voided Tips: -$70.40
+Credit Tips (Net): $2,605.53
+===================
+```
 
 ---
 
-## 💡 WHAT THIS MEANS FOR YOU
+## ✅ SUCCESS CRITERIA
 
-You now have a **complete documentation system** that enables:
+**Must Match:**
+- Net Sales = $46,880.35 ✓
+- Cash Sales = $2,257.92 ✓
+- Discounts = $978.00 ✓
 
-1. **Session Continuity** - AI can pick up exactly where you left off
-2. **Autonomous Operation** - AI has full context to work independently
-3. **Change Tracking** - Every session logged with decisions and rationale
-4. **Technical Reference** - Complete system documentation in one place
-5. **Best Practices** - Security, API patterns, testing checklists built in
-
-**The AI assistant will now:**
-- Automatically read project context at session start
-- Create START_POINT files for each session
-- Update PROJECT_MASTER_LOG with all work
-- Follow project-specific security and coding standards
-- Work autonomously with full understanding of the system
+**Should Match:**
+- Credit Tips (Gross) = $2,675.93 ±$1
+- Credit Tips (Net) = $2,605.53 ±$1
 
 ---
 
-## 🎉 YOU'RE ALL SET!
+## 📝 COMMITS
 
-Next time you start a Claude Code session, the AI will:
-1. Read these documentation files automatically
-2. Understand the complete Jayna Cash Counter system
-3. Know all recent fixes and current project state
-4. Follow security best practices (no hardcoded secrets)
-5. Work autonomously with full project context
-
-**No more re-explaining the project every session!**
+```
+c479e1b - debug: add enhanced logging
+7ec48a9 - feat: comprehensive void and discount tracking
+d56bb5d - feat: display discount metrics in console
+```
 
 ---
 
-*Session completed: October 6, 2025*
-*Files created: 3 comprehensive documentation files*
-*Total documentation: 1400+ lines of project-specific guidance*
-*Status: Ready for future development sessions*
+**Status:** ✅ Deployed to production, ready for testing
+**Date:** October 6, 2025
