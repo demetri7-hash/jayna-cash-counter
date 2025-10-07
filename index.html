@@ -6517,16 +6517,6 @@
         throw new Error('No cash count data found for this date range');
       }
 
-      // Calculate total Toast cash sales using correct column name
-      let totalToastCashSales = 0;
-      totalToastCashSales = rangeData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
-
-      // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
-      const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
-
-      // Update the cash tips display
-      document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
-
       // Get data from either files OR API
       let payrollData, creditTips, cashSales, netSales;
 
@@ -6546,6 +6536,23 @@
         cashSales = apiFetchedData.salesData.cashSales;
         netSales = apiFetchedData.salesData.netSales;
       }
+
+      // Calculate total Toast cash sales
+      // Use API cashSales if available, otherwise sum from daily PM data
+      let totalToastCashSales = 0;
+      if (!hasFiles && cashSales) {
+        // Using API data - use the cashSales from API
+        totalToastCashSales = cashSales;
+      } else {
+        // Using files or have daily data - sum from database
+        totalToastCashSales = rangeData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
+      }
+
+      // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
+      const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
+
+      // Update the cash tips display
+      document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
 
       // Calculate labor metrics
       const baseLaborCost = payrollData.totalLaborCost || 0;
