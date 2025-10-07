@@ -193,7 +193,21 @@ export default async function handler(req, res) {
                     // This is Toast's official net sales value per check
                     // NOTE: check.amount ALREADY EXCLUDES voided payments (proven in v6.2 testing)
                     if (!isOrderExcluded && !isCheckExcluded) {
-                      const checkAmount = check.amount || 0;
+                      let checkAmount = check.amount || 0;
+
+                      // V6.3 CRITICAL FIX: Exclude GIFTCARD payments from net sales
+                      // Per Toast docs: "Net sales excludes purchases of gift cards"
+                      // Gift cards are DEFERRED REVENUE, not immediate sales
+                      if (check.payments && Array.isArray(check.payments)) {
+                        for (const payment of check.payments) {
+                          if (payment.type === 'GIFTCARD' || payment.type === 'GIFT_CARD') {
+                            const giftCardAmount = payment.amount || 0;
+                            checkAmount -= giftCardAmount;
+                            console.log(`💳 EXCLUDING GIFT CARD from net sales: $${giftCardAmount} (deferred revenue)`);
+                          }
+                        }
+                      }
+
                       totalNetSales += checkAmount;
                     }
 
@@ -418,7 +432,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.1-reverted-check-amount-correct-20251007-0500', // REVERTED v6.2: check.amount already excludes voided payments
+      version: 'v6.3-exclude-giftcards-20251007-0600', // Exclude GIFTCARD payments from net sales (deferred revenue)
       dateRange: {
         start: startDate,
         end: endDate
