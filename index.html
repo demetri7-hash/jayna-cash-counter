@@ -6955,12 +6955,14 @@
       const equity = equityMap[rec.employee];
       const weighted = rec.hours * equity;
       totalWeightedHours += weighted;
-      
+
       return {
         employee: rec.employee,
         first: rec.first,
         last: rec.last,
         hours: rec.hours,
+        regularHours: rec.regularHours || 0,
+        overtimeHours: rec.overtimeHours || 0,
         equity: equity,
         weighted: weighted,
         due: 0
@@ -7123,7 +7125,9 @@
                 <th style="padding: 12px; text-align: left; font-size: 14px;">#</th>
                 <th style="padding: 12px; text-align: left; font-size: 14px;">First</th>
                 <th style="padding: 12px; text-align: left; font-size: 14px;">Last</th>
-                <th style="padding: 12px; text-align: center; font-size: 14px;">Hours</th>
+                <th style="padding: 12px; text-align: center; font-size: 14px;">Reg Hours</th>
+                <th style="padding: 12px; text-align: center; font-size: 14px;">OT Hours</th>
+                <th style="padding: 12px; text-align: center; font-size: 14px;">Total Hours</th>
                 <th style="padding: 12px; text-align: center; font-size: 14px;">Equity (%)</th>
                 <th style="padding: 12px; text-align: center; font-size: 14px;">Weighted Hours</th>
                 <th style="padding: 12px; text-align: center; font-size: 14px;">Tips Due</th>
@@ -7138,14 +7142,26 @@
     tipPoolRecords.forEach((record, index) => {
       const rowBg = index % 2 === 0 ? '#f8f9fa' : 'white';
       const equityPercent = record.equity * 100;
+      // Calculate OT hours (regularHours and overtimeHours come from API)
+      const regularHours = record.regularHours || 0;
+      const overtimeHours = record.overtimeHours || 0;
+      const totalHours = record.hours;
+
+      // Highlight OT hours in orange if > 0
+      const otStyle = overtimeHours > 0
+        ? 'color: #ff8c00; font-weight: bold;'
+        : '';
+
       tableHtml += `
         <tr data-employee="${record.employee}" style="background: ${rowBg};">
           <td style="padding: 12px; border-bottom: 1px solid #ddd;">${index + 1}</td>
           <td style="padding: 12px; border-bottom: 1px solid #ddd;">${record.first}</td>
           <td style="padding: 12px; border-bottom: 1px solid #ddd;">${record.last}</td>
-          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd;">${record.hours.toFixed(2)}</td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd;">${regularHours.toFixed(2)}</td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd; ${otStyle}">${overtimeHours.toFixed(2)}</td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd; font-weight: bold;">${totalHours.toFixed(2)}</td>
           <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd;">
-            <input type="number" name="equity" step="1" min="1" max="100" value="${equityPercent.toFixed(0)}" 
+            <input type="number" name="equity" step="1" min="1" max="100" value="${equityPercent.toFixed(0)}"
                    style="width: 60px; text-align: center; border: 1px solid #ccc; border-radius: 0; padding: 4px;" />
           </td>
           <td style="padding: 12px; text-align: center; border-bottom: 1px solid #ddd;">${record.weighted.toFixed(3)}</td>
@@ -8043,6 +8059,8 @@
           employee_first_name: employee.first,
           employee_last_name: employee.last,
           hours_worked: employee.hours,
+          regular_hours: employee.regularHours || 0,
+          overtime_hours: employee.overtimeHours || 0,
           equity_percentage: employee.equity,
           weighted_hours: employee.weighted,
           tips_due: employee.due,
