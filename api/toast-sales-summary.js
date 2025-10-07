@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // Set CORS headers (v4.1 - added service charge tracking + payment breakdown)
+  // Set CORS headers (v5.0 - CRITICAL FIXES: deleted orders + gratuity service charge filter)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -50,12 +50,17 @@ export default async function handler(req, res) {
     let totalTipsOnDiscountedChecks = 0;
     let debugOrderCount = 0; // Separate counter for debug logging
 
+    // CRITICAL FIX: Track voided vs deleted separately
+    let totalVoidedOrders = 0;
+    let totalDeletedOrders = 0;
+
     // Alternative calculation: from menu items (like Toast does)
     let totalGrossSales = 0; // Sum of all item prices
     let totalVoidedItemSales = 0; // Sales from voided items
 
-    // Service charge tracking
+    // Service charge tracking (non-gratuity only)
     let totalServiceCharges = 0;
+    let totalGratuityServiceCharges = 0; // Track separately for debugging
 
     // Payment type breakdown for debugging
     let paymentTypeBreakdown = {};
@@ -107,15 +112,21 @@ export default async function handler(req, res) {
             if (Array.isArray(orders) && orders.length > 0) {
               console.log(`${businessDate} Page ${page}: ${orders.length} orders (total processed: ${totalOrdersProcessed})`);
 
-              // Process each order (INCLUDING voided orders to get gross tips)
+              // Process each order (INCLUDING voided/deleted orders to get gross tips)
               for (const order of orders) {
-                debugOrderCount++; // Increment for every order, regardless of void status
+                debugOrderCount++; // Increment for every order, regardless of void/delete status
 
-                // SIMPLIFIED void detection - only check voided boolean
-                // Removing all other checks temporarily to isolate the issue
+                // CRITICAL FIX: Check BOTH voided AND deleted (Toast has two separate states!)
+                // Per Toast docs: "Exclude voided orders/checks AND deleted orders/checks"
                 const isVoided = order.voided === true;
+                const isDeleted = order.deleted === true;
+                const isOrderExcluded = isVoided || isDeleted;
 
-                if (!isVoided) {
+                // Count voided and deleted separately for debugging
+                if (isVoided) totalVoidedOrders++;
+                if (isDeleted) totalDeletedOrders++;
+
+                if (!isOrderExcluded) {
                   totalOrdersProcessed++;
                 }
 
@@ -153,8 +164,11 @@ export default async function handler(req, res) {
                 // Process payments within checks
                 if (order.checks && Array.isArray(order.checks)) {
                   for (const check of order.checks) {
-                    // SIMPLIFIED check void detection - only check voided boolean
+                    // CRITICAL FIX: Check BOTH voided AND deleted at check level
+                    // "When an order is deleted, the checks are deleted and inherit the deleted and deletedDate values"
                     const isCheckVoided = check.voided === true;
+                    const isCheckDeleted = check.deleted === true;
+                    const isCheckExcluded = isCheckVoided || isCheckDeleted;
 
                     // Track check-level discounts
                     let checkDiscounts = 0;
@@ -167,15 +181,25 @@ export default async function handler(req, res) {
                     }
 
                     // Track check-level service charges (NOT payments, but added to net sales)
-                    if (!isVoided && !isCheckVoided && check.appliedServiceCharges && Array.isArray(check.appliedServiceCharges)) {
+                    // CRITICAL FIX: Only include NON-GRATUITY service charges per Toast docs
+                    // "Gratuity service charges are paid to staff, not added to net sales"
+                    if (!isOrderExcluded && !isCheckExcluded && check.appliedServiceCharges && Array.isArray(check.appliedServiceCharges)) {
                       for (const serviceCharge of check.appliedServiceCharges) {
                         const chargeAmount = serviceCharge.chargeAmount || 0;
-                        totalServiceCharges += chargeAmount;
+                        const isGratuity = serviceCharge.gratuity === true;
+
+                        if (isGratuity) {
+                          // Gratuity service charge - goes to staff, NOT net sales
+                          totalGratuityServiceCharges += chargeAmount;
+                        } else {
+                          // Non-gratuity service charge - goes to restaurant, add to net sales
+                          totalServiceCharges += chargeAmount;
+                        }
                       }
                     }
 
                     // Track selection-level (menu item) sales and voids
-                    // CRITICAL: Only process items from NON-VOIDED orders/checks
+                    // CRITICAL: Only process items from NON-VOIDED/DELETED orders/checks
                     if (check.selections && Array.isArray(check.selections)) {
                       for (const selection of check.selections) {
                         const selectionPrice = selection.price || 0;
@@ -185,8 +209,8 @@ export default async function handler(req, res) {
                         // SIMPLIFIED selection void detection - only check voided boolean
                         const isSelectionVoided = selection.voided === true;
 
-                        // Only count items from non-voided orders/checks
-                        if (!isVoided && !isCheckVoided) {
+                        // Only count items from non-voided/deleted orders/checks
+                        if (!isOrderExcluded && !isCheckExcluded) {
                           if (isSelectionVoided) {
                             // Item was voided - track separately
                             totalVoidedItemSales += selectionTotal;
@@ -224,17 +248,18 @@ export default async function handler(req, res) {
                                                payment.type !== 'HOUSE_ACCOUNT' &&
                                                payment.type !== 'UNDECLARED_CASH';
 
-                        // Debug logging for all voided transactions
-                        if (isVoided || isCheckVoided || isPaymentVoided) {
-                          console.log(`VOID DETECTED: Order ${order.orderNumber}, Amount: $${amount}, Tip: $${tipAmount}, Type: ${payment.type}`);
-                          console.log(`  Void reasons: OrderVoid=${isVoided}, CheckVoid=${isCheckVoided}, PaymentVoid=${isPaymentVoided}`);
-                          console.log(`  Order data: voided=${order.voided}, voidDate=${order.voidDate}, deleted=${order.deleted}`);
+                        // Debug logging for all voided/deleted transactions
+                        if (isOrderExcluded || isCheckExcluded || isPaymentVoided) {
+                          console.log(`VOID/DELETE DETECTED: Order ${order.orderNumber}, Amount: $${amount}, Tip: $${tipAmount}, Type: ${payment.type}`);
+                          console.log(`  Reasons: OrderVoid=${isVoided}, OrderDelete=${isDeleted}, CheckVoid=${isCheckVoided}, CheckDelete=${isCheckDeleted}, PaymentVoid=${isPaymentVoided}`);
+                          console.log(`  Order data: voided=${order.voided}, deleted=${order.deleted}, voidDate=${order.voidDate}, deletedDate=${order.deletedDate}`);
+                          console.log(`  Check data: voided=${check.voided}, deleted=${check.deleted}`);
                           console.log(`  Payment data: refundStatus=${payment.refundStatus}, paymentStatus=${payment.paymentStatus}\n`);
                         }
 
-                        // Only include payment amounts from NON-VOIDED orders
-                        // (voided orders still appear in API but shouldn't count toward sales)
-                        if (!isVoided && !isCheckVoided && !isPaymentVoided) {
+                        // Only include payment amounts from NON-VOIDED/DELETED orders
+                        // Per Toast docs: Exclude both voided AND deleted orders/checks
+                        if (!isOrderExcluded && !isCheckExcluded && !isPaymentVoided) {
                           totalNetSales += amount;
 
                           // Track payment types for debugging
@@ -254,11 +279,11 @@ export default async function handler(req, res) {
                           // Add to gross tips (all tips before voiding)
                           totalCreditTipsGross += tipAmount;
 
-                          // If voided (order, check, or payment level), add to voided total
-                          if (isVoided || isCheckVoided || isPaymentVoided) {
+                          // If voided/deleted (order, check, or payment level), add to voided total
+                          if (isOrderExcluded || isCheckExcluded || isPaymentVoided) {
                             totalVoidedTips += tipAmount;
                           } else {
-                            // Only add to net tips if NOT voided
+                            // Only add to net tips if NOT voided/deleted
                             totalCreditTips += tipAmount;
 
                             // Track tips on checks with discounts
@@ -268,8 +293,8 @@ export default async function handler(req, res) {
                           }
                         }
 
-                        // Track cash sales from non-voided payments only
-                        if (payment.type === 'CASH' && !isVoided && !isCheckVoided && !isPaymentVoided) {
+                        // Track cash sales from non-voided/deleted payments only
+                        if (payment.type === 'CASH' && !isOrderExcluded && !isCheckExcluded && !isPaymentVoided) {
                           totalCashSales += amount;
                         }
                       }
@@ -325,18 +350,21 @@ export default async function handler(req, res) {
     for (const [type, data] of Object.entries(paymentTypeBreakdown)) {
       console.log(`  ${type}: ${data.count} payments, $${data.amount.toFixed(2)} amount, $${data.tips.toFixed(2)} tips`);
     }
-    console.log(`DEBUG: Total orders from API: ${debugOrderCount}`);
-    console.log(`Orders Processed (non-voided): ${totalOrdersProcessed}`);
-    console.log(`Orders marked as voided: ${debugOrderCount - totalOrdersProcessed}`);
+    console.log(`\nDEBUG: Total orders from API: ${debugOrderCount}`);
+    console.log(`  Orders Processed (active): ${totalOrdersProcessed}`);
+    console.log(`  Orders VOIDED: ${totalVoidedOrders}`);
+    console.log(`  Orders DELETED: ${totalDeletedOrders}`);
+    console.log(`  Total Excluded: ${totalVoidedOrders + totalDeletedOrders} (should match ${debugOrderCount - totalOrdersProcessed})`);
     console.log(`\nSales Calculation Comparison:`);
     console.log(`  Method 1 (from payments): $${totalNetSales.toFixed(2)}`);
-    console.log(`  + Service Charges: $${totalServiceCharges.toFixed(2)}`);
+    console.log(`  + Non-Gratuity Service Charges: $${totalServiceCharges.toFixed(2)}`);
+    console.log(`  (Gratuity Service Charges excluded: $${totalGratuityServiceCharges.toFixed(2)})`);
     console.log(`  = Net Sales: $${finalNetSales.toFixed(2)} ✓ USING THIS`);
     console.log(`  Method 2 (from items): Gross $${totalGrossSales.toFixed(2)} - Discounts $${totalDiscounts.toFixed(2)} = $${calculatedNetSales.toFixed(2)} ✗ BROKEN`);
     console.log(`  Voided Item Sales: $${totalVoidedItemSales.toFixed(2)}`);
-    console.log(`\nNet Sales (payments + service charges): $${finalNetSales.toFixed(2)}`);
+    console.log(`\nNet Sales (payments + non-gratuity service charges): $${finalNetSales.toFixed(2)}`);
     console.log(`  Base Payments: $${totalNetSales.toFixed(2)}`);
-    console.log(`  Service Charges: $${totalServiceCharges.toFixed(2)}`);
+    console.log(`  Non-Gratuity Service Charges: $${totalServiceCharges.toFixed(2)}`);
     console.log(`Total Discounts: $${totalDiscounts.toFixed(2)}`);
     console.log(`Credit Tips (Gross): $${totalCreditTipsGross.toFixed(2)}`);
     console.log(`Voided Tips: $${totalVoidedTips.toFixed(2)}`);
@@ -347,12 +375,12 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v4.1-service-charges-20251007-0000', // Added service charge tracking
+      version: 'v5.0-deleted-orders-gratuity-filter-20251007-0100', // CRITICAL FIXES
       dateRange: {
         start: startDate,
         end: endDate
       },
-      netSales: finalNetSales, // Payment-based + service charges
+      netSales: finalNetSales, // Payment-based + NON-gratuity service charges only
       grossSales: totalGrossSales, // For transparency
       voidedItemSales: totalVoidedItemSales, // Track voided item sales
       creditTips: totalCreditTips,
@@ -360,20 +388,24 @@ export default async function handler(req, res) {
       voidedTips: totalVoidedTips,
       cashSales: totalCashSales,
       discounts: totalDiscounts,
-      serviceCharges: totalServiceCharges, // NEW
+      serviceCharges: totalServiceCharges, // Non-gratuity only
+      gratuityServiceCharges: totalGratuityServiceCharges, // Excluded from net sales
       tipsOnDiscountedChecks: totalTipsOnDiscountedChecks,
       businessDatesProcessed: businessDates.length,
       ordersProcessed: totalOrdersProcessed,
-      // Debug info
+      // Debug info - ENHANCED
       debug: {
         totalOrdersFromAPI: debugOrderCount,
-        ordersMarkedVoided: debugOrderCount - totalOrdersProcessed,
+        ordersVoided: totalVoidedOrders,
+        ordersDeleted: totalDeletedOrders,
+        ordersExcluded: totalVoidedOrders + totalDeletedOrders,
         basePayments: totalNetSales, // Before service charges
-        serviceCharges: totalServiceCharges,
+        serviceChargesNonGratuity: totalServiceCharges,
+        serviceChargesGratuity: totalGratuityServiceCharges,
         netSalesFromPayments: finalNetSales, // After adding service charges
         netSalesFromItems: calculatedNetSales, // Broken (3.4x inflated)
         voidedItemSales: totalVoidedItemSales,
-        paymentTypeBreakdown: paymentTypeBreakdown // NEW
+        paymentTypeBreakdown: paymentTypeBreakdown
       }
     });
 
