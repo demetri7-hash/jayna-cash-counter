@@ -126,16 +126,18 @@ export default async function handler(req, res) {
                                                payment.type !== 'HOUSE_ACCOUNT' &&
                                                payment.type !== 'UNDECLARED_CASH';
 
-                        // Debug logging for voided tips
-                        if (tipAmount > 0 && isCreditCardTip && (isVoided || isCheckVoided || isPaymentVoided)) {
-                          console.log(`VOIDED TIP FOUND: Order ${order.orderNumber}, Tip: $${tipAmount}, OrderVoided: ${isVoided}, CheckVoided: ${isCheckVoided}, PaymentVoided: ${isPaymentVoided}, RefundStatus: ${payment.refundStatus}`);
+                        // Debug logging for all voided transactions
+                        if (isVoided || isCheckVoided || isPaymentVoided) {
+                          console.log(`VOID: Order ${order.orderNumber}, Amount: $${amount}, Tip: $${tipAmount}, Type: ${payment.type}, OrderVoid: ${isVoided}, CheckVoid: ${isCheckVoided}, PaymentVoid: ${isPaymentVoided}`);
                         }
 
-                        // Add ALL payment amounts to net sales (Toast API already excludes voided amounts)
-                        // We only need to track voids for TIPS transparency
-                        totalNetSales += amount;
+                        // Only include payment amounts from NON-VOIDED orders
+                        // (voided orders still appear in API but shouldn't count toward sales)
+                        if (!isVoided && !isCheckVoided && !isPaymentVoided) {
+                          totalNetSales += amount;
+                        }
 
-                        // Handle tips separately
+                        // Handle tips separately - track ALL tips including voided for transparency
                         if (isCreditCardTip && tipAmount > 0) {
                           // Add to gross tips (all tips before voiding)
                           totalCreditTipsGross += tipAmount;
@@ -149,8 +151,8 @@ export default async function handler(req, res) {
                           }
                         }
 
-                        // Track ALL cash sales (Toast API already excludes voided amounts)
-                        if (payment.type === 'CASH') {
+                        // Track cash sales from non-voided payments only
+                        if (payment.type === 'CASH' && !isVoided && !isCheckVoided && !isPaymentVoided) {
                           totalCashSales += amount;
                         }
                       }
