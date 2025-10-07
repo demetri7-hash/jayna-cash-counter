@@ -118,33 +118,41 @@ export default async function handler(req, res) {
 
                 // CRITICAL FIX: Check BOTH voided AND deleted (Toast has two separate states!)
                 // Per Toast docs: "Exclude voided orders/checks AND deleted orders/checks"
-                const isVoided = order.voided === true;
+                // Also check guestOrderStatus and paymentStatus per Toast docs
+                const isVoided = order.voided === true ||
+                                order.guestOrderStatus === 'VOIDED' ||
+                                order.paymentStatus === 'VOIDED';
                 const isDeleted = order.deleted === true;
                 const isOrderExcluded = isVoided || isDeleted;
 
                 // Count voided and deleted separately for debugging
-                if (isVoided) totalVoidedOrders++;
+                if (order.voided === true || order.guestOrderStatus === 'VOIDED' || order.paymentStatus === 'VOIDED') {
+                  totalVoidedOrders++;
+                }
                 if (isDeleted) totalDeletedOrders++;
 
                 if (!isOrderExcluded) {
                   totalOrdersProcessed++;
                 }
 
-                // ENHANCED DEBUG: Log first 5 orders completely to see structure
+                // ENHANCED DEBUG: Log first 5 orders AND all excluded orders
                 // Use debugOrderCount to avoid logging ALL orders if none are counted
-                if (debugOrderCount <= 5) {
-                  console.log(`\n=== SAMPLE ORDER ${debugOrderCount} (${order.orderNumber}) ===`);
+                if (debugOrderCount <= 5 || isOrderExcluded) {
+                  console.log(`\n=== ${isOrderExcluded ? 'EXCLUDED' : 'SAMPLE'} ORDER ${debugOrderCount} (${order.orderNumber}) ===`);
                   console.log('Order fields:', Object.keys(order));
                   console.log('Order voided?', order.voided);
-                  console.log('Order voidDate?', order.voidDate);
-                  console.log('Order deletedDate?', order.deletedDate);
-                  console.log('Order deleted?', order.deleted);
                   console.log('Order guestOrderStatus?', order.guestOrderStatus);
                   console.log('Order paymentStatus?', order.paymentStatus);
-                  console.log('isVoided result:', isVoided);
+                  console.log('Order deleted?', order.deleted);
+                  console.log('Order voidDate?', order.voidDate);
+                  console.log('Order deletedDate?', order.deletedDate);
+                  console.log('isVoided result:', isVoided, `(voided=${order.voided}, guestOrderStatus=${order.guestOrderStatus}, paymentStatus=${order.paymentStatus})`);
+                  console.log('isDeleted result:', isDeleted);
+                  console.log('isOrderExcluded result:', isOrderExcluded);
                   if (order.checks && order.checks[0]) {
                     console.log('Check fields:', Object.keys(order.checks[0]));
                     console.log('Check voided?', order.checks[0].voided);
+                    console.log('Check deleted?', order.checks[0].deleted);
                     console.log('Check voidDate?', order.checks[0].voidDate);
                     if (order.checks[0].payments && order.checks[0].payments[0]) {
                       console.log('Payment fields:', Object.keys(order.checks[0].payments[0]));
@@ -152,6 +160,8 @@ export default async function handler(req, res) {
                       console.log('Payment voided?', order.checks[0].payments[0].voided);
                       console.log('Payment paymentStatus?', order.checks[0].payments[0].paymentStatus);
                       console.log('Payment voidInfo?', order.checks[0].payments[0].voidInfo);
+                      console.log('Payment amount?', order.checks[0].payments[0].amount);
+                      console.log('Payment tipAmount?', order.checks[0].payments[0].tipAmount);
                     }
                   }
                   console.log('=== END SAMPLE ===\n');
