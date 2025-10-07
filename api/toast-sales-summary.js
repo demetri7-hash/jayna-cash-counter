@@ -66,6 +66,11 @@ export default async function handler(req, res) {
     // Payment type breakdown for debugging
     let paymentTypeBreakdown = {};
 
+    // V6.8 DIAGNOSTIC: Track all unique payment types and exclusions
+    let allPaymentTypes = new Set();
+    let excludedCreditPayments = [];
+    let giftCardPaymentsFound = [];
+
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
     // ordersBulk gives us all payment data in paginated batches
@@ -200,10 +205,20 @@ export default async function handler(req, res) {
                       // Gift cards are DEFERRED REVENUE, not immediate sales
                       if (check.payments && Array.isArray(check.payments)) {
                         for (const payment of check.payments) {
+                          // V6.8 DIAGNOSTIC: Log all potential gift card payment types
+                          const payType = payment.type || 'UNKNOWN';
+                          if (payType.toLowerCase().includes('gift') || payType.toLowerCase().includes('card')) {
+                            giftCardPaymentsFound.push({
+                              type: payType,
+                              amount: payment.amount || 0,
+                              order: order.orderNumber
+                            });
+                          }
+
                           if (payment.type === 'GIFTCARD' || payment.type === 'GIFT_CARD') {
                             const giftCardAmount = payment.amount || 0;
                             checkAmount -= giftCardAmount;
-                            console.log(`💳 EXCLUDING GIFT CARD from net sales: $${giftCardAmount} (deferred revenue)`);
+                            console.log(`💳 EXCLUDING GIFT CARD from net sales: $${giftCardAmount} Type="${payment.type}" Order=${order.orderNumber}`);
                           }
                         }
                       }
@@ -278,6 +293,9 @@ export default async function handler(req, res) {
                         const tipAmount = payment.tipAmount || 0;
                         const amount = payment.amount || 0;
 
+                        // V6.8 DIAGNOSTIC: Track all payment types we encounter
+                        allPaymentTypes.add(payment.type || 'UNKNOWN');
+
                         // CRITICAL FIX: PARTIAL refunds need special handling!
                         // Toast docs: "For partial refunds, only subtract the refunded amount"
                         // V6.7: Also exclude DENIED payments (failed credit card authorizations)
@@ -285,6 +303,21 @@ export default async function handler(req, res) {
                                              payment.refundStatus === 'FULL' ||
                                              payment.paymentStatus === 'VOIDED' ||
                                              payment.paymentStatus === 'DENIED';
+
+                        // V6.8 DIAGNOSTIC: Track excluded CREDIT payments specifically
+                        if (payment.type === 'CREDIT' && (isOrderExcluded || isCheckExcluded || isFullyVoided)) {
+                          excludedCreditPayments.push({
+                            amount: amount,
+                            tipAmount: tipAmount,
+                            paymentStatus: payment.paymentStatus,
+                            refundStatus: payment.refundStatus,
+                            voided: payment.voided,
+                            orderVoided: order.voided,
+                            checkVoided: check.voided,
+                            orderNumber: order.orderNumber,
+                            reason: isOrderExcluded ? 'OrderExcluded' : isCheckExcluded ? 'CheckExcluded' : 'PaymentVoided'
+                          });
+                        }
 
                         const isPartiallyRefunded = payment.refundStatus === 'PARTIAL';
 
@@ -405,6 +438,34 @@ export default async function handler(req, res) {
     const finalNetSales = totalNetSales;
 
     console.log(`\n=== SALES SUMMARY COMPLETE ===`);
+
+    // V6.8 DIAGNOSTIC OUTPUT
+    console.log(`\n🔍 V6.8 DIAGNOSTICS:`);
+    console.log(`\nAll Payment Types Found: ${Array.from(allPaymentTypes).join(', ')}`);
+
+    console.log(`\n💳 Gift Card Payments Found (${giftCardPaymentsFound.length}):`);
+    if (giftCardPaymentsFound.length > 0) {
+      giftCardPaymentsFound.forEach(gc => {
+        console.log(`  Type="${gc.type}" Amount=$${gc.amount} Order=${gc.order}`);
+      });
+    } else {
+      console.log('  NONE FOUND - This is why $40 not excluded!');
+    }
+
+    console.log(`\n❌ Excluded CREDIT Payments (${excludedCreditPayments.length}):`);
+    let totalExcludedAmount = 0;
+    let totalExcludedTips = 0;
+    if (excludedCreditPayments.length > 0) {
+      excludedCreditPayments.forEach(excl => {
+        totalExcludedAmount += excl.amount;
+        totalExcludedTips += excl.tipAmount;
+        console.log(`  Amount=$${excl.amount} Tip=$${excl.tipAmount} Status=${excl.paymentStatus} Reason=${excl.reason} Order=${excl.orderNumber}`);
+      });
+      console.log(`  TOTAL EXCLUDED: Amount=$${totalExcludedAmount.toFixed(2)} Tips=$${totalExcludedTips.toFixed(2)}`);
+    } else {
+      console.log('  NONE - No CREDIT payments excluded');
+    }
+
     console.log(`\nPayment Type Breakdown (includes tips):`);
     for (const [type, data] of Object.entries(paymentTypeBreakdown)) {
       console.log(`  ${type}: ${data.count} payments, $${data.amount.toFixed(2)} amount, $${data.tips.toFixed(2)} tips`);
@@ -434,7 +495,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.7-exclude-denied-payments-20251007-0700', // Exclude DENIED payments (failed credit card authorizations)
+      version: 'v6.8-full-diagnostics-20251007-0715', // Comprehensive diagnostics to identify gift card type and over-exclusion
       dateRange: {
         start: startDate,
         end: endDate
