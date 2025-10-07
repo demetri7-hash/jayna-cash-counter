@@ -328,21 +328,22 @@ export default async function handler(req, res) {
                           }
                         }
 
-                        // V6.4 DIAGNOSTIC: Log ALL payments with tips to identify missing $70.40
-                        if (tipAmount > 0 && !isOrderExcluded && !isCheckExcluded && !isFullyVoided) {
-                          console.log(`💰 TIP FOUND: Type="${payment.type}" Amount=$${tipAmount} Counted=${isCreditCardTip} Order=${order.orderNumber}`);
+                        // V6.6 DIAGNOSTIC: Track ALL CREDIT payments with tips (included and excluded)
+                        if (payment.type === 'CREDIT' && tipAmount > 0) {
+                          if (isOrderExcluded || isCheckExcluded || isFullyVoided) {
+                            console.log(`❌ CREDIT TIP EXCLUDED: Tip=$${tipAmount} Order=${order.orderNumber}`);
+                            console.log(`   Reasons: OrderVoid=${isOrderExcluded}, CheckVoid=${isCheckExcluded}, PaymentVoid=${isFullyVoided}`);
+                            console.log(`   Amount=$${amount} RefundStatus=${payment.refundStatus} PaymentStatus=${payment.paymentStatus}`);
+                          }
                         }
 
-                        // V6.5 DIAGNOSTIC: Log OTHER payment details to identify credit-like vs delivery platforms
-                        if (payment.type === 'OTHER' && !isOrderExcluded && !isCheckExcluded && !isFullyVoided) {
-                          console.log(`🔍 OTHER PAYMENT: Amount=$${amount} Tip=$${tipAmount} Order=${order.orderNumber}`);
-                          console.log(`   otherPayment fields:`, payment.otherPayment ? Object.keys(payment.otherPayment) : 'null');
-                          if (payment.otherPayment) {
-                            console.log(`   otherPayment.type: ${payment.otherPayment.type || 'undefined'}`);
-                            console.log(`   otherPayment.name: ${payment.otherPayment.name || 'undefined'}`);
+                        // V6.6 DIAGNOSTIC: Track CREDIT payment counts and totals
+                        if (payment.type === 'CREDIT' && !isOrderExcluded && !isCheckExcluded && !isFullyVoided) {
+                          // This is a CREDIT payment that passes all filters - log if it has unusual characteristics
+                          if (tipAmount > 0 && (payment.refundStatus !== 'NONE' || payment.paymentStatus !== 'CAPTURED')) {
+                            console.log(`⚠️ CREDIT TIP with unusual status: Tip=$${tipAmount} Order=${order.orderNumber}`);
+                            console.log(`   RefundStatus=${payment.refundStatus} PaymentStatus=${payment.paymentStatus}`);
                           }
-                          console.log(`   cardType: ${payment.cardType || 'undefined'}`);
-                          console.log(`   cardProcessorType: ${payment.cardProcessorType || 'undefined'}`);
                         }
 
                         // Handle tips separately - track ALL tips including voided for transparency
@@ -420,15 +421,16 @@ export default async function handler(req, res) {
     const finalNetSales = totalNetSales;
 
     console.log(`\n=== SALES SUMMARY COMPLETE ===`);
-    console.log(`\n💰 V6.4 DIAGNOSTIC: Check logs above for all tips by payment type`);
+    console.log(`\n💰 V6.6 DIAGNOSTIC: Check logs above for EXCLUDED CREDIT TIPS (❌) and UNUSUAL CREDIT TIPS (⚠️)`);
     console.log(`\nPayment Type Breakdown (includes tips):`);
     for (const [type, data] of Object.entries(paymentTypeBreakdown)) {
       console.log(`  ${type}: ${data.count} payments, $${data.amount.toFixed(2)} amount, $${data.tips.toFixed(2)} tips`);
     }
-    console.log(`\n🎯 CREDIT TIPS ANALYSIS:`);
-    console.log(`  Current (excluding OTHER/CASH/HOUSE_ACCOUNT): $${totalCreditTips.toFixed(2)}`);
-    console.log(`  Toast Sales Summary shows: $2,675.93`);
-    console.log(`  Discrepancy: $${(2675.93 - totalCreditTips).toFixed(2)} ${totalCreditTips < 2675.93 ? 'MISSING' : 'EXTRA'}`);
+    console.log(`\n🎯 CREDIT TIPS ANALYSIS (CREDIT type only, excluding OTHER):`);
+    console.log(`  Our API shows: ${paymentTypeBreakdown['CREDIT']?.count || 0} CREDIT payments with $${totalCreditTips.toFixed(2)} tips`);
+    console.log(`  Toast shows: 880 CREDIT payments with $2,675.93 tips`);
+    console.log(`  Payment count difference: ${(paymentTypeBreakdown['CREDIT']?.count || 0) - 880} payments`);
+    console.log(`  Tips discrepancy: $${(2675.93 - totalCreditTips).toFixed(2)} ${totalCreditTips < 2675.93 ? 'MISSING' : 'EXTRA'}`);
     console.log(`\nDEBUG: Total orders from API: ${debugOrderCount}`);
     console.log(`  Orders Processed (active): ${totalOrdersProcessed}`);
     console.log(`  Orders VOIDED (order-level): ${totalVoidedOrders}`);
@@ -454,7 +456,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.5-diagnostic-other-20251007-0630', // Diagnostic logging for OTHER payment details
+      version: 'v6.6-diagnostic-credit-exclusions-20251007-0645', // Track excluded CREDIT tips to find missing $70.40
       dateRange: {
         start: startDate,
         end: endDate
