@@ -574,7 +574,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.13-comprehensive-credit-analysis-20251007-0800', // Track ALL CREDIT payments + future order detection
+      version: 'v6.14-detect-prepaid-future-orders-20251007-0805', // Detect pre-paid future orders (paid outside date range)
       dateRange: {
         start: startDate,
         end: endDate
@@ -667,6 +667,24 @@ export default async function handler(req, res) {
                    p.source === 'ONLINE_ORDERING' ||
                    p.source === 'CATERING';
           }),
+          // V6.14 CRITICAL: Pre-paid future orders (paid BEFORE our date range)
+          prePaidFutureOrders: (() => {
+            const startDate = parseInt(businessDates[0].replace(/-/g, ''));
+            const endDate = parseInt(businessDates[businessDates.length - 1].replace(/-/g, ''));
+            const prePaid = allCreditPayments.filter(p => {
+              const paidBizDate = p.paidBusinessDate;
+              return paidBizDate && (paidBizDate < startDate || paidBizDate > endDate);
+            });
+            return {
+              count: prePaid.length,
+              totalAmount: prePaid.reduce((sum, p) => sum + p.amount, 0),
+              totalTips: prePaid.reduce((sum, p) => sum + p.tipAmount, 0),
+              payments: prePaid,
+              message: prePaid.length > 0
+                ? `FOUND ${prePaid.length} pre-paid orders! These may need exclusion.`
+                : 'No pre-paid future orders found'
+            };
+          })(),
           bySource: {
             ONLINE_ORDERING: allCreditPayments.filter(p => p.source === 'ONLINE_ORDERING').length,
             CATERING: allCreditPayments.filter(p => p.source === 'CATERING').length,
