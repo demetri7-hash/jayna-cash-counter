@@ -1060,29 +1060,9 @@
         </div>
         
         <div class="form-group">
-          <label for="tdsDriverTips">TDS Driver Tips for the Week (Auto-Calculated):</label>
-          
-          <!-- Auto-calculated display section -->
-          <div style="background: #d4edda; border: 2px solid #28a745; border-radius: 0; padding: 20px; margin-bottom: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-              <span style="font-weight: 700; color: #155724; font-size: 16px;">🤖 Auto-Calculated from Toast API</span>
-              <span style="background: #28a745; color: white; padding: 6px 12px; border-radius: 0; font-size: 12px; font-weight: 600;">
-                NET TIPS
-              </span>
-            </div>
-            
-            <div style="text-align: center; margin: 15px 0;">
-              <div style="font-size: 32px; font-weight: bold; color: #155724; margin-bottom: 8px;" id="autoTdsAmount">Click "Calculate Tip Pool" to fetch</div>
-              <div style="font-size: 14px; color: #155724; font-weight: 500;" id="autoTdsDetails">Will auto-calculate when you process tip pool</div>
-            </div>
-            
-            <div style="background: rgba(21, 87, 36, 0.1); padding: 10px; border-radius: 0; font-size: 13px; color: #155724;">
-              <strong>ℹ️ Smart Calculation:</strong> Automatically fetches TDS Driver delivery tips for your selected date range, excluding voided/refunded orders for accurate net amounts.
-            </div>
-          </div>
-          
-          <!-- Hidden field for form processing -->
-          <input type="hidden" id="tdsDriverTips" value="0">
+          <label for="tdsDriverTips">TDS Driver Tips for the Week ($):</label>
+          <input type="number" id="tdsDriverTips" class="form-input" step="0.01" readonly style="background: #f8f9fa; color: #666;">
+          <div id="tdsAutoFetchStatus" style="font-size: 14px; color: #666; margin-top: 5px;">Auto-calculated from Toast API when you calculate tip pool</div>
         </div>
         
         <div class="form-group">
@@ -6234,8 +6214,7 @@
     };
     
     // Reset UI
-    document.getElementById('autoTdsAmount').textContent = 'Not calculated';
-    document.getElementById('autoTdsDetails').textContent = 'Enter date range to auto-calculate TDS Driver tips';
+    document.getElementById('tdsAutoFetchStatus').innerHTML = '<span style="color: #666;">Auto-calculated from Toast API when you calculate tip pool</span>';
     document.getElementById('tdsDriverTips').value = '0';
   }
 
@@ -6276,8 +6255,7 @@
     tdsDataStatus.error = null;
     
     // Update UI to show fetching
-    document.getElementById('autoTdsAmount').textContent = 'Fetching...';
-    document.getElementById('autoTdsDetails').textContent = 'Auto-calculating TDS Driver tips for selected date range...';
+    document.getElementById('tdsAutoFetchStatus').innerHTML = '<span style="color: #666;">Fetching TDS driver tips...</span>';
     updateCalculateButtonState();
     
     try {
@@ -6364,11 +6342,9 @@
       tdsDataStatus.hasData = true;
       tdsDataStatus.data = totalNetTips;
       
-      // Update the hidden field and UI
+      // Update the field and UI
       document.getElementById('tdsDriverTips').value = totalNetTips.toFixed(2);
-      document.getElementById('autoTdsAmount').textContent = `$${totalNetTips.toFixed(2)}`;
-      document.getElementById('autoTdsDetails').textContent = 
-        `${totalOrderCount} TDS Driver orders • Server GUID filtering • Net: $${totalNetTips.toFixed(2)} • Comprehensive analysis method`;
+      document.getElementById('tdsAutoFetchStatus').innerHTML = `<span style="color: #28a745;">✓ Loaded: $${totalNetTips.toFixed(2)} from ${totalOrderCount} TDS orders</span>`;
       
       console.log('TDS Driver tips auto-fetched successfully:', totalNetTips);
       
@@ -6379,9 +6355,8 @@
       tdsDataStatus.error = tdsError.message;
       
       // Update UI to show error but allow calculation to proceed with 0
-      document.getElementById('autoTdsAmount').textContent = 'API Error';
-      document.getElementById('autoTdsDetails').textContent = `Failed to auto-fetch: ${tdsError.message}`;
-      
+      document.getElementById('tdsAutoFetchStatus').innerHTML = `<span style="color: #dc3545;">Failed to fetch TDS tips: ${tdsError.message}</span>`;
+
       // Use 0 for TDS tips if auto-fetch fails
       document.getElementById('tdsDriverTips').value = '0';
     }
@@ -7783,10 +7758,40 @@
           if (!hasNotes) {
             doc.setTextColor(150, 150, 150);
             doc.text('No notes for this period', leftBoxX + boxWidth / 2, currentY + 70, { align: 'center' });
+            notesY = currentY + 80; // Position for custom notes
           }
         } else {
           doc.setTextColor(150, 150, 150);
           doc.text('No notes available', leftBoxX + boxWidth / 2, currentY + 70, { align: 'center' });
+          notesY = currentY + 80; // Position for custom notes
+        }
+
+        // Add custom tip pool notes if available
+        if (tipPoolSummary && tipPoolSummary.customNotes && tipPoolSummary.customNotes.trim()) {
+          // Add separator line if there were daily notes
+          if (notesY > currentY + 30) {
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.line(leftBoxX + 10, notesY - 5, leftBoxX + boxWidth - 10, notesY - 5);
+          }
+
+          // Custom notes header
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7);
+          doc.setTextColor(0, 0, 0);
+          doc.text('TIP POOL NOTES:', leftBoxX + 5, notesY + 5);
+          notesY += 12;
+
+          // Custom notes content
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
+          const noteLines = doc.splitTextToSize(tipPoolSummary.customNotes.trim(), boxWidth - 10);
+          noteLines.forEach(line => {
+            if (notesY < currentY + boxHeight - 5) {
+              doc.text(line, leftBoxX + 5, notesY);
+              notesY += 8;
+            }
+          });
         }
 
         // Right box content - Labor Summary
@@ -7864,12 +7869,17 @@
           doc.setTextColor(borderColor[0], borderColor[1], borderColor[2]);
           doc.text(`${ld.laborPercentage.toFixed(2)}%`, rightBoxX + boxWidth / 2, percentBoxY + 36, { align: 'center' });
 
-          // Variance
+          // Variance and benchmark
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(6);
+          doc.setTextColor(100, 100, 100);
+          doc.text('Target: 30.00%', rightBoxX + boxWidth / 2, percentBoxY + 42, { align: 'center' });
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6);
           doc.setTextColor(0, 0, 0);
-          const varianceText = `Variance: ${ld.laborVariance > 0 ? '+' : ''}${ld.laborVariance.toFixed(2)}% ${isOverBudget ? 'OVER' : 'UNDER'}`;
-          doc.text(varianceText, rightBoxX + boxWidth / 2, percentBoxY + 45, { align: 'center' });
+          const varianceText = `${ld.laborVariance > 0 ? '+' : ''}${ld.laborVariance.toFixed(2)}% ${isOverBudget ? 'OVER' : 'UNDER'}`;
+          doc.text(varianceText, rightBoxX + boxWidth / 2, percentBoxY + 48, { align: 'center' });
 
         } else {
           doc.setTextColor(150, 150, 150);

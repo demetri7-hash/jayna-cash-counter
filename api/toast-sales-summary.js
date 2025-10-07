@@ -55,80 +55,112 @@ export default async function handler(req, res) {
 
         let page = 1;
         let hasMorePages = true;
+        let retryCount = 0;
+        const maxRetries = 3;
 
         while (hasMorePages) {
           const ordersUrl = `${toastApiUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&page=${page}&pageSize=100`;
 
-          const ordersResponse = await fetch(ordersUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Toast-Restaurant-External-ID': restaurantId,
-              'Content-Type': 'application/json'
-            }
-          });
+          try {
+            const ordersResponse = await fetch(ordersUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Toast-Restaurant-External-ID': restaurantId,
+                'Content-Type': 'application/json'
+              }
+            });
 
-          if (!ordersResponse.ok) {
-            console.error(`Failed to fetch orders for ${businessDate}, page ${page}: ${ordersResponse.status}`);
-            break;
-          }
-
-          const orders = await ordersResponse.json();
-
-          if (Array.isArray(orders) && orders.length > 0) {
-            console.log(`${businessDate} Page ${page}: ${orders.length} orders`);
-
-            // Process each order
-            for (const order of orders) {
-              // Skip voided orders
-              if (order.voided || order.voidDate) {
-                continue;
+            if (!ordersResponse.ok) {
+              // If rate limited, retry with exponential backoff
+              if (ordersResponse.status === 429 && retryCount < maxRetries) {
+                const backoffDelay = 1000 * Math.pow(2, retryCount);
+                console.log(`Rate limited on ${businessDate} page ${page}, retrying in ${backoffDelay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                retryCount++;
+                continue; // Retry same page
               }
 
-              totalOrdersProcessed++;
+              console.error(`Failed to fetch orders for ${businessDate}, page ${page}: ${ordersResponse.status}`);
+              break;
+            }
 
-              // Process payments within checks
-              if (order.checks && Array.isArray(order.checks)) {
-                for (const check of order.checks) {
-                  if (check.payments && Array.isArray(check.payments)) {
-                    for (const payment of check.payments) {
-                      // Skip voided/refunded payments
-                      if (payment.voidInfo || payment.refundStatus === 'REFUNDED') {
-                        continue;
-                      }
+            const orders = await ordersResponse.json();
+            retryCount = 0; // Reset retry count on success
 
-                      const tipAmount = payment.tipAmount || 0;
-                      const amount = payment.amount || 0;
+            if (Array.isArray(orders) && orders.length > 0) {
+              console.log(`${businessDate} Page ${page}: ${orders.length} orders (total processed: ${totalOrdersProcessed})`);
 
-                      // Net sales = sum of all payment amounts (including tips)
-                      totalNetSales += amount + tipAmount;
+              // Process each order
+              for (const order of orders) {
+                // Skip voided orders
+                if (order.voided || order.voidDate) {
+                  continue;
+                }
 
-                      // Categorize by payment type
-                      if (payment.type === 'CASH') {
-                        totalCashSales += amount;
-                      } else {
-                        // All non-cash payment tips
-                        totalCreditTips += tipAmount;
+                totalOrdersProcessed++;
+
+                // Process payments within checks
+                if (order.checks && Array.isArray(order.checks)) {
+                  for (const check of order.checks) {
+                    if (check.payments && Array.isArray(check.payments)) {
+                      for (const payment of check.payments) {
+                        const tipAmount = payment.tipAmount || 0;
+                        const amount = payment.amount || 0;
+
+                        // Skip voided/refunded payments (same logic as TDS API)
+                        if (payment.refundStatus === 'FULL' || payment.refundStatus === 'PARTIAL' ||
+                            payment.refundStatus === 'REFUNDED' || payment.voided ||
+                            payment.paymentStatus === 'VOIDED' || payment.voidInfo) {
+                          console.log(`Skipping voided/refunded payment: ${payment.type} $${amount} tip:$${tipAmount}`);
+                          continue;
+                        }
+
+                        // Net sales = sum of all payment amounts (including tips)
+                        totalNetSales += amount + tipAmount;
+
+                        // Categorize by payment type
+                        if (payment.type === 'CASH') {
+                          totalCashSales += amount;
+                        } else {
+                          // All non-cash payment tips
+                          totalCreditTips += tipAmount;
+                        }
                       }
                     }
                   }
                 }
               }
-            }
 
-            page++;
+              page++;
 
-            // If less than 100 orders, we're done with this date
-            if (orders.length < 100) {
+              // If less than 100 orders, we're done with this date
+              if (orders.length < 100) {
+                hasMorePages = false;
+              }
+            } else {
               hasMorePages = false;
             }
-          } else {
-            hasMorePages = false;
-          }
 
-          // Small delay between pages to avoid rate limits
-          await new Promise(resolve => setTimeout(resolve, 100));
+            // Longer delay between pages to avoid rate limits (increased from 100ms to 300ms)
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+          } catch (fetchError) {
+            console.error(`Error fetching page ${page} for ${businessDate}:`, fetchError.message);
+            // Retry logic for network errors
+            if (retryCount < maxRetries) {
+              const backoffDelay = 1000 * Math.pow(2, retryCount);
+              console.log(`Retrying in ${backoffDelay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, backoffDelay));
+              retryCount++;
+              continue;
+            }
+            break;
+          }
         }
+
+        // Delay between dates to further avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (dateError) {
         console.error(`Error processing date ${dateStr}:`, dateError.message);

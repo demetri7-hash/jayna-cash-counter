@@ -48,52 +48,84 @@ export default async function handler(req, res) {
       dateRange.push(d.toISOString().split('T')[0]);
     }
 
-    // Fetch orders for each date (EXACT same pagination logic as comprehensive analysis)
+    // Fetch orders for each date with improved pagination and retry logic
     for (const date of dateRange) {
       const businessDate = date.replace(/-/g, '');
       console.log(`Fetching TDS orders for ${businessDate}...`);
-      
+
       let page = 1;
       let hasMorePages = true;
       const pageSize = 100;
-      
+      let retryCount = 0;
+      const maxRetries = 3;
+
       while (hasMorePages) {
         const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&page=${page}&pageSize=${pageSize}`;
-        
-        const ordersResponse = await fetch(ordersUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
-            'Content-Type': 'application/json'
+
+        try {
+          const ordersResponse = await fetch(ordersUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!ordersResponse.ok) {
+            // If rate limited, retry with exponential backoff
+            if (ordersResponse.status === 429 && retryCount < maxRetries) {
+              const backoffDelay = 1000 * Math.pow(2, retryCount);
+              console.log(`Rate limited on ${businessDate} page ${page}, retrying in ${backoffDelay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, backoffDelay));
+              retryCount++;
+              continue; // Retry same page
+            }
+
+            console.error(`Failed to fetch orders for ${businessDate}, page ${page}: ${ordersResponse.status}`);
+            break;
           }
-        });
 
-        if (!ordersResponse.ok) {
-          console.error(`Failed to fetch orders for ${businessDate}, page ${page}: ${ordersResponse.status}`);
-          break;
-        }
+          const pageOrders = await ordersResponse.json();
+          retryCount = 0; // Reset retry count on success
 
-        const pageOrders = await ordersResponse.json();
-        
-        if (Array.isArray(pageOrders) && pageOrders.length > 0) {
-          allOrders = allOrders.concat(pageOrders);
-          console.log(`${businessDate} Page ${page}: ${pageOrders.length} orders (Total: ${allOrders.length})`);
-          
-          if (pageOrders.length === pageSize) {
-            page++;
+          if (Array.isArray(pageOrders) && pageOrders.length > 0) {
+            allOrders = allOrders.concat(pageOrders);
+            console.log(`${businessDate} Page ${page}: ${pageOrders.length} orders (Total: ${allOrders.length})`);
+
+            if (pageOrders.length === pageSize) {
+              page++;
+            } else {
+              hasMorePages = false;
+            }
           } else {
             hasMorePages = false;
           }
-        } else {
-          hasMorePages = false;
-        }
-        
-        if (page > 50) {
-          console.warn(`Max pages reached for ${businessDate}`);
-          hasMorePages = false;
+
+          // Delay between pages to avoid rate limits (300ms like sales API)
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          if (page > 50) {
+            console.warn(`Max pages reached for ${businessDate}`);
+            hasMorePages = false;
+          }
+
+        } catch (fetchError) {
+          console.error(`Error fetching page ${page} for ${businessDate}:`, fetchError.message);
+          // Retry logic for network errors
+          if (retryCount < maxRetries) {
+            const backoffDelay = 1000 * Math.pow(2, retryCount);
+            console.log(`Retrying in ${backoffDelay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+            retryCount++;
+            continue;
+          }
+          break;
         }
       }
+
+      // Delay between dates to further avoid rate limits
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     console.log(`TOTAL ORDERS RETRIEVED: ${allOrders.length}`);
