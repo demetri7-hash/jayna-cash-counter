@@ -6452,32 +6452,69 @@
 
     // Update status indicator
     const statusDiv = document.getElementById('autoFetchStatus');
-    statusDiv.innerHTML = '<span style="color: #666;">Fetching data from Toast...</span>';
+    statusDiv.innerHTML = '<span style="color: #666;">Checking for data...</span>';
 
     try {
-      // Step 1: Get Toast API access token
-      console.log('Auto-fetching Toast data...');
+      // STEP 1: Try database first (instant if data exists)
+      console.log('Checking database for sales data...');
+      document.getElementById('loadingText').textContent = 'Checking database...';
+      document.getElementById('loadingSubtext').textContent = 'Looking for automatically imported Toast data';
+
+      const dbResponse = await fetch(`/api/get-daily-sales?startDate=${startDate}&endDate=${endDate}`);
+      const dbResult = await dbResponse.json();
+
+      if (dbResult.success && dbResult.hasData) {
+        // Found data in database! Use it.
+        console.log('✓ Found data in database:', dbResult);
+        statusDiv.innerHTML = `<span style="color: #28a745;">✓ Data loaded from database (${dbResult.daysFound} days, automated import)</span>`;
+
+        // Still need labor data from API
+        document.getElementById('loadingText').textContent = 'Fetching labor data from Toast...';
+        document.getElementById('loadingSubtext').textContent = 'Getting employee hours...';
+
+        const authResponse = await fetch('/api/toast-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        const authData = await authResponse.json();
+        const token = authData.data.accessToken;
+
+        const laborResponse = await fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`);
+        const laborResult = await laborResponse.json();
+
+        // Store data globally
+        apiFetchedData.laborData = laborResult.employees;
+        apiFetchedData.laborData.totalLaborCost = laborResult.totalLaborCost;
+        apiFetchedData.salesData = {
+          creditTips: dbResult.data.creditTips,
+          creditTipsGross: dbResult.data.creditTips,
+          voidedTips: 0,
+          discounts: 0,
+          tipsOnDiscountedChecks: 0,
+          cashSales: dbResult.data.cashSales,
+          netSales: dbResult.data.netSales
+        };
+
+        console.log('Auto-fetch complete (database + API labor):', { laborResult, salesData: dbResult.data });
+        loadingOverlay.style.display = 'none';
+        return;
+      }
+
+      // STEP 2: No database data - fall back to Toast API
+      console.log('No database data found, fetching from Toast API...');
+      statusDiv.innerHTML = '<span style="color: #ffc107;">⚠ No database data - fetching from Toast API (slower)...</span>';
+
       document.getElementById('loadingText').textContent = 'Authenticating with Toast API...';
+      document.getElementById('loadingSubtext').textContent = 'No automated data available for this date range';
+
       const authResponse = await fetch('/api/toast-auth', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' }
       });
 
-      if (!authResponse.ok) {
-        throw new Error('Authentication failed');
-      }
-
+      if (!authResponse.ok) throw new Error('Authentication failed');
       const authData = await authResponse.json();
-
-      if (!authData.success || !authData.data?.accessToken) {
-        throw new Error('Failed to get access token');
-      }
-
+      if (!authData.success || !authData.data?.accessToken) throw new Error('Failed to get access token');
       const token = authData.data.accessToken;
 
-      // Step 2: Fetch labor and sales data in parallel
+      // Fetch labor and sales data from API
       document.getElementById('loadingText').textContent = 'Fetching labor and payment data...';
       document.getElementById('loadingSubtext').textContent = 'Processing hundreds of payments - this takes 1-2 minutes';
 
@@ -6486,9 +6523,7 @@
         fetch(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`)
       ]);
 
-      if (!laborResponse.ok || !salesResponse.ok) {
-        throw new Error('Failed to fetch data');
-      }
+      if (!laborResponse.ok || !salesResponse.ok) throw new Error('Failed to fetch data');
 
       const [laborResult, salesResult] = await Promise.all([
         laborResponse.json(),
@@ -6509,9 +6544,9 @@
       };
 
       // Show subtle success indicator
-      statusDiv.innerHTML = `<span style="color: #28a745;">✓ Data loaded: ${laborResult.employeesCount} employees, $${salesResult.creditTips.toFixed(2)} credit tips</span>`;
+      statusDiv.innerHTML = `<span style="color: #28a745;">✓ Data loaded from API: ${laborResult.employeesCount} employees, $${salesResult.creditTips.toFixed(2)} credit tips</span>`;
 
-      console.log('Auto-fetch complete:', { laborResult, salesResult });
+      console.log('Auto-fetch complete (API fallback):', { laborResult, salesResult });
 
       // Display enhanced sales summary
       console.log(`\n=== SALES SUMMARY ===`);
