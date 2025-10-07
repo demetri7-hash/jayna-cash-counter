@@ -3,21 +3,25 @@
 
 export default async function handler(req, res) {
   // Enable CORS
-  res.setHeader('Access-Control-Allow-Origin', 'https://jayna-cash-counter.vercel.app');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
 
-  if (req.method !== 'POST') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { accessToken, startDate, endDate } = req.body;
+    // Support both GET (query params) and POST (body) for compatibility
+    const accessToken = req.method === 'GET' ? req.query.token : req.body.accessToken;
+    const startDate = req.method === 'GET' ? req.query.startDate : req.body.startDate;
+    const endDate = req.method === 'GET' ? req.query.endDate : req.body.endDate;
 
     if (!accessToken || !startDate || !endDate) {
       return res.status(400).json({
@@ -260,12 +264,14 @@ export default async function handler(req, res) {
 
       // Tips from Payments endpoint (best practice)
       creditTips: creditTips,
+      creditTipsGross: creditTips + voidedTips, // For frontend compatibility
       creditAmount: creditAmount,
       creditCount: creditCount,
       cashSales: cashSales,
       otherSales: otherSales,
       otherTips: otherTips,
       voidedTips: voidedTips,
+      tipsOnDiscountedChecks: 0, // Not calculated with Payments endpoint approach
       deniedPayments: deniedPayments,
 
       // Card type breakdown
