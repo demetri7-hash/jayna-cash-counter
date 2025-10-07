@@ -29,16 +29,27 @@ export default async function handler(req, res) {
 
     console.log(`Fetching sales summary for ${startDate} to ${endDate}`);
 
-    // Parse dates to get business date range
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const businessDates = [];
+    // CRITICAL FIX: Parse user's target date range for filtering payments
+    const targetStart = new Date(startDate);
+    const targetEnd = new Date(endDate);
+    const targetStartBizDate = parseInt(startDate.replace(/-/g, ''));
+    const targetEndBizDate = parseInt(endDate.replace(/-/g, ''));
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    // EXPANDED FETCH RANGE: Fetch orders 7 days before to 30 days after
+    // This captures pre-paid future orders (e.g., catering paid Sept 30, fulfilled Oct 12)
+    const fetchStart = new Date(targetStart);
+    fetchStart.setDate(fetchStart.getDate() - 7);
+    const fetchEnd = new Date(targetEnd);
+    fetchEnd.setDate(fetchEnd.getDate() + 30);
+
+    const businessDates = [];
+    for (let d = new Date(fetchStart); d <= fetchEnd; d.setDate(d.getDate() + 1)) {
       businessDates.push(d.toISOString().split('T')[0]);
     }
 
-    console.log(`Processing ${businessDates.length} business dates`);
+    console.log(`TARGET range: ${startDate} to ${endDate} (${targetStartBizDate} to ${targetEndBizDate})`);
+    console.log(`FETCH range: ${fetchStart.toISOString().split('T')[0]} to ${fetchEnd.toISOString().split('T')[0]} (${businessDates.length} days)`);
+    console.log(`Will filter payments by paidBusinessDate to match Toast Sales Summary`);
 
     let totalNetSales = 0;
     let totalCreditTips = 0;
@@ -341,6 +352,25 @@ export default async function handler(req, res) {
                         const tipAmount = payment.tipAmount || 0;
                         const amount = payment.amount || 0;
 
+                        // V7.0 CRITICAL FIX: Filter by paidBusinessDate to match Toast Sales Summary
+                        // This captures pre-paid future orders (e.g., catering paid Sept 30, fulfilled Oct 12)
+                        const paymentPaidBizDate = payment.paidBusinessDate;
+                        if (paymentPaidBizDate) {
+                          const isOutsideTargetRange = paymentPaidBizDate < targetStartBizDate || paymentPaidBizDate > targetEndBizDate;
+
+                          if (isOutsideTargetRange) {
+                            // Log excluded payments for transparency
+                            if (amount > 0 || tipAmount > 0) {
+                              console.log(`[V7.0] Excluding payment outside target paid date range:
+                                paidBusinessDate=${paymentPaidBizDate} (target: ${targetStartBizDate}-${targetEndBizDate})
+                                amount=$${amount}, tip=$${tipAmount}
+                                type=${payment.type}, cardType=${payment.cardType}
+                                orderNumber=${order.orderNumber}, businessDate=${order.businessDate}`);
+                            }
+                            continue; // Skip this payment - paid outside target range
+                          }
+                        }
+
                         // V6.8 DIAGNOSTIC: Track all payment types we encounter
                         allPaymentTypes.add(payment.type || 'UNKNOWN');
 
@@ -606,7 +636,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.16-comprehensive-payment-breakdown-20251007-0825', // Track ALL payments by type + card breakdown
+      version: 'v7.0-paidBusinessDate-filtering-20251007-1030', // Filter by paidBusinessDate to match Toast Sales Summary exactly
       dateRange: {
         start: startDate,
         end: endDate
