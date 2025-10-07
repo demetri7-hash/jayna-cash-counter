@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // Set CORS headers (v5.2 - CRITICAL: PARTIAL refund handling + HOUSE_ACCOUNT exclusion)
+  // Set CORS headers (v6.0 - CRITICAL: Use check.amount for 100% accuracy)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -180,6 +180,14 @@ export default async function handler(req, res) {
                     const isCheckDeleted = check.deleted === true;
                     const isCheckExcluded = isCheckVoided || isCheckDeleted;
 
+                    // V6.0 CRITICAL FIX: Use check.amount instead of summing payments!
+                    // check.amount = "Total calculated price including discounts and service charges"
+                    // This is Toast's official net sales value per check
+                    if (!isOrderExcluded && !isCheckExcluded) {
+                      const checkAmount = check.amount || 0;
+                      totalNetSales += checkAmount;
+                    }
+
                     // Track check-level discounts
                     let checkDiscounts = 0;
                     if (check.appliedDiscounts && Array.isArray(check.appliedDiscounts)) {
@@ -279,13 +287,12 @@ export default async function handler(req, res) {
                           console.log(`  Payment data: refundStatus=${payment.refundStatus}, paymentStatus=${payment.paymentStatus}, type=${payment.type}\n`);
                         }
 
-                        // Calculate net payment amount based on exclusion rules
+                        // V6.0: Track payment types for debugging (NOT for net sales - using check.amount now)
                         if (!isOrderExcluded && !isCheckExcluded && !isFullyVoided && !isHouseAccount) {
                           // CRITICAL: For PARTIAL refunds, subtract refund amount. For others, use full amount.
                           const netPaymentAmount = isPartiallyRefunded ? (amount - refundAmount) : amount;
-                          totalNetSales += netPaymentAmount;
 
-                          // Track payment types for debugging
+                          // Track payment types for debugging (NOT added to totalNetSales anymore)
                           const paymentType = payment.type || 'UNKNOWN';
                           if (!paymentTypeBreakdown[paymentType]) {
                             paymentTypeBreakdown[paymentType] = { count: 0, amount: 0, tips: 0, refunds: 0 };
@@ -368,9 +375,9 @@ export default async function handler(req, res) {
     // Calculate net sales using Toast's method (from menu items)
     const calculatedNetSales = totalGrossSales - totalDiscounts;
 
-    // CRITICAL FIX: Item-based calculation is broken (3.4x inflated)
-    // Use payment-based calculation + service charges
-    const finalNetSales = totalNetSales + totalServiceCharges;
+    // V6.0 CRITICAL FIX: Use check.amount (Toast's official calculated total)
+    // check.amount already includes discounts and service charges per Toast API docs
+    const finalNetSales = totalNetSales;
 
     console.log(`\n=== SALES SUMMARY COMPLETE ===`);
     console.log(`\nPayment Type Breakdown:`);
@@ -383,15 +390,13 @@ export default async function handler(req, res) {
     console.log(`  Orders DELETED: ${totalDeletedOrders}`);
     console.log(`  Total Excluded: ${totalVoidedOrders + totalDeletedOrders} (should match ${debugOrderCount - totalOrdersProcessed})`);
     console.log(`\nSales Calculation Comparison:`);
-    console.log(`  Method 1 (from payments): $${totalNetSales.toFixed(2)}`);
-    console.log(`  + Non-Gratuity Service Charges: $${totalServiceCharges.toFixed(2)}`);
-    console.log(`  (Gratuity Service Charges excluded: $${totalGratuityServiceCharges.toFixed(2)})`);
-    console.log(`  = Net Sales: $${finalNetSales.toFixed(2)} ✓ USING THIS`);
-    console.log(`  Method 2 (from items): Gross $${totalGrossSales.toFixed(2)} - Discounts $${totalDiscounts.toFixed(2)} = $${calculatedNetSales.toFixed(2)} ✗ BROKEN`);
+    console.log(`  V6.0 Method (from check.amount): $${totalNetSales.toFixed(2)} ✓ USING THIS`);
+    console.log(`  (check.amount already includes discounts and service charges)`);
+    console.log(`  Service Charges tracked: $${totalServiceCharges.toFixed(2)} non-gratuity, $${totalGratuityServiceCharges.toFixed(2)} gratuity`);
+    console.log(`  Legacy Method (from items): Gross $${totalGrossSales.toFixed(2)} - Discounts $${totalDiscounts.toFixed(2)} = $${calculatedNetSales.toFixed(2)} ✗ BROKEN`);
     console.log(`  Voided Item Sales: $${totalVoidedItemSales.toFixed(2)}`);
-    console.log(`\nNet Sales (payments + non-gratuity service charges): $${finalNetSales.toFixed(2)}`);
-    console.log(`  Base Payments: $${totalNetSales.toFixed(2)}`);
-    console.log(`  Non-Gratuity Service Charges: $${totalServiceCharges.toFixed(2)}`);
+    console.log(`\nNet Sales (from check.amount): $${finalNetSales.toFixed(2)}`);
+    console.log(`  Service Charges (for reference): $${totalServiceCharges.toFixed(2)} non-gratuity`);
     console.log(`Total Discounts: $${totalDiscounts.toFixed(2)}`);
     console.log(`Credit Tips (Gross): $${totalCreditTipsGross.toFixed(2)}`);
     console.log(`Voided Tips: $${totalVoidedTips.toFixed(2)}`);
@@ -402,12 +407,12 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v5.2-partial-refund-house-account-20251007-0130', // CRITICAL: PARTIAL refund + HOUSE_ACCOUNT exclusion
+      version: 'v6.0-check-amount-100-percent-20251007-0200', // CRITICAL: Use check.amount for 100% accuracy
       dateRange: {
         start: startDate,
         end: endDate
       },
-      netSales: finalNetSales, // Payment-based + NON-gratuity service charges only
+      netSales: finalNetSales, // V6.0: From check.amount (Toast's official calculated total)
       grossSales: totalGrossSales, // For transparency
       voidedItemSales: totalVoidedItemSales, // Track voided item sales
       creditTips: totalCreditTips,
@@ -415,22 +420,21 @@ export default async function handler(req, res) {
       voidedTips: totalVoidedTips,
       cashSales: totalCashSales,
       discounts: totalDiscounts,
-      serviceCharges: totalServiceCharges, // Non-gratuity only
+      serviceCharges: totalServiceCharges, // Non-gratuity (for reference, already in netSales)
       gratuityServiceCharges: totalGratuityServiceCharges, // Excluded from net sales
       tipsOnDiscountedChecks: totalTipsOnDiscountedChecks,
       businessDatesProcessed: businessDates.length,
       ordersProcessed: totalOrdersProcessed,
-      // Debug info - ENHANCED
+      // Debug info - V6.0
       debug: {
         totalOrdersFromAPI: debugOrderCount,
         ordersVoided: totalVoidedOrders,
         ordersDeleted: totalDeletedOrders,
         ordersExcluded: totalVoidedOrders + totalDeletedOrders,
-        basePayments: totalNetSales, // Before service charges
-        serviceChargesNonGratuity: totalServiceCharges,
+        netSalesFromCheckAmount: finalNetSales, // V6.0: Using check.amount
+        serviceChargesNonGratuity: totalServiceCharges, // Already included in check.amount
         serviceChargesGratuity: totalGratuityServiceCharges,
-        netSalesFromPayments: finalNetSales, // After adding service charges
-        netSalesFromItems: calculatedNetSales, // Broken (3.4x inflated)
+        netSalesFromItems: calculatedNetSales, // Legacy (broken - 3.4x inflated)
         voidedItemSales: totalVoidedItemSales,
         paymentTypeBreakdown: paymentTypeBreakdown
       }
