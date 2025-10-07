@@ -84,6 +84,9 @@ export default async function handler(req, res) {
     // V6.15 CRITICAL: Track HOUSE_ACCOUNT payments (should be excluded like gift cards)
     let houseAccountPayments = [];
 
+    // V6.16 COMPREHENSIVE: Track ALL payments by type to find missing amounts
+    let allPaymentsByType = {};
+
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
     // ordersBulk gives us all payment data in paginated batches
@@ -341,6 +344,22 @@ export default async function handler(req, res) {
                         // V6.8 DIAGNOSTIC: Track all payment types we encounter
                         allPaymentTypes.add(payment.type || 'UNKNOWN');
 
+                        // V6.16 COMPREHENSIVE: Track ALL payments for analysis
+                        const payType = payment.type || 'UNKNOWN';
+                        if (!allPaymentsByType[payType]) {
+                          allPaymentsByType[payType] = [];
+                        }
+                        allPaymentsByType[payType].push({
+                          amount: amount,
+                          tipAmount: tipAmount,
+                          paymentStatus: payment.paymentStatus || 'NONE',
+                          refundStatus: payment.refundStatus || 'NONE',
+                          orderNumber: order.orderNumber,
+                          businessDate: order.businessDate,
+                          isExcluded: isOrderExcluded || isCheckExcluded,
+                          cardType: payment.cardType || null
+                        });
+
                         // CRITICAL FIX: PARTIAL refunds need special handling!
                         // Toast docs: "For partial refunds, only subtract the refunded amount"
                         // V6.7: Also exclude DENIED payments (failed credit card authorizations)
@@ -587,7 +606,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.15-detect-house-accounts-20251007-0820', // Detect HOUSE_ACCOUNT payments (excluded from sales)
+      version: 'v6.16-comprehensive-payment-breakdown-20251007-0825', // Track ALL payments by type + card breakdown
       dateRange: {
         start: startDate,
         end: endDate
@@ -718,7 +737,37 @@ export default async function handler(req, res) {
           message: houseAccountPayments.length > 0
             ? `FOUND ${houseAccountPayments.length} HOUSE_ACCOUNT payments - these are excluded from net sales`
             : 'No HOUSE_ACCOUNT payments found'
-        }
+        },
+        // V6.16 COMPREHENSIVE PAYMENT BREAKDOWN
+        v616_allPaymentsByType: Object.keys(allPaymentsByType).reduce((acc, type) => {
+          const payments = allPaymentsByType[type];
+          const counted = payments.filter(p => !p.isExcluded && p.paymentStatus !== 'DENIED' && p.paymentStatus !== 'VOIDED' && p.refundStatus !== 'FULL');
+          const excluded = payments.filter(p => p.isExcluded || p.paymentStatus === 'DENIED' || p.paymentStatus === 'VOIDED' || p.refundStatus === 'FULL');
+
+          acc[type] = {
+            total: payments.length,
+            counted: counted.length,
+            excluded: excluded.length,
+            countedAmount: counted.reduce((sum, p) => sum + p.amount, 0),
+            countedTips: counted.reduce((sum, p) => sum + p.tipAmount, 0),
+            excludedAmount: excluded.reduce((sum, p) => sum + p.amount, 0),
+            excludedTips: excluded.reduce((sum, p) => sum + p.tipAmount, 0),
+            byCardType: type === 'CREDIT' ? (() => {
+              const byCard = {};
+              payments.forEach(p => {
+                const card = p.cardType || 'UNKNOWN';
+                if (!byCard[card]) byCard[card] = {count: 0, amount: 0, tips: 0};
+                if (!p.isExcluded && p.paymentStatus !== 'DENIED' && p.paymentStatus !== 'VOIDED') {
+                  byCard[card].count++;
+                  byCard[card].amount += p.amount;
+                  byCard[card].tips += p.tipAmount;
+                }
+              });
+              return byCard;
+            })() : undefined
+          };
+          return acc;
+        }, {})
       }
     });
 
