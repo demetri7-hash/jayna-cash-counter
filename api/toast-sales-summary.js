@@ -71,6 +71,9 @@ export default async function handler(req, res) {
     let excludedCreditPayments = [];
     let giftCardPaymentsFound = [];
 
+    // V6.10 CRITICAL: Track gift card ITEMS sold (deferred revenue)
+    let giftCardItemsSold = [];
+
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
     // ordersBulk gives us all payment data in paginated batches
@@ -200,25 +203,35 @@ export default async function handler(req, res) {
                     if (!isOrderExcluded && !isCheckExcluded) {
                       let checkAmount = check.amount || 0;
 
-                      // V6.3 CRITICAL FIX: Exclude GIFTCARD payments from net sales
+                      // V6.10 CRITICAL FIX: Exclude gift card ITEMS sold (not payment types!)
                       // Per Toast docs: "Net sales excludes purchases of gift cards"
                       // Gift cards are DEFERRED REVENUE, not immediate sales
-                      if (check.payments && Array.isArray(check.payments)) {
-                        for (const payment of check.payments) {
-                          // V6.8 DIAGNOSTIC: Log all potential gift card payment types
-                          const payType = payment.type || 'UNKNOWN';
-                          if (payType.toLowerCase().includes('gift') || payType.toLowerCase().includes('card')) {
-                            giftCardPaymentsFound.push({
-                              type: payType,
-                              amount: payment.amount || 0,
-                              order: order.orderNumber
-                            });
-                          }
+                      // When a customer BUYS a gift card, it's not a sale - it's a liability
+                      if (check.selections && Array.isArray(check.selections)) {
+                        for (const selection of check.selections) {
+                          // Check multiple potential indicators for gift card items
+                          const isGiftCard = selection.salesCategory?.name?.toLowerCase().includes('gift card') ||
+                                           selection.salesCategory?.name?.toLowerCase().includes('giftcard') ||
+                                           selection.itemGroup?.name?.toLowerCase().includes('gift card') ||
+                                           selection.itemGroup?.name?.toLowerCase().includes('giftcard') ||
+                                           (selection.item && selection.item.name?.toLowerCase().includes('gift card')) ||
+                                           (selection.itemName && selection.itemName.toLowerCase().includes('gift card')) ||
+                                           selection.diningOption?.behavior === 'GIFT_CARD';
 
-                          if (payment.type === 'GIFTCARD' || payment.type === 'GIFT_CARD') {
-                            const giftCardAmount = payment.amount || 0;
+                          if (isGiftCard && !selection.voided) {
+                            const giftCardAmount = (selection.price || 0) * (selection.quantity || 1);
                             checkAmount -= giftCardAmount;
-                            console.log(`💳 EXCLUDING GIFT CARD from net sales: $${giftCardAmount} Type="${payment.type}" Order=${order.orderNumber}`);
+
+                            giftCardItemsSold.push({
+                              itemName: selection.itemName || selection.item?.name || 'Unknown',
+                              salesCategory: selection.salesCategory?.name,
+                              itemGroup: selection.itemGroup?.name,
+                              amount: giftCardAmount,
+                              order: order.orderNumber,
+                              businessDate: order.businessDate
+                            });
+
+                            console.log(`💳 EXCLUDING GIFT CARD ITEM from net sales: $${giftCardAmount} Item="${selection.itemName || selection.item?.name}" Order=${order.orderNumber}`);
                           }
                         }
                       }
@@ -503,7 +516,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.9-diagnostics-in-response-20251007-0730', // Return diagnostics in JSON response for visibility
+      version: 'v6.10-exclude-giftcard-items-20251007-0735', // CRITICAL: Exclude gift card ITEMS sold, not payment types!
       dateRange: {
         start: startDate,
         end: endDate
@@ -549,6 +562,13 @@ export default async function handler(req, res) {
             totalTips: totalExcludedCreditTips,
             payments: excludedCreditPayments
           }
+        },
+        // V6.10 CRITICAL DIAGNOSTICS: Gift card ITEMS sold
+        v610_giftCardItems: {
+          count: giftCardItemsSold.length,
+          totalAmount: giftCardItemsSold.reduce((sum, gc) => sum + gc.amount, 0),
+          items: giftCardItemsSold,
+          message: giftCardItemsSold.length === 0 ? 'NO GIFT CARD ITEMS FOUND - Check selection properties!' : `Found ${giftCardItemsSold.length} gift card item(s) sold`
         }
       }
     });
