@@ -280,9 +280,11 @@ export default async function handler(req, res) {
 
                         // CRITICAL FIX: PARTIAL refunds need special handling!
                         // Toast docs: "For partial refunds, only subtract the refunded amount"
+                        // V6.7: Also exclude DENIED payments (failed credit card authorizations)
                         const isFullyVoided = payment.voided === true ||
                                              payment.refundStatus === 'FULL' ||
-                                             payment.paymentStatus === 'VOIDED';
+                                             payment.paymentStatus === 'VOIDED' ||
+                                             payment.paymentStatus === 'DENIED';
 
                         const isPartiallyRefunded = payment.refundStatus === 'PARTIAL';
 
@@ -325,24 +327,6 @@ export default async function handler(req, res) {
                           paymentTypeBreakdown[paymentType].tips += tipAmount;
                           if (isPartiallyRefunded) {
                             paymentTypeBreakdown[paymentType].refunds += refundAmount;
-                          }
-                        }
-
-                        // V6.6 DIAGNOSTIC: Track ALL CREDIT payments with tips (included and excluded)
-                        if (payment.type === 'CREDIT' && tipAmount > 0) {
-                          if (isOrderExcluded || isCheckExcluded || isFullyVoided) {
-                            console.log(`❌ CREDIT TIP EXCLUDED: Tip=$${tipAmount} Order=${order.orderNumber}`);
-                            console.log(`   Reasons: OrderVoid=${isOrderExcluded}, CheckVoid=${isCheckExcluded}, PaymentVoid=${isFullyVoided}`);
-                            console.log(`   Amount=$${amount} RefundStatus=${payment.refundStatus} PaymentStatus=${payment.paymentStatus}`);
-                          }
-                        }
-
-                        // V6.6 DIAGNOSTIC: Track CREDIT payment counts and totals
-                        if (payment.type === 'CREDIT' && !isOrderExcluded && !isCheckExcluded && !isFullyVoided) {
-                          // This is a CREDIT payment that passes all filters - log if it has unusual characteristics
-                          if (tipAmount > 0 && (payment.refundStatus !== 'NONE' || payment.paymentStatus !== 'CAPTURED')) {
-                            console.log(`⚠️ CREDIT TIP with unusual status: Tip=$${tipAmount} Order=${order.orderNumber}`);
-                            console.log(`   RefundStatus=${payment.refundStatus} PaymentStatus=${payment.paymentStatus}`);
                           }
                         }
 
@@ -421,16 +405,10 @@ export default async function handler(req, res) {
     const finalNetSales = totalNetSales;
 
     console.log(`\n=== SALES SUMMARY COMPLETE ===`);
-    console.log(`\n💰 V6.6 DIAGNOSTIC: Check logs above for EXCLUDED CREDIT TIPS (❌) and UNUSUAL CREDIT TIPS (⚠️)`);
     console.log(`\nPayment Type Breakdown (includes tips):`);
     for (const [type, data] of Object.entries(paymentTypeBreakdown)) {
       console.log(`  ${type}: ${data.count} payments, $${data.amount.toFixed(2)} amount, $${data.tips.toFixed(2)} tips`);
     }
-    console.log(`\n🎯 CREDIT TIPS ANALYSIS (CREDIT type only, excluding OTHER):`);
-    console.log(`  Our API shows: ${paymentTypeBreakdown['CREDIT']?.count || 0} CREDIT payments with $${totalCreditTips.toFixed(2)} tips`);
-    console.log(`  Toast shows: 880 CREDIT payments with $2,675.93 tips`);
-    console.log(`  Payment count difference: ${(paymentTypeBreakdown['CREDIT']?.count || 0) - 880} payments`);
-    console.log(`  Tips discrepancy: $${(2675.93 - totalCreditTips).toFixed(2)} ${totalCreditTips < 2675.93 ? 'MISSING' : 'EXTRA'}`);
     console.log(`\nDEBUG: Total orders from API: ${debugOrderCount}`);
     console.log(`  Orders Processed (active): ${totalOrdersProcessed}`);
     console.log(`  Orders VOIDED (order-level): ${totalVoidedOrders}`);
@@ -456,7 +434,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.6-diagnostic-credit-exclusions-20251007-0645', // Track excluded CREDIT tips to find missing $70.40
+      version: 'v6.7-exclude-denied-payments-20251007-0700', // Exclude DENIED payments (failed credit card authorizations)
       dateRange: {
         start: startDate,
         end: endDate
