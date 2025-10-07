@@ -207,35 +207,37 @@ export default async function handler(req, res) {
                     if (!isOrderExcluded && !isCheckExcluded) {
                       let checkAmount = check.amount || 0;
 
-                      // V6.10 CRITICAL FIX: Exclude gift card ITEMS sold (not payment types!)
+                      // V6.12 CRITICAL FIX: Exclude gift card ITEMS sold (not payment types!)
                       // Per Toast docs: "Net sales excludes purchases of gift cards"
                       // Gift cards are DEFERRED REVENUE, not immediate sales
                       // When a customer BUYS a gift card, it's not a sale - it's a liability
                       if (check.selections && Array.isArray(check.selections)) {
                         for (const selection of check.selections) {
-                          // Check multiple potential indicators for gift card items
-                          const isGiftCard = selection.salesCategory?.name?.toLowerCase().includes('gift card') ||
-                                           selection.salesCategory?.name?.toLowerCase().includes('giftcard') ||
-                                           selection.itemGroup?.name?.toLowerCase().includes('gift card') ||
-                                           selection.itemGroup?.name?.toLowerCase().includes('giftcard') ||
-                                           (selection.item && selection.item.name?.toLowerCase().includes('gift card')) ||
-                                           (selection.itemName && selection.itemName.toLowerCase().includes('gift card')) ||
-                                           selection.diningOption?.behavior === 'GIFT_CARD';
+                          // V6.12 BREAKTHROUGH: Use Toast's actual gift card properties!
+                          // Found from v6.11b diagnostics: toastGiftCard, giftCardSelectionInfo, deferred
+                          const isGiftCard = selection.toastGiftCard !== null && selection.toastGiftCard !== undefined ||
+                                           selection.giftCardSelectionInfo !== null && selection.giftCardSelectionInfo !== undefined ||
+                                           selection.deferred === true ||
+                                           selection.storedValueTransactionId !== null && selection.storedValueTransactionId !== undefined;
 
                           if (isGiftCard && !selection.voided) {
                             const giftCardAmount = (selection.price || 0) * (selection.quantity || 1);
                             checkAmount -= giftCardAmount;
 
                             giftCardItemsSold.push({
-                              itemName: selection.itemName || selection.item?.name || 'Unknown',
+                              itemName: selection.itemName || selection.item?.name || selection.displayName || 'Unknown',
                               salesCategory: selection.salesCategory?.name,
                               itemGroup: selection.itemGroup?.name,
                               amount: giftCardAmount,
                               order: order.orderNumber,
-                              businessDate: order.businessDate
+                              businessDate: order.businessDate,
+                              hasToastGiftCard: !!selection.toastGiftCard,
+                              hasGiftCardInfo: !!selection.giftCardSelectionInfo,
+                              isDeferred: selection.deferred === true,
+                              hasStoredValueTxn: !!selection.storedValueTransactionId
                             });
 
-                            console.log(`💳 EXCLUDING GIFT CARD ITEM from net sales: $${giftCardAmount} Item="${selection.itemName || selection.item?.name}" Order=${order.orderNumber}`);
+                            console.log(`💳 EXCLUDING GIFT CARD ITEM from net sales: $${giftCardAmount} Item="${selection.displayName || selection.itemName || selection.item?.name}" Order=${order.orderNumber}`);
                           }
                         }
                       }
@@ -543,7 +545,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.11b-find-40-dollar-items-20251007-0750', // DIAGNOSTIC: Separate $40 items to identify gift card
+      version: 'v6.12-BREAKTHROUGH-gift-card-exclusion-20251007-0755', // BREAKTHROUGH: Use toastGiftCard, giftCardSelectionInfo, deferred properties!
       dateRange: {
         start: startDate,
         end: endDate
