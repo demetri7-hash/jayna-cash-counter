@@ -53,6 +53,7 @@ export default async function handler(req, res) {
     // CRITICAL FIX: Track voided vs deleted separately
     let totalVoidedOrders = 0;
     let totalDeletedOrders = 0;
+    let totalVoidedChecks = 0; // NEW: Track check-level voids separately
 
     // Alternative calculation: from menu items (like Toast does)
     let totalGrossSales = 0; // Sum of all item prices
@@ -179,6 +180,13 @@ export default async function handler(req, res) {
                     const isCheckVoided = check.voided === true;
                     const isCheckDeleted = check.deleted === true;
                     const isCheckExcluded = isCheckVoided || isCheckDeleted;
+
+                    // CRITICAL FIX: Count voided CHECKS separately (this is the missing 6 voids!)
+                    // If check is voided but order is NOT voided, count it as a separate void
+                    if ((isCheckVoided || isCheckDeleted) && !isOrderExcluded) {
+                      totalVoidedChecks++;
+                      console.log(`🔍 FOUND VOIDED CHECK IN NON-VOIDED ORDER: Order ${order.orderNumber}, Check voided: ${isCheckVoided}, deleted: ${isCheckDeleted}, check amount: $${check.amount || 0}`);
+                    }
 
                     // V6.0 CRITICAL FIX: Use check.amount instead of summing payments!
                     // check.amount = "Total calculated price including discounts and service charges"
@@ -386,8 +394,10 @@ export default async function handler(req, res) {
     }
     console.log(`\nDEBUG: Total orders from API: ${debugOrderCount}`);
     console.log(`  Orders Processed (active): ${totalOrdersProcessed}`);
-    console.log(`  Orders VOIDED: ${totalVoidedOrders}`);
-    console.log(`  Orders DELETED: ${totalDeletedOrders}`);
+    console.log(`  Orders VOIDED (order-level): ${totalVoidedOrders}`);
+    console.log(`  Orders DELETED (order-level): ${totalDeletedOrders}`);
+    console.log(`  Checks VOIDED (check-level in non-voided orders): ${totalVoidedChecks}`);
+    console.log(`  🎯 TOTAL VOIDS (matching Toast): ${totalVoidedOrders + totalVoidedChecks} (should be 10)`);
     console.log(`  Total Excluded: ${totalVoidedOrders + totalDeletedOrders} (should match ${debugOrderCount - totalOrdersProcessed})`);
     console.log(`\nSales Calculation Comparison:`);
     console.log(`  V6.0 Method (from check.amount): $${totalNetSales.toFixed(2)} ✓ USING THIS`);
@@ -407,7 +417,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.0-check-amount-100-percent-20251007-0200', // CRITICAL: Use check.amount for 100% accuracy
+      version: 'v6.1-check-level-voids-20251007-0300', // CRITICAL: Detect check-level voids for accurate void count
       dateRange: {
         start: startDate,
         end: endDate
@@ -430,6 +440,8 @@ export default async function handler(req, res) {
         totalOrdersFromAPI: debugOrderCount,
         ordersVoided: totalVoidedOrders,
         ordersDeleted: totalDeletedOrders,
+        checksVoided: totalVoidedChecks, // NEW: Check-level voids
+        totalVoidCount: totalVoidedOrders + totalVoidedChecks, // Should match Toast's "10 voided orders"
         ordersExcluded: totalVoidedOrders + totalDeletedOrders,
         netSalesFromCheckAmount: finalNetSales, // V6.0: Using check.amount
         serviceChargesNonGratuity: totalServiceCharges, // Already included in check.amount
