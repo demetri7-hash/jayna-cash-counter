@@ -4714,12 +4714,25 @@
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     
+    // Build summary lines with voided tips breakdown if applicable
     const summaryLines = [
       `TOAST CASH SALES REPORTED: $${weeklyData.total_toast_sales.toFixed(2)}`,
       `ACTUAL CASH IN: $${weeklyData.actual_cash_in.toFixed(2)}`,
       `TOTAL DISCREPANCY: $${weeklyData.total_discrepancy.toFixed(2)}`,
-      `ENVELOPE DEPOSITS: $${weeklyData.envelope_deposits.toFixed(2)}`,
-      `CREDIT TIPS: $${weeklyData.credit_tips.toFixed(2)}`,
+      `ENVELOPE DEPOSITS: $${weeklyData.envelope_deposits.toFixed(2)}`
+    ];
+
+    // Add credit tips breakdown if voided tips exist
+    if (tipPoolSummary.voidedTipsTotal && tipPoolSummary.voidedTipsTotal > 0) {
+      const grossTips = weeklyData.credit_tips + tipPoolSummary.voidedTipsTotal;
+      summaryLines.push(`CREDIT TIPS (GROSS): $${grossTips.toFixed(2)}`);
+      summaryLines.push(`  - VOIDED TIPS: -$${tipPoolSummary.voidedTipsTotal.toFixed(2)} (${tipPoolSummary.voidedTipsCount} orders)`);
+      summaryLines.push(`CREDIT TIPS (NET): $${weeklyData.credit_tips.toFixed(2)}`);
+    } else {
+      summaryLines.push(`CREDIT TIPS: $${weeklyData.credit_tips.toFixed(2)}`);
+    }
+
+    summaryLines.push(
       `CASH TIPS: $${weeklyData.cash_tips.toFixed(2)}`,
       `EZCATER TIPS: $${weeklyData.ezcater_tips.toFixed(2)}`,
       `TOTAL TIPS: $${weeklyData.total_tips.toFixed(2)}`,
@@ -4727,7 +4740,7 @@
       `TIP POOL TOTAL (MINUS TDS): $${weeklyData.tip_pool_total.toFixed(2)}`,
       `HOURLY RATE: $${weeklyData.hourly_rate.toFixed(2)}`,
       `CASH NEEDED: $${weeklyData.cash_needed.toFixed(2)}`
-    ];
+    );
     
     summaryLines.forEach((line, index) => {
       if (index % 2 === 0) {
@@ -6427,7 +6440,8 @@
       apiFetchedData.salesData = {
         creditTips: salesResult.creditTips,
         cashSales: salesResult.cashSales,
-        netSales: salesResult.netSales
+        netSales: salesResult.netSales,
+        voidedTips: salesResult.voidedTips || { total: 0, count: 0, details: [] }
       };
 
       // Show subtle success indicator
@@ -6595,6 +6609,11 @@
         dateRange = `${startFormatted} - ${endFormatted}`;
       }
 
+      // Get voided tips info if using API
+      const voidedTipsInfo = !hasFiles && apiFetchedData.salesData?.voidedTips
+        ? apiFetchedData.salesData.voidedTips
+        : { total: 0, count: 0, details: [] };
+
       tipPoolSummary = {
         creditTips: creditTips,
         cashSales: cashSales,
@@ -6611,6 +6630,8 @@
         dateRange: dateRange,
         calculatedByName: calculatedByName,
         customNotes: customNotes,
+        voidedTipsTotal: voidedTipsInfo.total,
+        voidedTipsCount: voidedTipsInfo.count,
         generatedAt: new Date().toLocaleString(),
         // Labor metrics for combined report
         laborData: {
