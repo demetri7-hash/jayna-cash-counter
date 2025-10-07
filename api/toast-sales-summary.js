@@ -106,7 +106,9 @@ export default async function handler(req, res) {
                       // Categorize by payment type
                       if (payment.type === 'CASH') {
                         totalCashSales += amount;
-                      } else if (payment.type === 'CREDIT' || payment.type === 'CREDIT_CARD') {
+                        // Cash tips are NOT counted here - they go in the envelope
+                      } else {
+                        // All non-cash payment tips (credit, debit, gift cards, etc.)
                         totalCreditTips += tipAmount;
                       }
                     }
