@@ -78,6 +78,9 @@ export default async function handler(req, res) {
     let selectionSampleCount = 0;
     let selectionStructures = [];
 
+    // V6.13 CRITICAL DIAGNOSTIC: Track ALL CREDIT payments for comprehensive analysis
+    let allCreditPayments = [];
+
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
     // ordersBulk gives us all payment data in paginated batches
@@ -343,6 +346,32 @@ export default async function handler(req, res) {
                                              payment.paymentStatus === 'VOIDED' ||
                                              payment.paymentStatus === 'DENIED';
 
+                        // V6.13 CRITICAL: Track ALL CREDIT payments for analysis
+                        if (payment.type === 'CREDIT') {
+                          const partialRefund = payment.refundStatus === 'PARTIAL' ? (payment.refund?.refundAmount || 0) : 0;
+                          allCreditPayments.push({
+                            amount: amount,
+                            tipAmount: tipAmount,
+                            refundStatus: payment.refundStatus || 'NONE',
+                            refundAmount: partialRefund,
+                            paymentStatus: payment.paymentStatus || 'NONE',
+                            voided: payment.voided || false,
+                            orderVoided: order.voided || false,
+                            checkVoided: check.voided || false,
+                            orderNumber: order.orderNumber,
+                            businessDate: order.businessDate,
+                            paidDate: payment.paidDate,
+                            paidBusinessDate: payment.paidBusinessDate,
+                            promisedDate: order.promisedDate,
+                            openedDate: order.openedDate,
+                            closedDate: order.closedDate,
+                            source: order.source,
+                            willBeExcluded: isOrderExcluded || isCheckExcluded || isFullyVoided,
+                            willBeCounted: !(isOrderExcluded || isCheckExcluded || isFullyVoided),
+                            netAmount: payment.refundStatus === 'PARTIAL' ? (amount - partialRefund) : amount
+                          });
+                        }
+
                         // V6.8 DIAGNOSTIC: Track excluded CREDIT payments specifically
                         if (payment.type === 'CREDIT' && (isOrderExcluded || isCheckExcluded || isFullyVoided)) {
                           excludedCreditPayments.push({
@@ -545,7 +574,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.12-BREAKTHROUGH-gift-card-exclusion-20251007-0755', // BREAKTHROUGH: Use toastGiftCard, giftCardSelectionInfo, deferred properties!
+      version: 'v6.13-comprehensive-credit-analysis-20251007-0800', // Track ALL CREDIT payments + future order detection
       dateRange: {
         start: startDate,
         end: endDate
@@ -604,6 +633,50 @@ export default async function handler(req, res) {
           }),
           firstTwenty: selectionStructures.slice(0, 20), // Sample of all selections
           message: `Captured ${selectionStructures.length} selections. Check fortyDollarItems and giftCardNamedItems arrays!`
+        },
+        // V6.13 COMPREHENSIVE CREDIT ANALYSIS
+        v613_creditAnalysis: {
+          totalCreditPayments: allCreditPayments.length,
+          counted: allCreditPayments.filter(p => p.willBeCounted).length,
+          excluded: allCreditPayments.filter(p => p.willBeExcluded).length,
+          countedTotals: {
+            amount: allCreditPayments.filter(p => p.willBeCounted).reduce((sum, p) => sum + p.netAmount, 0),
+            tips: allCreditPayments.filter(p => p.willBeCounted).reduce((sum, p) => sum + p.tipAmount, 0)
+          },
+          excludedTotals: {
+            amount: allCreditPayments.filter(p => p.willBeExcluded).reduce((sum, p) => sum + p.amount, 0),
+            tips: allCreditPayments.filter(p => p.willBeExcluded).reduce((sum, p) => sum + p.tipAmount, 0)
+          },
+          byPaymentStatus: {
+            CAPTURED: allCreditPayments.filter(p => p.paymentStatus === 'CAPTURED').length,
+            DENIED: allCreditPayments.filter(p => p.paymentStatus === 'DENIED').length,
+            VOIDED: allCreditPayments.filter(p => p.paymentStatus === 'VOIDED').length,
+            OTHER: allCreditPayments.filter(p => !['CAPTURED', 'DENIED', 'VOIDED'].includes(p.paymentStatus)).length
+          },
+          byRefundStatus: {
+            NONE: allCreditPayments.filter(p => p.refundStatus === 'NONE').length,
+            PARTIAL: allCreditPayments.filter(p => p.refundStatus === 'PARTIAL').length,
+            FULL: allCreditPayments.filter(p => p.refundStatus === 'FULL').length
+          },
+          partialRefunds: allCreditPayments.filter(p => p.refundStatus === 'PARTIAL'),
+          // Future order detection (promisedDate > closedDate or source indicators)
+          possibleFutureOrders: allCreditPayments.filter(p => {
+            const promised = p.promisedDate ? new Date(p.promisedDate) : null;
+            const closed = p.closedDate ? new Date(p.closedDate) : null;
+            return (promised && closed && promised > closed) ||
+                   p.source === 'ONLINE_ORDERING' ||
+                   p.source === 'CATERING';
+          }),
+          bySource: {
+            ONLINE_ORDERING: allCreditPayments.filter(p => p.source === 'ONLINE_ORDERING').length,
+            CATERING: allCreditPayments.filter(p => p.source === 'CATERING').length,
+            POS: allCreditPayments.filter(p => p.source === 'POS').length,
+            OTHER: allCreditPayments.filter(p => !['ONLINE_ORDERING', 'CATERING', 'POS'].includes(p.source)).length
+          },
+          // Sample of counted and excluded for inspection
+          sampleCounted: allCreditPayments.filter(p => p.willBeCounted).slice(0, 10),
+          sampleExcluded: allCreditPayments.filter(p => p.willBeExcluded),
+          message: `Total: ${allCreditPayments.length}, Counted: ${allCreditPayments.filter(p => p.willBeCounted).length}, Excluded: ${allCreditPayments.filter(p => p.willBeExcluded).length}`
         }
       }
     });
