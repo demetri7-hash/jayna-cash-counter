@@ -54,8 +54,6 @@ export default async function handler(req, res) {
     let totalVoidedOrders = 0;
     let totalDeletedOrders = 0;
     let totalVoidedChecks = 0; // NEW: Track check-level voids separately
-    let totalVoidedPayments = 0; // NEW: Track payment-level voids
-    let totalVoidedPaymentAmount = 0; // NEW: Track $ amount of voided payments
 
     // Alternative calculation: from menu items (like Toast does)
     let totalGrossSales = 0; // Sum of all item prices
@@ -190,37 +188,13 @@ export default async function handler(req, res) {
                       console.log(`🔍 FOUND VOIDED CHECK IN NON-VOIDED ORDER: Order ${order.orderNumber}, Check voided: ${isCheckVoided}, deleted: ${isCheckDeleted}, check amount: $${check.amount || 0}`);
                     }
 
-                    // V6.2 CRITICAL FIX: Calculate voided payment amounts FIRST
-                    // check.amount includes voided payments, we need to subtract them!
-                    let voidedPaymentAmountForThisCheck = 0;
-                    if (check.payments && Array.isArray(check.payments)) {
-                      for (const payment of check.payments) {
-                        const paymentAmount = payment.amount || 0;
-                        const isPaymentVoided = payment.voided === true ||
-                                               payment.refundStatus === 'FULL' ||
-                                               payment.paymentStatus === 'VOIDED';
-
-                        // If payment is voided in non-voided order/check, track it
-                        if (isPaymentVoided && !isOrderExcluded && !isCheckExcluded) {
-                          voidedPaymentAmountForThisCheck += paymentAmount;
-                          totalVoidedPayments++;
-                          totalVoidedPaymentAmount += paymentAmount;
-                          console.log(`💳 FOUND VOIDED PAYMENT IN ACTIVE CHECK: Order ${order.orderNumber || 'unknown'}, Payment $${paymentAmount}, Type: ${payment.type}`);
-                        }
-                      }
-                    }
-
-                    // V6.2 CRITICAL FIX: Subtract voided payment amounts from check.amount
+                    // V6.0 CRITICAL FIX: Use check.amount instead of summing payments!
                     // check.amount = "Total calculated price including discounts and service charges"
-                    // BUT it doesn't auto-update when individual payments are voided!
+                    // This is Toast's official net sales value per check
+                    // NOTE: check.amount ALREADY EXCLUDES voided payments (proven in v6.2 testing)
                     if (!isOrderExcluded && !isCheckExcluded) {
                       const checkAmount = check.amount || 0;
-                      const adjustedCheckAmount = checkAmount - voidedPaymentAmountForThisCheck;
-                      totalNetSales += adjustedCheckAmount;
-
-                      if (voidedPaymentAmountForThisCheck > 0) {
-                        console.log(`📊 ADJUSTED CHECK AMOUNT: Original $${checkAmount.toFixed(2)} - Voided Payments $${voidedPaymentAmountForThisCheck.toFixed(2)} = Net $${adjustedCheckAmount.toFixed(2)}`);
-                      }
+                      totalNetSales += checkAmount;
                     }
 
                     // Track check-level discounts
@@ -424,9 +398,7 @@ export default async function handler(req, res) {
     console.log(`  Orders VOIDED (order-level): ${totalVoidedOrders}`);
     console.log(`  Orders DELETED (order-level): ${totalDeletedOrders}`);
     console.log(`  Checks VOIDED (check-level in non-voided orders): ${totalVoidedChecks}`);
-    console.log(`  💳 Payments VOIDED (payment-level in active checks): ${totalVoidedPayments}`);
-    console.log(`  💰 Voided Payment Amount: $${totalVoidedPaymentAmount.toFixed(2)}`);
-    console.log(`  🎯 TOTAL VOIDS (matching Toast): ${totalVoidedOrders + totalVoidedChecks + totalVoidedPayments} (should be 10)`);
+    console.log(`  🎯 TOTAL VOIDS (matching Toast): ${totalVoidedOrders + totalVoidedChecks} (should be 10)`);
     console.log(`  Total Excluded: ${totalVoidedOrders + totalDeletedOrders} (should match ${debugOrderCount - totalOrdersProcessed})`);
     console.log(`\nSales Calculation Comparison:`);
     console.log(`  V6.0 Method (from check.amount): $${totalNetSales.toFixed(2)} ✓ USING THIS`);
@@ -446,7 +418,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.2-payment-level-voids-20251007-0400', // CRITICAL: Subtract voided payment amounts from check.amount
+      version: 'v6.1-reverted-check-amount-correct-20251007-0500', // REVERTED v6.2: check.amount already excludes voided payments
       dateRange: {
         start: startDate,
         end: endDate
@@ -464,17 +436,15 @@ export default async function handler(req, res) {
       tipsOnDiscountedChecks: totalTipsOnDiscountedChecks,
       businessDatesProcessed: businessDates.length,
       ordersProcessed: totalOrdersProcessed,
-      // Debug info - V6.2
+      // Debug info - V6.1
       debug: {
         totalOrdersFromAPI: debugOrderCount,
         ordersVoided: totalVoidedOrders,
         ordersDeleted: totalDeletedOrders,
         checksVoided: totalVoidedChecks, // Check-level voids
-        paymentsVoided: totalVoidedPayments, // NEW: Payment-level voids
-        voidedPaymentAmount: totalVoidedPaymentAmount, // NEW: $ amount of voided payments
-        totalVoidCount: totalVoidedOrders + totalVoidedChecks + totalVoidedPayments, // Should match Toast's "10 voided orders"
+        totalVoidCount: totalVoidedOrders + totalVoidedChecks, // Should match Toast's "10 voided orders"
         ordersExcluded: totalVoidedOrders + totalDeletedOrders,
-        netSalesFromCheckAmount: finalNetSales, // V6.2: Using adjusted check.amount (minus voided payments)
+        netSalesFromCheckAmount: finalNetSales, // V6.1: Using check.amount (already excludes voided payments)
         serviceChargesNonGratuity: totalServiceCharges, // Already included in check.amount
         serviceChargesGratuity: totalGratuityServiceCharges,
         netSalesFromItems: calculatedNetSales, // Legacy (broken - 3.4x inflated)
