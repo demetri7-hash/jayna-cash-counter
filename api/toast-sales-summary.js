@@ -44,86 +44,90 @@ export default async function handler(req, res) {
     let totalCashSales = 0;
     let totalOrdersProcessed = 0;
 
-    // Process each business date using Payments API (Toast's official recommendation)
-    // Per Toast docs: "Poll the /payments endpoint using paidBusinessDate. Sum the tipAmount values."
+    // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
+    // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
+    // ordersBulk gives us all payment data in paginated batches
     for (const dateStr of businessDates) {
       try {
         // Format date for Toast API (YYYYMMDD without dashes)
         const businessDate = dateStr.replace(/-/g, '');
-        console.log(`Fetching payments for ${businessDate} (${dateStr})...`);
+        console.log(`Fetching orders for ${businessDate} (${dateStr})...`);
 
-        // Get payment GUIDs for this business date
-        const paymentsListUrl = `${toastApiUrl}/orders/v2/payments?paidBusinessDate=${businessDate}`;
+        let page = 1;
+        let hasMorePages = true;
 
-        const paymentsListResponse = await fetch(paymentsListUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Toast-Restaurant-External-ID': restaurantId,
-            'Content-Type': 'application/json'
+        while (hasMorePages) {
+          const ordersUrl = `${toastApiUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&page=${page}&pageSize=100`;
+
+          const ordersResponse = await fetch(ordersUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Toast-Restaurant-External-ID': restaurantId,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!ordersResponse.ok) {
+            console.error(`Failed to fetch orders for ${businessDate}, page ${page}: ${ordersResponse.status}`);
+            break;
           }
-        });
 
-        if (!paymentsListResponse.ok) {
-          console.error(`Failed to fetch payment list for ${businessDate}: ${paymentsListResponse.status}`);
-          continue;
-        }
+          const orders = await ordersResponse.json();
 
-        const paymentGuids = await paymentsListResponse.json();
-        console.log(`${businessDate}: Found ${paymentGuids.length} payment GUIDs`);
+          if (Array.isArray(orders) && orders.length > 0) {
+            console.log(`${businessDate} Page ${page}: ${orders.length} orders`);
 
-        // Fetch individual payment details and sum tips
-        for (const paymentGuid of paymentGuids) {
-          try {
-            const paymentDetailUrl = `${toastApiUrl}/orders/v2/payments/${paymentGuid}`;
-
-            const paymentDetailResponse = await fetch(paymentDetailUrl, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Toast-Restaurant-External-ID': restaurantId,
-                'Content-Type': 'application/json'
+            // Process each order
+            for (const order of orders) {
+              // Skip voided orders
+              if (order.voided || order.voidDate) {
+                continue;
               }
-            });
 
-            if (!paymentDetailResponse.ok) {
-              console.error(`Failed to fetch payment ${paymentGuid}`);
-              continue;
+              totalOrdersProcessed++;
+
+              // Process payments within checks
+              if (order.checks && Array.isArray(order.checks)) {
+                for (const check of order.checks) {
+                  if (check.payments && Array.isArray(check.payments)) {
+                    for (const payment of check.payments) {
+                      // Skip voided/refunded payments
+                      if (payment.voidInfo || payment.refundStatus === 'REFUNDED') {
+                        continue;
+                      }
+
+                      const tipAmount = payment.tipAmount || 0;
+                      const amount = payment.amount || 0;
+
+                      // Net sales = sum of all payment amounts (including tips)
+                      totalNetSales += amount + tipAmount;
+
+                      // Categorize by payment type
+                      if (payment.type === 'CASH') {
+                        totalCashSales += amount;
+                      } else {
+                        // All non-cash payment tips
+                        totalCreditTips += tipAmount;
+                      }
+                    }
+                  }
+                }
+              }
             }
 
-            const payment = await paymentDetailResponse.json();
+            page++;
 
-            // Skip voided/refunded payments
-            if (payment.paymentStatus === 'VOIDED' || payment.refundStatus === 'REFUNDED') {
-              continue;
+            // If less than 100 orders, we're done with this date
+            if (orders.length < 100) {
+              hasMorePages = false;
             }
-
-            totalOrdersProcessed++;
-
-            const tipAmount = payment.tipAmount || 0;
-            const amount = payment.amount || 0;
-
-            // Net sales = sum of all payment amounts (including tips)
-            totalNetSales += amount + tipAmount;
-
-            // Categorize by payment type
-            if (payment.type === 'CASH') {
-              totalCashSales += amount;
-              // Cash tips are NOT counted here - they go in the envelope
-            } else {
-              // All non-cash payment tips (credit, debit, gift cards, etc.)
-              // Per Toast docs: "Sum the tipAmount values on each payment"
-              totalCreditTips += tipAmount;
-            }
-
-          } catch (paymentError) {
-            console.error(`Error processing payment ${paymentGuid}:`, paymentError.message);
+          } else {
+            hasMorePages = false;
           }
 
-          // Small delay every 10 payments to avoid rate limits
-          if (totalOrdersProcessed % 10 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 50));
-          }
+          // Small delay between pages to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
 
       } catch (dateError) {
