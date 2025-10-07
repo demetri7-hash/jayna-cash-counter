@@ -98,10 +98,11 @@ export default async function handler(req, res) {
               // Process each order (INCLUDING voided orders to get gross tips)
               for (const order of orders) {
                 // Enhanced void detection per Toast documentation
-                const isVoided = order.voided ||
-                                order.voidDate ||
-                                order.deleted ||
-                                order.deletedDate ||
+                // IMPORTANT: Check for TRUE values, not just field existence
+                const isVoided = order.voided === true ||
+                                (order.voidDate && order.voidDate !== null && order.voidDate !== '') ||
+                                order.deleted === true ||
+                                (order.deletedDate && order.deletedDate !== null && order.deletedDate !== '') ||
                                 order.guestOrderStatus === 'VOIDED' ||
                                 order.paymentStatus === 'VOIDED';
 
@@ -140,11 +141,11 @@ export default async function handler(req, res) {
                 // Process payments within checks
                 if (order.checks && Array.isArray(order.checks)) {
                   for (const check of order.checks) {
-                    // Enhanced check void detection
-                    const isCheckVoided = check.voided ||
-                                         check.voidDate ||
-                                         check.deleted ||
-                                         check.deletedDate;
+                    // Enhanced check void detection - check for TRUE values
+                    const isCheckVoided = check.voided === true ||
+                                         (check.voidDate && check.voidDate !== null && check.voidDate !== '') ||
+                                         check.deleted === true ||
+                                         (check.deletedDate && check.deletedDate !== null && check.deletedDate !== '');
 
                     // Track check-level discounts
                     let checkDiscounts = 0;
@@ -159,8 +160,8 @@ export default async function handler(req, res) {
                     // Track selection-level voids and discounts
                     if (check.selections && Array.isArray(check.selections)) {
                       for (const selection of check.selections) {
-                        // Selection void detection
-                        if (selection.voided || selection.voidDate) {
+                        // Selection void detection - check for TRUE values
+                        if (selection.voided === true || (selection.voidDate && selection.voidDate !== null && selection.voidDate !== '')) {
                           // Item was voided - this affects sales
                           const selectionPrice = selection.price || 0;
                           if (!isVoided && !isCheckVoided) {
@@ -185,13 +186,13 @@ export default async function handler(req, res) {
                         const tipAmount = payment.tipAmount || 0;
                         const amount = payment.amount || 0;
 
-                        // Check if payment itself is voided
+                        // Check if payment itself is voided - check for TRUE/valid values
                         const isPaymentVoided = payment.refundStatus === 'FULL' ||
                                                payment.refundStatus === 'PARTIAL' ||
                                                payment.refundStatus === 'REFUNDED' ||
-                                               payment.voided ||
+                                               payment.voided === true ||
                                                payment.paymentStatus === 'VOIDED' ||
-                                               payment.voidInfo;
+                                               (payment.voidInfo && Object.keys(payment.voidInfo).length > 0);
 
                         // Categorize by payment type (not cash, not delivery platforms)
                         const isCreditCardTip = payment.type !== 'CASH' &&
