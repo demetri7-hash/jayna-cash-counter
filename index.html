@@ -6229,27 +6229,36 @@
     }
 
     try {
-      // Copy exact working query from generateDateRangePDF
-      const { data: rangeData } = await supabase
-        .from('cash_counts')
-        .select('*')
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .not('pm_total', 'is', null)
-        .order('date', { ascending: true });
-
-      if (!rangeData || rangeData.length === 0) {
-        document.getElementById('calculatedCashTips').value = '';
-        return;
-      }
-
-      // Calculate total Toast cash sales using correct column name
+      // PRIORITY 1: Use API-fetched cash sales if available
       let totalToastCashSales = 0;
-      totalToastCashSales = rangeData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
+
+      if (apiFetchedData.salesData && apiFetchedData.salesData.cashSales) {
+        // Use API data (more accurate)
+        totalToastCashSales = apiFetchedData.salesData.cashSales;
+        console.log('calculateCashTips: Using API cash sales:', totalToastCashSales);
+      } else {
+        // PRIORITY 2: Fall back to database PM data if API data not available
+        const { data: rangeData } = await supabase
+          .from('cash_counts')
+          .select('*')
+          .gte('date', startDate)
+          .lte('date', endDate)
+          .not('pm_total', 'is', null)
+          .order('date', { ascending: true });
+
+        if (!rangeData || rangeData.length === 0) {
+          document.getElementById('calculatedCashTips').value = '';
+          return;
+        }
+
+        // Calculate total Toast cash sales using correct column name
+        totalToastCashSales = rangeData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
+        console.log('calculateCashTips: Using PM database data:', totalToastCashSales);
+      }
 
       // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
       const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
-      
+
       // Update the display
       document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
 
