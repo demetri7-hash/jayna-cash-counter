@@ -49,6 +49,10 @@ export default async function handler(req, res) {
     let totalTipsOnDiscountedChecks = 0;
     let debugOrderCount = 0; // Separate counter for debug logging
 
+    // Alternative calculation: from menu items (like Toast does)
+    let totalGrossSales = 0; // Sum of all item prices
+    let totalVoidedItemSales = 0; // Sales from voided items
+
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
     // ordersBulk gives us all payment data in paginated batches
@@ -155,17 +159,26 @@ export default async function handler(req, res) {
                       }
                     }
 
-                    // Track selection-level voids and discounts
+                    // Track selection-level (menu item) sales and voids
                     if (check.selections && Array.isArray(check.selections)) {
                       for (const selection of check.selections) {
+                        const selectionPrice = selection.price || 0;
+                        const selectionQuantity = selection.quantity || 1;
+                        const selectionTotal = selectionPrice * selectionQuantity;
+
                         // SIMPLIFIED selection void detection - only check voided boolean
-                        if (selection.voided === true) {
-                          // Item was voided - this affects sales
-                          const selectionPrice = selection.price || 0;
+                        const isSelectionVoided = selection.voided === true;
+
+                        if (isSelectionVoided) {
+                          // Item was voided - track separately
+                          totalVoidedItemSales += selectionTotal;
                           if (!isVoided && !isCheckVoided) {
                             // Only log if order/check not already voided
-                            console.log(`  Voided item: ${selection.itemName || 'Unknown'}, Price: $${selectionPrice}`);
+                            console.log(`  Voided item: ${selection.itemName || selection.item?.name || 'Unknown'}, Price: $${selectionPrice}, Qty: ${selectionQuantity}`);
                           }
+                        } else {
+                          // Not voided - add to gross sales
+                          totalGrossSales += selectionTotal;
                         }
 
                         // Selection-level discounts
@@ -275,11 +288,19 @@ export default async function handler(req, res) {
       }
     }
 
+    // Calculate net sales using Toast's method (from menu items)
+    const calculatedNetSales = totalGrossSales - totalDiscounts;
+
     console.log(`\n=== SALES SUMMARY COMPLETE ===`);
     console.log(`DEBUG: Total orders from API: ${debugOrderCount}`);
     console.log(`Orders Processed (non-voided): ${totalOrdersProcessed}`);
     console.log(`Orders marked as voided: ${debugOrderCount - totalOrdersProcessed}`);
-    console.log(`Net Sales: $${totalNetSales.toFixed(2)}`);
+    console.log(`\nSales Calculation Comparison:`);
+    console.log(`  Method 1 (from payments): $${totalNetSales.toFixed(2)}`);
+    console.log(`  Method 2 (from items): Gross $${totalGrossSales.toFixed(2)} - Discounts $${totalDiscounts.toFixed(2)} = $${calculatedNetSales.toFixed(2)}`);
+    console.log(`  Voided Item Sales: $${totalVoidedItemSales.toFixed(2)}`);
+    console.log(`  Using Method 2 for accuracy`);
+    console.log(`\nNet Sales (Toast method): $${calculatedNetSales.toFixed(2)}`);
     console.log(`Total Discounts: $${totalDiscounts.toFixed(2)}`);
     console.log(`Credit Tips (Gross): $${totalCreditTipsGross.toFixed(2)}`);
     console.log(`Voided Tips: $${totalVoidedTips.toFixed(2)}`);
@@ -294,7 +315,9 @@ export default async function handler(req, res) {
         start: startDate,
         end: endDate
       },
-      netSales: totalNetSales,
+      netSales: calculatedNetSales, // Using item-based calculation (Toast method)
+      grossSales: totalGrossSales, // For transparency
+      voidedItemSales: totalVoidedItemSales, // Track voided item sales
       creditTips: totalCreditTips,
       creditTipsGross: totalCreditTipsGross,
       voidedTips: totalVoidedTips,
@@ -307,7 +330,9 @@ export default async function handler(req, res) {
       debug: {
         totalOrdersFromAPI: debugOrderCount,
         ordersMarkedVoided: debugOrderCount - totalOrdersProcessed,
-        checkVercelLogsForSampleOrders: true
+        netSalesFromPayments: totalNetSales, // Show both methods
+        netSalesFromItems: calculatedNetSales,
+        voidedItemSales: totalVoidedItemSales
       }
     });
 
