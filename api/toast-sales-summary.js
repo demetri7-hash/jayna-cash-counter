@@ -101,6 +101,30 @@ export default async function handler(req, res) {
                   totalOrdersProcessed++;
                 }
 
+                // ENHANCED DEBUG: Log first 5 orders completely to see structure
+                if (totalOrdersProcessed <= 5) {
+                  console.log(`\n=== SAMPLE ORDER ${totalOrdersProcessed} (${order.orderNumber}) ===`);
+                  console.log('Order fields:', Object.keys(order));
+                  console.log('Order voided?', order.voided);
+                  console.log('Order voidDate?', order.voidDate);
+                  console.log('Order deletedDate?', order.deletedDate);
+                  console.log('Order deleted?', order.deleted);
+                  console.log('Order voidBusinessDate?', order.voidBusinessDate);
+                  if (order.checks && order.checks[0]) {
+                    console.log('Check fields:', Object.keys(order.checks[0]));
+                    console.log('Check voided?', order.checks[0].voided);
+                    console.log('Check voidDate?', order.checks[0].voidDate);
+                    if (order.checks[0].payments && order.checks[0].payments[0]) {
+                      console.log('Payment fields:', Object.keys(order.checks[0].payments[0]));
+                      console.log('Payment refundStatus?', order.checks[0].payments[0].refundStatus);
+                      console.log('Payment voided?', order.checks[0].payments[0].voided);
+                      console.log('Payment paymentStatus?', order.checks[0].payments[0].paymentStatus);
+                      console.log('Payment voidInfo?', order.checks[0].payments[0].voidInfo);
+                    }
+                  }
+                  console.log('=== END SAMPLE ===\n');
+                }
+
                 // Process payments within checks
                 if (order.checks && Array.isArray(order.checks)) {
                   for (const check of order.checks) {
@@ -128,7 +152,10 @@ export default async function handler(req, res) {
 
                         // Debug logging for all voided transactions
                         if (isVoided || isCheckVoided || isPaymentVoided) {
-                          console.log(`VOID: Order ${order.orderNumber}, Amount: $${amount}, Tip: $${tipAmount}, Type: ${payment.type}, OrderVoid: ${isVoided}, CheckVoid: ${isCheckVoided}, PaymentVoid: ${isPaymentVoided}`);
+                          console.log(`VOID DETECTED: Order ${order.orderNumber}, Amount: $${amount}, Tip: $${tipAmount}, Type: ${payment.type}`);
+                          console.log(`  Void reasons: OrderVoid=${isVoided}, CheckVoid=${isCheckVoided}, PaymentVoid=${isPaymentVoided}`);
+                          console.log(`  Order data: voided=${order.voided}, voidDate=${order.voidDate}, deleted=${order.deleted}`);
+                          console.log(`  Payment data: refundStatus=${payment.refundStatus}, paymentStatus=${payment.paymentStatus}\n`);
                         }
 
                         // Only include payment amounts from NON-VOIDED orders
