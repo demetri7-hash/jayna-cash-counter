@@ -1,6 +1,6 @@
-// Toast Sales Analytics API - Uses Payments endpoint (Homebase method)
-// Method: Payments endpoint with paidBusinessDate for 100% accuracy
-// NOTE: Analytics API requires separate credentials not included in Standard API access
+// Toast Sales Analytics API - Uses Payments endpoint for 100% accuracy
+// Method: Payments endpoint with businessDate (matches Toast Sales Summary)
+// NOTE: Uses businessDate (order fulfillment) NOT paidBusinessDate (payment date)
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -51,11 +51,13 @@ export default async function handler(req, res) {
 
     let allPaymentGuids = [];
 
-    // Get payment GUIDs for each business date using paidBusinessDate
+    // Get payment GUIDs for each business date using businessDate (NOT paidBusinessDate)
+    // businessDate = when order was fulfilled (matches Toast Sales Summary)
+    // paidBusinessDate = when payment was made (excludes pre-paid orders from fulfillment date)
     for (const businessDate of businessDates) {
-      console.log(`Fetching payments for paidBusinessDate: ${businessDate}`);
+      console.log(`Fetching payments for businessDate: ${businessDate}`);
 
-      const paymentsResponse = await fetch(`${TOAST_CONFIG.baseUrl}/orders/v2/payments?paidBusinessDate=${businessDate}`, {
+      const paymentsResponse = await fetch(`${TOAST_CONFIG.baseUrl}/orders/v2/payments?businessDate=${businessDate}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -191,8 +193,8 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v2.0-payments-only-20251007',
-      method: 'Payments endpoint with paidBusinessDate (Homebase method)',
+      version: 'v3.0-payments-businessDate-20251007',
+      method: 'Payments endpoint with businessDate (matches Toast Sales Summary)',
       dateRange: { startDate, endDate },
 
       // Sales calculated from payments
