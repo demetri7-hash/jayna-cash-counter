@@ -46,9 +46,11 @@ export default async function handler(req, res) {
 
     // Process each business date using Payments API (Toast's official recommendation)
     // Per Toast docs: "Poll the /payments endpoint using paidBusinessDate. Sum the tipAmount values."
-    for (const businessDate of businessDates) {
+    for (const dateStr of businessDates) {
       try {
-        console.log(`Fetching payments for ${businessDate}...`);
+        // Format date for Toast API (YYYYMMDD without dashes)
+        const businessDate = dateStr.replace(/-/g, '');
+        console.log(`Fetching payments for ${businessDate} (${dateStr})...`);
 
         // Get payment GUIDs for this business date
         const paymentsListUrl = `${toastApiUrl}/orders/v2/payments?paidBusinessDate=${businessDate}`;
@@ -125,7 +127,7 @@ export default async function handler(req, res) {
         }
 
       } catch (dateError) {
-        console.error(`Error processing date ${businessDate}:`, dateError.message);
+        console.error(`Error processing date ${dateStr}:`, dateError.message);
       }
     }
 
