@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // Set CORS headers (v2 - fixed void detection)
+  // Set CORS headers (v3 - fixed item calculation to exclude voided orders)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -160,6 +160,7 @@ export default async function handler(req, res) {
                     }
 
                     // Track selection-level (menu item) sales and voids
+                    // CRITICAL: Only process items from NON-VOIDED orders/checks
                     if (check.selections && Array.isArray(check.selections)) {
                       for (const selection of check.selections) {
                         const selectionPrice = selection.price || 0;
@@ -169,24 +170,24 @@ export default async function handler(req, res) {
                         // SIMPLIFIED selection void detection - only check voided boolean
                         const isSelectionVoided = selection.voided === true;
 
-                        if (isSelectionVoided) {
-                          // Item was voided - track separately
-                          totalVoidedItemSales += selectionTotal;
-                          if (!isVoided && !isCheckVoided) {
-                            // Only log if order/check not already voided
+                        // Only count items from non-voided orders/checks
+                        if (!isVoided && !isCheckVoided) {
+                          if (isSelectionVoided) {
+                            // Item was voided - track separately
+                            totalVoidedItemSales += selectionTotal;
                             console.log(`  Voided item: ${selection.itemName || selection.item?.name || 'Unknown'}, Price: $${selectionPrice}, Qty: ${selectionQuantity}`);
+                          } else {
+                            // Not voided - add to gross sales
+                            totalGrossSales += selectionTotal;
                           }
-                        } else {
-                          // Not voided - add to gross sales
-                          totalGrossSales += selectionTotal;
-                        }
 
-                        // Selection-level discounts
-                        if (selection.appliedDiscounts && Array.isArray(selection.appliedDiscounts)) {
-                          for (const discount of selection.appliedDiscounts) {
-                            const discountAmount = discount.discountAmount || 0;
-                            checkDiscounts += discountAmount;
-                            totalDiscounts += discountAmount;
+                          // Selection-level discounts
+                          if (selection.appliedDiscounts && Array.isArray(selection.appliedDiscounts)) {
+                            for (const discount of selection.appliedDiscounts) {
+                              const discountAmount = discount.discountAmount || 0;
+                              checkDiscounts += discountAmount;
+                              totalDiscounts += discountAmount;
+                            }
                           }
                         }
                       }
