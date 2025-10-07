@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // Set CORS headers (v4.0 - switched to payment-based calculation - item-based broken)
+  // Set CORS headers (v4.1 - added service charge tracking + payment breakdown)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -53,6 +53,12 @@ export default async function handler(req, res) {
     // Alternative calculation: from menu items (like Toast does)
     let totalGrossSales = 0; // Sum of all item prices
     let totalVoidedItemSales = 0; // Sales from voided items
+
+    // Service charge tracking
+    let totalServiceCharges = 0;
+
+    // Payment type breakdown for debugging
+    let paymentTypeBreakdown = {};
 
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
@@ -160,6 +166,14 @@ export default async function handler(req, res) {
                       }
                     }
 
+                    // Track check-level service charges (NOT payments, but added to net sales)
+                    if (!isVoided && !isCheckVoided && check.appliedServiceCharges && Array.isArray(check.appliedServiceCharges)) {
+                      for (const serviceCharge of check.appliedServiceCharges) {
+                        const chargeAmount = serviceCharge.chargeAmount || 0;
+                        totalServiceCharges += chargeAmount;
+                      }
+                    }
+
                     // Track selection-level (menu item) sales and voids
                     // CRITICAL: Only process items from NON-VOIDED orders/checks
                     if (check.selections && Array.isArray(check.selections)) {
@@ -222,6 +236,15 @@ export default async function handler(req, res) {
                         // (voided orders still appear in API but shouldn't count toward sales)
                         if (!isVoided && !isCheckVoided && !isPaymentVoided) {
                           totalNetSales += amount;
+
+                          // Track payment types for debugging
+                          const paymentType = payment.type || 'UNKNOWN';
+                          if (!paymentTypeBreakdown[paymentType]) {
+                            paymentTypeBreakdown[paymentType] = { count: 0, amount: 0, tips: 0 };
+                          }
+                          paymentTypeBreakdown[paymentType].count++;
+                          paymentTypeBreakdown[paymentType].amount += amount;
+                          paymentTypeBreakdown[paymentType].tips += tipAmount;
                         }
 
                         // Handle tips separately - track ALL tips including voided for transparency
@@ -294,19 +317,26 @@ export default async function handler(req, res) {
     const calculatedNetSales = totalGrossSales - totalDiscounts;
 
     // CRITICAL FIX: Item-based calculation is broken (3.4x inflated)
-    // Use payment-based calculation instead (only $79 off vs $113k off!)
-    const finalNetSales = totalNetSales; // Payment-based is accurate
+    // Use payment-based calculation + service charges
+    const finalNetSales = totalNetSales + totalServiceCharges;
 
     console.log(`\n=== SALES SUMMARY COMPLETE ===`);
+    console.log(`\nPayment Type Breakdown:`);
+    for (const [type, data] of Object.entries(paymentTypeBreakdown)) {
+      console.log(`  ${type}: ${data.count} payments, $${data.amount.toFixed(2)} amount, $${data.tips.toFixed(2)} tips`);
+    }
     console.log(`DEBUG: Total orders from API: ${debugOrderCount}`);
     console.log(`Orders Processed (non-voided): ${totalOrdersProcessed}`);
     console.log(`Orders marked as voided: ${debugOrderCount - totalOrdersProcessed}`);
     console.log(`\nSales Calculation Comparison:`);
-    console.log(`  Method 1 (from payments): $${totalNetSales.toFixed(2)} ✓ USING THIS`);
+    console.log(`  Method 1 (from payments): $${totalNetSales.toFixed(2)}`);
+    console.log(`  + Service Charges: $${totalServiceCharges.toFixed(2)}`);
+    console.log(`  = Net Sales: $${finalNetSales.toFixed(2)} ✓ USING THIS`);
     console.log(`  Method 2 (from items): Gross $${totalGrossSales.toFixed(2)} - Discounts $${totalDiscounts.toFixed(2)} = $${calculatedNetSales.toFixed(2)} ✗ BROKEN`);
     console.log(`  Voided Item Sales: $${totalVoidedItemSales.toFixed(2)}`);
-    console.log(`  Using Method 1 (payments) - only $79 off vs $113k off!`);
-    console.log(`\nNet Sales (from payments): $${finalNetSales.toFixed(2)}`);
+    console.log(`\nNet Sales (payments + service charges): $${finalNetSales.toFixed(2)}`);
+    console.log(`  Base Payments: $${totalNetSales.toFixed(2)}`);
+    console.log(`  Service Charges: $${totalServiceCharges.toFixed(2)}`);
     console.log(`Total Discounts: $${totalDiscounts.toFixed(2)}`);
     console.log(`Credit Tips (Gross): $${totalCreditTipsGross.toFixed(2)}`);
     console.log(`Voided Tips: $${totalVoidedTips.toFixed(2)}`);
@@ -317,12 +347,12 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v4.0-payments-20251006-2350', // Using payment-based calculation
+      version: 'v4.1-service-charges-20251007-0000', // Added service charge tracking
       dateRange: {
         start: startDate,
         end: endDate
       },
-      netSales: finalNetSales, // Using payment-based calculation (accurate!)
+      netSales: finalNetSales, // Payment-based + service charges
       grossSales: totalGrossSales, // For transparency
       voidedItemSales: totalVoidedItemSales, // Track voided item sales
       creditTips: totalCreditTips,
@@ -330,6 +360,7 @@ export default async function handler(req, res) {
       voidedTips: totalVoidedTips,
       cashSales: totalCashSales,
       discounts: totalDiscounts,
+      serviceCharges: totalServiceCharges, // NEW
       tipsOnDiscountedChecks: totalTipsOnDiscountedChecks,
       businessDatesProcessed: businessDates.length,
       ordersProcessed: totalOrdersProcessed,
@@ -337,9 +368,12 @@ export default async function handler(req, res) {
       debug: {
         totalOrdersFromAPI: debugOrderCount,
         ordersMarkedVoided: debugOrderCount - totalOrdersProcessed,
-        netSalesFromPayments: totalNetSales, // Using this one!
+        basePayments: totalNetSales, // Before service charges
+        serviceCharges: totalServiceCharges,
+        netSalesFromPayments: finalNetSales, // After adding service charges
         netSalesFromItems: calculatedNetSales, // Broken (3.4x inflated)
-        voidedItemSales: totalVoidedItemSales
+        voidedItemSales: totalVoidedItemSales,
+        paymentTypeBreakdown: paymentTypeBreakdown // NEW
       }
     });
 
