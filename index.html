@@ -6440,6 +6440,8 @@
         creditTips: salesResult.creditTips,
         creditTipsGross: salesResult.creditTipsGross || salesResult.creditTips,
         voidedTips: salesResult.voidedTips || 0,
+        discounts: salesResult.discounts || 0,
+        tipsOnDiscountedChecks: salesResult.tipsOnDiscountedChecks || 0,
         cashSales: salesResult.cashSales,
         netSales: salesResult.netSales
       };
@@ -6449,12 +6451,21 @@
 
       console.log('Auto-fetch complete:', { laborResult, salesResult });
 
-      // Display voided tips summary if any
-      if (salesResult.voidedTips && salesResult.voidedTips > 0) {
-        console.log(`\n⚠️ VOIDED TIPS: $${salesResult.voidedTips.toFixed(2)}`);
-        console.log(`Credit Tips (Gross): $${salesResult.creditTipsGross.toFixed(2)}`);
-        console.log(`Credit Tips (Net): $${salesResult.creditTips.toFixed(2)}`);
+      // Display enhanced sales summary
+      console.log(`\n=== SALES SUMMARY ===`);
+      console.log(`Net Sales: $${salesResult.netSales.toFixed(2)}`);
+      if (salesResult.discounts && salesResult.discounts > 0) {
+        console.log(`Total Discounts: $${salesResult.discounts.toFixed(2)}`);
       }
+      console.log(`Credit Tips (Gross): $${salesResult.creditTipsGross.toFixed(2)}`);
+      if (salesResult.voidedTips && salesResult.voidedTips > 0) {
+        console.log(`  - Voided Tips: -$${salesResult.voidedTips.toFixed(2)}`);
+      }
+      if (salesResult.tipsOnDiscountedChecks && salesResult.tipsOnDiscountedChecks > 0) {
+        console.log(`  - Tips on Discounted Checks: $${salesResult.tipsOnDiscountedChecks.toFixed(2)}`);
+      }
+      console.log(`Credit Tips (Net): $${salesResult.creditTips.toFixed(2)}`);
+      console.log(`===================\n`);
 
     } catch (error) {
       console.error('Auto-fetch error:', error);
