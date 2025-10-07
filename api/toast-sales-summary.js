@@ -287,7 +287,9 @@ export default async function handler(req, res) {
     }
 
     console.log(`\n=== SALES SUMMARY COMPLETE ===`);
-    console.log(`Orders Processed: ${totalOrdersProcessed}`);
+    console.log(`DEBUG: Total orders from API: ${debugOrderCount}`);
+    console.log(`Orders Processed (non-voided): ${totalOrdersProcessed}`);
+    console.log(`Orders marked as voided: ${debugOrderCount - totalOrdersProcessed}`);
     console.log(`Net Sales: $${totalNetSales.toFixed(2)}`);
     console.log(`Total Discounts: $${totalDiscounts.toFixed(2)}`);
     console.log(`Credit Tips (Gross): $${totalCreditTipsGross.toFixed(2)}`);
@@ -311,7 +313,13 @@ export default async function handler(req, res) {
       discounts: totalDiscounts,
       tipsOnDiscountedChecks: totalTipsOnDiscountedChecks,
       businessDatesProcessed: businessDates.length,
-      ordersProcessed: totalOrdersProcessed
+      ordersProcessed: totalOrdersProcessed,
+      // Debug info
+      debug: {
+        totalOrdersFromAPI: debugOrderCount,
+        ordersMarkedVoided: debugOrderCount - totalOrdersProcessed,
+        checkVercelLogsForSampleOrders: true
+      }
     });
 
   } catch (error) {
