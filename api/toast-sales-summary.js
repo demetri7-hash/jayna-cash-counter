@@ -74,6 +74,10 @@ export default async function handler(req, res) {
     // NOTE: Gift card PAYMENTS are valid and counted! Only SALES of new cards are excluded.
     let giftCardItemsSold = [];
 
+    // V6.11 DIAGNOSTIC: Log selection structures to identify gift card properties
+    let selectionSampleCount = 0;
+    let selectionStructures = [];
+
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
     // ordersBulk gives us all payment data in paginated batches
@@ -274,6 +278,23 @@ export default async function handler(req, res) {
                         const selectionPrice = selection.price || 0;
                         const selectionQuantity = selection.quantity || 1;
                         const selectionTotal = selectionPrice * selectionQuantity;
+
+                        // V6.11 DIAGNOSTIC: Capture selection structures (first 10 + any with 'gift' in name)
+                        const selectionName = (selection.itemName || selection.item?.name || '').toLowerCase();
+                        if (selectionSampleCount < 10 || selectionName.includes('gift') || selectionName.includes('card')) {
+                          selectionStructures.push({
+                            name: selection.itemName || selection.item?.name,
+                            price: selectionPrice,
+                            quantity: selectionQuantity,
+                            salesCategory: selection.salesCategory?.name,
+                            itemGroup: selection.itemGroup?.name,
+                            diningOption: selection.diningOption?.behavior,
+                            voided: selection.voided,
+                            allKeys: Object.keys(selection),
+                            order: order.orderNumber
+                          });
+                          selectionSampleCount++;
+                        }
 
                         // SIMPLIFIED selection void detection - only check voided boolean
                         const isSelectionVoided = selection.voided === true;
@@ -519,7 +540,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.10-exclude-giftcard-items-20251007-0740', // CRITICAL: Exclude gift card ITEMS sold, not payment types!
+      version: 'v6.11-capture-selection-structures-20251007-0745', // DIAGNOSTIC: Capture selection structures to identify gift card
       dateRange: {
         start: startDate,
         end: endDate
@@ -567,6 +588,12 @@ export default async function handler(req, res) {
           totalAmount: giftCardItemsSold.reduce((sum, gc) => sum + gc.amount, 0),
           items: giftCardItemsSold,
           message: giftCardItemsSold.length === 0 ? 'NO GIFT CARD ITEMS FOUND - Check selection properties!' : `Found ${giftCardItemsSold.length} gift card item(s) sold`
+        },
+        // V6.11 DIAGNOSTIC: Selection structures to identify gift card properties
+        v611_selectionStructures: {
+          count: selectionStructures.length,
+          selections: selectionStructures.slice(0, 20), // First 20 to avoid huge response
+          message: `Captured ${selectionStructures.length} selection samples. Look for $40 item or 'gift' in names.`
         }
       }
     });
