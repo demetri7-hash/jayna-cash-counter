@@ -44,7 +44,14 @@ export default async function handler(req, res) {
       .order('date', { ascending: true });
 
     if (error) {
-      throw new Error(`Database error: ${error.message}`);
+      // Table doesn't exist yet or other DB error - return graceful 404
+      console.log('Database error (likely table not created yet):', error.message);
+      return res.status(404).json({
+        success: false,
+        error: 'Database table not ready yet',
+        message: 'Automated data not available. The system will create this automatically tomorrow.',
+        hasData: false
+      });
     }
 
     if (!data || data.length === 0) {

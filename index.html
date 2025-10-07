@@ -1391,14 +1391,18 @@
     initializeSupabase();
     initializeEmailJS();
     setTodayDate();
-    
+
     // Load saved data (removed loadTipPoolData to reset tip pool fields every time)
     loadCombinedReportData();
-    
+
     // Initialize TDS data and button state
     resetTdsData();
     updateCalculateButtonState();
-    
+
+    // Add file upload listeners to show status when files are selected
+    document.getElementById('laborFile').addEventListener('change', handleFileUpload);
+    document.getElementById('salesFile').addEventListener('change', handleFileUpload);
+
     // Removed "App ready" message to prevent page bouncing
   });
   
@@ -6431,6 +6435,27 @@
     updateCalculateButtonState();
   }
 
+  // Handle file upload - show status and clear API data
+  function handleFileUpload() {
+    const laborFile = document.getElementById('laborFile').files[0];
+    const salesFile = document.getElementById('salesFile').files[0];
+    const statusDiv = document.getElementById('autoFetchStatus');
+
+    if (laborFile && salesFile) {
+      // Both files uploaded - clear any API data and show success message
+      apiFetchedData.laborData = null;
+      apiFetchedData.salesData = null;
+      statusDiv.innerHTML = '<span style="color: #28a745;">✓ Files uploaded - will use these instead of database/API</span>';
+      console.log('Files uploaded, API data cleared');
+    } else if (laborFile || salesFile) {
+      // Only one file - show reminder
+      statusDiv.innerHTML = '<span style="color: #ffc107;">⚠ Please upload both Labor Summary CSV and Sales Summary ZIP</span>';
+    } else {
+      // No files - clear message
+      statusDiv.innerHTML = '';
+    }
+  }
+
   // Global storage for API-fetched data
   let apiFetchedData = {
     laborData: null,
@@ -6444,6 +6469,18 @@
 
     if (!startDate || !endDate) {
       return; // Silently skip if dates not set
+    }
+
+    // CRITICAL: Skip auto-fetch if user has already uploaded files
+    const laborFile = document.getElementById('laborFile').files[0];
+    const salesFile = document.getElementById('salesFile').files[0];
+    const hasFiles = laborFile && salesFile;
+
+    if (hasFiles) {
+      console.log('Files already uploaded - skipping auto-fetch');
+      const statusDiv = document.getElementById('autoFetchStatus');
+      statusDiv.innerHTML = '<span style="color: #28a745;">✓ Using uploaded files (will bypass database and API)</span>';
+      return; // User wants to use uploaded files, don't fetch!
     }
 
     // Show loading overlay
