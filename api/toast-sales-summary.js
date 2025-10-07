@@ -94,9 +94,31 @@ export default async function handler(req, res) {
 
               // Process each order
               for (const order of orders) {
-                // Skip voided orders
+                // Track voided orders and their tips
                 if (order.voided || order.voidDate) {
-                  continue;
+                  // Extract tips from voided orders for reporting
+                  if (order.checks && Array.isArray(order.checks)) {
+                    for (const check of order.checks) {
+                      if (check.payments && Array.isArray(check.payments)) {
+                        for (const payment of check.payments) {
+                          const tipAmount = payment.tipAmount || 0;
+                          if (tipAmount > 0 && payment.type !== 'CASH') {
+                            voidedTipsDetails.push({
+                              orderNumber: order.orderNumber || 'N/A',
+                              businessDate: order.businessDate,
+                              paymentType: payment.type,
+                              tipAmount: tipAmount,
+                              totalAmount: (payment.amount || 0) + tipAmount,
+                              voidReason: 'ORDER_VOIDED',
+                              checkNumber: check.checkNumber || 'N/A',
+                              voidDate: order.voidDate || 'N/A'
+                            });
+                          }
+                        }
+                      }
+                    }
+                  }
+                  continue; // Skip voided orders
                 }
 
                 totalOrdersProcessed++;
