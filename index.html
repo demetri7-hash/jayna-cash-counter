@@ -640,6 +640,51 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 </head>
 <body>
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+  ">
+    <div style="
+      text-align: center;
+      color: white;
+    ">
+      <div class="spinner" style="
+        border: 8px solid #f3f3f3;
+        border-top: 8px solid #4CAF50;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+      "></div>
+      <div id="loadingText" style="
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 10px;
+      ">Fetching Toast data...</div>
+      <div id="loadingSubtext" style="
+        font-size: 14px;
+        color: #ccc;
+      ">This may take up to 2 minutes</div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+
   <div class="container">
     <div class="header">
       <h1>JAYNA GYRO CASH COUNTER</h1>
@@ -6392,6 +6437,10 @@
       return; // Silently skip if dates not set
     }
 
+    // Show loading overlay
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    loadingOverlay.style.display = 'flex';
+
     // Update status indicator
     const statusDiv = document.getElementById('autoFetchStatus');
     statusDiv.innerHTML = '<span style="color: #666;">Fetching data from Toast...</span>';
@@ -6399,6 +6448,7 @@
     try {
       // Step 1: Get Toast API access token
       console.log('Auto-fetching Toast data...');
+      document.getElementById('loadingText').textContent = 'Authenticating with Toast API...';
       const authResponse = await fetch('/api/toast-auth', {
         method: 'POST',
         headers: {
@@ -6419,6 +6469,9 @@
       const token = authData.data.accessToken;
 
       // Step 2: Fetch labor and sales data in parallel
+      document.getElementById('loadingText').textContent = 'Fetching labor and payment data...';
+      document.getElementById('loadingSubtext').textContent = 'Processing hundreds of payments - this takes 1-2 minutes';
+
       const [laborResponse, salesResponse] = await Promise.all([
         fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`),
         fetch(`/api/toast-sales-analytics?startDate=${startDate}&endDate=${endDate}&token=${token}`)
@@ -6473,10 +6526,16 @@
       console.log(`Total Tips: $${salesResult.totalTips.toFixed(2)}`);
       console.log(`===================\n`);
 
+      // Hide loading overlay on success
+      loadingOverlay.style.display = 'none';
+
     } catch (error) {
       console.error('Auto-fetch error:', error);
       const statusDiv = document.getElementById('autoFetchStatus');
       statusDiv.innerHTML = '<span style="color: #dc3545;">Failed to fetch data. You can upload files manually instead.</span>';
+
+      // Hide loading overlay on error
+      loadingOverlay.style.display = 'none';
     }
   }
 
