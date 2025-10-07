@@ -81,6 +81,9 @@ export default async function handler(req, res) {
     // V6.13 CRITICAL DIAGNOSTIC: Track ALL CREDIT payments for comprehensive analysis
     let allCreditPayments = [];
 
+    // V6.15 CRITICAL: Track HOUSE_ACCOUNT payments (should be excluded like gift cards)
+    let houseAccountPayments = [];
+
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
     // ordersBulk gives us all payment data in paginated batches
@@ -398,6 +401,16 @@ export default async function handler(req, res) {
                         // "Net sales excludes purchases of gift cards or house account payments"
                         const isHouseAccount = payment.type === 'HOUSE_ACCOUNT';
 
+                        // V6.15 DIAGNOSTIC: Track house account payments
+                        if (isHouseAccount && !isOrderExcluded && !isCheckExcluded) {
+                          houseAccountPayments.push({
+                            amount: amount,
+                            tipAmount: tipAmount,
+                            orderNumber: order.orderNumber,
+                            businessDate: order.businessDate
+                          });
+                        }
+
                         // Categorize by payment type (not cash, not delivery platforms, not house account)
                         const isCreditCardTip = payment.type !== 'CASH' &&
                                                payment.type !== 'OTHER' &&
@@ -574,7 +587,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.14-detect-prepaid-future-orders-20251007-0805', // Detect pre-paid future orders (paid outside date range)
+      version: 'v6.15-detect-house-accounts-20251007-0820', // Detect HOUSE_ACCOUNT payments (excluded from sales)
       dateRange: {
         start: startDate,
         end: endDate
@@ -695,6 +708,16 @@ export default async function handler(req, res) {
           sampleCounted: allCreditPayments.filter(p => p.willBeCounted).slice(0, 10),
           sampleExcluded: allCreditPayments.filter(p => p.willBeExcluded),
           message: `Total: ${allCreditPayments.length}, Counted: ${allCreditPayments.filter(p => p.willBeCounted).length}, Excluded: ${allCreditPayments.filter(p => p.willBeExcluded).length}`
+        },
+        // V6.15 HOUSE ACCOUNT DETECTION
+        v615_houseAccountPayments: {
+          count: houseAccountPayments.length,
+          totalAmount: houseAccountPayments.reduce((sum, p) => sum + p.amount, 0),
+          totalTips: houseAccountPayments.reduce((sum, p) => sum + p.tipAmount, 0),
+          payments: houseAccountPayments,
+          message: houseAccountPayments.length > 0
+            ? `FOUND ${houseAccountPayments.length} HOUSE_ACCOUNT payments - these are excluded from net sales`
+            : 'No HOUSE_ACCOUNT payments found'
         }
       }
     });
