@@ -328,6 +328,11 @@ export default async function handler(req, res) {
                           }
                         }
 
+                        // V6.4 DIAGNOSTIC: Log ALL payments with tips to identify missing $70.40
+                        if (tipAmount > 0 && !isOrderExcluded && !isCheckExcluded && !isFullyVoided) {
+                          console.log(`💰 TIP FOUND: Type="${payment.type}" Amount=$${tipAmount} Counted=${isCreditCardTip} Order=${order.orderNumber}`);
+                        }
+
                         // Handle tips separately - track ALL tips including voided for transparency
                         if (isCreditCardTip && tipAmount > 0) {
                           orderHasTips = true;
@@ -403,10 +408,15 @@ export default async function handler(req, res) {
     const finalNetSales = totalNetSales;
 
     console.log(`\n=== SALES SUMMARY COMPLETE ===`);
-    console.log(`\nPayment Type Breakdown:`);
+    console.log(`\n💰 V6.4 DIAGNOSTIC: Check logs above for all tips by payment type`);
+    console.log(`\nPayment Type Breakdown (includes tips):`);
     for (const [type, data] of Object.entries(paymentTypeBreakdown)) {
       console.log(`  ${type}: ${data.count} payments, $${data.amount.toFixed(2)} amount, $${data.tips.toFixed(2)} tips`);
     }
+    console.log(`\n🎯 CREDIT TIPS ANALYSIS:`);
+    console.log(`  Current (excluding OTHER/CASH/HOUSE_ACCOUNT): $${totalCreditTips.toFixed(2)}`);
+    console.log(`  Toast Sales Summary shows: $2,675.93`);
+    console.log(`  Discrepancy: $${(2675.93 - totalCreditTips).toFixed(2)} ${totalCreditTips < 2675.93 ? 'MISSING' : 'EXTRA'}`);
     console.log(`\nDEBUG: Total orders from API: ${debugOrderCount}`);
     console.log(`  Orders Processed (active): ${totalOrdersProcessed}`);
     console.log(`  Orders VOIDED (order-level): ${totalVoidedOrders}`);
@@ -432,7 +442,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.3-exclude-giftcards-20251007-0600', // Exclude GIFTCARD payments from net sales (deferred revenue)
+      version: 'v6.4-diagnostic-tips-20251007-0615', // Diagnostic logging to identify $70.40 credit tips discrepancy
       dateRange: {
         start: startDate,
         end: endDate
