@@ -104,6 +104,9 @@ export default async function handler(req, res) {
                 // Process payments within checks
                 if (order.checks && Array.isArray(order.checks)) {
                   for (const check of order.checks) {
+                    // Check if check is voided
+                    const isCheckVoided = check.voided || check.voidDate;
+
                     if (check.payments && Array.isArray(check.payments)) {
                       for (const payment of check.payments) {
                         const tipAmount = payment.tipAmount || 0;
@@ -123,8 +126,13 @@ export default async function handler(req, res) {
                                                payment.type !== 'HOUSE_ACCOUNT' &&
                                                payment.type !== 'UNDECLARED_CASH';
 
+                        // Debug logging for voided tips
+                        if (tipAmount > 0 && isCreditCardTip && (isVoided || isCheckVoided || isPaymentVoided)) {
+                          console.log(`VOIDED TIP FOUND: Order ${order.orderNumber}, Tip: $${tipAmount}, OrderVoided: ${isVoided}, CheckVoided: ${isCheckVoided}, PaymentVoided: ${isPaymentVoided}, RefundStatus: ${payment.refundStatus}`);
+                        }
+
                         // Add payment amount to net sales (excluding tips)
-                        if (!isVoided && !isPaymentVoided) {
+                        if (!isVoided && !isCheckVoided && !isPaymentVoided) {
                           totalNetSales += amount;
                         }
 
@@ -133,8 +141,8 @@ export default async function handler(req, res) {
                           // Add to gross tips (all tips before voiding)
                           totalCreditTipsGross += tipAmount;
 
-                          // If voided (order or payment level), add to voided total
-                          if (isVoided || isPaymentVoided) {
+                          // If voided (order, check, or payment level), add to voided total
+                          if (isVoided || isCheckVoided || isPaymentVoided) {
                             totalVoidedTips += tipAmount;
                           } else {
                             // Only add to net tips if NOT voided
@@ -143,7 +151,7 @@ export default async function handler(req, res) {
                         }
 
                         // Track cash sales separately
-                        if (payment.type === 'CASH' && !isVoided && !isPaymentVoided) {
+                        if (payment.type === 'CASH' && !isVoided && !isCheckVoided && !isPaymentVoided) {
                           totalCashSales += amount;
                         }
                       }
