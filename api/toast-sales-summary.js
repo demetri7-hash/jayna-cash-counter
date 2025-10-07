@@ -43,6 +43,7 @@ export default async function handler(req, res) {
     let totalCreditTips = 0;
     let totalCashSales = 0;
     let totalOrdersProcessed = 0;
+    let voidedTipsDetails = []; // Track voided tip transactions
 
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
@@ -112,6 +113,20 @@ export default async function handler(req, res) {
                         if (payment.refundStatus === 'FULL' || payment.refundStatus === 'PARTIAL' ||
                             payment.refundStatus === 'REFUNDED' || payment.voided ||
                             payment.paymentStatus === 'VOIDED' || payment.voidInfo) {
+
+                          // Track voided tips for detailed reporting (only non-cash tips)
+                          if (tipAmount > 0 && payment.type !== 'CASH') {
+                            voidedTipsDetails.push({
+                              orderNumber: order.orderNumber || 'N/A',
+                              businessDate: order.businessDate,
+                              paymentType: payment.type,
+                              tipAmount: tipAmount,
+                              totalAmount: amount + tipAmount,
+                              voidReason: payment.voidInfo?.voidBusinessDate || payment.refundStatus || 'VOIDED',
+                              checkNumber: check.checkNumber || 'N/A'
+                            });
+                          }
+
                           console.log(`Skipping voided/refunded payment: ${payment.type} $${amount} tip:$${tipAmount}`);
                           continue;
                         }
@@ -175,11 +190,15 @@ export default async function handler(req, res) {
       }
     }
 
+    // Calculate total voided tips
+    const totalVoidedTips = voidedTipsDetails.reduce((sum, v) => sum + v.tipAmount, 0);
+
     console.log(`Sales Summary Complete:`);
     console.log(`- Orders Processed: ${totalOrdersProcessed}`);
     console.log(`- Net Sales: $${totalNetSales.toFixed(2)}`);
     console.log(`- Credit Tips: $${totalCreditTips.toFixed(2)}`);
     console.log(`- Cash Sales: $${totalCashSales.toFixed(2)}`);
+    console.log(`- Voided Tips: $${totalVoidedTips.toFixed(2)} (${voidedTipsDetails.length} transactions)`);
 
     return res.json({
       success: true,
@@ -191,7 +210,12 @@ export default async function handler(req, res) {
       creditTips: totalCreditTips,
       cashSales: totalCashSales,
       businessDatesProcessed: businessDates.length,
-      ordersProcessed: totalOrdersProcessed
+      ordersProcessed: totalOrdersProcessed,
+      voidedTips: {
+        total: totalVoidedTips,
+        count: voidedTipsDetails.length,
+        details: voidedTipsDetails
+      }
     });
 
   } catch (error) {
