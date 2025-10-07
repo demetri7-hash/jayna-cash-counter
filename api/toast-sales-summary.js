@@ -41,9 +41,10 @@ export default async function handler(req, res) {
 
     let totalNetSales = 0;
     let totalCreditTips = 0;
+    let totalCreditTipsGross = 0; // Before voiding
     let totalCashSales = 0;
     let totalOrdersProcessed = 0;
-    let voidedTipsDetails = []; // Track voided tip transactions
+    let totalVoidedTips = 0;
 
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
@@ -92,36 +93,13 @@ export default async function handler(req, res) {
             if (Array.isArray(orders) && orders.length > 0) {
               console.log(`${businessDate} Page ${page}: ${orders.length} orders (total processed: ${totalOrdersProcessed})`);
 
-              // Process each order
+              // Process each order (INCLUDING voided orders to get gross tips)
               for (const order of orders) {
-                // Track voided orders and their tips
-                if (order.voided || order.voidDate) {
-                  // Extract tips from voided orders for reporting
-                  if (order.checks && Array.isArray(order.checks)) {
-                    for (const check of order.checks) {
-                      if (check.payments && Array.isArray(check.payments)) {
-                        for (const payment of check.payments) {
-                          const tipAmount = payment.tipAmount || 0;
-                          if (tipAmount > 0 && payment.type !== 'CASH') {
-                            voidedTipsDetails.push({
-                              orderNumber: order.orderNumber || 'N/A',
-                              businessDate: order.businessDate,
-                              paymentType: payment.type,
-                              tipAmount: tipAmount,
-                              totalAmount: (payment.amount || 0) + tipAmount,
-                              voidReason: 'ORDER_VOIDED',
-                              checkNumber: check.checkNumber || 'N/A',
-                              voidDate: order.voidDate || 'N/A'
-                            });
-                          }
-                        }
-                      }
-                    }
-                  }
-                  continue; // Skip voided orders
-                }
+                const isVoided = order.voided || order.voidDate;
 
-                totalOrdersProcessed++;
+                if (!isVoided) {
+                  totalOrdersProcessed++;
+                }
 
                 // Process payments within checks
                 if (order.checks && Array.isArray(order.checks)) {
@@ -131,45 +109,36 @@ export default async function handler(req, res) {
                         const tipAmount = payment.tipAmount || 0;
                         const amount = payment.amount || 0;
 
-                        // Skip voided/refunded payments (same logic as TDS API)
-                        if (payment.refundStatus === 'FULL' || payment.refundStatus === 'PARTIAL' ||
-                            payment.refundStatus === 'REFUNDED' || payment.voided ||
-                            payment.paymentStatus === 'VOIDED' || payment.voidInfo) {
+                        // Check if payment itself is voided
+                        const isPaymentVoided = payment.refundStatus === 'FULL' ||
+                                               payment.refundStatus === 'PARTIAL' ||
+                                               payment.refundStatus === 'REFUNDED' ||
+                                               payment.voided ||
+                                               payment.paymentStatus === 'VOIDED' ||
+                                               payment.voidInfo;
 
-                          // Track voided tips for detailed reporting (only non-cash tips)
-                          if (tipAmount > 0 && payment.type !== 'CASH') {
-                            voidedTipsDetails.push({
-                              orderNumber: order.orderNumber || 'N/A',
-                              businessDate: order.businessDate,
-                              paymentType: payment.type,
-                              tipAmount: tipAmount,
-                              totalAmount: amount + tipAmount,
-                              voidReason: payment.voidInfo?.voidBusinessDate || payment.refundStatus || 'VOIDED',
-                              checkNumber: check.checkNumber || 'N/A'
-                            });
+                        // Categorize by payment type (not cash, not delivery platforms)
+                        const isCreditCardTip = payment.type !== 'CASH' &&
+                                               payment.type !== 'OTHER' &&
+                                               payment.type !== 'HOUSE_ACCOUNT' &&
+                                               payment.type !== 'UNDECLARED_CASH';
+
+                        if (isCreditCardTip && tipAmount > 0) {
+                          // Add to gross tips (all tips before voiding)
+                          totalCreditTipsGross += tipAmount;
+
+                          // If voided (order or payment level), add to voided total
+                          if (isVoided || isPaymentVoided) {
+                            totalVoidedTips += tipAmount;
+                          } else {
+                            // Only add to net tips if NOT voided
+                            totalCreditTips += tipAmount;
+                            totalNetSales += amount + tipAmount;
                           }
-
-                          console.log(`Skipping voided/refunded payment: ${payment.type} $${amount} tip:$${tipAmount}`);
-                          continue;
-                        }
-
-                        // Net sales = sum of all payment amounts (including tips)
-                        totalNetSales += amount + tipAmount;
-
-                        // Categorize by payment type
-                        if (payment.type === 'CASH') {
+                        } else if (payment.type === 'CASH' && !isVoided && !isPaymentVoided) {
+                          // Only count cash sales if not voided
                           totalCashSales += amount;
-                          // Cash payments don't have tips in our system
-                        } else if (payment.type === 'OTHER' || payment.type === 'HOUSE_ACCOUNT' ||
-                                   payment.type === 'UNDECLARED_CASH') {
-                          // Exclude OTHER (DoorDash/Grubhub/Uber) - those tips go to delivery drivers
-                          console.log(`Excluding delivery platform tip: ${payment.type} tip:$${tipAmount}`);
-                        } else {
-                          // All other payment types (credit cards, debit, gift cards, etc.) get tips counted
-                          if (tipAmount > 0) {
-                            console.log(`Credit tip: ${payment.type} tip:$${tipAmount}`);
-                          }
-                          totalCreditTips += tipAmount;
+                          totalNetSales += amount;
                         }
                       }
                     }
@@ -212,15 +181,13 @@ export default async function handler(req, res) {
       }
     }
 
-    // Calculate total voided tips
-    const totalVoidedTips = voidedTipsDetails.reduce((sum, v) => sum + v.tipAmount, 0);
-
     console.log(`Sales Summary Complete:`);
     console.log(`- Orders Processed: ${totalOrdersProcessed}`);
     console.log(`- Net Sales: $${totalNetSales.toFixed(2)}`);
-    console.log(`- Credit Tips: $${totalCreditTips.toFixed(2)}`);
+    console.log(`- Credit Tips (Gross): $${totalCreditTipsGross.toFixed(2)}`);
+    console.log(`- Voided Tips: $${totalVoidedTips.toFixed(2)}`);
+    console.log(`- Credit Tips (Net): $${totalCreditTips.toFixed(2)}`);
     console.log(`- Cash Sales: $${totalCashSales.toFixed(2)}`);
-    console.log(`- Voided Tips: $${totalVoidedTips.toFixed(2)} (${voidedTipsDetails.length} transactions)`);
 
     return res.json({
       success: true,
@@ -230,14 +197,11 @@ export default async function handler(req, res) {
       },
       netSales: totalNetSales,
       creditTips: totalCreditTips,
+      creditTipsGross: totalCreditTipsGross,
+      voidedTips: totalVoidedTips,
       cashSales: totalCashSales,
       businessDatesProcessed: businessDates.length,
-      ordersProcessed: totalOrdersProcessed,
-      voidedTips: {
-        total: totalVoidedTips,
-        count: voidedTipsDetails.length,
-        details: voidedTipsDetails
-      }
+      ordersProcessed: totalOrdersProcessed
     });
 
   } catch (error) {

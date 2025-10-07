@@ -4724,9 +4724,8 @@
 
     // Add credit tips breakdown if voided tips exist
     if (tipPoolSummary.voidedTipsTotal && tipPoolSummary.voidedTipsTotal > 0) {
-      const grossTips = weeklyData.credit_tips + tipPoolSummary.voidedTipsTotal;
-      summaryLines.push(`CREDIT TIPS (GROSS): $${grossTips.toFixed(2)}`);
-      summaryLines.push(`  - VOIDED TIPS: -$${tipPoolSummary.voidedTipsTotal.toFixed(2)} (${tipPoolSummary.voidedTipsCount} orders)`);
+      summaryLines.push(`CREDIT TIPS (GROSS): $${tipPoolSummary.creditTipsGross.toFixed(2)}`);
+      summaryLines.push(`  - VOIDED TIPS: -$${tipPoolSummary.voidedTipsTotal.toFixed(2)}`);
       summaryLines.push(`CREDIT TIPS (NET): $${weeklyData.credit_tips.toFixed(2)}`);
     } else {
       summaryLines.push(`CREDIT TIPS: $${weeklyData.credit_tips.toFixed(2)}`);
@@ -6439,9 +6438,10 @@
       apiFetchedData.laborData.totalLaborCost = laborResult.totalLaborCost;
       apiFetchedData.salesData = {
         creditTips: salesResult.creditTips,
+        creditTipsGross: salesResult.creditTipsGross || salesResult.creditTips,
+        voidedTips: salesResult.voidedTips || 0,
         cashSales: salesResult.cashSales,
-        netSales: salesResult.netSales,
-        voidedTips: salesResult.voidedTips || { total: 0, count: 0, details: [] }
+        netSales: salesResult.netSales
       };
 
       // Show subtle success indicator
@@ -6449,10 +6449,11 @@
 
       console.log('Auto-fetch complete:', { laborResult, salesResult });
 
-      // Display voided tips details if any
-      if (salesResult.voidedTips && salesResult.voidedTips.count > 0) {
-        console.log(`\n⚠️ VOIDED TIPS DETECTED: $${salesResult.voidedTips.total.toFixed(2)} from ${salesResult.voidedTips.count} transactions`);
-        console.table(salesResult.voidedTips.details);
+      // Display voided tips summary if any
+      if (salesResult.voidedTips && salesResult.voidedTips > 0) {
+        console.log(`\n⚠️ VOIDED TIPS: $${salesResult.voidedTips.toFixed(2)}`);
+        console.log(`Credit Tips (Gross): $${salesResult.creditTipsGross.toFixed(2)}`);
+        console.log(`Credit Tips (Net): $${salesResult.creditTips.toFixed(2)}`);
       }
 
     } catch (error) {
@@ -6610,12 +6611,17 @@
       }
 
       // Get voided tips info if using API
-      const voidedTipsInfo = !hasFiles && apiFetchedData.salesData?.voidedTips
+      const voidedTipsAmount = !hasFiles && apiFetchedData.salesData?.voidedTips
         ? apiFetchedData.salesData.voidedTips
-        : { total: 0, count: 0, details: [] };
+        : 0;
+      const creditTipsGross = !hasFiles && apiFetchedData.salesData?.creditTipsGross
+        ? apiFetchedData.salesData.creditTipsGross
+        : creditTips;
 
       tipPoolSummary = {
         creditTips: creditTips,
+        creditTipsGross: creditTipsGross,
+        voidedTipsTotal: voidedTipsAmount,
         cashSales: cashSales,
         cashTips: calculatedCashTips,
         realEnvelopeDeposit: realEnvelopeDeposit,
@@ -6630,8 +6636,6 @@
         dateRange: dateRange,
         calculatedByName: calculatedByName,
         customNotes: customNotes,
-        voidedTipsTotal: voidedTipsInfo.total,
-        voidedTipsCount: voidedTipsInfo.count,
         generatedAt: new Date().toLocaleString(),
         // Labor metrics for combined report
         laborData: {
