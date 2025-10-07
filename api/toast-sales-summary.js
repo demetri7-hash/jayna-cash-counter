@@ -86,11 +86,7 @@ export default async function handler(req, res) {
 
               totalOrdersProcessed++;
 
-              // Get net sales from order total
-              const orderTotal = order.totalAmount || 0;
-              totalNetSales += orderTotal;
-
-              // Process payments for tips and cash
+              // Process payments for tips, cash, and net sales
               if (order.checks && Array.isArray(order.checks)) {
                 for (const check of order.checks) {
                   if (check.payments && Array.isArray(check.payments)) {
@@ -102,6 +98,9 @@ export default async function handler(req, res) {
 
                       const tipAmount = payment.tipAmount || 0;
                       const amount = payment.amount || 0;
+
+                      // Net sales = sum of all payment amounts (including tips)
+                      totalNetSales += amount + tipAmount;
 
                       // Categorize by payment type
                       if (payment.type === 'CASH') {

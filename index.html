@@ -1100,7 +1100,13 @@
           <label for="calculatedByName">Tips Calculated By:</label>
           <input type="text" id="calculatedByName" class="form-input" placeholder="Your Full Name">
         </div>
-        
+
+        <div class="form-group">
+          <label for="tipPoolNotes">Custom Notes (Optional):</label>
+          <textarea id="tipPoolNotes" class="form-input" rows="3" placeholder="Enter any notes or adjustments for this tip pool calculation..."></textarea>
+          <div style="font-size: 12px; color: #666; margin-top: 5px;">These notes will be displayed in the tip pool summary below.</div>
+        </div>
+
         <button class="submit-btn" onclick="calculateTipPool()" style="background: #28a745;">Calculate Tip Pool</button>
         <button class="submit-btn" onclick="downloadTipPoolPDF()" id="tipPoolPdfBtn" style="background: #007bff; margin-left: 10px; display: none;">Download Tip Pool PDF</button>
         <button class="submit-btn" onclick="clearSavedData()" style="background: #dc3545; margin-left: 10px;" title="Clear all saved data and start fresh">Clear Saved Data</button>
@@ -6499,6 +6505,7 @@
     const realEnvelopeDeposit = parseFloat(document.getElementById('realEnvelopeDeposit').value) || 0;
     const ezcaterTips = parseFloat(document.getElementById('ezcaterTips').value) || 0;
     const calculatedByName = document.getElementById('calculatedByName').value.trim();
+    const customNotes = document.getElementById('tipPoolNotes').value.trim();
 
     // Check if we have either files OR API-fetched data
     const hasFiles = laborFile && salesFile;
@@ -6640,6 +6647,7 @@
         cashNeeded: result.cashNeeded,
         dateRange: dateRange,
         calculatedByName: calculatedByName,
+        customNotes: customNotes,
         generatedAt: new Date().toLocaleString(),
         // Labor metrics for combined report
         laborData: {
@@ -7041,7 +7049,62 @@
         <div style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 0; border-left: 4px solid #2196f3;">
           <p style="margin: 0; font-size: 14px;"><strong>Period:</strong> ${tipPoolSummary.dateRange || 'Not specified'}</p>
           <p style="margin: 5px 0 0 0; font-size: 14px;"><strong>Calculated by:</strong> ${tipPoolSummary.calculatedByName}</p>
+          ${tipPoolSummary.customNotes ? `<p style="margin: 10px 0 0 0; font-size: 13px; padding-top: 8px; border-top: 1px solid #90caf9;"><strong>Notes:</strong> ${tipPoolSummary.customNotes}</p>` : ''}
         </div>
+
+        ${tipPoolSummary.laborData ? `
+        <!-- Labor Summary Section -->
+        <div style="margin-top: 20px; padding: 20px; background: white; border-radius: 0; border: 2px solid #1e3c72;">
+          <h3 style="margin: 0 0 15px 0; color: #1e3c72; text-transform: uppercase;">Labor Cost Analysis</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+
+            <!-- Left Column -->
+            <div>
+              <div style="padding: 10px; background: #f8f9fa; border-left: 3px solid #1e3c72; margin-bottom: 8px;">
+                <div style="font-size: 11px; color: #666;">BASE LABOR COST</div>
+                <div style="font-size: 18px; font-weight: bold; color: #1e3c72;">$${tipPoolSummary.laborData.baseLaborCost.toFixed(2)}</div>
+              </div>
+              <div style="padding: 10px; background: #f8f9fa; border-left: 3px solid #6c757d; margin-bottom: 8px;">
+                <div style="font-size: 11px; color: #666;">MANAGER SALARY (WEEKLY)</div>
+                <div style="font-size: 18px; font-weight: bold; color: #6c757d;">$${tipPoolSummary.laborData.demetriSalary.toFixed(2)}</div>
+              </div>
+              <div style="padding: 10px; background: #f8f9fa; border-left: 3px solid #17a2b8; margin-bottom: 8px;">
+                <div style="font-size: 11px; color: #666;">SUBTOTAL LABOR</div>
+                <div style="font-size: 18px; font-weight: bold; color: #17a2b8;">$${tipPoolSummary.laborData.subtotalLabor.toFixed(2)}</div>
+              </div>
+              <div style="padding: 10px; background: #f8f9fa; border-left: 3px solid #ffc107; margin-bottom: 8px;">
+                <div style="font-size: 11px; color: #666;">PAYROLL BURDEN (33%)</div>
+                <div style="font-size: 18px; font-weight: bold; color: #f57c00;">$${tipPoolSummary.laborData.payrollBurden.toFixed(2)}</div>
+              </div>
+            </div>
+
+            <!-- Right Column -->
+            <div>
+              <div style="padding: 10px; background: #f8f9fa; border-left: 3px solid #28a745; margin-bottom: 8px;">
+                <div style="font-size: 11px; color: #666;">TRUE TOTAL LABOR COST</div>
+                <div style="font-size: 18px; font-weight: bold; color: #28a745;">$${tipPoolSummary.laborData.trueTotalLaborCost.toFixed(2)}</div>
+              </div>
+              <div style="padding: 10px; background: #f8f9fa; border-left: 3px solid #007bff; margin-bottom: 8px;">
+                <div style="font-size: 11px; color: #666;">NET SALES</div>
+                <div style="font-size: 18px; font-weight: bold; color: #007bff;">$${tipPoolSummary.laborData.netSales.toFixed(2)}</div>
+              </div>
+              <div style="padding: 15px; background: ${tipPoolSummary.laborData.laborVariance > 0 ? '#ffebee' : '#e8f5e9'}; border-left: 4px solid ${tipPoolSummary.laborData.laborVariance > 0 ? '#dc3545' : '#28a745'}; text-align: center;">
+                <div style="font-size: 11px; color: #666; margin-bottom: 5px;">LABOR PERCENTAGE</div>
+                <div style="font-size: 32px; font-weight: bold; color: ${tipPoolSummary.laborData.laborVariance > 0 ? '#dc3545' : '#28a745'};">
+                  ${tipPoolSummary.laborData.laborPercentage.toFixed(2)}%
+                </div>
+                <div style="font-size: 10px; color: #666; margin-top: 5px;">
+                  Industry Benchmark: ${tipPoolSummary.laborData.industryBenchmark.toFixed(1)}%
+                  <br>
+                  <span style="font-weight: bold; color: ${tipPoolSummary.laborData.laborVariance > 0 ? '#dc3545' : '#28a745'};">
+                    ${tipPoolSummary.laborData.laborVariance > 0 ? '▲' : '▼'} ${Math.abs(tipPoolSummary.laborData.laborVariance).toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        ` : ''}
       </div>
     `;
   }
