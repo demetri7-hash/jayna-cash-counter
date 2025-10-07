@@ -279,19 +279,22 @@ export default async function handler(req, res) {
                         const selectionQuantity = selection.quantity || 1;
                         const selectionTotal = selectionPrice * selectionQuantity;
 
-                        // V6.11 DIAGNOSTIC: Capture selection structures (first 10 + any with 'gift' in name)
+                        // V6.11 DIAGNOSTIC: Capture selection structures (first 50 + any with 'gift' in name or $40)
                         const selectionName = (selection.itemName || selection.item?.name || '').toLowerCase();
-                        if (selectionSampleCount < 10 || selectionName.includes('gift') || selectionName.includes('card')) {
+                        const is40Dollar = Math.abs(selectionTotal - 40) < 0.01;
+                        if (selectionSampleCount < 50 || selectionName.includes('gift') || selectionName.includes('card') || is40Dollar) {
                           selectionStructures.push({
                             name: selection.itemName || selection.item?.name,
                             price: selectionPrice,
                             quantity: selectionQuantity,
+                            total: selectionTotal,
                             salesCategory: selection.salesCategory?.name,
                             itemGroup: selection.itemGroup?.name,
                             diningOption: selection.diningOption?.behavior,
                             voided: selection.voided,
                             allKeys: Object.keys(selection),
-                            order: order.orderNumber
+                            order: order.orderNumber,
+                            is40Dollar: is40Dollar
                           });
                           selectionSampleCount++;
                         }
@@ -540,7 +543,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.11-capture-selection-structures-20251007-0745', // DIAGNOSTIC: Capture selection structures to identify gift card
+      version: 'v6.11b-find-40-dollar-items-20251007-0750', // DIAGNOSTIC: Separate $40 items to identify gift card
       dateRange: {
         start: startDate,
         end: endDate
@@ -592,8 +595,13 @@ export default async function handler(req, res) {
         // V6.11 DIAGNOSTIC: Selection structures to identify gift card properties
         v611_selectionStructures: {
           count: selectionStructures.length,
-          selections: selectionStructures.slice(0, 20), // First 20 to avoid huge response
-          message: `Captured ${selectionStructures.length} selection samples. Look for $40 item or 'gift' in names.`
+          fortyDollarItems: selectionStructures.filter(s => s.is40Dollar),
+          giftCardNamedItems: selectionStructures.filter(s => {
+            const name = (s.name || '').toLowerCase();
+            return name.includes('gift') || name.includes('card');
+          }),
+          firstTwenty: selectionStructures.slice(0, 20), // Sample of all selections
+          message: `Captured ${selectionStructures.length} selections. Check fortyDollarItems and giftCardNamedItems arrays!`
         }
       }
     });
