@@ -1,8 +1,9 @@
 export default async function handler(req, res) {
-  // Set CORS headers (v3 - fixed item calculation to exclude voided orders)
+  // Set CORS headers (v3.1 - force cache invalidation - fixed item calculation)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
@@ -312,6 +313,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
+      version: 'v3.1-20251006-2342', // Version identifier for cache verification
       dateRange: {
         start: startDate,
         end: endDate
