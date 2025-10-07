@@ -69,9 +69,9 @@ export default async function handler(req, res) {
     // V6.8 DIAGNOSTIC: Track all unique payment types and exclusions
     let allPaymentTypes = new Set();
     let excludedCreditPayments = [];
-    let giftCardPaymentsFound = [];
 
     // V6.10 CRITICAL: Track gift card ITEMS sold (deferred revenue)
+    // NOTE: Gift card PAYMENTS are valid and counted! Only SALES of new cards are excluded.
     let giftCardItemsSold = [];
 
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
@@ -453,16 +453,19 @@ export default async function handler(req, res) {
     console.log(`\n=== SALES SUMMARY COMPLETE ===`);
 
     // V6.8 DIAGNOSTIC OUTPUT
-    console.log(`\n🔍 V6.8 DIAGNOSTICS:`);
+    console.log(`\n🔍 V6.10 DIAGNOSTICS:`);
     console.log(`\nAll Payment Types Found: ${Array.from(allPaymentTypes).join(', ')}`);
 
-    console.log(`\n💳 Gift Card Payments Found (${giftCardPaymentsFound.length}):`);
-    if (giftCardPaymentsFound.length > 0) {
-      giftCardPaymentsFound.forEach(gc => {
-        console.log(`  Type="${gc.type}" Amount=$${gc.amount} Order=${gc.order}`);
+    console.log(`\n💳 Gift Card ITEMS Sold (${giftCardItemsSold.length}):`);
+    let totalGiftCardItemAmount = 0;
+    if (giftCardItemsSold.length > 0) {
+      giftCardItemsSold.forEach(gc => {
+        totalGiftCardItemAmount += gc.amount;
+        console.log(`  Item="${gc.itemName}" Amount=$${gc.amount} Order=${gc.order}`);
       });
+      console.log(`  TOTAL GIFT CARD ITEMS: $${totalGiftCardItemAmount.toFixed(2)} - EXCLUDED from net sales`);
     } else {
-      console.log('  NONE FOUND - This is why $40 not excluded!');
+      console.log('  NONE FOUND - Check selection properties!');
     }
 
     console.log(`\n❌ Excluded CREDIT Payments (${excludedCreditPayments.length}):`);
@@ -516,7 +519,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.10-exclude-giftcard-items-20251007-0735', // CRITICAL: Exclude gift card ITEMS sold, not payment types!
+      version: 'v6.10-exclude-giftcard-items-20251007-0740', // CRITICAL: Exclude gift card ITEMS sold, not payment types!
       dateRange: {
         start: startDate,
         end: endDate
@@ -551,11 +554,6 @@ export default async function handler(req, res) {
         // V6.9 CRITICAL DIAGNOSTICS
         v69_diagnostics: {
           allPaymentTypes: Array.from(allPaymentTypes).sort(),
-          giftCardPayments: {
-            count: giftCardPaymentsFound.length,
-            payments: giftCardPaymentsFound,
-            message: giftCardPaymentsFound.length === 0 ? 'NO GIFT CARDS FOUND - This is why $40 not excluded!' : 'Gift cards found'
-          },
           excludedCreditPayments: {
             count: excludedCreditPayments.length,
             totalAmount: totalExcludedCreditAmount,
