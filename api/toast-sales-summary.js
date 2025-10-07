@@ -122,13 +122,18 @@ export default async function handler(req, res) {
                         // Categorize by payment type
                         if (payment.type === 'CASH') {
                           totalCashSales += amount;
-                        } else if (payment.type === 'CREDIT' || payment.type === 'CREDIT_CARD' ||
-                                   payment.type === 'CREDIT_DEBIT' || payment.type === 'DEBIT' ||
-                                   payment.type === 'GIFTCARD' || payment.type === 'GIFT_CARD') {
-                          // Only credit/debit card tips (exclude DoorDash, Grubhub, Uber - those are "OTHER")
+                          // Cash payments don't have tips in our system
+                        } else if (payment.type === 'OTHER' || payment.type === 'HOUSE_ACCOUNT' ||
+                                   payment.type === 'UNDECLARED_CASH') {
+                          // Exclude OTHER (DoorDash/Grubhub/Uber) - those tips go to delivery drivers
+                          console.log(`Excluding delivery platform tip: ${payment.type} tip:$${tipAmount}`);
+                        } else {
+                          // All other payment types (credit cards, debit, gift cards, etc.) get tips counted
+                          if (tipAmount > 0) {
+                            console.log(`Credit tip: ${payment.type} tip:$${tipAmount}`);
+                          }
                           totalCreditTips += tipAmount;
                         }
-                        // Skip OTHER payment types (DoorDash, Grubhub, Uber) - those tips go to delivery drivers
                       }
                     }
                   }
