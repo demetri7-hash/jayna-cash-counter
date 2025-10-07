@@ -27,21 +27,33 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`V7.1 PAYMENTS ENDPOINT: ${startDate} to ${endDate}`);
+    console.log(`V7.2 PAYMENTS ENDPOINT + EXPANDED RANGE: ${startDate} to ${endDate}`);
 
     const TOAST_CONFIG = {
       baseUrl: process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com',
       restaurantGuid: process.env.TOAST_RESTAURANT_GUID || 'd3efae34-7c2e-4107-a442-49081e624706'
     };
 
-    // Generate paidBusinessDates in YYYYMMDD format
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const paidBusinessDates = [];
+    // TARGET range for filtering (user's requested dates)
+    const targetStart = new Date(startDate);
+    const targetEnd = new Date(endDate);
+    const targetStartBizDate = parseInt(startDate.replace(/-/g, ''));
+    const targetEndBizDate = parseInt(endDate.replace(/-/g, ''));
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    // EXPANDED FETCH range to capture pre-paid future orders
+    // Keep it reasonable to avoid timeout (3 days before, 14 days after)
+    const fetchStart = new Date(targetStart);
+    fetchStart.setDate(fetchStart.getDate() - 3);
+    const fetchEnd = new Date(targetEnd);
+    fetchEnd.setDate(fetchEnd.getDate() + 14);
+
+    const paidBusinessDates = [];
+    for (let d = new Date(fetchStart); d <= fetchEnd; d.setDate(d.getDate() + 1)) {
       paidBusinessDates.push(d.toISOString().split('T')[0].replace(/-/g, ''));
     }
+
+    console.log(`TARGET: ${startDate} to ${endDate} (${targetStartBizDate}-${targetEndBizDate})`);
+    console.log(`FETCH: ${fetchStart.toISOString().split('T')[0]} to ${fetchEnd.toISOString().split('T')[0]} (${paidBusinessDates.length} dates)`);
 
     let allPaymentGuids = [];
 
@@ -68,8 +80,8 @@ export default async function handler(req, res) {
       allPaymentGuids = allPaymentGuids.concat(paymentGuids);
       console.log(`Found ${paymentGuids.length} payments for ${paidDate} (Total: ${allPaymentGuids.length})`);
 
-      // Rate limiting
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Minimal rate limiting to avoid timeout
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     console.log(`Total payment GUIDs to fetch: ${allPaymentGuids.length}`);
@@ -120,6 +132,12 @@ export default async function handler(req, res) {
         const paymentType = payment.type || 'UNKNOWN';
         const paymentStatus = payment.paymentStatus || 'NONE';
         const cardType = payment.cardType || 'UNKNOWN';
+        const paidBizDate = payment.paidBusinessDate;
+
+        // V7.2 FILTER: Only include payments paid within target range
+        if (paidBizDate && (paidBizDate < targetStartBizDate || paidBizDate > targetEndBizDate)) {
+          continue; // Skip - paid outside target range
+        }
 
         // Exclude DENIED and VOIDED payments
         if (paymentStatus === 'DENIED' || paymentStatus === 'VOIDED') {
@@ -155,9 +173,8 @@ export default async function handler(req, res) {
           otherTips += tipAmount;
         }
 
-        // Rate limiting - pause every 50 payments
-        if ((i + 1) % 50 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+        // Minimal logging to track progress (no rate limiting to avoid timeout)
+        if ((i + 1) % 100 === 0) {
           console.log(`Processed ${i + 1}/${allPaymentGuids.length} payments...`);
         }
 
@@ -186,8 +203,8 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v7.1-payments-paidBusinessDate-20251007',
-      method: 'Payments endpoint with paidBusinessDate (matches Toast Sales Summary)',
+      version: 'v7.2-payments-expanded-range-20251007',
+      method: 'Payments endpoint with paidBusinessDate + expanded fetch range + filtering',
       dateRange: { startDate, endDate },
 
       // Sales calculated from payments
