@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // Set CORS headers (v5.0 - CRITICAL FIXES: deleted orders + gratuity service charge filter)
+  // Set CORS headers (v5.2 - CRITICAL: PARTIAL refund handling + HOUSE_ACCOUNT exclusion)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -247,41 +247,55 @@ export default async function handler(req, res) {
                         const tipAmount = payment.tipAmount || 0;
                         const amount = payment.amount || 0;
 
-                        // CRITICAL FIX: Check payment void/refund at PAYMENT level (not just order level)
-                        // Toast docs: paymentStatus can be 'VOIDED' even if refundStatus isn't set
-                        const isPaymentVoided = payment.voided === true ||
-                                               payment.refundStatus === 'FULL' ||
-                                               payment.refundStatus === 'PARTIAL' ||
-                                               payment.paymentStatus === 'VOIDED';
+                        // CRITICAL FIX: PARTIAL refunds need special handling!
+                        // Toast docs: "For partial refunds, only subtract the refunded amount"
+                        const isFullyVoided = payment.voided === true ||
+                                             payment.refundStatus === 'FULL' ||
+                                             payment.paymentStatus === 'VOIDED';
 
-                        // Categorize by payment type (not cash, not delivery platforms)
+                        const isPartiallyRefunded = payment.refundStatus === 'PARTIAL';
+
+                        // Get refund amount for partial refunds
+                        const refundAmount = (isPartiallyRefunded && payment.refund)
+                                            ? (payment.refund.refundAmount || 0)
+                                            : 0;
+
+                        // CRITICAL FIX: Exclude HOUSE_ACCOUNT from net sales per Toast docs
+                        // "Net sales excludes purchases of gift cards or house account payments"
+                        const isHouseAccount = payment.type === 'HOUSE_ACCOUNT';
+
+                        // Categorize by payment type (not cash, not delivery platforms, not house account)
                         const isCreditCardTip = payment.type !== 'CASH' &&
                                                payment.type !== 'OTHER' &&
                                                payment.type !== 'HOUSE_ACCOUNT' &&
                                                payment.type !== 'UNDECLARED_CASH';
 
-                        // Debug logging for all voided/deleted transactions
-                        if (isOrderExcluded || isCheckExcluded || isPaymentVoided) {
-                          console.log(`VOID/DELETE DETECTED: Order ${order.orderNumber}, Amount: $${amount}, Tip: $${tipAmount}, Type: ${payment.type}`);
-                          console.log(`  Reasons: OrderVoid=${isVoided}, OrderDelete=${isDeleted}, CheckVoid=${isCheckVoided}, CheckDelete=${isCheckDeleted}, PaymentVoid=${isPaymentVoided}`);
+                        // Debug logging for all voided/deleted/refunded transactions
+                        if (isOrderExcluded || isCheckExcluded || isFullyVoided || isPartiallyRefunded || isHouseAccount) {
+                          console.log(`EXCLUSION DETECTED: Order ${order.orderNumber}, Amount: $${amount}, Refund: $${refundAmount}, Tip: $${tipAmount}, Type: ${payment.type}`);
+                          console.log(`  Reasons: OrderVoid=${isVoided}, OrderDelete=${isDeleted}, CheckVoid=${isCheckVoided}, CheckDelete=${isCheckDeleted}, PaymentVoid=${isFullyVoided}, PartialRefund=${isPartiallyRefunded}, HouseAccount=${isHouseAccount}`);
                           console.log(`  Order data: voided=${order.voided}, deleted=${order.deleted}, voidDate=${order.voidDate}, deletedDate=${order.deletedDate}`);
                           console.log(`  Check data: voided=${check.voided}, deleted=${check.deleted}`);
-                          console.log(`  Payment data: refundStatus=${payment.refundStatus}, paymentStatus=${payment.paymentStatus}\n`);
+                          console.log(`  Payment data: refundStatus=${payment.refundStatus}, paymentStatus=${payment.paymentStatus}, type=${payment.type}\n`);
                         }
 
-                        // Only include payment amounts from NON-VOIDED/DELETED orders
-                        // Per Toast docs: Exclude both voided AND deleted orders/checks
-                        if (!isOrderExcluded && !isCheckExcluded && !isPaymentVoided) {
-                          totalNetSales += amount;
+                        // Calculate net payment amount based on exclusion rules
+                        if (!isOrderExcluded && !isCheckExcluded && !isFullyVoided && !isHouseAccount) {
+                          // CRITICAL: For PARTIAL refunds, subtract refund amount. For others, use full amount.
+                          const netPaymentAmount = isPartiallyRefunded ? (amount - refundAmount) : amount;
+                          totalNetSales += netPaymentAmount;
 
                           // Track payment types for debugging
                           const paymentType = payment.type || 'UNKNOWN';
                           if (!paymentTypeBreakdown[paymentType]) {
-                            paymentTypeBreakdown[paymentType] = { count: 0, amount: 0, tips: 0 };
+                            paymentTypeBreakdown[paymentType] = { count: 0, amount: 0, tips: 0, refunds: 0 };
                           }
                           paymentTypeBreakdown[paymentType].count++;
-                          paymentTypeBreakdown[paymentType].amount += amount;
+                          paymentTypeBreakdown[paymentType].amount += netPaymentAmount;
                           paymentTypeBreakdown[paymentType].tips += tipAmount;
+                          if (isPartiallyRefunded) {
+                            paymentTypeBreakdown[paymentType].refunds += refundAmount;
+                          }
                         }
 
                         // Handle tips separately - track ALL tips including voided for transparency
@@ -292,7 +306,7 @@ export default async function handler(req, res) {
                           totalCreditTipsGross += tipAmount;
 
                           // If voided/deleted (order, check, or payment level), add to voided total
-                          if (isOrderExcluded || isCheckExcluded || isPaymentVoided) {
+                          if (isOrderExcluded || isCheckExcluded || isFullyVoided) {
                             totalVoidedTips += tipAmount;
                           } else {
                             // Only add to net tips if NOT voided/deleted
@@ -306,8 +320,9 @@ export default async function handler(req, res) {
                         }
 
                         // Track cash sales from non-voided/deleted payments only
-                        if (payment.type === 'CASH' && !isOrderExcluded && !isCheckExcluded && !isPaymentVoided) {
-                          totalCashSales += amount;
+                        if (payment.type === 'CASH' && !isOrderExcluded && !isCheckExcluded && !isFullyVoided) {
+                          const netCashAmount = isPartiallyRefunded ? (amount - refundAmount) : amount;
+                          totalCashSales += netCashAmount;
                         }
                       }
                     }
@@ -387,7 +402,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v5.1-payment-level-void-detection-20251007-0120', // CRITICAL FIX: payment.paymentStatus check
+      version: 'v5.2-partial-refund-house-account-20251007-0130', // CRITICAL: PARTIAL refund + HOUSE_ACCOUNT exclusion
       dateRange: {
         start: startDate,
         end: endDate
