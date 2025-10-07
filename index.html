@@ -995,45 +995,34 @@
         <h2 style="margin-bottom: 20px; color: #1e3c72;">Tip Pool Calculator</h2>
         
         <div style="background: #f8f9fa; padding: 15px; border-radius: 0; margin-bottom: 20px; border-left: 4px solid #007bff;">
-          <h4 style="margin: 0 0 10px 0; color: #007bff;">Instructions:</h4>
-          <p style="margin: 5px 0; font-size: 14px;">1. Upload Labor Summary CSV and Sales Summary ZIP files from Toast</p>
-          <p style="margin: 5px 0; font-size: 14px;">2. Select the date range matching your tip pool period</p>
-          <p style="margin: 5px 0; font-size: 14px;">3. Enter the actual cash amount counted from envelopes</p>
-          <p style="margin: 5px 0; font-size: 14px;">4. System will auto-calculate cash tips (Real Envelope - Toast Cash Sales)</p>
-          <p style="margin: 5px 0; font-size: 14px;">5. Enter EZ Cater tips, TDS Driver tips, and your name</p>
-          <p style="margin: 5px 0; font-size: 14px; color: #dc3545;"><strong>Note:</strong> This integrates with your weekly cash reports</p>
+          <h4 style="margin: 0 0 10px 0; color: #007bff;">Quick Start:</h4>
+          <p style="margin: 5px 0; font-size: 14px;">1. Select date range → data auto-fetches from Toast</p>
+          <p style="margin: 5px 0; font-size: 14px;">2. Enter Real Envelope Deposit</p>
+          <p style="margin: 5px 0; font-size: 14px;">3. Enter EZ Cater tips + your name</p>
+          <p style="margin: 5px 0; font-size: 14px;">4. Click Calculate</p>
+          <p style="margin: 5px 0; font-size: 12px; color: #666;"><em>TDS Driver tips auto-calculate from your saved PM data</em></p>
         </div>
         
-        <div class="form-group">
-          <label for="laborFile">Labor Summary CSV File:</label>
-          <input type="file" id="laborFile" class="form-input" accept=".csv" style="padding: 8px;">
-        </div>
-
-        <div class="form-group">
-          <label for="salesFile">Sales Summary ZIP File:</label>
-          <input type="file" id="salesFile" class="form-input" accept=".zip" style="padding: 8px;">
-        </div>
-
-        <!-- Fetch from API button -->
-        <div style="background: var(--light-blue); border: 2px solid var(--primary-blue); padding: 20px; margin: 20px 0;">
-          <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-size: 18px; font-weight: 600; color: var(--primary-blue); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-              🚀 NEW: Auto-Fetch Data from Toast API
+        <!-- Optional manual file uploads (data auto-fetches from Toast API) -->
+        <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;">
+          <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
+            Manual File Upload (Optional - Click to expand)
+          </summary>
+          <div style="margin-top: 15px;">
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label for="laborFile" style="font-size: 12px;">Labor Summary CSV File:</label>
+              <input type="file" id="laborFile" class="form-input" accept=".csv" style="padding: 8px;">
             </div>
-            <div style="font-size: 13px; color: var(--gray-medium);">
-              Skip manual file uploads - fetch labor and sales data directly from Toast!
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="salesFile" style="font-size: 12px;">Sales Summary ZIP File:</label>
+              <input type="file" id="salesFile" class="form-input" accept=".zip" style="padding: 8px;">
             </div>
           </div>
-          <button class="submit-btn" onclick="fetchTipPoolDataFromAPI()" style="background: var(--secondary-blue); margin-top: 0;">
-            Fetch Data from Toast API
-          </button>
-          <div style="font-size: 11px; color: var(--gray-medium); margin-top: 10px; text-align: center;">
-            <strong>Note:</strong> Select date range below first, then click to auto-fill labor/sales data
-          </div>
-        </div>
+        </details>
 
         <div class="form-group">
-          <label for="tipPoolDateRange">Date Range for Cash Sales Calculation:</label>
+          <label for="tipPoolDateRange">Date Range for Tip Pool:</label>
           <div style="display: flex; gap: 15px; margin: 10px 0;">
             <div style="flex: 1;">
               <label for="tipPoolStartDate" style="font-size: 12px; color: #666;">Start Date:</label>
@@ -1041,11 +1030,11 @@
             </div>
             <div style="flex: 1;">
               <label for="tipPoolEndDate" style="font-size: 12px; color: #666;">End Date:</label>
-              <input type="date" id="tipPoolEndDate" class="form-input" onchange="calculateCashTips()">
+              <input type="date" id="tipPoolEndDate" class="form-input" onchange="calculateCashTips(); autoFetchOnDateChange()">
             </div>
           </div>
-          <div style="font-size: 12px; color: #dc3545; margin-top: 5px;">
-            <strong>Note:</strong> Should match your tip pool period (max 7 days)
+          <div id="autoFetchStatus" style="font-size: 11px; color: #666; margin-top: 5px; min-height: 16px;">
+            <!-- Auto-fetch status will appear here -->
           </div>
         </div>
         
@@ -6407,20 +6396,22 @@
     salesData: null
   };
 
-  async function fetchTipPoolDataFromAPI() {
+  // Auto-fetch function called when end date changes
+  async function autoFetchOnDateChange() {
     const startDate = document.getElementById('tipPoolStartDate').value;
     const endDate = document.getElementById('tipPoolEndDate').value;
 
     if (!startDate || !endDate) {
-      showMessage('Please select start and end dates first!', 'error');
-      return;
+      return; // Silently skip if dates not set
     }
 
-    try {
-      showLoading('Fetching Data from Toast API', 'Authenticating with Toast API...');
+    // Update status indicator
+    const statusDiv = document.getElementById('autoFetchStatus');
+    statusDiv.innerHTML = '<span style="color: #666;">Fetching data from Toast...</span>';
 
+    try {
       // Step 1: Get Toast API access token
-      console.log('Authenticating with Toast API...');
+      console.log('Auto-fetching Toast data...');
       const authResponse = await fetch('/api/toast-auth', {
         method: 'POST',
         headers: {
@@ -6429,44 +6420,31 @@
       });
 
       if (!authResponse.ok) {
-        throw new Error('Toast authentication failed');
+        throw new Error('Authentication failed');
       }
 
       const authData = await authResponse.json();
-      console.log('Auth response:', authData);
 
       if (!authData.success || !authData.data?.accessToken) {
-        throw new Error('Failed to get Toast access token');
+        throw new Error('Failed to get access token');
       }
 
       const token = authData.data.accessToken;
-      console.log('Successfully authenticated with Toast API');
 
-      // Step 2: Fetch labor data from Toast
-      showLoading('Fetching Data from Toast API', 'Retrieving labor data for your selected date range...');
-      console.log('Fetching labor data from Toast API...');
-      const laborResponse = await fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`);
+      // Step 2: Fetch labor and sales data in parallel
+      const [laborResponse, salesResponse] = await Promise.all([
+        fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`),
+        fetch(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`)
+      ]);
 
-      if (!laborResponse.ok) {
-        const errorData = await laborResponse.json();
-        throw new Error(`Labor API failed: ${errorData.error || laborResponse.statusText}`);
+      if (!laborResponse.ok || !salesResponse.ok) {
+        throw new Error('Failed to fetch data');
       }
 
-      const laborResult = await laborResponse.json();
-      console.log('Labor data fetched:', laborResult);
-
-      // Step 3: Fetch sales data from Toast
-      showLoading('Fetching Data from Toast API', 'Retrieving sales data for your selected date range...');
-      console.log('Fetching sales data from Toast API...');
-      const salesResponse = await fetch(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`);
-
-      if (!salesResponse.ok) {
-        const errorData = await salesResponse.json();
-        throw new Error(`Sales API failed: ${errorData.error || salesResponse.statusText}`);
-      }
-
-      const salesResult = await salesResponse.json();
-      console.log('Sales data fetched:', salesResult);
+      const [laborResult, salesResult] = await Promise.all([
+        laborResponse.json(),
+        salesResponse.json()
+      ]);
 
       // Store the fetched data globally
       apiFetchedData.laborData = laborResult.employees;
@@ -6477,24 +6455,21 @@
         netSales: salesResult.netSales
       };
 
-      hideLoading();
+      // Show subtle success indicator
+      statusDiv.innerHTML = `<span style="color: #28a745;">✓ Data loaded: ${laborResult.employeesCount} employees, $${salesResult.creditTips.toFixed(2)} credit tips</span>`;
 
-      // Show success message with details
-      showMessage(
-        `✅ Data fetched successfully!<br>` +
-        `<strong>Labor:</strong> ${laborResult.employeesCount} employees, $${laborResult.totalLaborCost.toFixed(2)} total cost<br>` +
-        `<strong>Sales:</strong> Credit Tips: $${salesResult.creditTips.toFixed(2)}, Cash Sales: $${salesResult.cashSales.toFixed(2)}, Net Sales: $${salesResult.netSales.toFixed(2)}<br>` +
-        `<br><strong>Ready to calculate!</strong> Enter EZCater tips and Real Envelope Deposit, then click "Calculate Tip Pool"`,
-        'success'
-      );
-
-      console.log('API data stored successfully. Ready for tip pool calculation.');
+      console.log('Auto-fetch complete:', { laborResult, salesResult });
 
     } catch (error) {
-      hideLoading();
-      console.error('API fetch error:', error);
-      showMessage(`Failed to fetch data from Toast API: ${error.message}`, 'error');
+      console.error('Auto-fetch error:', error);
+      const statusDiv = document.getElementById('autoFetchStatus');
+      statusDiv.innerHTML = '<span style="color: #dc3545;">Failed to fetch data. You can upload files manually instead.</span>';
     }
+  }
+
+  // Legacy function kept for compatibility (if called elsewhere)
+  async function fetchTipPoolDataFromAPI() {
+    await autoFetchOnDateChange();
   }
 
   async function calculateTipPool() {
@@ -6512,7 +6487,7 @@
     const hasAPIData = apiFetchedData.laborData && apiFetchedData.salesData;
 
     if (!hasFiles && !hasAPIData) {
-      showErrorMessage('Please either upload files OR click "Fetch Data from Toast API" first.');
+      showErrorMessage('Please select dates first (data will auto-fetch) OR upload files manually.');
       return;
     }
 
