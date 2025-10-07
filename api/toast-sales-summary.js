@@ -122,10 +122,13 @@ export default async function handler(req, res) {
                         // Categorize by payment type
                         if (payment.type === 'CASH') {
                           totalCashSales += amount;
-                        } else {
-                          // All non-cash payment tips
+                        } else if (payment.type === 'CREDIT' || payment.type === 'CREDIT_CARD' ||
+                                   payment.type === 'CREDIT_DEBIT' || payment.type === 'DEBIT' ||
+                                   payment.type === 'GIFTCARD' || payment.type === 'GIFT_CARD') {
+                          // Only credit/debit card tips (exclude DoorDash, Grubhub, Uber - those are "OTHER")
                           totalCreditTips += tipAmount;
                         }
+                        // Skip OTHER payment types (DoorDash, Grubhub, Uber) - those tips go to delivery drivers
                       }
                     }
                   }
