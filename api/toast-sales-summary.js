@@ -131,10 +131,9 @@ export default async function handler(req, res) {
                           console.log(`VOIDED TIP FOUND: Order ${order.orderNumber}, Tip: $${tipAmount}, OrderVoided: ${isVoided}, CheckVoided: ${isCheckVoided}, PaymentVoided: ${isPaymentVoided}, RefundStatus: ${payment.refundStatus}`);
                         }
 
-                        // Add payment amount to net sales (excluding tips)
-                        if (!isVoided && !isCheckVoided && !isPaymentVoided) {
-                          totalNetSales += amount;
-                        }
+                        // Add ALL payment amounts to net sales (Toast API already excludes voided amounts)
+                        // We only need to track voids for TIPS transparency
+                        totalNetSales += amount;
 
                         // Handle tips separately
                         if (isCreditCardTip && tipAmount > 0) {
@@ -150,8 +149,8 @@ export default async function handler(req, res) {
                           }
                         }
 
-                        // Track cash sales separately
-                        if (payment.type === 'CASH' && !isVoided && !isCheckVoided && !isPaymentVoided) {
+                        // Track ALL cash sales (Toast API already excludes voided amounts)
+                        if (payment.type === 'CASH') {
                           totalCashSales += amount;
                         }
                       }
