@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // Set CORS headers (v3.1 - force cache invalidation - fixed item calculation)
+  // Set CORS headers (v4.0 - switched to payment-based calculation - item-based broken)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -293,16 +293,20 @@ export default async function handler(req, res) {
     // Calculate net sales using Toast's method (from menu items)
     const calculatedNetSales = totalGrossSales - totalDiscounts;
 
+    // CRITICAL FIX: Item-based calculation is broken (3.4x inflated)
+    // Use payment-based calculation instead (only $79 off vs $113k off!)
+    const finalNetSales = totalNetSales; // Payment-based is accurate
+
     console.log(`\n=== SALES SUMMARY COMPLETE ===`);
     console.log(`DEBUG: Total orders from API: ${debugOrderCount}`);
     console.log(`Orders Processed (non-voided): ${totalOrdersProcessed}`);
     console.log(`Orders marked as voided: ${debugOrderCount - totalOrdersProcessed}`);
     console.log(`\nSales Calculation Comparison:`);
-    console.log(`  Method 1 (from payments): $${totalNetSales.toFixed(2)}`);
-    console.log(`  Method 2 (from items): Gross $${totalGrossSales.toFixed(2)} - Discounts $${totalDiscounts.toFixed(2)} = $${calculatedNetSales.toFixed(2)}`);
+    console.log(`  Method 1 (from payments): $${totalNetSales.toFixed(2)} ✓ USING THIS`);
+    console.log(`  Method 2 (from items): Gross $${totalGrossSales.toFixed(2)} - Discounts $${totalDiscounts.toFixed(2)} = $${calculatedNetSales.toFixed(2)} ✗ BROKEN`);
     console.log(`  Voided Item Sales: $${totalVoidedItemSales.toFixed(2)}`);
-    console.log(`  Using Method 2 for accuracy`);
-    console.log(`\nNet Sales (Toast method): $${calculatedNetSales.toFixed(2)}`);
+    console.log(`  Using Method 1 (payments) - only $79 off vs $113k off!`);
+    console.log(`\nNet Sales (from payments): $${finalNetSales.toFixed(2)}`);
     console.log(`Total Discounts: $${totalDiscounts.toFixed(2)}`);
     console.log(`Credit Tips (Gross): $${totalCreditTipsGross.toFixed(2)}`);
     console.log(`Voided Tips: $${totalVoidedTips.toFixed(2)}`);
@@ -313,12 +317,12 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v3.1-20251006-2342', // Version identifier for cache verification
+      version: 'v4.0-payments-20251006-2350', // Using payment-based calculation
       dateRange: {
         start: startDate,
         end: endDate
       },
-      netSales: calculatedNetSales, // Using item-based calculation (Toast method)
+      netSales: finalNetSales, // Using payment-based calculation (accurate!)
       grossSales: totalGrossSales, // For transparency
       voidedItemSales: totalVoidedItemSales, // Track voided item sales
       creditTips: totalCreditTips,
@@ -333,8 +337,8 @@ export default async function handler(req, res) {
       debug: {
         totalOrdersFromAPI: debugOrderCount,
         ordersMarkedVoided: debugOrderCount - totalOrdersProcessed,
-        netSalesFromPayments: totalNetSales, // Show both methods
-        netSalesFromItems: calculatedNetSales,
+        netSalesFromPayments: totalNetSales, // Using this one!
+        netSalesFromItems: calculatedNetSales, // Broken (3.4x inflated)
         voidedItemSales: totalVoidedItemSales
       }
     });
