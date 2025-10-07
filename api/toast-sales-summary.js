@@ -45,6 +45,8 @@ export default async function handler(req, res) {
     let totalCashSales = 0;
     let totalOrdersProcessed = 0;
     let totalVoidedTips = 0;
+    let totalDiscounts = 0;
+    let totalTipsOnDiscountedChecks = 0;
 
     // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
     // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
@@ -95,7 +97,13 @@ export default async function handler(req, res) {
 
               // Process each order (INCLUDING voided orders to get gross tips)
               for (const order of orders) {
-                const isVoided = order.voided || order.voidDate;
+                // Enhanced void detection per Toast documentation
+                const isVoided = order.voided ||
+                                order.voidDate ||
+                                order.deleted ||
+                                order.deletedDate ||
+                                order.guestOrderStatus === 'VOIDED' ||
+                                order.paymentStatus === 'VOIDED';
 
                 if (!isVoided) {
                   totalOrdersProcessed++;
@@ -125,11 +133,52 @@ export default async function handler(req, res) {
                   console.log('=== END SAMPLE ===\n');
                 }
 
+                // Track discounts at order level
+                let orderDiscountAmount = 0;
+                let orderHasTips = false;
+
                 // Process payments within checks
                 if (order.checks && Array.isArray(order.checks)) {
                   for (const check of order.checks) {
-                    // Check if check is voided
-                    const isCheckVoided = check.voided || check.voidDate;
+                    // Enhanced check void detection
+                    const isCheckVoided = check.voided ||
+                                         check.voidDate ||
+                                         check.deleted ||
+                                         check.deletedDate;
+
+                    // Track check-level discounts
+                    let checkDiscounts = 0;
+                    if (check.appliedDiscounts && Array.isArray(check.appliedDiscounts)) {
+                      for (const discount of check.appliedDiscounts) {
+                        const discountAmount = discount.discountAmount || 0;
+                        checkDiscounts += discountAmount;
+                        totalDiscounts += discountAmount;
+                      }
+                    }
+
+                    // Track selection-level voids and discounts
+                    if (check.selections && Array.isArray(check.selections)) {
+                      for (const selection of check.selections) {
+                        // Selection void detection
+                        if (selection.voided || selection.voidDate) {
+                          // Item was voided - this affects sales
+                          const selectionPrice = selection.price || 0;
+                          if (!isVoided && !isCheckVoided) {
+                            // Only log if order/check not already voided
+                            console.log(`  Voided item: ${selection.itemName || 'Unknown'}, Price: $${selectionPrice}`);
+                          }
+                        }
+
+                        // Selection-level discounts
+                        if (selection.appliedDiscounts && Array.isArray(selection.appliedDiscounts)) {
+                          for (const discount of selection.appliedDiscounts) {
+                            const discountAmount = discount.discountAmount || 0;
+                            checkDiscounts += discountAmount;
+                            totalDiscounts += discountAmount;
+                          }
+                        }
+                      }
+                    }
 
                     if (check.payments && Array.isArray(check.payments)) {
                       for (const payment of check.payments) {
@@ -166,6 +215,8 @@ export default async function handler(req, res) {
 
                         // Handle tips separately - track ALL tips including voided for transparency
                         if (isCreditCardTip && tipAmount > 0) {
+                          orderHasTips = true;
+
                           // Add to gross tips (all tips before voiding)
                           totalCreditTipsGross += tipAmount;
 
@@ -175,6 +226,11 @@ export default async function handler(req, res) {
                           } else {
                             // Only add to net tips if NOT voided
                             totalCreditTips += tipAmount;
+
+                            // Track tips on checks with discounts
+                            if (checkDiscounts > 0) {
+                              totalTipsOnDiscountedChecks += tipAmount;
+                            }
                           }
                         }
 
@@ -223,13 +279,16 @@ export default async function handler(req, res) {
       }
     }
 
-    console.log(`Sales Summary Complete:`);
-    console.log(`- Orders Processed: ${totalOrdersProcessed}`);
-    console.log(`- Net Sales: $${totalNetSales.toFixed(2)}`);
-    console.log(`- Credit Tips (Gross): $${totalCreditTipsGross.toFixed(2)}`);
-    console.log(`- Voided Tips: $${totalVoidedTips.toFixed(2)}`);
-    console.log(`- Credit Tips (Net): $${totalCreditTips.toFixed(2)}`);
-    console.log(`- Cash Sales: $${totalCashSales.toFixed(2)}`);
+    console.log(`\n=== SALES SUMMARY COMPLETE ===`);
+    console.log(`Orders Processed: ${totalOrdersProcessed}`);
+    console.log(`Net Sales: $${totalNetSales.toFixed(2)}`);
+    console.log(`Total Discounts: $${totalDiscounts.toFixed(2)}`);
+    console.log(`Credit Tips (Gross): $${totalCreditTipsGross.toFixed(2)}`);
+    console.log(`Voided Tips: $${totalVoidedTips.toFixed(2)}`);
+    console.log(`Tips on Discounted Checks: $${totalTipsOnDiscountedChecks.toFixed(2)}`);
+    console.log(`Credit Tips (Net): $${totalCreditTips.toFixed(2)}`);
+    console.log(`Cash Sales: $${totalCashSales.toFixed(2)}`);
+    console.log(`=== END SUMMARY ===\n`);
 
     return res.json({
       success: true,
@@ -242,6 +301,8 @@ export default async function handler(req, res) {
       creditTipsGross: totalCreditTipsGross,
       voidedTips: totalVoidedTips,
       cashSales: totalCashSales,
+      discounts: totalDiscounts,
+      tipsOnDiscountedChecks: totalTipsOnDiscountedChecks,
       businessDatesProcessed: businessDates.length,
       ordersProcessed: totalOrdersProcessed
     });
