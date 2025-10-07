@@ -123,6 +123,12 @@ export default async function handler(req, res) {
                                                payment.type !== 'HOUSE_ACCOUNT' &&
                                                payment.type !== 'UNDECLARED_CASH';
 
+                        // Add payment amount to net sales (excluding tips)
+                        if (!isVoided && !isPaymentVoided) {
+                          totalNetSales += amount;
+                        }
+
+                        // Handle tips separately
                         if (isCreditCardTip && tipAmount > 0) {
                           // Add to gross tips (all tips before voiding)
                           totalCreditTipsGross += tipAmount;
@@ -133,12 +139,12 @@ export default async function handler(req, res) {
                           } else {
                             // Only add to net tips if NOT voided
                             totalCreditTips += tipAmount;
-                            totalNetSales += amount + tipAmount;
                           }
-                        } else if (payment.type === 'CASH' && !isVoided && !isPaymentVoided) {
-                          // Only count cash sales if not voided
+                        }
+
+                        // Track cash sales separately
+                        if (payment.type === 'CASH' && !isVoided && !isPaymentVoided) {
                           totalCashSales += amount;
-                          totalNetSales += amount;
                         }
                       }
                     }
