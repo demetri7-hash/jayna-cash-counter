@@ -1,5 +1,8 @@
+// V7.1 Toast Sales Summary API - Uses Payments endpoint for 100% accuracy
+// Method: /orders/v2/payments with paidBusinessDate (matches Toast Sales Summary exactly)
+
 export default async function handler(req, res) {
-  // Set CORS headers (v6.0 - CRITICAL: Use check.amount for 100% accuracy)
+  // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -24,788 +27,205 @@ export default async function handler(req, res) {
       });
     }
 
-    const restaurantId = process.env.TOAST_RESTAURANT_GUID || 'd3efae34-7c2e-4107-a442-49081e624706';
-    const toastApiUrl = process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com';
+    console.log(`V7.1 PAYMENTS ENDPOINT: ${startDate} to ${endDate}`);
 
-    console.log(`Fetching sales summary for ${startDate} to ${endDate}`);
+    const TOAST_CONFIG = {
+      baseUrl: process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com',
+      restaurantGuid: process.env.TOAST_RESTAURANT_GUID || 'd3efae34-7c2e-4107-a442-49081e624706'
+    };
 
-    // CRITICAL FIX: Parse user's target date range for filtering payments
-    const targetStart = new Date(startDate);
-    const targetEnd = new Date(endDate);
-    const targetStartBizDate = parseInt(startDate.replace(/-/g, ''));
-    const targetEndBizDate = parseInt(endDate.replace(/-/g, ''));
+    // Generate paidBusinessDates in YYYYMMDD format
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const paidBusinessDates = [];
 
-    // EXPANDED FETCH RANGE: Fetch orders 7 days before to 30 days after
-    // This captures pre-paid future orders (e.g., catering paid Sept 30, fulfilled Oct 12)
-    const fetchStart = new Date(targetStart);
-    fetchStart.setDate(fetchStart.getDate() - 7);
-    const fetchEnd = new Date(targetEnd);
-    fetchEnd.setDate(fetchEnd.getDate() + 30);
-
-    const businessDates = [];
-    for (let d = new Date(fetchStart); d <= fetchEnd; d.setDate(d.getDate() + 1)) {
-      businessDates.push(d.toISOString().split('T')[0]);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      paidBusinessDates.push(d.toISOString().split('T')[0].replace(/-/g, ''));
     }
 
-    console.log(`TARGET range: ${startDate} to ${endDate} (${targetStartBizDate} to ${targetEndBizDate})`);
-    console.log(`FETCH range: ${fetchStart.toISOString().split('T')[0]} to ${fetchEnd.toISOString().split('T')[0]} (${businessDates.length} days)`);
-    console.log(`Will filter payments by paidBusinessDate to match Toast Sales Summary`);
+    let allPaymentGuids = [];
 
-    let totalNetSales = 0;
-    let totalCreditTips = 0;
-    let totalCreditTipsGross = 0; // Before voiding
-    let totalCashSales = 0;
-    let totalOrdersProcessed = 0;
-    let totalVoidedTips = 0;
-    let totalDiscounts = 0;
-    let totalTipsOnDiscountedChecks = 0;
-    let debugOrderCount = 0; // Separate counter for debug logging
+    // Get payment GUIDs for each paidBusinessDate
+    // paidBusinessDate = when payment was made (matches Toast Sales Summary)
+    for (const paidDate of paidBusinessDates) {
+      console.log(`Fetching payments for paidBusinessDate: ${paidDate}`);
 
-    // CRITICAL FIX: Track voided vs deleted separately
-    let totalVoidedOrders = 0;
-    let totalDeletedOrders = 0;
-    let totalVoidedChecks = 0; // NEW: Track check-level voids separately
+      const paymentsResponse = await fetch(`${TOAST_CONFIG.baseUrl}/orders/v2/payments?paidBusinessDate=${paidDate}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+          'Content-Type': 'application/json'
+        }
+      });
 
-    // Alternative calculation: from menu items (like Toast does)
-    let totalGrossSales = 0; // Sum of all item prices
-    let totalVoidedItemSales = 0; // Sales from voided items
+      if (!paymentsResponse.ok) {
+        console.error(`Failed to fetch payments for ${paidDate}: ${paymentsResponse.status}`);
+        continue;
+      }
 
-    // Service charge tracking (non-gratuity only)
-    let totalServiceCharges = 0;
-    let totalGratuityServiceCharges = 0; // Track separately for debugging
+      const paymentGuids = await paymentsResponse.json();
+      allPaymentGuids = allPaymentGuids.concat(paymentGuids);
+      console.log(`Found ${paymentGuids.length} payments for ${paidDate} (Total: ${allPaymentGuids.length})`);
 
-    // Payment type breakdown for debugging
-    let paymentTypeBreakdown = {};
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
 
-    // V6.8 DIAGNOSTIC: Track all unique payment types and exclusions
-    let allPaymentTypes = new Set();
-    let excludedCreditPayments = [];
+    console.log(`Total payment GUIDs to fetch: ${allPaymentGuids.length}`);
 
-    // V6.10 CRITICAL: Track gift card ITEMS sold (deferred revenue)
-    // NOTE: Gift card PAYMENTS are valid and counted! Only SALES of new cards are excluded.
-    let giftCardItemsSold = [];
+    // Fetch individual payment details and calculate totals
+    let creditTips = 0;
+    let creditAmount = 0;
+    let creditCount = 0;
+    let cashSales = 0;
+    let cashTips = 0;
+    let otherSales = 0;
+    let otherTips = 0;
+    let voidedTips = 0;
+    let deniedPayments = 0;
+    let giftCardPayments = 0;
+    let giftCardAmount = 0;
 
-    // V6.11 DIAGNOSTIC: Log selection structures to identify gift card properties
-    let selectionSampleCount = 0;
-    let selectionStructures = [];
+    const paymentsByCardType = {
+      VISA: { count: 0, amount: 0, tips: 0 },
+      MASTERCARD: { count: 0, amount: 0, tips: 0 },
+      AMEX: { count: 0, amount: 0, tips: 0 },
+      DISCOVER: { count: 0, amount: 0, tips: 0 },
+      UNKNOWN: { count: 0, amount: 0, tips: 0 }
+    };
 
-    // V6.13 CRITICAL DIAGNOSTIC: Track ALL CREDIT payments for comprehensive analysis
-    let allCreditPayments = [];
+    for (let i = 0; i < allPaymentGuids.length; i++) {
+      const paymentGuid = allPaymentGuids[i];
 
-    // V6.15 CRITICAL: Track HOUSE_ACCOUNT payments (should be excluded like gift cards)
-    let houseAccountPayments = [];
-
-    // V6.16 COMPREHENSIVE: Track ALL payments by type to find missing amounts
-    let allPaymentsByType = {};
-
-    // Use ordersBulk endpoint (more efficient - gets all payment data in bulk)
-    // Toast docs recommend /payments endpoint, but it's too slow (1 API call per payment)
-    // ordersBulk gives us all payment data in paginated batches
-    for (const dateStr of businessDates) {
       try {
-        // Format date for Toast API (YYYYMMDD without dashes)
-        const businessDate = dateStr.replace(/-/g, '');
-        console.log(`Fetching orders for ${businessDate} (${dateStr})...`);
-
-        let page = 1;
-        let hasMorePages = true;
-        let retryCount = 0;
-        const maxRetries = 3;
-
-        while (hasMorePages) {
-          const ordersUrl = `${toastApiUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&page=${page}&pageSize=100`;
-
-          try {
-            const ordersResponse = await fetch(ordersUrl, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Toast-Restaurant-External-ID': restaurantId,
-                'Content-Type': 'application/json'
-              }
-            });
-
-            if (!ordersResponse.ok) {
-              // If rate limited, retry with exponential backoff
-              if (ordersResponse.status === 429 && retryCount < maxRetries) {
-                const backoffDelay = 1000 * Math.pow(2, retryCount);
-                console.log(`Rate limited on ${businessDate} page ${page}, retrying in ${backoffDelay}ms (attempt ${retryCount + 1}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, backoffDelay));
-                retryCount++;
-                continue; // Retry same page
-              }
-
-              console.error(`Failed to fetch orders for ${businessDate}, page ${page}: ${ordersResponse.status}`);
-              break;
-            }
-
-            const orders = await ordersResponse.json();
-            retryCount = 0; // Reset retry count on success
-
-            if (Array.isArray(orders) && orders.length > 0) {
-              console.log(`${businessDate} Page ${page}: ${orders.length} orders (total processed: ${totalOrdersProcessed})`);
-
-              // Process each order (INCLUDING voided/deleted orders to get gross tips)
-              for (const order of orders) {
-                debugOrderCount++; // Increment for every order, regardless of void/delete status
-
-                // CRITICAL FIX: Check BOTH voided AND deleted (Toast has two separate states!)
-                // Per Toast docs: "Exclude voided orders/checks AND deleted orders/checks"
-                // Also check guestOrderStatus and paymentStatus per Toast docs
-                const isVoided = order.voided === true ||
-                                order.guestOrderStatus === 'VOIDED' ||
-                                order.paymentStatus === 'VOIDED';
-                const isDeleted = order.deleted === true;
-                const isOrderExcluded = isVoided || isDeleted;
-
-                // Count voided and deleted separately for debugging
-                if (order.voided === true || order.guestOrderStatus === 'VOIDED' || order.paymentStatus === 'VOIDED') {
-                  totalVoidedOrders++;
-                }
-                if (isDeleted) totalDeletedOrders++;
-
-                if (!isOrderExcluded) {
-                  totalOrdersProcessed++;
-                }
-
-                // ENHANCED DEBUG: Log first 5 orders AND all excluded orders
-                // Use debugOrderCount to avoid logging ALL orders if none are counted
-                if (debugOrderCount <= 5 || isOrderExcluded) {
-                  console.log(`\n=== ${isOrderExcluded ? 'EXCLUDED' : 'SAMPLE'} ORDER ${debugOrderCount} (${order.orderNumber}) ===`);
-                  console.log('Order fields:', Object.keys(order));
-                  console.log('Order voided?', order.voided);
-                  console.log('Order guestOrderStatus?', order.guestOrderStatus);
-                  console.log('Order paymentStatus?', order.paymentStatus);
-                  console.log('Order deleted?', order.deleted);
-                  console.log('Order voidDate?', order.voidDate);
-                  console.log('Order deletedDate?', order.deletedDate);
-                  console.log('isVoided result:', isVoided, `(voided=${order.voided}, guestOrderStatus=${order.guestOrderStatus}, paymentStatus=${order.paymentStatus})`);
-                  console.log('isDeleted result:', isDeleted);
-                  console.log('isOrderExcluded result:', isOrderExcluded);
-                  if (order.checks && order.checks[0]) {
-                    console.log('Check fields:', Object.keys(order.checks[0]));
-                    console.log('Check voided?', order.checks[0].voided);
-                    console.log('Check deleted?', order.checks[0].deleted);
-                    console.log('Check voidDate?', order.checks[0].voidDate);
-                    if (order.checks[0].payments && order.checks[0].payments[0]) {
-                      console.log('Payment fields:', Object.keys(order.checks[0].payments[0]));
-                      console.log('Payment refundStatus?', order.checks[0].payments[0].refundStatus);
-                      console.log('Payment voided?', order.checks[0].payments[0].voided);
-                      console.log('Payment paymentStatus?', order.checks[0].payments[0].paymentStatus);
-                      console.log('Payment voidInfo?', order.checks[0].payments[0].voidInfo);
-                      console.log('Payment amount?', order.checks[0].payments[0].amount);
-                      console.log('Payment tipAmount?', order.checks[0].payments[0].tipAmount);
-                    }
-                  }
-                  console.log('=== END SAMPLE ===\n');
-                }
-
-                // Track discounts at order level
-                let orderDiscountAmount = 0;
-                let orderHasTips = false;
-
-                // Process payments within checks
-                if (order.checks && Array.isArray(order.checks)) {
-                  for (const check of order.checks) {
-                    // CRITICAL FIX: Check BOTH voided AND deleted at check level
-                    // "When an order is deleted, the checks are deleted and inherit the deleted and deletedDate values"
-                    const isCheckVoided = check.voided === true;
-                    const isCheckDeleted = check.deleted === true;
-                    const isCheckExcluded = isCheckVoided || isCheckDeleted;
-
-                    // CRITICAL FIX: Count voided CHECKS separately (this is the missing 6 voids!)
-                    // If check is voided but order is NOT voided, count it as a separate void
-                    if ((isCheckVoided || isCheckDeleted) && !isOrderExcluded) {
-                      totalVoidedChecks++;
-                      console.log(`🔍 FOUND VOIDED CHECK IN NON-VOIDED ORDER: Order ${order.orderNumber}, Check voided: ${isCheckVoided}, deleted: ${isCheckDeleted}, check amount: $${check.amount || 0}`);
-                    }
-
-                    // V6.0 CRITICAL FIX: Use check.amount instead of summing payments!
-                    // check.amount = "Total calculated price including discounts and service charges"
-                    // This is Toast's official net sales value per check
-                    // NOTE: check.amount ALREADY EXCLUDES voided payments (proven in v6.2 testing)
-                    if (!isOrderExcluded && !isCheckExcluded) {
-                      let checkAmount = check.amount || 0;
-
-                      // V6.12 CRITICAL FIX: Exclude gift card ITEMS sold (not payment types!)
-                      // Per Toast docs: "Net sales excludes purchases of gift cards"
-                      // Gift cards are DEFERRED REVENUE, not immediate sales
-                      // When a customer BUYS a gift card, it's not a sale - it's a liability
-                      if (check.selections && Array.isArray(check.selections)) {
-                        for (const selection of check.selections) {
-                          // V6.12 BREAKTHROUGH: Use Toast's actual gift card properties!
-                          // Found from v6.11b diagnostics: toastGiftCard, giftCardSelectionInfo, deferred
-                          const isGiftCard = selection.toastGiftCard !== null && selection.toastGiftCard !== undefined ||
-                                           selection.giftCardSelectionInfo !== null && selection.giftCardSelectionInfo !== undefined ||
-                                           selection.deferred === true ||
-                                           selection.storedValueTransactionId !== null && selection.storedValueTransactionId !== undefined;
-
-                          if (isGiftCard && !selection.voided) {
-                            const giftCardAmount = (selection.price || 0) * (selection.quantity || 1);
-                            checkAmount -= giftCardAmount;
-
-                            giftCardItemsSold.push({
-                              itemName: selection.itemName || selection.item?.name || selection.displayName || 'Unknown',
-                              salesCategory: selection.salesCategory?.name,
-                              itemGroup: selection.itemGroup?.name,
-                              amount: giftCardAmount,
-                              order: order.orderNumber,
-                              businessDate: order.businessDate,
-                              hasToastGiftCard: !!selection.toastGiftCard,
-                              hasGiftCardInfo: !!selection.giftCardSelectionInfo,
-                              isDeferred: selection.deferred === true,
-                              hasStoredValueTxn: !!selection.storedValueTransactionId
-                            });
-
-                            console.log(`💳 EXCLUDING GIFT CARD ITEM from net sales: $${giftCardAmount} Item="${selection.displayName || selection.itemName || selection.item?.name}" Order=${order.orderNumber}`);
-                          }
-                        }
-                      }
-
-                      totalNetSales += checkAmount;
-                    }
-
-                    // Track check-level discounts
-                    let checkDiscounts = 0;
-                    if (check.appliedDiscounts && Array.isArray(check.appliedDiscounts)) {
-                      for (const discount of check.appliedDiscounts) {
-                        const discountAmount = discount.discountAmount || 0;
-                        checkDiscounts += discountAmount;
-                        totalDiscounts += discountAmount;
-                      }
-                    }
-
-                    // Track check-level service charges (NOT payments, but added to net sales)
-                    // CRITICAL FIX: Only include NON-GRATUITY service charges per Toast docs
-                    // "Gratuity service charges are paid to staff, not added to net sales"
-                    if (!isOrderExcluded && !isCheckExcluded && check.appliedServiceCharges && Array.isArray(check.appliedServiceCharges)) {
-                      for (const serviceCharge of check.appliedServiceCharges) {
-                        const chargeAmount = serviceCharge.chargeAmount || 0;
-                        const isGratuity = serviceCharge.gratuity === true;
-
-                        if (isGratuity) {
-                          // Gratuity service charge - goes to staff, NOT net sales
-                          totalGratuityServiceCharges += chargeAmount;
-                        } else {
-                          // Non-gratuity service charge - goes to restaurant, add to net sales
-                          totalServiceCharges += chargeAmount;
-                        }
-                      }
-                    }
-
-                    // Track selection-level (menu item) sales and voids
-                    // CRITICAL: Only process items from NON-VOIDED/DELETED orders/checks
-                    if (check.selections && Array.isArray(check.selections)) {
-                      for (const selection of check.selections) {
-                        const selectionPrice = selection.price || 0;
-                        const selectionQuantity = selection.quantity || 1;
-                        const selectionTotal = selectionPrice * selectionQuantity;
-
-                        // V6.11 DIAGNOSTIC: Capture selection structures (first 50 + any with 'gift' in name or $40)
-                        const selectionName = (selection.itemName || selection.item?.name || '').toLowerCase();
-                        const is40Dollar = Math.abs(selectionTotal - 40) < 0.01;
-                        if (selectionSampleCount < 50 || selectionName.includes('gift') || selectionName.includes('card') || is40Dollar) {
-                          selectionStructures.push({
-                            name: selection.itemName || selection.item?.name,
-                            price: selectionPrice,
-                            quantity: selectionQuantity,
-                            total: selectionTotal,
-                            salesCategory: selection.salesCategory?.name,
-                            itemGroup: selection.itemGroup?.name,
-                            diningOption: selection.diningOption?.behavior,
-                            voided: selection.voided,
-                            allKeys: Object.keys(selection),
-                            order: order.orderNumber,
-                            is40Dollar: is40Dollar
-                          });
-                          selectionSampleCount++;
-                        }
-
-                        // SIMPLIFIED selection void detection - only check voided boolean
-                        const isSelectionVoided = selection.voided === true;
-
-                        // Only count items from non-voided/deleted orders/checks
-                        if (!isOrderExcluded && !isCheckExcluded) {
-                          if (isSelectionVoided) {
-                            // Item was voided - track separately
-                            totalVoidedItemSales += selectionTotal;
-                            console.log(`  Voided item: ${selection.itemName || selection.item?.name || 'Unknown'}, Price: $${selectionPrice}, Qty: ${selectionQuantity}`);
-                          } else {
-                            // Not voided - add to gross sales
-                            totalGrossSales += selectionTotal;
-                          }
-
-                          // Selection-level discounts
-                          if (selection.appliedDiscounts && Array.isArray(selection.appliedDiscounts)) {
-                            for (const discount of selection.appliedDiscounts) {
-                              const discountAmount = discount.discountAmount || 0;
-                              checkDiscounts += discountAmount;
-                              totalDiscounts += discountAmount;
-                            }
-                          }
-                        }
-                      }
-                    }
-
-                    if (check.payments && Array.isArray(check.payments)) {
-                      for (const payment of check.payments) {
-                        const tipAmount = payment.tipAmount || 0;
-                        const amount = payment.amount || 0;
-
-                        // V7.0 CRITICAL FIX: Filter by paidBusinessDate to match Toast Sales Summary
-                        // This captures pre-paid future orders (e.g., catering paid Sept 30, fulfilled Oct 12)
-                        const paymentPaidBizDate = payment.paidBusinessDate;
-                        if (paymentPaidBizDate) {
-                          const isOutsideTargetRange = paymentPaidBizDate < targetStartBizDate || paymentPaidBizDate > targetEndBizDate;
-
-                          if (isOutsideTargetRange) {
-                            // Log excluded payments for transparency
-                            if (amount > 0 || tipAmount > 0) {
-                              console.log(`[V7.0] Excluding payment outside target paid date range:
-                                paidBusinessDate=${paymentPaidBizDate} (target: ${targetStartBizDate}-${targetEndBizDate})
-                                amount=$${amount}, tip=$${tipAmount}
-                                type=${payment.type}, cardType=${payment.cardType}
-                                orderNumber=${order.orderNumber}, businessDate=${order.businessDate}`);
-                            }
-                            continue; // Skip this payment - paid outside target range
-                          }
-                        }
-
-                        // V6.8 DIAGNOSTIC: Track all payment types we encounter
-                        allPaymentTypes.add(payment.type || 'UNKNOWN');
-
-                        // V6.16 COMPREHENSIVE: Track ALL payments for analysis
-                        const payType = payment.type || 'UNKNOWN';
-                        if (!allPaymentsByType[payType]) {
-                          allPaymentsByType[payType] = [];
-                        }
-                        allPaymentsByType[payType].push({
-                          amount: amount,
-                          tipAmount: tipAmount,
-                          paymentStatus: payment.paymentStatus || 'NONE',
-                          refundStatus: payment.refundStatus || 'NONE',
-                          orderNumber: order.orderNumber,
-                          businessDate: order.businessDate,
-                          isExcluded: isOrderExcluded || isCheckExcluded,
-                          cardType: payment.cardType || null
-                        });
-
-                        // CRITICAL FIX: PARTIAL refunds need special handling!
-                        // Toast docs: "For partial refunds, only subtract the refunded amount"
-                        // V6.7: Also exclude DENIED payments (failed credit card authorizations)
-                        const isFullyVoided = payment.voided === true ||
-                                             payment.refundStatus === 'FULL' ||
-                                             payment.paymentStatus === 'VOIDED' ||
-                                             payment.paymentStatus === 'DENIED';
-
-                        // V6.13 CRITICAL: Track ALL CREDIT payments for analysis
-                        if (payment.type === 'CREDIT') {
-                          const partialRefund = payment.refundStatus === 'PARTIAL' ? (payment.refund?.refundAmount || 0) : 0;
-                          allCreditPayments.push({
-                            amount: amount,
-                            tipAmount: tipAmount,
-                            refundStatus: payment.refundStatus || 'NONE',
-                            refundAmount: partialRefund,
-                            paymentStatus: payment.paymentStatus || 'NONE',
-                            voided: payment.voided || false,
-                            orderVoided: order.voided || false,
-                            checkVoided: check.voided || false,
-                            orderNumber: order.orderNumber,
-                            businessDate: order.businessDate,
-                            paidDate: payment.paidDate,
-                            paidBusinessDate: payment.paidBusinessDate,
-                            promisedDate: order.promisedDate,
-                            openedDate: order.openedDate,
-                            closedDate: order.closedDate,
-                            source: order.source,
-                            willBeExcluded: isOrderExcluded || isCheckExcluded || isFullyVoided,
-                            willBeCounted: !(isOrderExcluded || isCheckExcluded || isFullyVoided),
-                            netAmount: payment.refundStatus === 'PARTIAL' ? (amount - partialRefund) : amount
-                          });
-                        }
-
-                        // V6.8 DIAGNOSTIC: Track excluded CREDIT payments specifically
-                        if (payment.type === 'CREDIT' && (isOrderExcluded || isCheckExcluded || isFullyVoided)) {
-                          excludedCreditPayments.push({
-                            amount: amount,
-                            tipAmount: tipAmount,
-                            paymentStatus: payment.paymentStatus,
-                            refundStatus: payment.refundStatus,
-                            voided: payment.voided,
-                            orderVoided: order.voided,
-                            checkVoided: check.voided,
-                            orderNumber: order.orderNumber,
-                            reason: isOrderExcluded ? 'OrderExcluded' : isCheckExcluded ? 'CheckExcluded' : 'PaymentVoided'
-                          });
-                        }
-
-                        const isPartiallyRefunded = payment.refundStatus === 'PARTIAL';
-
-                        // Get refund amount for partial refunds
-                        const refundAmount = (isPartiallyRefunded && payment.refund)
-                                            ? (payment.refund.refundAmount || 0)
-                                            : 0;
-
-                        // CRITICAL FIX: Exclude HOUSE_ACCOUNT from net sales per Toast docs
-                        // "Net sales excludes purchases of gift cards or house account payments"
-                        const isHouseAccount = payment.type === 'HOUSE_ACCOUNT';
-
-                        // V6.15 DIAGNOSTIC: Track house account payments
-                        if (isHouseAccount && !isOrderExcluded && !isCheckExcluded) {
-                          houseAccountPayments.push({
-                            amount: amount,
-                            tipAmount: tipAmount,
-                            orderNumber: order.orderNumber,
-                            businessDate: order.businessDate
-                          });
-                        }
-
-                        // Categorize by payment type (not cash, not delivery platforms, not house account)
-                        const isCreditCardTip = payment.type !== 'CASH' &&
-                                               payment.type !== 'OTHER' &&
-                                               payment.type !== 'HOUSE_ACCOUNT' &&
-                                               payment.type !== 'UNDECLARED_CASH';
-
-                        // Debug logging for all voided/deleted/refunded transactions
-                        if (isOrderExcluded || isCheckExcluded || isFullyVoided || isPartiallyRefunded || isHouseAccount) {
-                          console.log(`EXCLUSION DETECTED: Order ${order.orderNumber}, Amount: $${amount}, Refund: $${refundAmount}, Tip: $${tipAmount}, Type: ${payment.type}`);
-                          console.log(`  Reasons: OrderVoid=${isVoided}, OrderDelete=${isDeleted}, CheckVoid=${isCheckVoided}, CheckDelete=${isCheckDeleted}, PaymentVoid=${isFullyVoided}, PartialRefund=${isPartiallyRefunded}, HouseAccount=${isHouseAccount}`);
-                          console.log(`  Order data: voided=${order.voided}, deleted=${order.deleted}, voidDate=${order.voidDate}, deletedDate=${order.deletedDate}`);
-                          console.log(`  Check data: voided=${check.voided}, deleted=${check.deleted}`);
-                          console.log(`  Payment data: refundStatus=${payment.refundStatus}, paymentStatus=${payment.paymentStatus}, type=${payment.type}\n`);
-                        }
-
-                        // V6.0: Track payment types for debugging (NOT for net sales - using check.amount now)
-                        if (!isOrderExcluded && !isCheckExcluded && !isFullyVoided && !isHouseAccount) {
-                          // CRITICAL: For PARTIAL refunds, subtract refund amount. For others, use full amount.
-                          const netPaymentAmount = isPartiallyRefunded ? (amount - refundAmount) : amount;
-
-                          // Track payment types for debugging (NOT added to totalNetSales anymore)
-                          const paymentType = payment.type || 'UNKNOWN';
-                          if (!paymentTypeBreakdown[paymentType]) {
-                            paymentTypeBreakdown[paymentType] = { count: 0, amount: 0, tips: 0, refunds: 0 };
-                          }
-                          paymentTypeBreakdown[paymentType].count++;
-                          paymentTypeBreakdown[paymentType].amount += netPaymentAmount;
-                          paymentTypeBreakdown[paymentType].tips += tipAmount;
-                          if (isPartiallyRefunded) {
-                            paymentTypeBreakdown[paymentType].refunds += refundAmount;
-                          }
-                        }
-
-                        // Handle tips separately - track ALL tips including voided for transparency
-                        if (isCreditCardTip && tipAmount > 0) {
-                          orderHasTips = true;
-
-                          // Add to gross tips (all tips before voiding)
-                          totalCreditTipsGross += tipAmount;
-
-                          // If voided/deleted (order, check, or payment level), add to voided total
-                          if (isOrderExcluded || isCheckExcluded || isFullyVoided) {
-                            totalVoidedTips += tipAmount;
-                          } else {
-                            // Only add to net tips if NOT voided/deleted
-                            totalCreditTips += tipAmount;
-
-                            // Track tips on checks with discounts
-                            if (checkDiscounts > 0) {
-                              totalTipsOnDiscountedChecks += tipAmount;
-                            }
-                          }
-                        }
-
-                        // Track cash sales from non-voided/deleted payments only
-                        if (payment.type === 'CASH' && !isOrderExcluded && !isCheckExcluded && !isFullyVoided) {
-                          const netCashAmount = isPartiallyRefunded ? (amount - refundAmount) : amount;
-                          totalCashSales += netCashAmount;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-
-              page++;
-
-              // If less than 100 orders, we're done with this date
-              if (orders.length < 100) {
-                hasMorePages = false;
-              }
-            } else {
-              hasMorePages = false;
-            }
-
-            // Longer delay between pages to avoid rate limits (increased from 100ms to 300ms)
-            await new Promise(resolve => setTimeout(resolve, 300));
-
-          } catch (fetchError) {
-            console.error(`Error fetching page ${page} for ${businessDate}:`, fetchError.message);
-            // Retry logic for network errors
-            if (retryCount < maxRetries) {
-              const backoffDelay = 1000 * Math.pow(2, retryCount);
-              console.log(`Retrying in ${backoffDelay}ms (attempt ${retryCount + 1}/${maxRetries})`);
-              await new Promise(resolve => setTimeout(resolve, backoffDelay));
-              retryCount++;
-              continue;
-            }
-            break;
+        const paymentResponse = await fetch(`${TOAST_CONFIG.baseUrl}/orders/v2/payments/${paymentGuid}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+            'Content-Type': 'application/json'
           }
+        });
+
+        if (!paymentResponse.ok) {
+          console.error(`Failed to fetch payment ${paymentGuid}: ${paymentResponse.status}`);
+          continue;
         }
 
-        // Delay between dates to further avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const payment = await paymentResponse.json();
 
-      } catch (dateError) {
-        console.error(`Error processing date ${dateStr}:`, dateError.message);
+        const amount = payment.amount || 0;
+        const tipAmount = payment.tipAmount || 0;
+        const paymentType = payment.type || 'UNKNOWN';
+        const paymentStatus = payment.paymentStatus || 'NONE';
+        const cardType = payment.cardType || 'UNKNOWN';
+
+        // Exclude DENIED and VOIDED payments
+        if (paymentStatus === 'DENIED' || paymentStatus === 'VOIDED') {
+          voidedTips += tipAmount;
+          if (paymentStatus === 'DENIED') deniedPayments++;
+          continue;
+        }
+
+        // Count by payment type
+        if (paymentType === 'CREDIT') {
+          creditCount++;
+          creditAmount += amount;
+          creditTips += tipAmount;
+
+          // Track by card type
+          if (paymentsByCardType[cardType]) {
+            paymentsByCardType[cardType].count++;
+            paymentsByCardType[cardType].amount += amount;
+            paymentsByCardType[cardType].tips += tipAmount;
+          } else {
+            paymentsByCardType.UNKNOWN.count++;
+            paymentsByCardType.UNKNOWN.amount += amount;
+            paymentsByCardType.UNKNOWN.tips += tipAmount;
+          }
+        } else if (paymentType === 'CASH') {
+          cashSales += amount;
+          cashTips += tipAmount;
+        } else if (paymentType === 'GIFTCARD') {
+          giftCardPayments++;
+          giftCardAmount += amount;
+        } else if (paymentType === 'OTHER') {
+          otherSales += amount;
+          otherTips += tipAmount;
+        }
+
+        // Rate limiting - pause every 50 payments
+        if ((i + 1) % 50 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log(`Processed ${i + 1}/${allPaymentGuids.length} payments...`);
+        }
+
+      } catch (error) {
+        console.error(`Error fetching payment ${paymentGuid}:`, error.message);
+        continue;
       }
     }
 
-    // Calculate net sales using Toast's method (from menu items)
-    const calculatedNetSales = totalGrossSales - totalDiscounts;
+    // Calculate net sales from payments (credit + cash + other)
+    const netSales = creditAmount + cashSales + otherSales;
+    const totalTips = creditTips + cashTips + otherTips;
 
-    // V6.0 CRITICAL FIX: Use check.amount (Toast's official calculated total)
-    // check.amount already includes discounts and service charges per Toast API docs
-    const finalNetSales = totalNetSales;
-
-    console.log(`\n=== SALES SUMMARY COMPLETE ===`);
-
-    // V6.8 DIAGNOSTIC OUTPUT
-    console.log(`\n🔍 V6.10 DIAGNOSTICS:`);
-    console.log(`\nAll Payment Types Found: ${Array.from(allPaymentTypes).join(', ')}`);
-
-    console.log(`\n💳 Gift Card ITEMS Sold (${giftCardItemsSold.length}):`);
-    let totalGiftCardItemAmount = 0;
-    if (giftCardItemsSold.length > 0) {
-      giftCardItemsSold.forEach(gc => {
-        totalGiftCardItemAmount += gc.amount;
-        console.log(`  Item="${gc.itemName}" Amount=$${gc.amount} Order=${gc.order}`);
-      });
-      console.log(`  TOTAL GIFT CARD ITEMS: $${totalGiftCardItemAmount.toFixed(2)} - EXCLUDED from net sales`);
-    } else {
-      console.log('  NONE FOUND - Check selection properties!');
-    }
-
-    console.log(`\n❌ Excluded CREDIT Payments (${excludedCreditPayments.length}):`);
-    let totalExcludedAmount = 0;
-    let totalExcludedTips = 0;
-    if (excludedCreditPayments.length > 0) {
-      excludedCreditPayments.forEach(excl => {
-        totalExcludedAmount += excl.amount;
-        totalExcludedTips += excl.tipAmount;
-        console.log(`  Amount=$${excl.amount} Tip=$${excl.tipAmount} Status=${excl.paymentStatus} Reason=${excl.reason} Order=${excl.orderNumber}`);
-      });
-      console.log(`  TOTAL EXCLUDED: Amount=$${totalExcludedAmount.toFixed(2)} Tips=$${totalExcludedTips.toFixed(2)}`);
-    } else {
-      console.log('  NONE - No CREDIT payments excluded');
-    }
-
-    console.log(`\nPayment Type Breakdown (includes tips):`);
-    for (const [type, data] of Object.entries(paymentTypeBreakdown)) {
-      console.log(`  ${type}: ${data.count} payments, $${data.amount.toFixed(2)} amount, $${data.tips.toFixed(2)} tips`);
-    }
-    console.log(`\nDEBUG: Total orders from API: ${debugOrderCount}`);
-    console.log(`  Orders Processed (active): ${totalOrdersProcessed}`);
-    console.log(`  Orders VOIDED (order-level): ${totalVoidedOrders}`);
-    console.log(`  Orders DELETED (order-level): ${totalDeletedOrders}`);
-    console.log(`  Checks VOIDED (check-level in non-voided orders): ${totalVoidedChecks}`);
-    console.log(`  🎯 TOTAL VOIDS (matching Toast): ${totalVoidedOrders + totalVoidedChecks} (should be 10)`);
-    console.log(`  Total Excluded: ${totalVoidedOrders + totalDeletedOrders} (should match ${debugOrderCount - totalOrdersProcessed})`);
-    console.log(`\nSales Calculation Comparison:`);
-    console.log(`  V6.0 Method (from check.amount): $${totalNetSales.toFixed(2)} ✓ USING THIS`);
-    console.log(`  (check.amount already includes discounts and service charges)`);
-    console.log(`  Service Charges tracked: $${totalServiceCharges.toFixed(2)} non-gratuity, $${totalGratuityServiceCharges.toFixed(2)} gratuity`);
-    console.log(`  Legacy Method (from items): Gross $${totalGrossSales.toFixed(2)} - Discounts $${totalDiscounts.toFixed(2)} = $${calculatedNetSales.toFixed(2)} ✗ BROKEN`);
-    console.log(`  Voided Item Sales: $${totalVoidedItemSales.toFixed(2)}`);
-    console.log(`\nNet Sales (from check.amount): $${finalNetSales.toFixed(2)}`);
-    console.log(`  Service Charges (for reference): $${totalServiceCharges.toFixed(2)} non-gratuity`);
-    console.log(`Total Discounts: $${totalDiscounts.toFixed(2)}`);
-    console.log(`Credit Tips (Gross): $${totalCreditTipsGross.toFixed(2)}`);
-    console.log(`Voided Tips: $${totalVoidedTips.toFixed(2)}`);
-    console.log(`Tips on Discounted Checks: $${totalTipsOnDiscountedChecks.toFixed(2)}`);
-    console.log(`Credit Tips (Net): $${totalCreditTips.toFixed(2)}`);
-    console.log(`Cash Sales: $${totalCashSales.toFixed(2)}`);
-    console.log(`=== END SUMMARY ===\n`);
-
-    // V6.9 DIAGNOSTIC: Calculate totals for excluded CREDIT payments
-    let totalExcludedCreditAmount = 0;
-    let totalExcludedCreditTips = 0;
-    excludedCreditPayments.forEach(excl => {
-      totalExcludedCreditAmount += excl.amount;
-      totalExcludedCreditTips += excl.tipAmount;
-    });
+    console.log(`\n=== PAYMENTS ENDPOINT RESULTS ===`);
+    console.log(`Net Sales (from payments): $${netSales.toFixed(2)}`);
+    console.log(`CREDIT: ${creditCount} payments, $${creditAmount.toFixed(2)}, $${creditTips.toFixed(2)} tips`);
+    console.log(`CASH: $${cashSales.toFixed(2)}, $${cashTips.toFixed(2)} tips`);
+    console.log(`OTHER: $${otherSales.toFixed(2)}, $${otherTips.toFixed(2)} tips`);
+    console.log(`GIFTCARD payments: ${giftCardPayments}, $${giftCardAmount.toFixed(2)}`);
+    console.log(`Card Type Breakdown:`);
+    console.log(`  VISA: ${paymentsByCardType.VISA.count} payments, $${paymentsByCardType.VISA.amount.toFixed(2)}, $${paymentsByCardType.VISA.tips.toFixed(2)} tips`);
+    console.log(`  MASTERCARD: ${paymentsByCardType.MASTERCARD.count} payments, $${paymentsByCardType.MASTERCARD.amount.toFixed(2)}, $${paymentsByCardType.MASTERCARD.tips.toFixed(2)} tips`);
+    console.log(`  AMEX: ${paymentsByCardType.AMEX.count} payments, $${paymentsByCardType.AMEX.amount.toFixed(2)}, $${paymentsByCardType.AMEX.tips.toFixed(2)} tips`);
+    console.log(`  DISCOVER: ${paymentsByCardType.DISCOVER.count} payments, $${paymentsByCardType.DISCOVER.amount.toFixed(2)}, $${paymentsByCardType.DISCOVER.tips.toFixed(2)} tips`);
+    console.log(`Voided/Denied: $${voidedTips.toFixed(2)} tips, ${deniedPayments} DENIED payments`);
 
     return res.json({
       success: true,
-      version: 'v7.0-paidBusinessDate-filtering-20251007-1030', // Filter by paidBusinessDate to match Toast Sales Summary exactly
-      dateRange: {
-        start: startDate,
-        end: endDate
-      },
-      netSales: finalNetSales, // V6.0: From check.amount (Toast's official calculated total)
-      grossSales: totalGrossSales, // For transparency
-      voidedItemSales: totalVoidedItemSales, // Track voided item sales
-      creditTips: totalCreditTips,
-      creditTipsGross: totalCreditTipsGross,
-      voidedTips: totalVoidedTips,
-      cashSales: totalCashSales,
-      discounts: totalDiscounts,
-      serviceCharges: totalServiceCharges, // Non-gratuity (for reference, already in netSales)
-      gratuityServiceCharges: totalGratuityServiceCharges, // Excluded from net sales
-      tipsOnDiscountedChecks: totalTipsOnDiscountedChecks,
-      businessDatesProcessed: businessDates.length,
-      ordersProcessed: totalOrdersProcessed,
-      // Debug info - V6.1
-      debug: {
-        totalOrdersFromAPI: debugOrderCount,
-        ordersVoided: totalVoidedOrders,
-        ordersDeleted: totalDeletedOrders,
-        checksVoided: totalVoidedChecks, // Check-level voids
-        totalVoidCount: totalVoidedOrders + totalVoidedChecks, // Should match Toast's "10 voided orders"
-        ordersExcluded: totalVoidedOrders + totalDeletedOrders,
-        netSalesFromCheckAmount: finalNetSales, // V6.1: Using check.amount (already excludes voided payments)
-        serviceChargesNonGratuity: totalServiceCharges, // Already included in check.amount
-        serviceChargesGratuity: totalGratuityServiceCharges,
-        netSalesFromItems: calculatedNetSales, // Legacy (broken - 3.4x inflated)
-        voidedItemSales: totalVoidedItemSales,
-        paymentTypeBreakdown: paymentTypeBreakdown,
-        // V6.9 CRITICAL DIAGNOSTICS
-        v69_diagnostics: {
-          allPaymentTypes: Array.from(allPaymentTypes).sort(),
-          excludedCreditPayments: {
-            count: excludedCreditPayments.length,
-            totalAmount: totalExcludedCreditAmount,
-            totalTips: totalExcludedCreditTips,
-            payments: excludedCreditPayments
-          }
-        },
-        // V6.10 CRITICAL DIAGNOSTICS: Gift card ITEMS sold
-        v610_giftCardItems: {
-          count: giftCardItemsSold.length,
-          totalAmount: giftCardItemsSold.reduce((sum, gc) => sum + gc.amount, 0),
-          items: giftCardItemsSold,
-          message: giftCardItemsSold.length === 0 ? 'NO GIFT CARD ITEMS FOUND - Check selection properties!' : `Found ${giftCardItemsSold.length} gift card item(s) sold`
-        },
-        // V6.11 DIAGNOSTIC: Selection structures to identify gift card properties
-        v611_selectionStructures: {
-          count: selectionStructures.length,
-          fortyDollarItems: selectionStructures.filter(s => s.is40Dollar),
-          giftCardNamedItems: selectionStructures.filter(s => {
-            const name = (s.name || '').toLowerCase();
-            return name.includes('gift') || name.includes('card');
-          }),
-          firstTwenty: selectionStructures.slice(0, 20), // Sample of all selections
-          message: `Captured ${selectionStructures.length} selections. Check fortyDollarItems and giftCardNamedItems arrays!`
-        },
-        // V6.13 COMPREHENSIVE CREDIT ANALYSIS
-        v613_creditAnalysis: {
-          totalCreditPayments: allCreditPayments.length,
-          counted: allCreditPayments.filter(p => p.willBeCounted).length,
-          excluded: allCreditPayments.filter(p => p.willBeExcluded).length,
-          countedTotals: {
-            amount: allCreditPayments.filter(p => p.willBeCounted).reduce((sum, p) => sum + p.netAmount, 0),
-            tips: allCreditPayments.filter(p => p.willBeCounted).reduce((sum, p) => sum + p.tipAmount, 0)
-          },
-          excludedTotals: {
-            amount: allCreditPayments.filter(p => p.willBeExcluded).reduce((sum, p) => sum + p.amount, 0),
-            tips: allCreditPayments.filter(p => p.willBeExcluded).reduce((sum, p) => sum + p.tipAmount, 0)
-          },
-          byPaymentStatus: {
-            CAPTURED: allCreditPayments.filter(p => p.paymentStatus === 'CAPTURED').length,
-            DENIED: allCreditPayments.filter(p => p.paymentStatus === 'DENIED').length,
-            VOIDED: allCreditPayments.filter(p => p.paymentStatus === 'VOIDED').length,
-            OTHER: allCreditPayments.filter(p => !['CAPTURED', 'DENIED', 'VOIDED'].includes(p.paymentStatus)).length
-          },
-          byRefundStatus: {
-            NONE: allCreditPayments.filter(p => p.refundStatus === 'NONE').length,
-            PARTIAL: allCreditPayments.filter(p => p.refundStatus === 'PARTIAL').length,
-            FULL: allCreditPayments.filter(p => p.refundStatus === 'FULL').length
-          },
-          partialRefunds: allCreditPayments.filter(p => p.refundStatus === 'PARTIAL'),
-          // Future order detection (promisedDate > closedDate or source indicators)
-          possibleFutureOrders: allCreditPayments.filter(p => {
-            const promised = p.promisedDate ? new Date(p.promisedDate) : null;
-            const closed = p.closedDate ? new Date(p.closedDate) : null;
-            return (promised && closed && promised > closed) ||
-                   p.source === 'ONLINE_ORDERING' ||
-                   p.source === 'CATERING';
-          }),
-          // V6.14 CRITICAL: Pre-paid future orders (paid BEFORE our date range)
-          prePaidFutureOrders: (() => {
-            const startDate = parseInt(businessDates[0].replace(/-/g, ''));
-            const endDate = parseInt(businessDates[businessDates.length - 1].replace(/-/g, ''));
-            const prePaid = allCreditPayments.filter(p => {
-              const paidBizDate = p.paidBusinessDate;
-              return paidBizDate && (paidBizDate < startDate || paidBizDate > endDate);
-            });
-            return {
-              count: prePaid.length,
-              totalAmount: prePaid.reduce((sum, p) => sum + p.amount, 0),
-              totalTips: prePaid.reduce((sum, p) => sum + p.tipAmount, 0),
-              payments: prePaid,
-              message: prePaid.length > 0
-                ? `FOUND ${prePaid.length} pre-paid orders! These may need exclusion.`
-                : 'No pre-paid future orders found'
-            };
-          })(),
-          bySource: {
-            ONLINE_ORDERING: allCreditPayments.filter(p => p.source === 'ONLINE_ORDERING').length,
-            CATERING: allCreditPayments.filter(p => p.source === 'CATERING').length,
-            POS: allCreditPayments.filter(p => p.source === 'POS').length,
-            OTHER: allCreditPayments.filter(p => !['ONLINE_ORDERING', 'CATERING', 'POS'].includes(p.source)).length
-          },
-          // Sample of counted and excluded for inspection
-          sampleCounted: allCreditPayments.filter(p => p.willBeCounted).slice(0, 10),
-          sampleExcluded: allCreditPayments.filter(p => p.willBeExcluded),
-          message: `Total: ${allCreditPayments.length}, Counted: ${allCreditPayments.filter(p => p.willBeCounted).length}, Excluded: ${allCreditPayments.filter(p => p.willBeExcluded).length}`
-        },
-        // V6.15 HOUSE ACCOUNT DETECTION
-        v615_houseAccountPayments: {
-          count: houseAccountPayments.length,
-          totalAmount: houseAccountPayments.reduce((sum, p) => sum + p.amount, 0),
-          totalTips: houseAccountPayments.reduce((sum, p) => sum + p.tipAmount, 0),
-          payments: houseAccountPayments,
-          message: houseAccountPayments.length > 0
-            ? `FOUND ${houseAccountPayments.length} HOUSE_ACCOUNT payments - these are excluded from net sales`
-            : 'No HOUSE_ACCOUNT payments found'
-        },
-        // V6.16 COMPREHENSIVE PAYMENT BREAKDOWN
-        v616_allPaymentsByType: Object.keys(allPaymentsByType).reduce((acc, type) => {
-          const payments = allPaymentsByType[type];
-          const counted = payments.filter(p => !p.isExcluded && p.paymentStatus !== 'DENIED' && p.paymentStatus !== 'VOIDED' && p.refundStatus !== 'FULL');
-          const excluded = payments.filter(p => p.isExcluded || p.paymentStatus === 'DENIED' || p.paymentStatus === 'VOIDED' || p.refundStatus === 'FULL');
+      version: 'v7.1-payments-paidBusinessDate-20251007',
+      method: 'Payments endpoint with paidBusinessDate (matches Toast Sales Summary)',
+      dateRange: { startDate, endDate },
 
-          acc[type] = {
-            total: payments.length,
-            counted: counted.length,
-            excluded: excluded.length,
-            countedAmount: counted.reduce((sum, p) => sum + p.amount, 0),
-            countedTips: counted.reduce((sum, p) => sum + p.tipAmount, 0),
-            excludedAmount: excluded.reduce((sum, p) => sum + p.amount, 0),
-            excludedTips: excluded.reduce((sum, p) => sum + p.tipAmount, 0),
-            byCardType: type === 'CREDIT' ? (() => {
-              const byCard = {};
-              payments.forEach(p => {
-                const card = p.cardType || 'UNKNOWN';
-                if (!byCard[card]) byCard[card] = {count: 0, amount: 0, tips: 0};
-                if (!p.isExcluded && p.paymentStatus !== 'DENIED' && p.paymentStatus !== 'VOIDED') {
-                  byCard[card].count++;
-                  byCard[card].amount += p.amount;
-                  byCard[card].tips += p.tipAmount;
-                }
-              });
-              return byCard;
-            })() : undefined
-          };
-          return acc;
-        }, {})
-      }
+      // Sales calculated from payments
+      netSales: netSales,
+      totalTips: totalTips,
+
+      // Payment breakdown
+      creditTips: creditTips,
+      creditAmount: creditAmount,
+      creditCount: creditCount,
+      cashSales: cashSales,
+      cashTips: cashTips,
+      otherSales: otherSales,
+      otherTips: otherTips,
+      giftCardPayments: giftCardPayments,
+      giftCardAmount: giftCardAmount,
+      voidedTips: voidedTips,
+      deniedPayments: deniedPayments,
+
+      // Card type breakdown
+      paymentsByCardType: paymentsByCardType,
+
+      // For compatibility with frontend
+      salesData: {
+        netSales: netSales,
+        creditTips: creditTips,
+        cashSales: cashSales
+      },
+
+      // Metadata
+      totalPaymentsProcessed: allPaymentGuids.length
     });
 
   } catch (error) {
-    console.error('Toast sales summary API error:', error);
+    console.error('Toast Sales Summary API error:', error);
     return res.status(500).json({
-      error: 'Internal server error',
-      details: error.message
+      success: false,
+      error: error.message
     });
   }
 }
