@@ -333,6 +333,18 @@ export default async function handler(req, res) {
                           console.log(`💰 TIP FOUND: Type="${payment.type}" Amount=$${tipAmount} Counted=${isCreditCardTip} Order=${order.orderNumber}`);
                         }
 
+                        // V6.5 DIAGNOSTIC: Log OTHER payment details to identify credit-like vs delivery platforms
+                        if (payment.type === 'OTHER' && !isOrderExcluded && !isCheckExcluded && !isFullyVoided) {
+                          console.log(`🔍 OTHER PAYMENT: Amount=$${amount} Tip=$${tipAmount} Order=${order.orderNumber}`);
+                          console.log(`   otherPayment fields:`, payment.otherPayment ? Object.keys(payment.otherPayment) : 'null');
+                          if (payment.otherPayment) {
+                            console.log(`   otherPayment.type: ${payment.otherPayment.type || 'undefined'}`);
+                            console.log(`   otherPayment.name: ${payment.otherPayment.name || 'undefined'}`);
+                          }
+                          console.log(`   cardType: ${payment.cardType || 'undefined'}`);
+                          console.log(`   cardProcessorType: ${payment.cardProcessorType || 'undefined'}`);
+                        }
+
                         // Handle tips separately - track ALL tips including voided for transparency
                         if (isCreditCardTip && tipAmount > 0) {
                           orderHasTips = true;
@@ -442,7 +454,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v6.4-diagnostic-tips-20251007-0615', // Diagnostic logging to identify $70.40 credit tips discrepancy
+      version: 'v6.5-diagnostic-other-20251007-0630', // Diagnostic logging for OTHER payment details
       dateRange: {
         start: startDate,
         end: endDate
