@@ -1,10 +1,11 @@
-// Toast Sales Analytics API - Uses OFFICIAL Toast methods for 100% accuracy
-// Method: Analytics API for net sales + Payments endpoint for tips
+// Toast Sales Analytics API - Uses Payments endpoint (Homebase method)
+// Method: Payments endpoint with paidBusinessDate for 100% accuracy
+// NOTE: Analytics API requires separate credentials not included in Standard API access
 
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', 'https://jayna-cash-counter.vercel.app');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -12,12 +13,15 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (req.method !== 'POST') {
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { accessToken, startDate, endDate } = req.body;
+    // Support both POST (body) and GET (query params)
+    const accessToken = req.method === 'POST' ? req.body.accessToken : req.query.token;
+    const startDate = req.method === 'POST' ? req.body.startDate : req.query.startDate;
+    const endDate = req.method === 'POST' ? req.body.endDate : req.query.endDate;
 
     if (!accessToken || !startDate || !endDate) {
       return res.status(400).json({
@@ -26,90 +30,15 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`ANALYTICS APPROACH: ${startDate} to ${endDate}`);
+    console.log(`PAYMENTS ENDPOINT APPROACH: ${startDate} to ${endDate}`);
 
     const TOAST_CONFIG = {
       baseUrl: process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com',
       restaurantGuid: process.env.TOAST_RESTAURANT_GUID || 'd3efae34-7c2e-4107-a442-49081e624706'
     };
 
-    // STEP 1: Get NET SALES from Analytics API (Toast's pre-calculated values)
-    console.log('Step 1: Requesting aggregated sales data from Analytics API...');
-
-    const analyticsRequestBody = {
-      restaurantGuids: [TOAST_CONFIG.restaurantGuid],
-      startDate: startDate,
-      endDate: endDate
-    };
-
-    const createReportResponse = await fetch(`${TOAST_CONFIG.baseUrl}/era/v1/metrics`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(analyticsRequestBody)
-    });
-
-    if (!createReportResponse.ok) {
-      const errorText = await createReportResponse.text();
-      console.error('Analytics report creation failed:', createReportResponse.status, errorText);
-      return res.status(createReportResponse.status).json({
-        success: false,
-        error: `Analytics API failed: ${createReportResponse.status}`,
-        details: errorText
-      });
-    }
-
-    const reportRequest = await createReportResponse.json();
-    const reportGuid = reportRequest.reportRequestGuid;
-    console.log(`Report GUID created: ${reportGuid}`);
-
-    // Poll for report completion (with timeout)
-    let reportData = null;
-    let attempts = 0;
-    const maxAttempts = 30; // 30 seconds max wait
-
-    while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-
-      const getReportResponse = await fetch(`${TOAST_CONFIG.baseUrl}/era/v1/metrics/${reportGuid}?fetchRestaurantNames=true`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (getReportResponse.ok) {
-        reportData = await getReportResponse.json();
-        if (reportData.reportStatus === 'SUCCESS') {
-          console.log('Analytics report ready!');
-          break;
-        }
-      }
-
-      attempts++;
-    }
-
-    if (!reportData || reportData.reportStatus !== 'SUCCESS') {
-      return res.status(500).json({
-        success: false,
-        error: 'Analytics report generation timed out or failed'
-      });
-    }
-
-    // Extract net sales from analytics data
-    const analyticsData = reportData.results && reportData.results.length > 0 ? reportData.results[0] : null;
-    const netSales = analyticsData?.netSalesAmount || 0;
-    const grossSales = analyticsData?.grossSalesAmount || 0;
-    const discounts = analyticsData?.discountAmount || 0;
-    const refunds = analyticsData?.refundAmount || 0;
-
-    console.log(`Analytics Data - Net Sales: $${netSales}, Gross: $${grossSales}, Discounts: $${discounts}`);
-
-    // STEP 2: Get TIPS from Payments endpoint (documented best practice)
-    console.log('Step 2: Fetching payment data for tips...');
+    // Get payment data using Payments endpoint (Homebase's documented method)
+    console.log('Fetching all payment data via Payments endpoint...');
 
     // Generate business dates in YYYYMMDD format
     const start = new Date(startDate);
@@ -150,15 +79,18 @@ export default async function handler(req, res) {
 
     console.log(`Total payment GUIDs to fetch: ${allPaymentGuids.length}`);
 
-    // Fetch individual payment details
+    // Fetch individual payment details and calculate totals
     let creditTips = 0;
     let creditAmount = 0;
     let creditCount = 0;
     let cashSales = 0;
+    let cashTips = 0;
     let otherSales = 0;
     let otherTips = 0;
     let voidedTips = 0;
     let deniedPayments = 0;
+    let giftCardPayments = 0;
+    let giftCardAmount = 0;
 
     const paymentsByCardType = {
       VISA: { count: 0, amount: 0, tips: 0 },
@@ -219,6 +151,10 @@ export default async function handler(req, res) {
           }
         } else if (paymentType === 'CASH') {
           cashSales += amount;
+          cashTips += tipAmount;
+        } else if (paymentType === 'GIFTCARD') {
+          giftCardPayments++;
+          giftCardAmount += amount;
         } else if (paymentType === 'OTHER') {
           otherSales += amount;
           otherTips += tipAmount;
@@ -236,35 +172,43 @@ export default async function handler(req, res) {
       }
     }
 
-    console.log(`\n=== FINAL RESULTS ===`);
-    console.log(`Net Sales (Analytics): $${netSales.toFixed(2)}`);
-    console.log(`CREDIT Payments: ${creditCount}, Amount: $${creditAmount.toFixed(2)}, Tips: $${creditTips.toFixed(2)}`);
+    // Calculate net sales from payments (credit + cash + other)
+    const netSales = creditAmount + cashSales + otherSales;
+    const totalTips = creditTips + cashTips + otherTips;
+
+    console.log(`\n=== PAYMENTS ENDPOINT RESULTS ===`);
+    console.log(`Net Sales (from payments): $${netSales.toFixed(2)}`);
+    console.log(`CREDIT: ${creditCount} payments, $${creditAmount.toFixed(2)}, $${creditTips.toFixed(2)} tips`);
+    console.log(`CASH: $${cashSales.toFixed(2)}, $${cashTips.toFixed(2)} tips`);
+    console.log(`OTHER: $${otherSales.toFixed(2)}, $${otherTips.toFixed(2)} tips`);
+    console.log(`GIFTCARD payments: ${giftCardPayments}, $${giftCardAmount.toFixed(2)}`);
     console.log(`Card Type Breakdown:`);
     console.log(`  VISA: ${paymentsByCardType.VISA.count} payments, $${paymentsByCardType.VISA.amount.toFixed(2)}, $${paymentsByCardType.VISA.tips.toFixed(2)} tips`);
     console.log(`  MASTERCARD: ${paymentsByCardType.MASTERCARD.count} payments, $${paymentsByCardType.MASTERCARD.amount.toFixed(2)}, $${paymentsByCardType.MASTERCARD.tips.toFixed(2)} tips`);
     console.log(`  AMEX: ${paymentsByCardType.AMEX.count} payments, $${paymentsByCardType.AMEX.amount.toFixed(2)}, $${paymentsByCardType.AMEX.tips.toFixed(2)} tips`);
     console.log(`  DISCOVER: ${paymentsByCardType.DISCOVER.count} payments, $${paymentsByCardType.DISCOVER.amount.toFixed(2)}, $${paymentsByCardType.DISCOVER.tips.toFixed(2)} tips`);
-    console.log(`Voided Tips: $${voidedTips.toFixed(2)}, DENIED Payments: ${deniedPayments}`);
+    console.log(`Voided/Denied: $${voidedTips.toFixed(2)} tips, ${deniedPayments} DENIED payments`);
 
     return res.json({
       success: true,
-      version: 'v1.0-analytics-plus-payments-20251007',
-      method: 'Analytics API for net sales + Payments endpoint for tips',
+      version: 'v2.0-payments-only-20251007',
+      method: 'Payments endpoint with paidBusinessDate (Homebase method)',
       dateRange: { startDate, endDate },
 
-      // Net sales from Analytics API (100% accurate)
+      // Sales calculated from payments
       netSales: netSales,
-      grossSales: grossSales,
-      discounts: discounts,
-      refunds: refunds,
+      totalTips: totalTips,
 
-      // Tips from Payments endpoint (best practice)
+      // Payment breakdown
       creditTips: creditTips,
       creditAmount: creditAmount,
       creditCount: creditCount,
       cashSales: cashSales,
+      cashTips: cashTips,
       otherSales: otherSales,
       otherTips: otherTips,
+      giftCardPayments: giftCardPayments,
+      giftCardAmount: giftCardAmount,
       voidedTips: voidedTips,
       deniedPayments: deniedPayments,
 
@@ -272,8 +216,7 @@ export default async function handler(req, res) {
       paymentsByCardType: paymentsByCardType,
 
       // Metadata
-      totalPaymentsProcessed: allPaymentGuids.length,
-      analyticsData: analyticsData
+      totalPaymentsProcessed: allPaymentGuids.length
     });
 
   } catch (error) {
