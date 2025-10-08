@@ -47,6 +47,14 @@
 ### In Progress:
 - None - all work complete and deployed
 
+### Next Session TODO:
+- 🔴 **Cash Sales API Issue** (DO NOT START YET - user will return)
+  - Problem: Cash sales inaccurate after removing extended date range
+  - Solution: Create separate API endpoint for cash sales
+  - Should pull daily cash sales (like PM flow does)
+  - Match `pm_toast_sales` from Supabase cash_counts table for each day
+  - User will return to work on this
+
 ---
 
 ## 📝 Uncommitted Changes
