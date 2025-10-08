@@ -7820,8 +7820,21 @@
       }
       
       const leftColumnMapped = leftColumnEntries.map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
-      
-      const rightColumnEntries = [
+
+      // Build right column entries (tip pool data)
+      const rightColumnEntries = [];
+
+      // Add previous variance carryover if it exists (compliance tracking)
+      if (tipPoolSummary.previousVariance && tipPoolSummary.previousVariance > 0) {
+        const carriedDate = new Date(tipPoolSummary.carriedFromDate).toLocaleDateString();
+        rightColumnEntries.push(
+          ['⚠️ UNPAID TIPS FROM PREVIOUS WEEK', `$${tipPoolSummary.previousVariance.toFixed(2)}`],
+          [`   Carried from ${carriedDate}`, '(ADDED TO POOL)']
+        );
+      }
+
+      // Standard tip pool entries
+      rightColumnEntries.push(
         ['Credit Tips', `$${tipPoolSummary.creditTips.toFixed(2)}`],
         ['Cash Tips', `$${tipPoolSummary.cashTips.toFixed(2)}`],
         ['EZCater Tips', `$${tipPoolSummary.ezcaterTips.toFixed(2)}`],
@@ -7829,7 +7842,9 @@
         ['TDS Driver', `$${tipPoolSummary.tdsDriverTips.toFixed(2)}`],
         ['Tip Pool Total (Minus TDS)', `$${tipPoolSummary.pool.toFixed(2)}`],
         ['Hourly Rate', `$${tipPoolSummary.hourlyRate.toFixed(2)}`]
-      ].map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
+      );
+
+      const rightColumnMapped = rightColumnEntries.map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
       
       // Define fixed x offsets for values within each column
       const colValueOffset = 170;  // Reduced from 200
@@ -7849,7 +7864,7 @@
       
       // Draw right column (tip data)
       let rightColumnY = summaryY;
-      for (const [label, value] of rightColumnEntries) {
+      for (const [label, value] of rightColumnMapped) {
         doc.setFont('helvetica', 'bold');
         doc.text(`${label}:`, col2X + 6, rightColumnY);
         doc.setFont('helvetica', 'normal');
