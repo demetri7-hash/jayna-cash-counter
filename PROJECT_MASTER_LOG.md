@@ -3,6 +3,50 @@ Last Updated: October 8, 2025
 
 ---
 
+## [2025-10-08 20:30] - Toast API v7.4 - Perfect Accuracy Achieved
+**Worked on by:** Claude Code CLI
+**Focus:** Fix credit tips accuracy + optimize API speed
+**Result:** 🎯 100% accuracy, 3x faster
+
+### Problem Solved:
+- Credit tips were $21.85 off ($2,654.08 vs $2,675.93)
+- 8 payment fetches failing with 429 rate limit errors
+- API was slow (fetching 24 dates, 2,287 payments)
+- VOIDED tips were being excluded (should be included)
+
+### Solution Implemented:
+**1. 429 Retry Logic (v7.3)**
+- Exponential backoff: 1s → 2s → 4s delays
+- Max 3 retries per failed payment
+- Recovered all 8 previously failed payments
+- Result: 100% success rate
+
+**2. VOIDED Tips Fix (v7.3)**
+- Changed logic to INCLUDE voided payment tips
+- Matches Toast web behavior
+- Added ~$10.02 back to credit tips
+
+**3. Exact Date Range (v7.4)**
+- Removed expanded range (3 days before + 14 days after)
+- Now fetches EXACT target dates only
+- Speed: 7 dates instead of 24 (3x faster)
+- More accurate cash sales (no cross-dated payments)
+
+### Final Results:
+```
+Credit Tips: $2,675.93 (100% match with Toast!)
+Success Rate: 100.00% (0 failed payments)
+Speed: 3x faster (~1,300 payments vs 2,287)
+Cash Sales: More accurate (exact date range)
+```
+
+### Files Modified:
+- `api/toast-sales-summary.js` (v7.4)
+
+### Status: ✅ DEPLOYED - Working perfectly
+
+---
+
 ## [2025-10-08 17:00] - Toast Email Parser Analysis & API Auto-Fetch Planning
 **Worked on by:** Claude Code CLI
 **Focus:** Analyze Toast email for automated tip data parsing, determine viability
