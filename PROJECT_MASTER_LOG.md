@@ -3,6 +3,111 @@ Last Updated: October 8, 2025
 
 ---
 
+## [2025-10-08 17:00] - Toast Email Parser Analysis & API Auto-Fetch Planning
+**Worked on by:** Claude Code CLI
+**Focus:** Analyze Toast email for automated tip data parsing, determine viability
+**Context:** User wants to automate tip pool data fetching. Investigated email parsing vs API approach.
+
+### Problem Statement:
+- Manual file upload works perfectly but requires human action
+- Want to automate data fetching for tip pool calculator
+- Automated email parser was deployed Oct 7, 2025 but not collecting data
+
+### Investigation Conducted:
+
+#### 1. Email Parser Status Check
+- **Cron Endpoint:** ✅ Working (`/api/cron/parse-toast-emails`)
+- **Gmail Connection:** ✅ Working (GMAIL_APP_PASSWORD configured)
+- **Supabase Table:** ✅ Exists (`daily_sales` table created)
+- **Database Records:** ❌ Empty (no data imported)
+- **Manual Trigger:** ✅ Success response: `{"success":true,"message":"Processed 0 Toast performance emails","data":[]}`
+
+**Finding:** Cron works but found ZERO unread emails from Toast
+
+#### 2. Email Content Analysis
+- **Email Received:** "Jayna Gyro - Sacramento - Tuesday, October 7"
+- **Email Type:** Daily Performance Summary
+- **FROM Address Issue:** Email shows `no-reply@toasttab.com` (with hyphen), parser searches for `noreply@toasttab.com` (no hyphen)
+- **Subject Issue:** Email subject is "Jayna Gyro - Sacramento - Tuesday, October 7", parser expects "Performance Summary" in subject
+
+#### 3. Data Available in Daily Email
+**What's in the email:**
+- ✅ Net Sales: $6,993.23
+- ✅ Gross Sales: $7,388.45
+- ✅ Discounts: $149.15
+- ✅ Voids: $15.50
+- ✅ Refunds: $246.07
+- ✅ Orders: 206
+- ✅ Guests: 206
+- ✅ Hourly Labor Cost: $1,618.28
+
+**What's MISSING (critical for tips):**
+- ❌ Credit Card Payment Totals
+- ❌ Cash Payment Totals
+- ❌ Credit Tips
+- ❌ Cash Tips
+- ❌ Payment Tender Breakdown
+
+#### 4. Attempted Tip Calculation with Tax Rate
+User suggested calculating tips using 8.75% tax rate:
+```
+Theory: Gross - Net - Tax = Tips?
+$7,388.45 - $6,993.23 = $395.22
+Tax = $6,993.23 × 0.0875 = $611.91
+Tips = $395.22 - $611.91 = -$216.69 ❌ NEGATIVE
+```
+
+**Finding:** Toast Gross Sales = Menu Items (not total collections including tax/tips)
+- Gross Sales = Net Sales + Discounts + Refunds
+- No way to reverse-engineer tips without payment tender data
+
+### Toast Email Types Available:
+| Email Type | Send Time | List | Has Tip Data? |
+|------------|-----------|------|---------------|
+| Daily Performance Summary | 4-9am PT | WEEKLY TIPS REPORT | ❌ No |
+| Weekly Performance Summary | 4-9am PT | WEEKLY TIPS REPORT | ❓ Unknown (arrives Monday) |
+
+### Decision Made:
+**Abandon email parser approach for now. Use Toast API auto-fetch instead.**
+
+**Rationale:**
+1. Daily email does NOT contain payment/tip data
+2. Weekly email might have data but unconfirmed (arrives Monday)
+3. Toast API already working perfectly (comprehensive-analysis endpoint)
+4. Manual file upload works perfectly and should remain as fallback
+
+### Solution: API Auto-Fetch Button
+**Plan:**
+- ADD new button to tip pool calculator: "Auto-Fetch from Toast API"
+- Use existing `/api/toast-comprehensive-analysis.js` endpoint
+- Fetch credit tips, cash tips, labor hours for date range
+- Pre-populate tip pool calculator with API data
+- Keep manual file upload as fallback option
+
+### Files Analyzed:
+- `api/cron/parse-toast-emails.js` (191 lines)
+- `database/daily_sales_schema.sql`
+- `Jayna Gyro - Sacramento - Tuesday, October 7.eml` (2344 lines)
+- `Jayna Gyro  Sacramento  Tuesday October 7.pdf` (4 pages)
+- `TOAST_EMAIL_SETUP.md`
+- `SESSION_SUMMARY_2025-10-07.md`
+
+### Files Created:
+- `check-email-parser.js` - Script to verify email parser database records
+- `check-table-exists.js` - Script to verify daily_sales table exists
+
+### Status: ⏸️ PAUSED - Email parser not viable
+**Next Steps:**
+1. Wait for Weekly Performance Summary email (Monday)
+2. Analyze weekly email structure for payment/tip data
+3. Implement API auto-fetch button in tip pool calculator (DO NOT REMOVE MANUAL UPLOAD)
+4. Test API auto-fetch workflow
+
+### Key Takeaway:
+Toast "Daily Performance Summary" email is for operational metrics (sales, guests, labor), NOT payment/tip data. Weekly email might include financial summaries with tenders. Toast API remains most reliable method for tip data automation.
+
+---
+
 ## [2025-10-08 14:30] - Rolling Tip Variance Tracker Implementation
 **Worked on by:** Claude Code CLI
 **Focus:** Implement rolling variance tracker for tip compliance (rounding carryover system)
