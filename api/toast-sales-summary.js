@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`V7.2 PAYMENTS ENDPOINT + EXPANDED RANGE: ${startDate} to ${endDate}`);
+    console.log(`V7.3 PAYMENTS ENDPOINT + RETRY LOGIC: ${startDate} to ${endDate}`);
 
     const TOAST_CONFIG = {
       baseUrl: process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com',
@@ -86,6 +86,46 @@ export default async function handler(req, res) {
 
     console.log(`Total payment GUIDs to fetch: ${allPaymentGuids.length}`);
 
+    // Helper function to fetch payment with retry logic for 429 errors
+    async function fetchPaymentWithRetry(paymentGuid, maxRetries = 3) {
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const paymentResponse = await fetch(`${TOAST_CONFIG.baseUrl}/orders/v2/payments/${paymentGuid}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (paymentResponse.ok) {
+            return { success: true, data: await paymentResponse.json() };
+          }
+
+          // Handle 429 rate limit errors with exponential backoff
+          if (paymentResponse.status === 429 && attempt < maxRetries) {
+            const delayMs = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+            console.log(`429 rate limit for ${paymentGuid}, retry ${attempt + 1}/${maxRetries} after ${delayMs}ms`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            continue; // Retry
+          }
+
+          // Other errors or final 429 after retries
+          return { success: false, status: paymentResponse.status, guid: paymentGuid };
+
+        } catch (error) {
+          if (attempt < maxRetries) {
+            const delayMs = Math.pow(2, attempt) * 1000;
+            console.log(`Error fetching ${paymentGuid}, retry ${attempt + 1}/${maxRetries} after ${delayMs}ms: ${error.message}`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            continue;
+          }
+          return { success: false, error: error.message, guid: paymentGuid };
+        }
+      }
+    }
+
     // Fetch individual payment details and calculate totals
     let creditTips = 0;
     let creditAmount = 0;
@@ -98,6 +138,7 @@ export default async function handler(req, res) {
     let deniedPayments = 0;
     let giftCardPayments = 0;
     let giftCardAmount = 0;
+    let failedPayments = 0;
 
     const paymentsByCardType = {
       VISA: { count: 0, amount: 0, tips: 0 },
@@ -111,21 +152,15 @@ export default async function handler(req, res) {
       const paymentGuid = allPaymentGuids[i];
 
       try {
-        const paymentResponse = await fetch(`${TOAST_CONFIG.baseUrl}/orders/v2/payments/${paymentGuid}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
-            'Content-Type': 'application/json'
-          }
-        });
+        const result = await fetchPaymentWithRetry(paymentGuid);
 
-        if (!paymentResponse.ok) {
-          console.error(`Failed to fetch payment ${paymentGuid}: ${paymentResponse.status}`);
+        if (!result.success) {
+          console.error(`Failed to fetch payment ${paymentGuid} after retries: ${result.status || result.error}`);
+          failedPayments++;
           continue;
         }
 
-        const payment = await paymentResponse.json();
+        const payment = result.data;
 
         const amount = payment.amount || 0;
         const tipAmount = payment.tipAmount || 0;
@@ -206,11 +241,12 @@ export default async function handler(req, res) {
     console.log(`  AMEX: ${paymentsByCardType.AMEX.count} payments, $${paymentsByCardType.AMEX.amount.toFixed(2)}, $${paymentsByCardType.AMEX.tips.toFixed(2)} tips`);
     console.log(`  DISCOVER: ${paymentsByCardType.DISCOVER.count} payments, $${paymentsByCardType.DISCOVER.amount.toFixed(2)}, $${paymentsByCardType.DISCOVER.tips.toFixed(2)} tips`);
     console.log(`Voided/Denied: $${voidedTips.toFixed(2)} tips, ${deniedPayments} DENIED payments`);
+    console.log(`Failed fetches after retries: ${failedPayments} payments`);
 
     return res.json({
       success: true,
-      version: 'v7.2-payments-expanded-range-20251007',
-      method: 'Payments endpoint with paidBusinessDate + expanded fetch range + filtering',
+      version: 'v7.3-payments-with-retry-20251008',
+      method: 'Payments endpoint with paidBusinessDate + 429 retry logic (exponential backoff)',
       dateRange: { startDate, endDate },
 
       // Sales calculated from payments
@@ -241,7 +277,9 @@ export default async function handler(req, res) {
       },
 
       // Metadata
-      totalPaymentsProcessed: allPaymentGuids.length
+      totalPaymentsProcessed: allPaymentGuids.length,
+      failedPayments: failedPayments,
+      successRate: ((allPaymentGuids.length - failedPayments) / allPaymentGuids.length * 100).toFixed(2) + '%'
     });
 
   } catch (error) {
