@@ -139,14 +139,20 @@ export default async function handler(req, res) {
           continue; // Skip - paid outside target range
         }
 
-        // Exclude DENIED and VOIDED payments
-        if (paymentStatus === 'DENIED' || paymentStatus === 'VOIDED') {
+        // Exclude DENIED payments only (VOIDED tips should be included)
+        if (paymentStatus === 'DENIED') {
           voidedTips += tipAmount;
-          if (paymentStatus === 'DENIED') deniedPayments++;
+          deniedPayments++;
           continue;
         }
 
-        // Count by payment type
+        // Track voided payments separately but still count them
+        const isVoided = paymentStatus === 'VOIDED';
+        if (isVoided) {
+          voidedTips += tipAmount;
+        }
+
+        // Count by payment type (VOIDED payments are included)
         if (paymentType === 'CREDIT') {
           creditCount++;
           creditAmount += amount;
