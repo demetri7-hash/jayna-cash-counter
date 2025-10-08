@@ -16,11 +16,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Essential Reading on Session Start
 
 **ALWAYS read these files at the start of every session:**
-1. `AI_PROJECT_INSTRUCTIONS.md` - Complete project context and authorization levels
-2. `PROJECT_MASTER_LOG.md` - Session history (newest entries first)
-3. `CURRENT_PROJECT_DOCUMENTATION.md` - System overview
+1. `CURRENT_STATUS.md` - **READ THIS FIRST** - Current work state, blockers, next steps
+2. `AI_PROJECT_INSTRUCTIONS.md` - Complete project context and authorization levels
+3. `PROJECT_MASTER_LOG.md` - Session history (newest entries first, read last 3 entries)
+4. `CURRENT_PROJECT_DOCUMENTATION.md` - System overview (if needed for context)
 
-After reading, ask the user: "What are we working on today?" Then create `START_POINT_[DATE].md` and update `PROJECT_MASTER_LOG.md`.
+After reading, ask the user: "What are we working on today?" Then update `CURRENT_STATUS.md` with session start time.
+
+## 🚨 CRITICAL: Session End Protocol
+
+**MANDATORY before ending ANY session:**
+
+### When to Trigger Session End:
+Watch for these user phrases (AUTO-TRIGGER checklist):
+- "thanks", "thank you", "that's all", "that's it"
+- "goodbye", "bye", "see you", "later"
+- "done for now", "that's good", "looks good"
+- Any farewell or completion phrase
+
+### Required Actions:
+When user signals session end, you MUST say:
+```
+"Before we end, let me update the status files to preserve our progress..."
+```
+
+Then follow `SESSION_END_CHECKLIST.md` (all steps mandatory):
+1. ✅ Update `CURRENT_STATUS.md` (work status, blockers, next steps)
+2. ✅ Update `PROJECT_MASTER_LOG.md` (add new entry at TOP)
+3. ✅ Run `git status` and document uncommitted changes
+4. ✅ Provide session summary to user
+5. ✅ Confirm: "✅ Status files updated. See you next session!"
+
+**See `SESSION_END_CHECKLIST.md` for complete protocol.**
+
+### Proactive Status Updates:
+Also update status files after:
+- Major milestones completed
+- 50+ messages in conversation
+- Before deployment to production
+- Any time context preservation is critical
 
 ## Tech Stack
 
@@ -84,9 +118,11 @@ git revert HEAD && git push origin main
 │   └── WORKING v2.85 DO NOT EDIT/
 │
 └── Documentation Files:
-    ├── AI_PROJECT_INSTRUCTIONS.md  # START HERE EVERY SESSION
+    ├── CURRENT_STATUS.md           # READ FIRST - current work state
+    ├── SESSION_END_CHECKLIST.md    # Mandatory before ending session
+    ├── AI_PROJECT_INSTRUCTIONS.md  # Complete project context
     ├── CLAUDE.md                   # This file
-    ├── PROJECT_MASTER_LOG.md       # Session history
+    ├── PROJECT_MASTER_LOG.md       # Session history (newest first)
     ├── CURRENT_PROJECT_DOCUMENTATION.md
     ├── PROCESS_LOG.md
     ├── PROJECT_SUMMARY.md
@@ -371,13 +407,14 @@ docs(readme): update deployment instructions
 
 ## Common Pitfalls to Avoid
 
-1. **Toast API:** Only checking `order.voided` → missing check-level voids → wrong totals
-2. **Toast API:** Summing payment amounts instead of using `check.amount` → inflated net sales
-3. **Toast API:** Not paginating fully → missing orders → incorrect analytics
-4. **Security:** Hardcoding UUIDs/keys in frontend → security vulnerability
-5. **Git:** Committing .env file → exposed secrets
-6. **Deployment:** Not testing after Vercel deploy → broken production
-7. **Context:** Starting without reading AI_PROJECT_INSTRUCTIONS.md → repeating work
+1. **Session End:** Forgetting to update status files before ending session → complete context loss
+2. **Session Start:** Not reading CURRENT_STATUS.md first → repeating work or missing blockers
+3. **Toast API:** Only checking `order.voided` → missing check-level voids → wrong totals
+4. **Toast API:** Summing payment amounts instead of using `check.amount` → inflated net sales
+5. **Toast API:** Not paginating fully → missing orders → incorrect analytics
+6. **Security:** Hardcoding UUIDs/keys in frontend → security vulnerability
+7. **Git:** Committing .env file → exposed secrets
+8. **Deployment:** Not testing after Vercel deploy → broken production
 
 ## Recent Critical Fixes
 
@@ -426,6 +463,20 @@ When in doubt:
 
 ---
 
+## 🔴 FINAL REMINDER: Session End Protocol
+
+**Before ending this session or when user says goodbye:**
+
+1. **Stop immediately** when you detect farewell phrases
+2. **Say:** "Before we end, let me update the status files..."
+3. **Follow:** `SESSION_END_CHECKLIST.md` (all 5 steps)
+4. **Update:** `CURRENT_STATUS.md` + `PROJECT_MASTER_LOG.md`
+5. **Confirm:** Provide session summary and "✅ Status files updated"
+
+**This is MANDATORY - not optional. Next Claude instance has ZERO memory of this session.**
+
+---
+
 **Current Version:** v6.1+ (Production Active)
-**Last Updated:** October 7, 2025
+**Last Updated:** October 8, 2025
 **Authorization:** Full autonomous operation granted
