@@ -27,33 +27,25 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`V7.3 PAYMENTS ENDPOINT + RETRY LOGIC: ${startDate} to ${endDate}`);
+    console.log(`V7.4 EXACT DATE RANGE + RETRY LOGIC: ${startDate} to ${endDate}`);
 
     const TOAST_CONFIG = {
       baseUrl: process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com',
       restaurantGuid: process.env.TOAST_RESTAURANT_GUID || 'd3efae34-7c2e-4107-a442-49081e624706'
     };
 
-    // TARGET range for filtering (user's requested dates)
+    // Fetch EXACT date range (no expansion - faster and more accurate for cash sales)
     const targetStart = new Date(startDate);
     const targetEnd = new Date(endDate);
     const targetStartBizDate = parseInt(startDate.replace(/-/g, ''));
     const targetEndBizDate = parseInt(endDate.replace(/-/g, ''));
 
-    // EXPANDED FETCH range to capture pre-paid future orders
-    // Keep it reasonable to avoid timeout (3 days before, 14 days after)
-    const fetchStart = new Date(targetStart);
-    fetchStart.setDate(fetchStart.getDate() - 3);
-    const fetchEnd = new Date(targetEnd);
-    fetchEnd.setDate(fetchEnd.getDate() + 14);
-
     const paidBusinessDates = [];
-    for (let d = new Date(fetchStart); d <= fetchEnd; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(targetStart); d <= targetEnd; d.setDate(d.getDate() + 1)) {
       paidBusinessDates.push(d.toISOString().split('T')[0].replace(/-/g, ''));
     }
 
-    console.log(`TARGET: ${startDate} to ${endDate} (${targetStartBizDate}-${targetEndBizDate})`);
-    console.log(`FETCH: ${fetchStart.toISOString().split('T')[0]} to ${fetchEnd.toISOString().split('T')[0]} (${paidBusinessDates.length} dates)`);
+    console.log(`FETCHING EXACT RANGE: ${startDate} to ${endDate} (${paidBusinessDates.length} dates)`);
 
     let allPaymentGuids = [];
 
@@ -167,12 +159,6 @@ export default async function handler(req, res) {
         const paymentType = payment.type || 'UNKNOWN';
         const paymentStatus = payment.paymentStatus || 'NONE';
         const cardType = payment.cardType || 'UNKNOWN';
-        const paidBizDate = payment.paidBusinessDate;
-
-        // V7.2 FILTER: Only include payments paid within target range
-        if (paidBizDate && (paidBizDate < targetStartBizDate || paidBizDate > targetEndBizDate)) {
-          continue; // Skip - paid outside target range
-        }
 
         // Exclude DENIED payments only (VOIDED tips should be included)
         if (paymentStatus === 'DENIED') {
@@ -245,8 +231,8 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v7.3-payments-with-retry-20251008',
-      method: 'Payments endpoint with paidBusinessDate + 429 retry logic (exponential backoff)',
+      version: 'v7.4-exact-range-with-retry-20251008',
+      method: 'Payments endpoint - EXACT date range + 429 retry logic (3x faster)',
       dateRange: { startDate, endDate },
 
       // Sales calculated from payments
