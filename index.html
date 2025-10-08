@@ -6668,6 +6668,27 @@
     const calculatedByName = document.getElementById('calculatedByName').value.trim();
     const customNotes = document.getElementById('tipPoolNotes').value.trim();
 
+    // Fetch previous week's unpaid tip variance from database
+    let previousVariance = 0;
+    let carriedFromDate = null;
+    try {
+      const { data: varianceData, error: varianceError } = await supabase
+        .from('tip_variance')
+        .select('*')
+        .lt('week_ending_date', endDate)
+        .order('week_ending_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!varianceError && varianceData) {
+        previousVariance = parseFloat(varianceData.variance_amount) || 0;
+        carriedFromDate = varianceData.week_ending_date;
+        console.log(`Carrying over unpaid tip variance: $${previousVariance.toFixed(2)} from week ending ${carriedFromDate}`);
+      }
+    } catch (err) {
+      console.log('No previous variance found or table does not exist yet:', err.message);
+    }
+
     // Check if we have either files OR API-fetched data
     const hasFiles = laborFile && salesFile;
     const hasAPIData = apiFetchedData.laborData && apiFetchedData.salesData;
@@ -6775,14 +6796,15 @@
       const industryBenchmark = 30.0;
       const laborVariance = laborPercentage - industryBenchmark;
 
-      // Compute tip pool using calculated cash tips
+      // Compute tip pool using calculated cash tips + previous variance carryover
       const result = computeTipPool(
         payrollData,
         creditTips,
         calculatedCashTips,
         ezcaterTips,
         tdsDriverTips,
-        cashSales
+        cashSales,
+        previousVariance
       );
 
       // Store global state
@@ -6827,6 +6849,11 @@
         calculatedByName: calculatedByName,
         customNotes: customNotes,
         generatedAt: new Date().toLocaleString(),
+        // Variance tracking for compliance
+        previousVariance: previousVariance,
+        carriedFromDate: carriedFromDate,
+        currentVariance: result.currentVariance,
+        totalPaidOut: result.totalPaidOut,
         // Labor metrics for combined report
         laborData: {
           baseLaborCost: baseLaborCost,
@@ -6881,7 +6908,7 @@
       console.log('Tip pool results div should now be visible');
 
       hideLoading();
-      
+
       // Show success message with instruction to review equity
       showSuccessMessage('Tip pool calculated successfully! Please review and adjust equity percentages if needed, then click "Download Tip Pool PDF".');
       
@@ -6921,12 +6948,59 @@
   async function downloadTipPoolPDF() {
     try {
       showLoading('Generating PDF', 'Creating tip pool distribution report...');
-      
+
+      // Recalculate variance based on FINAL tip distribution (after equity adjustments)
+      const totalPaidOut = tipPoolRecords.reduce((sum, rec) => sum + rec.due, 0);
+      const currentVariance = tipPoolSummary.pool - totalPaidOut;
+
+      console.log(`Final Variance Calculation (after equity adjustments):
+        - Pool: $${tipPoolSummary.pool.toFixed(2)}
+        - Total Paid Out: $${totalPaidOut.toFixed(2)}
+        - Variance to carry forward: $${currentVariance.toFixed(2)}
+      `);
+
+      // Update tipPoolSummary with recalculated values
+      tipPoolSummary.totalPaidOut = totalPaidOut;
+      tipPoolSummary.currentVariance = currentVariance;
+
+      // Save variance record to database (AFTER final equity adjustments)
+      try {
+        const endDate = document.getElementById('tipPoolEndDate').value;
+        const varianceRecord = {
+          week_ending_date: endDate,
+          calculated_total: tipPoolSummary.pool,
+          actual_paid_total: totalPaidOut,
+          variance_amount: currentVariance,
+          previous_variance: tipPoolSummary.previousVariance || 0,
+          carried_from_date: tipPoolSummary.carriedFromDate || null
+        };
+
+        console.log('Saving final variance record:', varianceRecord);
+
+        const { data: savedVariance, error: saveError } = await supabase
+          .from('tip_variance')
+          .upsert(varianceRecord, { onConflict: 'week_ending_date' })
+          .select()
+          .single();
+
+        if (saveError) {
+          console.error('Error saving variance record:', saveError);
+          showErrorMessage('Warning: Variance record could not be saved. PDF will still be generated.');
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Give user time to see warning
+        } else {
+          console.log('Variance record saved successfully:', savedVariance);
+        }
+      } catch (varianceErr) {
+        console.error('Exception saving variance:', varianceErr);
+        showErrorMessage('Warning: Variance record could not be saved. PDF will still be generated.');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
       await generateTipPoolPDF();
-      
+
       hideLoading();
       showTipPoolSuccessMessage();
-      
+
     } catch (error) {
       hideLoading();
       console.error('PDF generation error:', error);
@@ -7123,15 +7197,15 @@
     return { creditTips, cashSales, netSales };
   }
 
-  function computeTipPool(payrollData, creditTips, cashTips, ezcaterTips, tdsDriverTips, cashSales) {
+  function computeTipPool(payrollData, creditTips, cashTips, ezcaterTips, tdsDriverTips, cashSales, previousVariance = 0) {
     // Build equity mapping
     const equityMap = {};
     payrollData.forEach(rec => {
-      equityMap[rec.employee] = defaultEquity.hasOwnProperty(rec.employee) 
-        ? defaultEquity[rec.employee] 
+      equityMap[rec.employee] = defaultEquity.hasOwnProperty(rec.employee)
+        ? defaultEquity[rec.employee]
         : 1.0;
     });
-    
+
     // Compute weighted hours
     let totalWeightedHours = 0;
     const records = payrollData.map(rec => {
@@ -7151,25 +7225,38 @@
         due: 0
       };
     });
-    
-    // Calculate pool
+
+    // Calculate pool WITH previous variance carryover
     const totalTips = creditTips + cashTips + ezcaterTips;
-    const rawPool = totalTips - tdsDriverTips;
+    const rawPool = totalTips - tdsDriverTips + previousVariance; // Add unpaid variance from previous week
     const pool = Math.floor(rawPool); // Floor to whole dollar
-    
+
     // Calculate hourly rate
     const rate = totalWeightedHours ? pool / totalWeightedHours : 0;
-    
+
     // Calculate due amounts (floored to whole dollars)
+    let totalPaidOut = 0;
     records.forEach(r => {
       const rawDue = r.weighted * rate;
       r.due = Math.floor(rawDue);
+      totalPaidOut += r.due;
     });
-    
+
+    // Calculate current week's variance (will be carried to next week)
+    // This is the difference between the floored pool and what was actually paid out
+    const currentVariance = pool - totalPaidOut;
+
+    console.log(`Tip Pool Variance Calculation:
+      - Raw Pool (with carryover): $${rawPool.toFixed(2)}
+      - Floored Pool: $${pool.toFixed(2)}
+      - Total Paid Out: $${totalPaidOut.toFixed(2)}
+      - Current Variance (carryover to next week): $${currentVariance.toFixed(2)}
+    `);
+
     // Calculate cash needed
     const cashNeeded = creditTips - tdsDriverTips + ezcaterTips - cashSales;
-    
-    return { records, rate, totalWeightedHours, totalTips, pool, cashNeeded };
+
+    return { records, rate, totalWeightedHours, totalTips, pool, cashNeeded, currentVariance, totalPaidOut };
   }
 
   function renderTipPoolSummary() {
@@ -7187,11 +7274,26 @@
       cashStatusHtml = `<p><strong>Zero cash needed to pay out tips this week. Excess cash on hand:</strong> <span class="cash-surplus">$${Math.abs(cashNeeded).toFixed(2)}</span></p>`;
     }
     
+    // Build variance carryover display
+    let varianceCarryoverHtml = '';
+    if (tipPoolSummary.previousVariance && tipPoolSummary.previousVariance > 0) {
+      const carriedDate = new Date(tipPoolSummary.carriedFromDate).toLocaleDateString();
+      varianceCarryoverHtml = `
+          <div style="background: white; padding: 15px; border-radius: 0; border: 2px solid #ff9800; grid-column: 1 / -1;">
+            <h4 style="margin: 0 0 8px 0; color: #ff9800; font-size: 12px;">⚠️ UNPAID TIPS FROM PREVIOUS WEEK</h4>
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #ff9800;">$${tipPoolSummary.previousVariance.toFixed(2)}</p>
+            <p style="margin: 5px 0 0 0; font-size: 11px; color: #666;">Carried from week ending: ${carriedDate}</p>
+            <p style="margin: 5px 0 0 0; font-size: 11px; font-style: italic; color: #666;">This amount has been added to this week's tip pool</p>
+          </div>`;
+    }
+
     summaryDiv.innerHTML = `
       <div style="background: #f8f9fa; padding: 20px; border-radius: 0; margin: 20px 0;">
         <h3 style="margin: 0 0 15px 0; color: #1e3c72;">Tip Pool Summary</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-          
+
+          ${varianceCarryoverHtml}
+
           <div style="background: white; padding: 15px; border-radius: 0; border: 1px solid #ddd;">
             <h4 style="margin: 0 0 8px 0; color: #666; font-size: 12px;">CREDIT TIPS</h4>
             <p style="margin: 0; font-size: 18px; font-weight: bold; color: #007bff;">$${tipPoolSummary.creditTips.toFixed(2)}</p>
@@ -7407,7 +7509,8 @@
     });
     
     // Compute the raw pool and then floor it to meet business rules
-    const rawPool = tipPoolSummary.totalTips - tipPoolSummary.tdsDriverTips;
+    // IMPORTANT: Include previous variance carryover in the pool
+    const rawPool = tipPoolSummary.totalTips - tipPoolSummary.tdsDriverTips + (tipPoolSummary.previousVariance || 0);
     const pool = Math.floor(rawPool);
     const rate = totalWeightedHours ? pool / totalWeightedHours : 0;
     
@@ -7470,7 +7573,19 @@
       doc.setFont('helvetica', 'normal');
       
       // Build an array of [label, value] pairs
-      const entries = [
+      const entries = [];
+
+      // Add previous variance carryover if it exists (compliance tracking)
+      if (tipPoolSummary.previousVariance && tipPoolSummary.previousVariance > 0) {
+        const carriedDate = new Date(tipPoolSummary.carriedFromDate).toLocaleDateString();
+        entries.push(
+          ['⚠️ UNPAID TIPS FROM PREVIOUS WEEK', `$${tipPoolSummary.previousVariance.toFixed(2)}`],
+          [`   Carried from week ending ${carriedDate}`, '(ADDED TO POOL)']
+        );
+      }
+
+      // Standard tip pool entries
+      entries.push(
         ['Cash tips', `$${tipPoolSummary.cashTips.toFixed(2)}`],
         ['EZCater tips', `$${tipPoolSummary.ezcaterTips.toFixed(2)}`],
         ['Credit tips', `$${tipPoolSummary.creditTips.toFixed(2)}`],
@@ -7480,38 +7595,41 @@
         ['Pool (minus TDS driver)', `$${tipPoolSummary.pool.toFixed(2)}`],
         ['Total weighted hours', `${tipPoolSummary.totalWeightedHours.toFixed(3)}`],
         ['Hourly rate', `$${tipPoolSummary.hourlyRate.toFixed(2)}`]
-      ].map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
+      );
+
+      // Convert all to uppercase
+      const formattedEntries = entries.map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
       
       // Define fixed x offsets for values within each column
       const colValueOffset = 200; // points from the left edge of the column
       let summaryY = currentY + 86;
       const lineHeight = 14;
-      const colSplitIndex = Math.ceil(entries.length / 2);
+      const colSplitIndex = Math.ceil(formattedEntries.length / 2);
       const col2X = pageWidth / 2;
-      
+
       // Render first column
       for (let i = 0; i < colSplitIndex; i++) {
-        const [label, value] = entries[i];
+        const [label, value] = formattedEntries[i];
         doc.setFont('helvetica', 'bold');
         doc.text(`${label}:`, margin, summaryY + i * lineHeight);
         doc.setFont('helvetica', 'normal');
         doc.text(value, margin + colValueOffset, summaryY + i * lineHeight);
       }
-      
+
       // Render second column
-      for (let i = colSplitIndex; i < entries.length; i++) {
-        const [label, value] = entries[i];
+      for (let i = colSplitIndex; i < formattedEntries.length; i++) {
+        const [label, value] = formattedEntries[i];
         const rowIdx = i - colSplitIndex;
         doc.setFont('helvetica', 'bold');
         doc.text(`${label}:`, col2X, summaryY + rowIdx * lineHeight);
         doc.setFont('helvetica', 'normal');
         doc.text(value, col2X + colValueOffset, summaryY + rowIdx * lineHeight);
       }
-      
+
       // Cash needed line with color coding
       const cashNeeded = tipPoolSummary.cashNeeded;
       let needLabel, needValue, textColor;
-      
+
       if (cashNeeded > 0) {
         // Need additional cash - show positive number in red
         needLabel = 'CASH NEEDED TO PAY OUT TIPS';
@@ -7523,8 +7641,8 @@
         needValue = `$${Math.abs(cashNeeded).toFixed(2)}`;
         textColor = [40, 167, 69]; // Green color
       }
-      
-      const summaryLines = Math.max(colSplitIndex, entries.length - colSplitIndex);
+
+      const summaryLines = Math.max(colSplitIndex, formattedEntries.length - colSplitIndex);
       const cashY = summaryY + summaryLines * lineHeight + 10;
       
       // Set label in bold black
