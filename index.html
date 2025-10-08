@@ -8811,6 +8811,48 @@
       cleanTipPoolHtml = cleanTipPoolHtml.replace(/Weekly Combined Report[\s\S]*?Generate Combined Weekly Report/g, '');
       cleanTipPoolHtml = cleanTipPoolHtml.replace(/Download PDF Back to Menu/g, '');
       
+      // SAVE TIP VARIANCE TO DATABASE (for compliance tracking)
+      if (tipPoolRecords && tipPoolRecords.length > 0) {
+        try {
+          // Recalculate variance based on FINAL tip distribution (after any equity adjustments)
+          const totalPaidOut = tipPoolRecords.reduce((sum, rec) => sum + rec.due, 0);
+          const currentVariance = tipPoolSummary.pool - totalPaidOut;
+
+          console.log(`💾 Saving final variance record for week ${startDate} to ${endDate}:`);
+          console.log(`   Pool Total: $${tipPoolSummary.pool.toFixed(2)}`);
+          console.log(`   Paid Out: $${totalPaidOut.toFixed(2)}`);
+          console.log(`   Variance to carry forward: $${currentVariance.toFixed(2)}`);
+          console.log(`   Previous variance included: $${(tipPoolSummary.previousVariance || 0).toFixed(2)}`);
+
+          const varianceRecord = {
+            week_ending_date: endDate,
+            calculated_total: tipPoolSummary.pool,
+            actual_paid_total: totalPaidOut,
+            variance_amount: currentVariance,
+            previous_variance: tipPoolSummary.previousVariance || 0,
+            carried_from_date: tipPoolSummary.carriedFromDate || null
+          };
+
+          const { data: savedVariance, error: saveError } = await supabase
+            .from('tip_variance')
+            .upsert(varianceRecord, { onConflict: 'week_ending_date' })
+            .select()
+            .single();
+
+          if (saveError) {
+            console.error('❌ Error saving variance record:', saveError);
+          } else {
+            console.log(`✅ Variance record saved successfully!`);
+            console.log(`   Record ID: ${savedVariance.id}`);
+            console.log(`   Week ending: ${savedVariance.week_ending_date}`);
+            console.log(`   Variance amount: $${savedVariance.variance_amount.toFixed(2)}`);
+            console.log(`   This variance will be added to next week's tip pool (week after ${endDate})`);
+          }
+        } catch (varianceErr) {
+          console.error('❌ Exception saving variance:', varianceErr);
+        }
+      }
+
       // SAVE ALL DATA TO DATABASE BEFORE PDF GENERATION
       console.log('Saving comprehensive weekly report data to database...');
       try {
