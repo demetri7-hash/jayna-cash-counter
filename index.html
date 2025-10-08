@@ -6671,22 +6671,35 @@
     // Fetch previous week's unpaid tip variance from database
     let previousVariance = 0;
     let carriedFromDate = null;
+
+    console.log(`🔍 Checking for unpaid tip variance from weeks before ${endDate}...`);
+
     try {
       const { data: varianceData, error: varianceError } = await supabase
         .from('tip_variance')
         .select('*')
-        .lt('week_ending_date', endDate)
-        .order('week_ending_date', { ascending: false })
+        .lt('week_ending_date', endDate)  // Only get weeks BEFORE current week
+        .order('week_ending_date', { ascending: false })  // Most recent first
         .limit(1)
         .single();
 
-      if (!varianceError && varianceData) {
+      if (varianceError) {
+        // No previous data found (expected on first run)
+        console.log(`✅ No previous week variance data found. This is expected for the first week.`);
+        console.log(`   Current week: ${startDate} to ${endDate}`);
+        console.log(`   Previous variance: $0.00 (no carryover)`);
+      } else if (varianceData) {
         previousVariance = parseFloat(varianceData.variance_amount) || 0;
         carriedFromDate = varianceData.week_ending_date;
-        console.log(`Carrying over unpaid tip variance: $${previousVariance.toFixed(2)} from week ending ${carriedFromDate}`);
+        console.log(`✅ Found previous week variance!`);
+        console.log(`   Current week: ${startDate} to ${endDate}`);
+        console.log(`   Carrying over: $${previousVariance.toFixed(2)} from week ending ${carriedFromDate}`);
+        console.log(`   This amount will be ADDED to this week's tip pool`);
       }
     } catch (err) {
-      console.log('No previous variance found or table does not exist yet:', err.message);
+      console.log(`✅ No previous variance data exists (table may not exist yet or this is the first week)`);
+      console.log(`   Error: ${err.message}`);
+      console.log(`   Previous variance: $0.00 (no carryover)`);
     }
 
     // Check if we have either files OR API-fetched data
@@ -6966,6 +6979,7 @@
       // Save variance record to database (AFTER final equity adjustments)
       try {
         const endDate = document.getElementById('tipPoolEndDate').value;
+        const startDate = document.getElementById('tipPoolStartDate').value;
         const varianceRecord = {
           week_ending_date: endDate,
           calculated_total: tipPoolSummary.pool,
@@ -6975,7 +6989,11 @@
           carried_from_date: tipPoolSummary.carriedFromDate || null
         };
 
-        console.log('Saving final variance record:', varianceRecord);
+        console.log(`💾 Saving final variance record for week ${startDate} to ${endDate}:`);
+        console.log(`   Pool Total: $${tipPoolSummary.pool.toFixed(2)}`);
+        console.log(`   Paid Out: $${totalPaidOut.toFixed(2)}`);
+        console.log(`   Variance to carry forward: $${currentVariance.toFixed(2)}`);
+        console.log(`   Previous variance included: $${(tipPoolSummary.previousVariance || 0).toFixed(2)}`);
 
         const { data: savedVariance, error: saveError } = await supabase
           .from('tip_variance')
@@ -6984,14 +7002,18 @@
           .single();
 
         if (saveError) {
-          console.error('Error saving variance record:', saveError);
+          console.error('❌ Error saving variance record:', saveError);
           showErrorMessage('Warning: Variance record could not be saved. PDF will still be generated.');
           await new Promise(resolve => setTimeout(resolve, 2000)); // Give user time to see warning
         } else {
-          console.log('Variance record saved successfully:', savedVariance);
+          console.log(`✅ Variance record saved successfully!`);
+          console.log(`   Record ID: ${savedVariance.id}`);
+          console.log(`   Week ending: ${savedVariance.week_ending_date}`);
+          console.log(`   Variance amount: $${savedVariance.variance_amount.toFixed(2)}`);
+          console.log(`   This variance will be added to next week's tip pool (week after ${endDate})`);
         }
       } catch (varianceErr) {
-        console.error('Exception saving variance:', varianceErr);
+        console.error('❌ Exception saving variance:', varianceErr);
         showErrorMessage('Warning: Variance record could not be saved. PDF will still be generated.');
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
