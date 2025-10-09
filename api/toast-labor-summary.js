@@ -161,8 +161,18 @@ export default async function handler(req, res) {
     // Add total labor cost to result array (like parsePayrollCSV does)
     result.totalLaborCost = parseFloat(totalLaborCost.toFixed(2));
 
+    // Calculate OT discrepancy for debugging
+    let totalRegularHours = 0;
+    let totalOvertimeHours = 0;
+    result.forEach(emp => {
+      totalRegularHours += emp.regularHours;
+      totalOvertimeHours += emp.overtimeHours;
+    });
+
     console.log(`Labor Summary Complete:`);
     console.log(`- Employees with hours: ${result.length}`);
+    console.log(`- Total Regular Hours: ${totalRegularHours.toFixed(2)}`);
+    console.log(`- Total Overtime Hours: ${totalOvertimeHours.toFixed(2)}`);
     console.log(`- Total Labor Cost: $${totalLaborCost.toFixed(2)}`);
 
     return res.json({
@@ -174,7 +184,12 @@ export default async function handler(req, res) {
       employees: result,
       totalLaborCost: result.totalLaborCost,
       employeesCount: result.length,
-      timeEntriesProcessed: timeEntries.length
+      timeEntriesProcessed: timeEntries.length,
+      debug: {
+        totalRegularHours: parseFloat(totalRegularHours.toFixed(2)),
+        totalOvertimeHours: parseFloat(totalOvertimeHours.toFixed(2)),
+        message: 'Check Vercel logs for TIME ENTRY DEBUG details'
+      }
     });
 
   } catch (error) {
