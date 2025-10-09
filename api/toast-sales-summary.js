@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`V7.4 EXACT DATE RANGE + RETRY LOGIC: ${startDate} to ${endDate}`);
+    console.log(`V7.5 EXCLUDE VOIDED CASH: ${startDate} to ${endDate}`);
 
     const TOAST_CONFIG = {
       baseUrl: process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com',
@@ -160,21 +160,23 @@ export default async function handler(req, res) {
         const paymentStatus = payment.paymentStatus || 'NONE';
         const cardType = payment.cardType || 'UNKNOWN';
 
-        // Exclude DENIED payments only (VOIDED tips should be included)
+        // Exclude DENIED payments
         if (paymentStatus === 'DENIED') {
           voidedTips += tipAmount;
           deniedPayments++;
           continue;
         }
 
-        // Track voided payments separately but still count them
+        // Track voided status
         const isVoided = paymentStatus === 'VOIDED';
         if (isVoided) {
           voidedTips += tipAmount;
         }
 
-        // Count by payment type (VOIDED payments are included)
+        // Count by payment type
+        // IMPORTANT: CREDIT includes voided (Toast web counts them), CASH excludes voided (cash returned to customer)
         if (paymentType === 'CREDIT') {
+          // CREDIT: Include VOIDED payments (matches Toast web behavior)
           creditCount++;
           creditAmount += amount;
           creditTips += tipAmount;
@@ -190,8 +192,11 @@ export default async function handler(req, res) {
             paymentsByCardType.UNKNOWN.tips += tipAmount;
           }
         } else if (paymentType === 'CASH') {
-          cashSales += amount;
-          cashTips += tipAmount;
+          // CASH: Exclude VOIDED payments (cash was physically returned to customer)
+          if (!isVoided) {
+            cashSales += amount;
+            cashTips += tipAmount;
+          }
         } else if (paymentType === 'GIFTCARD') {
           giftCardPayments++;
           giftCardAmount += amount;
@@ -231,8 +236,8 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
-      version: 'v7.4-exact-range-with-retry-20251008',
-      method: 'Payments endpoint - EXACT date range + 429 retry logic (3x faster)',
+      version: 'v7.5-exclude-voided-cash-20251008',
+      method: 'Payments endpoint - CREDIT includes voided, CASH excludes voided',
       dateRange: { startDate, endDate },
 
       // Sales calculated from payments
