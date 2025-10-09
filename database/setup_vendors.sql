@@ -199,18 +199,19 @@ INSERT INTO order_schedules (vendor_id, vendor_name, order_day, order_cutoff_tim
 SELECT
   v.id,
   v.vendor_name,
-  unnest(v.order_days) as order_day,
+  day as order_day,
   v.order_cutoff_time,
   CASE
-    WHEN v.vendor_name = 'Mani Imports' AND unnest(v.order_days) = 'Tuesday' THEN 'Wednesday'
-    WHEN v.vendor_name = 'Mani Imports' AND unnest(v.order_days) = 'Thursday' THEN 'Friday'
-    WHEN v.vendor_name = 'Greenleaf' THEN unnest(v.order_days) -- Same day delivery
+    WHEN v.vendor_name = 'Mani Imports' AND day = 'Tuesday' THEN 'Wednesday'
+    WHEN v.vendor_name = 'Mani Imports' AND day = 'Thursday' THEN 'Friday'
+    WHEN v.vendor_name = 'Greenleaf' THEN day -- Same day delivery
     WHEN v.vendor_name = 'Eatopia' THEN 'Thursday'
-    WHEN v.vendor_name = 'Performance Food Service' AND unnest(v.order_days) = 'Sunday' THEN 'Monday'
-    WHEN v.vendor_name = 'Performance Food Service' AND unnest(v.order_days) = 'Wednesday' THEN 'Thursday'
+    WHEN v.vendor_name = 'Performance Food Service' AND day = 'Sunday' THEN 'Monday'
+    WHEN v.vendor_name = 'Performance Food Service' AND day = 'Wednesday' THEN 'Thursday'
     ELSE NULL
-  END
+  END as delivery_day
 FROM vendors v
+CROSS JOIN LATERAL unnest(v.order_days) as day
 WHERE v.order_days IS NOT NULL;
 
 -- Success message
