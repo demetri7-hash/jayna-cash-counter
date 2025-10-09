@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>Jayna Gyro - COGs Management</title>
+
+  <link rel="apple-touch-icon" href="https://static.spotapps.co/website_images/ab_websites/229800_website_v1/logo.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#00A8E1">
+
+  <style>
+    /* Jayna Brand Design - Sky Blue & Grayscale */
+    :root {
+      --primary-blue: #00A8E1;
+      --secondary-blue: #0094D6;
+      --light-blue: #E3F4FC;
+      --accent-blue: #0081C6;
+      --gray-900: #212121;
+      --gray-700: #424242;
+      --gray-500: #757575;
+      --gray-400: #BDBDBD;
+      --gray-300: #E0E0E0;
+      --gray-100: #F5F5F5;
+      --dark-gray: #616161; /* NEW - for COGs button */
+      --success: #00C853;
+      --warning: #FFB300;
+      --error: #D32F2F;
+      --white: #FFFFFF;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      font-family: 'Aptos', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--gray-100);
+      min-height: 100vh;
+      padding: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: var(--white);
+      border-radius: 0;
+      overflow: visible;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      min-height: auto;
+      max-height: none;
+    }
+    .header {
+      background: var(--white);
+      color: var(--gray-900);
+      text-align: center;
+      padding: 12px;
+      border-radius: 0;
+      border-bottom: 1px solid var(--gray-300);
+    }
+    .header h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; letter-spacing: 1.5px; text-transform: uppercase; }
+    .header p { opacity: 0.7; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+    .content {
+      padding: 12px;
+      max-height: none;
+      overflow: visible;
+    }
+
+    /* Main Menu - Same as index.html */
+    .main-menu {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .menu-btn {
+      padding: 16px 12px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      background: var(--gray-100);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-900);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+    }
+    .menu-btn:hover {
+      background: var(--gray-300);
+      color: var(--gray-900);
+      border-color: var(--gray-400);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+    .menu-btn.active {
+      border-color: var(--gray-400);
+      background: var(--gray-300);
+      color: var(--gray-900);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+    .menu-btn.primary {
+      background: var(--white);
+      color: var(--gray-700);
+      border-color: var(--gray-300);
+    }
+    .menu-btn.primary:hover {
+      background: var(--gray-100);
+      border-color: var(--gray-400);
+    }
+    /* COGs button - darker grey */
+    .menu-btn.cogs {
+      background: var(--dark-gray);
+      color: var(--white);
+      border-color: var(--dark-gray);
+    }
+    .menu-btn.cogs:hover {
+      background: var(--gray-700);
+      border-color: var(--gray-700);
+    }
+    .menu-btn.cogs.active {
+      background: var(--gray-700);
+      border-color: var(--gray-700);
+    }
+
+    .form-section {
+      display: none;
+      min-height: auto;
+      overflow: visible;
+    }
+    .form-section.active {
+      display: block;
+      position: relative;
+      z-index: 1;
+    }
+
+    .form-group { margin-bottom: 12px; }
+    .form-group label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 700;
+      font-size: 10px;
+      color: var(--gray-700);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      min-height: 44px;
+      box-sizing: border-box;
+      -webkit-appearance: none;
+      appearance: none;
+      transition: all 0.15s ease;
+      background: var(--white);
+      color: var(--gray-900);
+    }
+    .form-input:focus, .form-select:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 2px rgba(0, 168, 225, 0.15);
+      background: var(--white);
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border: none;
+      border-radius: 0;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-top: 12px;
+      min-height: 44px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .submit-btn:hover {
+      background: var(--gray-300);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+    }
+    .submit-btn.primary {
+      background: var(--primary-blue);
+      color: var(--white);
+    }
+    .submit-btn.primary:hover {
+      background: var(--secondary-blue);
+    }
+
+    /* COGs Dashboard Styles */
+    .cogs-dashboard {
+      display: grid;
+      gap: 16px;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .action-btn {
+      padding: 24px 16px;
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+    .action-btn:hover {
+      border-color: var(--primary-blue);
+      background: var(--light-blue);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+    }
+    .action-btn .icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    .action-btn .label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gray-700);
+    }
+
+    .summary-card {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 20px;
+      border-radius: 0;
+    }
+    .summary-card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gray-700);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .summary-stat {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--gray-300);
+    }
+    .summary-stat:last-child {
+      border-bottom: none;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--gray-500);
+      text-transform: uppercase;
+    }
+    .stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gray-900);
+    }
+    .stat-value.good {
+      color: var(--success);
+    }
+    .stat-value.warning {
+      color: var(--warning);
+    }
+    .stat-value.error {
+      color: var(--error);
+    }
+
+    /* Item List Table */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    .items-table th {
+      background: var(--gray-100);
+      padding: 12px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gray-700);
+      border-bottom: 2px solid var(--gray-300);
+    }
+    .items-table td {
+      padding: 12px;
+      border-bottom: 1px solid var(--gray-300);
+      font-size: 12px;
+    }
+    .items-table tr:hover {
+      background: var(--light-blue);
+    }
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 0;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-right: 4px;
+    }
+    .btn-edit {
+      background: var(--primary-blue);
+      color: var(--white);
+    }
+    .btn-edit:hover {
+      background: var(--secondary-blue);
+    }
+    .btn-delete {
+      background: var(--error);
+      color: var(--white);
+    }
+    .btn-delete:hover {
+      background: #B71C1C;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      .main-menu {
+        grid-template-columns: 1fr 1fr;
+      }
+      .quick-actions {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .main-menu {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>JAYNA GYRO</h1>
+      <p>COST OF GOODS MANAGEMENT</p>
+    </div>
+
+    <div class="content">
+      <!-- Main Menu - Persistent Navigation -->
+      <div id="mainMenu" class="main-menu">
+        <button class="menu-btn primary" onclick="window.location.href='index.html'">AM Count</button>
+        <button class="menu-btn primary" onclick="window.location.href='index.html'">PM Close</button>
+        <button class="menu-btn" onclick="window.location.href='index.html'">Generate Report</button>
+        <button class="menu-btn" onclick="window.location.href='index.html'">Tip Pool</button>
+        <button class="menu-btn" onclick="window.location.href='index.html'">Weekly Cashbox</button>
+        <button class="menu-btn" onclick="window.location.href='manager.html'">Manager</button>
+        <button class="menu-btn cogs active">COGs</button>
+      </div>
+
+      <!-- COGs Dashboard -->
+      <div id="cogsDashboard" class="form-section active">
+        <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">Cost of Goods Sold</h2>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+          <div class="action-btn" onclick="showSection('scanInvoice')">
+            <div class="icon">📸</div>
+            <div class="label">Scan Invoice</div>
+          </div>
+          <div class="action-btn" onclick="showSection('dailyCount')">
+            <div class="icon">📦</div>
+            <div class="label">Daily Count</div>
+          </div>
+          <div class="action-btn" onclick="showSection('viewReports')">
+            <div class="icon">📊</div>
+            <div class="label">View Reports</div>
+          </div>
+          <div class="action-btn" onclick="showSection('manageItems')">
+            <div class="icon">🏷️</div>
+            <div class="label">Manage Items</div>
+          </div>
+        </div>
+
+        <!-- This Week Summary -->
+        <div class="summary-card">
+          <h3>This Week Summary</h3>
+          <div class="summary-stat">
+            <span class="stat-label">Food Cost %</span>
+            <span class="stat-value good">28.5%</span>
+          </div>
+          <div class="summary-stat">
+            <span class="stat-label">COGs Total</span>
+            <span class="stat-value">$12,450.00</span>
+          </div>
+          <div class="summary-stat">
+            <span class="stat-label">Variance</span>
+            <span class="stat-value warning">-$127.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manage Items Section -->
+      <div id="manageItems" class="form-section">
+        <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">Inventory Items</h2>
+
+        <button class="submit-btn primary" onclick="showAddItemForm()">+ Add New Item</button>
+
+        <!-- Filter by Category -->
+        <div class="form-group" style="margin-top: 16px;">
+          <label for="categoryFilter">Filter by Category:</label>
+          <select id="categoryFilter" class="form-select" onchange="filterItems()">
+            <option value="">All Categories</option>
+            <option value="PRODUCE">Produce</option>
+            <option value="MEAT">Meat</option>
+            <option value="GYROS">Gyros</option>
+            <option value="BREADS">Breads</option>
+            <option value="LIQUOR">Liquor</option>
+            <option value="BEER">Beer</option>
+            <option value="WINE">Wine</option>
+            <option value="DAIRY">Dairy</option>
+            <option value="NA DRINKS">NA Drinks</option>
+            <option value="JUICES">Juices</option>
+          </select>
+        </div>
+
+        <!-- Items List -->
+        <div id="itemsList" style="margin-top: 20px;">
+          <p style="text-align: center; color: var(--gray-500); padding: 40px 0;">Loading items...</p>
+        </div>
+
+        <button class="submit-btn" onclick="showDashboard()">Back to Dashboard</button>
+      </div>
+
+      <!-- Add/Edit Item Form -->
+      <div id="itemForm" class="form-section">
+        <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;" id="itemFormTitle">Add New Item</h2>
+
+        <div class="form-group">
+          <label for="itemName">Item Name*</label>
+          <input type="text" id="itemName" class="form-input" required placeholder="e.g., Ground Beef 80/20">
+        </div>
+
+        <div class="form-group">
+          <label for="itemCategory">Category*</label>
+          <select id="itemCategory" class="form-select" required>
+            <option value="">Select Category</option>
+            <option value="PRODUCE">Produce</option>
+            <option value="MEAT">Meat</option>
+            <option value="GYROS">Gyros</option>
+            <option value="BREADS">Breads</option>
+            <option value="LIQUOR">Liquor</option>
+            <option value="BEER">Beer</option>
+            <option value="WINE">Wine</option>
+            <option value="DAIRY">Dairy</option>
+            <option value="NA DRINKS">NA Drinks</option>
+            <option value="JUICES">Juices</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="itemUnit">Unit*</label>
+          <input type="text" id="itemUnit" class="form-input" required placeholder="e.g., lb, case, each, oz, gal">
+        </div>
+
+        <div class="form-group">
+          <label for="itemParLevel">Par Level</label>
+          <input type="number" id="itemParLevel" class="form-input" step="0.01" placeholder="Ideal stock level">
+        </div>
+
+        <div class="form-group">
+          <label for="itemCost">Current Cost per Unit</label>
+          <input type="number" id="itemCost" class="form-input" step="0.01" placeholder="e.g., 5.99">
+        </div>
+
+        <div class="form-group">
+          <label for="itemVendor">Primary Vendor</label>
+          <input type="text" id="itemVendor" class="form-input" placeholder="e.g., Sysco Sacramento">
+        </div>
+
+        <div class="form-group">
+          <label for="itemBarcode">Barcode/UPC (Optional)</label>
+          <input type="text" id="itemBarcode" class="form-input" placeholder="For scanning beer/drinks">
+        </div>
+
+        <div class="form-group">
+          <label for="itemFrequency">Count Frequency</label>
+          <select id="itemFrequency" class="form-select">
+            <option value="daily">Daily</option>
+            <option value="weekly" selected>Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+
+        <button class="submit-btn primary" onclick="saveItem()">Save Item</button>
+        <button class="submit-btn" onclick="cancelItemForm()">Cancel</button>
+      </div>
+
+      <!-- Scan Invoice Section -->
+      <div id="scanInvoice" class="form-section">
+        <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">Scan Invoice</h2>
+        <p style="color: var(--gray-500); margin-bottom: 16px;">Coming in Day 2: Camera-based invoice scanning with OCR</p>
+        <button class="submit-btn" onclick="showDashboard()">Back to Dashboard</button>
+      </div>
+
+      <!-- Daily Count Section -->
+      <div id="dailyCount" class="form-section">
+        <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">Daily Inventory Count</h2>
+        <p style="color: var(--gray-500); margin-bottom: 16px;">Coming in Day 3: Camera-assisted counting with manual adjustment</p>
+        <button class="submit-btn" onclick="showDashboard()">Back to Dashboard</button>
+      </div>
+
+      <!-- Reports Section -->
+      <div id="viewReports" class="form-section">
+        <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">COGs Reports</h2>
+        <p style="color: var(--gray-500); margin-bottom: 16px;">Coming in Day 3: Comprehensive COGs analysis and reporting</p>
+        <button class="submit-btn" onclick="showDashboard()">Back to Dashboard</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    // Session Management - Check if user is authorized
+    window.addEventListener('DOMContentLoaded', () => {
+      const managerSession = localStorage.getItem('managerLoginTimestamp');
+      const now = Date.now();
+
+      if (!managerSession || (now - managerSession > 60 * 60 * 1000)) {
+        // Session expired - redirect to home
+        alert('Session expired. Please log in from the main menu.');
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // Session valid - initialize COGs system
+      initializeCOGs();
+    });
+
+    // Supabase Configuration
+    const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Current editing item ID (for updates)
+    let currentEditingId = null;
+
+    // Initialize COGs System
+    async function initializeCOGs() {
+      console.log('COGs system initialized');
+      await loadItems();
+    }
+
+    // Navigation Functions
+    function showSection(sectionId) {
+      // Hide all sections
+      document.querySelectorAll('.form-section').forEach(section => {
+        section.classList.remove('active');
+      });
+
+      // Show selected section
+      document.getElementById(sectionId).classList.add('active');
+    }
+
+    function showDashboard() {
+      showSection('cogsDashboard');
+    }
+
+    function showAddItemForm() {
+      currentEditingId = null;
+      document.getElementById('itemFormTitle').textContent = 'Add New Item';
+      document.getElementById('itemName').value = '';
+      document.getElementById('itemCategory').value = '';
+      document.getElementById('itemUnit').value = '';
+      document.getElementById('itemParLevel').value = '';
+      document.getElementById('itemCost').value = '';
+      document.getElementById('itemVendor').value = '';
+      document.getElementById('itemBarcode').value = '';
+      document.getElementById('itemFrequency').value = 'weekly';
+      showSection('itemForm');
+    }
+
+    function cancelItemForm() {
+      currentEditingId = null;
+      showSection('manageItems');
+    }
+
+    // Item Management Functions
+    async function loadItems(category = '') {
+      const itemsList = document.getElementById('itemsList');
+      itemsList.innerHTML = '<p style="text-align: center; color: var(--gray-500); padding: 40px 0;">Loading items...</p>';
+
+      try {
+        let query = supabase
+          .from('inventory_items')
+          .select('*')
+          .order('category', { ascending: true })
+          .order('item_name', { ascending: true });
+
+        if (category) {
+          query = query.eq('category', category);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          itemsList.innerHTML = '<p style="text-align: center; color: var(--gray-500); padding: 40px 0;">No items found. Click "Add New Item" to get started.</p>';
+          return;
+        }
+
+        // Build table
+        let html = '<table class="items-table"><thead><tr>';
+        html += '<th>Item</th>';
+        html += '<th>Category</th>';
+        html += '<th>Unit</th>';
+        html += '<th>Par</th>';
+        html += '<th>Cost</th>';
+        html += '<th>Actions</th>';
+        html += '</tr></thead><tbody>';
+
+        data.forEach(item => {
+          html += `<tr>
+            <td><strong>${item.item_name}</strong></td>
+            <td><span style="font-size: 10px; padding: 4px 8px; background: var(--light-blue); border-radius: 0;">${item.category}</span></td>
+            <td>${item.unit}</td>
+            <td>${item.par_level || '-'}</td>
+            <td>$${item.current_cost ? item.current_cost.toFixed(2) : '-'}</td>
+            <td>
+              <button class="btn-small btn-edit" onclick="editItem(${item.id})">Edit</button>
+              <button class="btn-small btn-delete" onclick="deleteItem(${item.id})">Delete</button>
+            </td>
+          </tr>`;
+        });
+
+        html += '</tbody></table>';
+        itemsList.innerHTML = html;
+
+      } catch (error) {
+        console.error('Error loading items:', error);
+        itemsList.innerHTML = `<p style="text-align: center; color: var(--error); padding: 40px 0;">Error loading items: ${error.message}</p>`;
+      }
+    }
+
+    function filterItems() {
+      const category = document.getElementById('categoryFilter').value;
+      loadItems(category);
+    }
+
+    async function saveItem() {
+      const name = document.getElementById('itemName').value.trim();
+      const category = document.getElementById('itemCategory').value;
+      const unit = document.getElementById('itemUnit').value.trim();
+      const parLevel = parseFloat(document.getElementById('itemParLevel').value) || null;
+      const cost = parseFloat(document.getElementById('itemCost').value) || null;
+      const vendor = document.getElementById('itemVendor').value.trim() || null;
+      const barcode = document.getElementById('itemBarcode').value.trim() || null;
+      const frequency = document.getElementById('itemFrequency').value;
+
+      if (!name || !category || !unit) {
+        alert('Please fill in all required fields (Item Name, Category, Unit)');
+        return;
+      }
+
+      try {
+        const itemData = {
+          item_name: name,
+          category: category,
+          unit: unit,
+          par_level: parLevel,
+          current_cost: cost,
+          vendor_name: vendor,
+          barcode: barcode,
+          count_frequency: frequency,
+          last_updated: new Date().toISOString()
+        };
+
+        let result;
+        if (currentEditingId) {
+          // Update existing item
+          result = await supabase
+            .from('inventory_items')
+            .update(itemData)
+            .eq('id', currentEditingId);
+        } else {
+          // Insert new item
+          itemData.created_at = new Date().toISOString();
+          result = await supabase
+            .from('inventory_items')
+            .insert([itemData]);
+        }
+
+        if (result.error) throw result.error;
+
+        alert(currentEditingId ? 'Item updated successfully!' : 'Item added successfully!');
+        currentEditingId = null;
+        showSection('manageItems');
+        loadItems();
+
+      } catch (error) {
+        console.error('Error saving item:', error);
+        alert('Error saving item: ' + error.message);
+      }
+    }
+
+    async function editItem(id) {
+      try {
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+
+        currentEditingId = id;
+        document.getElementById('itemFormTitle').textContent = 'Edit Item';
+        document.getElementById('itemName').value = data.item_name;
+        document.getElementById('itemCategory').value = data.category;
+        document.getElementById('itemUnit').value = data.unit;
+        document.getElementById('itemParLevel').value = data.par_level || '';
+        document.getElementById('itemCost').value = data.current_cost || '';
+        document.getElementById('itemVendor').value = data.vendor_name || '';
+        document.getElementById('itemBarcode').value = data.barcode || '';
+        document.getElementById('itemFrequency').value = data.count_frequency || 'weekly';
+        showSection('itemForm');
+
+      } catch (error) {
+        console.error('Error loading item:', error);
+        alert('Error loading item: ' + error.message);
+      }
+    }
+
+    async function deleteItem(id) {
+      if (!confirm('Are you sure you want to delete this item?')) {
+        return;
+      }
+
+      try {
+        const { error } = await supabase
+          .from('inventory_items')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+
+        alert('Item deleted successfully!');
+        loadItems();
+
+      } catch (error) {
+        console.error('Error deleting item:', error);
+        alert('Error deleting item: ' + error.message);
+      }
+    }
+  </script>
+</body>
+</html>

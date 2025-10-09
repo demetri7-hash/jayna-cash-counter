@@ -440,27 +440,31 @@ window.addEventListener('DOMContentLoaded', () => {
 
 ---
 
-## ❓ Open Questions for User
+## ✅ Requirements Confirmed
 
 1. **Inventory Categories:**
-   - What product categories do you track?
-   - Do you have existing item lists?
+   - PRODUCE, MEAT, GYROS (separate from meat), BREADS, LIQUOR, BEER, WINE, DAIRY, NA DRINKS, JUICES
+   - Have example lists but not complete - will build as we go
 
 2. **Invoice Processing:**
-   - Main vendors? (Sysco, US Foods, etc.)
-   - Invoice format? (PDF, paper, email?)
+   - Vendors: Dynamic assignment (create/assign as items come in)
+   - Format: Both PDF and paper receipts
+   - Data: ALL (item, price, quantity, date, vendor) - show/hide columns
 
 3. **Daily Counts:**
-   - How often? (Daily, weekly, by section?)
-   - Track waste/spoilage separately?
+   - Frequency: Variable (daily for some, weekly for others - user selects)
+   - Suggestions: YES - based on usage patterns and real data
+   - Waste/spoilage: YES - optional tracking
 
 4. **Reporting:**
-   - What metrics matter most?
-   - Need Toast sales integration for theoretical usage?
+   - Metrics: ALL (food cost %, usage trends, variance from theoretical)
+   - Toast integration: YES for theoretical usage calculations
+   - Alerts: YES for high-cost items and unusual variances
 
 5. **Camera Tech:**
-   - OCR vs computer vision preference?
-   - Offline capability needed?
+   - Tech: BOTH OCR and computer vision
+   - Connectivity: Online (better quality)
+   - Barcode/QR: YES - especially important for beer and drinks
 
 ---
 
