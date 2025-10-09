@@ -6900,6 +6900,9 @@
         // Labor metrics for combined report
         laborData: {
           baseLaborCost: baseLaborCost,
+          apiLaborCost: apiLaborCost,
+          manualLaborCost: manualLaborCostInput,
+          usingManualCost: manualLaborCostInput > 0,
           demetriSalary: demetriSalary,
           subtotalLabor: subtotalLabor,
           payrollBurden: payrollBurden,
@@ -7399,8 +7402,14 @@
             <!-- Left Column -->
             <div>
               <div style="padding: 10px; background: #f8f9fa; border-left: 3px solid #1e3c72; margin-bottom: 8px;">
-                <div style="font-size: 11px; color: #666;">BASE LABOR COST</div>
+                <div style="font-size: 11px; color: #666;">BASE LABOR COST ${tipPoolSummary.laborData.usingManualCost ? '(TOAST WEB)' : '(API)'}</div>
                 <div style="font-size: 18px; font-weight: bold; color: #1e3c72;">$${tipPoolSummary.laborData.baseLaborCost.toFixed(2)}</div>
+                ${tipPoolSummary.laborData.usingManualCost ? `
+                  <div style="font-size: 10px; color: #28a745; margin-top: 4px;">✓ Manual cost includes CA double-time</div>
+                  <div style="font-size: 9px; color: #999;">API: $${tipPoolSummary.laborData.apiLaborCost.toFixed(2)} (+$${(tipPoolSummary.laborData.manualLaborCost - tipPoolSummary.laborData.apiLaborCost).toFixed(2)})</div>
+                ` : `
+                  <div style="font-size: 10px; color: #ffc107; margin-top: 4px;">⚠️ May be $100-150 low (CA double-time)</div>
+                `}
               </div>
               <div style="padding: 10px; background: #f8f9fa; border-left: 3px solid #6c757d; margin-bottom: 8px;">
                 <div style="font-size: 11px; color: #666;">MANAGER SALARY (WEEKLY)</div>
