@@ -548,6 +548,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script>
+    // Configure PDF.js
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  </script>
 
   <script>
     // Supabase
@@ -879,6 +884,7 @@
 
     let currentInvoiceFile = null;
     let currentOcrText = '';
+    let extractedInvoices = []; // Array to hold multiple invoices from PDF
 
     function handleFileSelect(event) {
       const file = event.target.files[0];
@@ -886,13 +892,28 @@
 
       currentInvoiceFile = file;
 
-      // Show preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        document.getElementById('previewImage').src = e.target.result;
+      // Check if PDF
+      const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+      if (isPDF) {
+        // Show PDF info instead of image preview
+        document.getElementById('invoicePreview').innerHTML = `
+          <div style="padding: 20px; background: var(--light-blue); border: 2px solid var(--primary-blue); text-align: center;">
+            <p style="font-size: 16px; font-weight: bold; color: var(--primary-blue);">📄 PDF Uploaded</p>
+            <p style="font-size: 12px; color: var(--gray-700); margin-top: 8px;">${file.name}</p>
+            <p style="font-size: 11px; color: var(--gray-600); margin-top: 4px;">Click "Process Invoice" to extract all invoices from this PDF</p>
+          </div>
+        `;
         document.getElementById('invoicePreview').style.display = 'block';
-      };
-      reader.readAsDataURL(file);
+      } else {
+        // Show image preview for photos
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById('previewImage').src = e.target.result;
+          document.getElementById('invoicePreview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
     }
 
     async function processInvoice() {
@@ -901,56 +922,19 @@
         return;
       }
 
-      const vendorId = document.getElementById('invoiceVendor').value;
-      if (!vendorId) {
-        alert('Please select a vendor');
-        return;
-      }
-
       try {
         // Show processing status
         document.getElementById('ocrStatus').style.display = 'block';
         document.getElementById('processBtn').disabled = true;
 
-        // Update progress
-        document.getElementById('ocrProgress').textContent = 'Loading OCR engine...';
+        const isPDF = currentInvoiceFile.type === 'application/pdf' ||
+                     currentInvoiceFile.name.toLowerCase().endsWith('.pdf');
 
-        // Process with Tesseract
-        const result = await Tesseract.recognize(
-          currentInvoiceFile,
-          'eng',
-          {
-            logger: (m) => {
-              if (m.status === 'recognizing text') {
-                document.getElementById('ocrProgress').textContent = `Recognizing text... ${Math.round(m.progress * 100)}%`;
-              }
-            }
-          }
-        );
-
-        currentOcrText = result.data.text;
-
-        // Update progress
-        document.getElementById('ocrProgress').textContent = 'Parsing invoice data...';
-
-        // Parse the OCR text
-        const parsedData = parseInvoiceText(currentOcrText, vendorId);
-
-        // Show extracted data
-        document.getElementById('extractedVendor').value = parsedData.vendorName || '';
-        document.getElementById('extractedDate').value = parsedData.date || '';
-        document.getElementById('extractedInvoiceNumber').value = parsedData.invoiceNumber || '';
-        document.getElementById('extractedTotal').value = parsedData.total || '';
-        document.getElementById('rawOcrText').value = currentOcrText;
-
-        // Display extracted items
-        displayExtractedItems(parsedData.items || []);
-
-        // Hide processing, show extracted data
-        document.getElementById('ocrStatus').style.display = 'none';
-        document.getElementById('extractedData').style.display = 'block';
-        document.getElementById('processBtn').style.display = 'none';
-        document.getElementById('saveInvoiceBtn').style.display = 'block';
+        if (isPDF) {
+          await processPDFInvoices();
+        } else {
+          await processSingleImageInvoice();
+        }
 
       } catch (error) {
         console.error('OCR Error:', error);
@@ -960,41 +944,208 @@
       }
     }
 
-    function parseInvoiceText(text, vendorId) {
-      // Basic invoice parser - will improve as we analyze real invoices
+    async function processPDFInvoices() {
+      document.getElementById('ocrProgress').textContent = 'Loading PDF...';
+
+      // Read PDF file
+      const arrayBuffer = await currentInvoiceFile.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+      const totalPages = pdf.numPages;
+      document.getElementById('ocrProgress').textContent = `Found ${totalPages} pages in PDF`;
+
+      extractedInvoices = [];
+
+      // Process each page
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        document.getElementById('ocrProgress').textContent =
+          `Processing page ${pageNum} of ${totalPages}...`;
+
+        const page = await pdf.getPage(pageNum);
+
+        // Render page to canvas
+        const scale = 2.0; // Higher scale for better OCR
+        const viewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+
+        // Run OCR on canvas
+        document.getElementById('ocrProgress').textContent =
+          `Reading text from page ${pageNum}... 0%`;
+
+        const result = await Tesseract.recognize(
+          canvas,
+          'eng',
+          {
+            logger: (m) => {
+              if (m.status === 'recognizing text') {
+                document.getElementById('ocrProgress').textContent =
+                  `Reading text from page ${pageNum}... ${Math.round(m.progress * 100)}%`;
+              }
+            }
+          }
+        );
+
+        const ocrText = result.data.text;
+
+        // Parse invoice data
+        const parsedData = parseInvoiceText(ocrText);
+
+        // Store invoice with page number
+        extractedInvoices.push({
+          pageNumber: pageNum,
+          ocrText: ocrText,
+          vendorName: parsedData.vendorName || detectVendorName(ocrText),
+          date: parsedData.date || '',
+          invoiceNumber: parsedData.invoiceNumber || '',
+          subtotal: parsedData.subtotal || 0,
+          tax: parsedData.tax || 0,
+          deliveryFee: parsedData.deliveryFee || 0,
+          driverFee: parsedData.driverFee || 0,
+          total: parsedData.total || 0,
+          items: parsedData.items || []
+        });
+      }
+
+      // Display all extracted invoices
+      displayMultipleInvoices();
+
+      document.getElementById('ocrStatus').style.display = 'none';
+      document.getElementById('extractedData').style.display = 'block';
+      document.getElementById('processBtn').style.display = 'none';
+      document.getElementById('saveInvoiceBtn').style.display = 'block';
+      document.getElementById('saveInvoiceBtn').textContent = `Save All ${extractedInvoices.length} Invoices`;
+    }
+
+    async function processSingleImageInvoice() {
+      document.getElementById('ocrProgress').textContent = 'Loading OCR engine...';
+
+      const result = await Tesseract.recognize(
+        currentInvoiceFile,
+        'eng',
+        {
+          logger: (m) => {
+            if (m.status === 'recognizing text') {
+              document.getElementById('ocrProgress').textContent = `Recognizing text... ${Math.round(m.progress * 100)}%`;
+            }
+          }
+        }
+      );
+
+      currentOcrText = result.data.text;
+      document.getElementById('ocrProgress').textContent = 'Parsing invoice data...';
+
+      const parsedData = parseInvoiceText(currentOcrText);
+
+      extractedInvoices = [{
+        pageNumber: 1,
+        ocrText: currentOcrText,
+        vendorName: parsedData.vendorName || detectVendorName(currentOcrText),
+        date: parsedData.date || '',
+        invoiceNumber: parsedData.invoiceNumber || '',
+        subtotal: parsedData.subtotal || 0,
+        tax: parsedData.tax || 0,
+        deliveryFee: parsedData.deliveryFee || 0,
+        driverFee: parsedData.driverFee || 0,
+        total: parsedData.total || 0,
+        items: parsedData.items || []
+      }];
+
+      displayMultipleInvoices();
+
+      document.getElementById('ocrStatus').style.display = 'none';
+      document.getElementById('extractedData').style.display = 'block';
+      document.getElementById('processBtn').style.display = 'none';
+      document.getElementById('saveInvoiceBtn').style.display = 'block';
+    }
+
+    function detectVendorName(text) {
+      // Known vendor patterns
+      const vendorPatterns = {
+        'Mani Imports': /mani\s*imports?/i,
+        'Greenleaf': /greenleaf/i,
+        'Eatopia': /eatopia/i,
+        'EcoLab': /eco\s*lab/i,
+        'Restaurant Depot': /restaurant\s*depot/i,
+        'Performance Food Service': /performance\s*food|pfs/i
+      };
+
+      for (const [vendor, pattern] of Object.entries(vendorPatterns)) {
+        if (pattern.test(text)) {
+          return vendor;
+        }
+      }
+
+      return '';
+    }
+
+    function parseInvoiceText(text) {
       const lines = text.split('\n').filter(line => line.trim());
 
       const result = {
         vendorName: '',
         date: '',
         invoiceNumber: '',
-        total: '',
+        subtotal: 0,
+        tax: 0,
+        deliveryFee: 0,
+        driverFee: 0,
+        total: 0,
         items: []
       };
 
-      // Date patterns
+      // Date patterns (multiple formats)
       const datePatterns = [
         /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/,
-        /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/
+        /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
+        /(?:date|dated)[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i
       ];
 
       // Invoice number patterns
       const invoicePatterns = [
-        /inv(?:oice)?[#:\s]*(\w+)/i,
-        /#\s*(\d+)/,
-        /invoice\s*number[:\s]*(\w+)/i
+        /inv(?:oice)?[#:\s]*([A-Z0-9\-]+)/i,
+        /#\s*([A-Z0-9\-]+)/i,
+        /invoice\s*(?:number|no|#)[:\s]*([A-Z0-9\-]+)/i,
+        /order[:\s#]*([A-Z0-9\-]+)/i
       ];
 
-      // Total patterns
+      // Money extraction patterns
+      const subtotalPatterns = [
+        /sub\s*total[:\s]*\$?\s*([\d,]+\.?\d*)/i,
+        /subtotal[:\s]*\$?\s*([\d,]+\.?\d*)/i
+      ];
+
+      const taxPatterns = [
+        /tax[:\s]*\$?\s*([\d,]+\.?\d*)/i,
+        /sales\s*tax[:\s]*\$?\s*([\d,]+\.?\d*)/i
+      ];
+
+      const deliveryPatterns = [
+        /delivery\s*(?:fee|charge)?[:\s]*\$?\s*([\d,]+\.?\d*)/i,
+        /shipping[:\s]*\$?\s*([\d,]+\.?\d*)/i
+      ];
+
+      const driverPatterns = [
+        /driver\s*(?:fee|tip)?[:\s]*\$?\s*([\d,]+\.?\d*)/i,
+        /gratuity[:\s]*\$?\s*([\d,]+\.?\d*)/i
+      ];
+
       const totalPatterns = [
-        /total[:\s]*\$?\s*(\d+\.?\d*)/i,
-        /amount[:\s]*\$?\s*(\d+\.?\d*)/i,
-        /balance[:\s]*\$?\s*(\d+\.?\d*)/i
+        /(?:total|amount|balance)\s*(?:due)?[:\s]*\$?\s*([\d,]+\.?\d*)/i,
+        /grand\s*total[:\s]*\$?\s*([\d,]+\.?\d*)/i
       ];
 
       // Parse each line
-      lines.forEach(line => {
-        // Try to find date
+      lines.forEach((line, index) => {
+        // Date
         if (!result.date) {
           for (const pattern of datePatterns) {
             const match = line.match(pattern);
@@ -1005,7 +1156,7 @@
           }
         }
 
-        // Try to find invoice number
+        // Invoice number
         if (!result.invoiceNumber) {
           for (const pattern of invoicePatterns) {
             const match = line.match(pattern);
@@ -1016,26 +1167,101 @@
           }
         }
 
-        // Try to find total
-        if (!result.total) {
-          for (const pattern of totalPatterns) {
+        // Subtotal
+        if (!result.subtotal) {
+          for (const pattern of subtotalPatterns) {
             const match = line.match(pattern);
             if (match) {
-              result.total = match[1];
+              result.subtotal = parseFloat(match[1].replace(/,/g, ''));
               break;
             }
           }
         }
 
-        // Try to extract line items (basic pattern: item name, quantity, price)
-        const itemPattern = /^(.+?)\s+(\d+\.?\d*)\s+\$?\s*(\d+\.?\d*)$/;
-        const match = line.match(itemPattern);
-        if (match) {
-          result.items.push({
-            description: match[1].trim(),
-            quantity: parseFloat(match[2]),
-            price: parseFloat(match[3])
-          });
+        // Tax
+        if (!result.tax) {
+          for (const pattern of taxPatterns) {
+            const match = line.match(pattern);
+            if (match) {
+              result.tax = parseFloat(match[1].replace(/,/g, ''));
+              break;
+            }
+          }
+        }
+
+        // Delivery fee
+        if (!result.deliveryFee) {
+          for (const pattern of deliveryPatterns) {
+            const match = line.match(pattern);
+            if (match) {
+              result.deliveryFee = parseFloat(match[1].replace(/,/g, ''));
+              break;
+            }
+          }
+        }
+
+        // Driver fee
+        if (!result.driverFee) {
+          for (const pattern of driverPatterns) {
+            const match = line.match(pattern);
+            if (match) {
+              result.driverFee = parseFloat(match[1].replace(/,/g, ''));
+              break;
+            }
+          }
+        }
+
+        // Total (look for this last to avoid catching subtotals)
+        const totalMatch = line.match(/(?:total|amount|balance)\s*(?:due)?[:\s]*\$?\s*([\d,]+\.?\d*)/i);
+        if (totalMatch) {
+          const amount = parseFloat(totalMatch[1].replace(/,/g, ''));
+          if (amount > result.total) {
+            result.total = amount;
+          }
+        }
+
+        // Line items - flexible pattern for different invoice formats
+        const itemPatterns = [
+          // Pattern 1: Description Qty Price
+          /^(.{10,}?)\s+(\d+\.?\d*)\s+\$?\s*([\d,]+\.?\d*)$/,
+          // Pattern 2: Qty Description Price
+          /^(\d+\.?\d*)\s+(.{10,}?)\s+\$?\s*([\d,]+\.?\d*)$/,
+          // Pattern 3: Description Price (no qty)
+          /^(.{15,}?)\s+\$?\s*([\d,]+\.?\d*)$/
+        ];
+
+        for (const pattern of itemPatterns) {
+          const match = line.match(pattern);
+          if (match && !line.toLowerCase().includes('total') &&
+              !line.toLowerCase().includes('tax') &&
+              !line.toLowerCase().includes('delivery') &&
+              !line.toLowerCase().includes('subtotal')) {
+
+            const item = {};
+
+            if (pattern === itemPatterns[0]) {
+              // Pattern 1
+              item.description = match[1].trim();
+              item.quantity = parseFloat(match[2]);
+              item.price = parseFloat(match[3].replace(/,/g, ''));
+            } else if (pattern === itemPatterns[1]) {
+              // Pattern 2
+              item.quantity = parseFloat(match[1]);
+              item.description = match[2].trim();
+              item.price = parseFloat(match[3].replace(/,/g, ''));
+            } else {
+              // Pattern 3 (no qty)
+              item.description = match[1].trim();
+              item.quantity = 1;
+              item.price = parseFloat(match[2].replace(/,/g, ''));
+            }
+
+            // Only add if price seems reasonable (not a date or something else)
+            if (item.price > 0 && item.price < 10000) {
+              result.items.push(item);
+            }
+            break;
+          }
         }
       });
 
@@ -1065,63 +1291,195 @@
       return '';
     }
 
-    function displayExtractedItems(items) {
+    function displayMultipleInvoices() {
       const container = document.getElementById('extractedItemsList');
 
-      if (!items || items.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--gray-500);">No items extracted. You can add them manually after saving.</p>';
+      if (!extractedInvoices || extractedInvoices.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--gray-500);">No invoices extracted.</p>';
         return;
       }
 
-      let html = '<table class="items-table" style="font-size: 11px;"><thead><tr>';
-      html += '<th>Item</th><th>Qty</th><th>Price</th></tr></thead><tbody>';
+      let html = `<div style="margin-bottom: 16px; padding: 12px; background: var(--light-blue); border: 2px solid var(--primary-blue);">
+        <strong>✓ Found ${extractedInvoices.length} invoice${extractedInvoices.length > 1 ? 's' : ''} in this file</strong>
+      </div>`;
 
-      items.forEach(item => {
-        html += `<tr>
-          <td>${item.description}</td>
-          <td>${item.quantity}</td>
-          <td>$${item.price.toFixed(2)}</td>
-        </tr>`;
+      extractedInvoices.forEach((invoice, index) => {
+        const hasData = invoice.date || invoice.invoiceNumber || invoice.vendorName;
+
+        html += `
+          <div style="margin-bottom: 24px; padding: 16px; border: 2px solid var(--gray-300); background: white;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <strong style="font-size: 14px;">Invoice ${index + 1} ${invoice.pageNumber ? `(Page ${invoice.pageNumber})` : ''}</strong>
+              <span style="font-size: 12px; color: ${hasData ? 'var(--success)' : 'var(--warning)'};">
+                ${hasData ? '✓ Data Found' : '⚠️ Review Needed'}
+              </span>
+            </div>
+
+            <!-- Editable fields for this invoice -->
+            <div class="form-group">
+              <label>Vendor</label>
+              <input type="text" class="form-input" value="${invoice.vendorName || ''}"
+                     onchange="extractedInvoices[${index}].vendorName = this.value"
+                     placeholder="Auto-detected or enter manually">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="form-group">
+                <label>Invoice Date*</label>
+                <input type="date" class="form-input" value="${invoice.date || ''}"
+                       onchange="extractedInvoices[${index}].date = this.value">
+              </div>
+              <div class="form-group">
+                <label>Invoice #</label>
+                <input type="text" class="form-input" value="${invoice.invoiceNumber || ''}"
+                       onchange="extractedInvoices[${index}].invoiceNumber = this.value">
+              </div>
+            </div>
+
+            <!-- Financial breakdown -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+              <div class="form-group">
+                <label>Subtotal</label>
+                <input type="number" class="form-input" value="${invoice.subtotal || ''}" step="0.01"
+                       onchange="extractedInvoices[${index}].subtotal = parseFloat(this.value) || 0">
+              </div>
+              <div class="form-group">
+                <label>Tax</label>
+                <input type="number" class="form-input" value="${invoice.tax || ''}" step="0.01"
+                       onchange="extractedInvoices[${index}].tax = parseFloat(this.value) || 0">
+              </div>
+              <div class="form-group">
+                <label>Delivery Fee</label>
+                <input type="number" class="form-input" value="${invoice.deliveryFee || ''}" step="0.01"
+                       onchange="extractedInvoices[${index}].deliveryFee = parseFloat(this.value) || 0">
+              </div>
+              <div class="form-group">
+                <label>Driver Fee/Tip</label>
+                <input type="number" class="form-input" value="${invoice.driverFee || ''}" step="0.01"
+                       onchange="extractedInvoices[${index}].driverFee = parseFloat(this.value) || 0">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Total Amount*</label>
+              <input type="number" class="form-input" value="${invoice.total || ''}" step="0.01"
+                     onchange="extractedInvoices[${index}].total = parseFloat(this.value) || 0"
+                     style="font-weight: bold;">
+            </div>
+
+            <!-- Line items -->
+            ${invoice.items && invoice.items.length > 0 ? `
+              <details style="margin-top: 12px;">
+                <summary style="cursor: pointer; font-size: 12px; font-weight: bold;">
+                  ${invoice.items.length} line item${invoice.items.length > 1 ? 's' : ''} extracted
+                </summary>
+                <table class="items-table" style="font-size: 11px; margin-top: 8px;">
+                  <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
+                  <tbody>
+                    ${invoice.items.map(item => `
+                      <tr>
+                        <td>${item.description}</td>
+                        <td>${item.quantity}</td>
+                        <td>$${item.price.toFixed(2)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </details>
+            ` : '<p style="font-size: 11px; color: var(--gray-500); margin-top: 8px;">No line items extracted</p>'}
+
+            <!-- Raw OCR text for this invoice -->
+            <details style="margin-top: 12px;">
+              <summary style="cursor: pointer; font-size: 11px; color: var(--gray-500);">View Raw OCR Text</summary>
+              <textarea readonly style="width: 100%; min-height: 150px; margin-top: 8px; font-family: monospace; font-size: 10px; padding: 8px; border: 1px solid var(--gray-300);">${invoice.ocrText}</textarea>
+            </details>
+          </div>
+        `;
       });
 
-      html += '</tbody></table>';
       container.innerHTML = html;
+
+      // Update main fields to hidden (since we're showing individual invoice fields)
+      document.getElementById('extractedVendor').closest('.form-group').style.display = 'none';
+      document.getElementById('extractedDate').closest('.form-group').parentElement.style.display = 'none';
+      document.getElementById('extractedTotal').closest('.form-group').style.display = 'none';
     }
 
     async function saveInvoice() {
-      const vendorId = document.getElementById('invoiceVendor').value;
-      const vendorName = document.getElementById('invoiceVendor').selectedOptions[0].text;
-      const date = document.getElementById('extractedDate').value;
-      const invoiceNumber = document.getElementById('extractedInvoiceNumber').value;
-      const total = parseFloat(document.getElementById('extractedTotal').value) || 0;
-
-      if (!vendorId || !date) {
-        alert('Please fill in vendor and date');
+      // Batch save all extracted invoices
+      if (!extractedInvoices || extractedInvoices.length === 0) {
+        alert('No invoices to save');
         return;
       }
 
       try {
-        // Save to invoice_archive table
-        const { data, error } = await supabase
-          .from('invoice_archive')
-          .insert([{
+        const invoicesToSave = [];
+        let missingData = [];
+
+        // Validate each invoice
+        extractedInvoices.forEach((invoice, index) => {
+          if (!invoice.date) {
+            missingData.push(`Invoice ${index + 1}: missing date`);
+          }
+          if (!invoice.total || invoice.total === 0) {
+            missingData.push(`Invoice ${index + 1}: missing total amount`);
+          }
+
+          // Get vendor ID from vendor name
+          const vendorSelect = document.getElementById('invoiceVendor');
+          let vendorId = null;
+          let foundVendor = invoice.vendorName;
+
+          // Try to find vendor ID from dropdown by matching name
+          for (let option of vendorSelect.options) {
+            if (option.text.toLowerCase() === invoice.vendorName.toLowerCase()) {
+              vendorId = option.value;
+              foundVendor = option.text;
+              break;
+            }
+          }
+
+          invoicesToSave.push({
             vendor_id: vendorId,
-            vendor_name: vendorName,
-            invoice_date: date,
-            invoice_number: invoiceNumber,
-            total_amount: total,
-            ocr_text: currentOcrText,
+            vendor_name: foundVendor || invoice.vendorName || 'Unknown',
+            invoice_date: invoice.date,
+            invoice_number: invoice.invoiceNumber,
+            total_amount: invoice.total,
+            ocr_text: invoice.ocrText,
+            parsed_data: JSON.stringify({
+              subtotal: invoice.subtotal,
+              tax: invoice.tax,
+              deliveryFee: invoice.deliveryFee,
+              driverFee: invoice.driverFee,
+              pageNumber: invoice.pageNumber,
+              itemCount: invoice.items.length
+            }),
+            items_extracted: JSON.stringify(invoice.items),
             processed: true,
             verified: false,
             uploaded_at: new Date().toISOString()
-          }])
+          });
+        });
+
+        // Show warnings if data is missing but still allow save
+        if (missingData.length > 0) {
+          const proceed = confirm(
+            `Warning: Some invoices are missing data:\n\n${missingData.join('\n')}\n\nDo you want to save anyway?`
+          );
+          if (!proceed) return;
+        }
+
+        // Save all invoices
+        const { data, error } = await supabase
+          .from('invoice_archive')
+          .insert(invoicesToSave)
           .select();
 
         if (error) throw error;
 
-        alert('Invoice saved successfully!');
+        alert(`✓ Successfully saved ${invoicesToSave.length} invoice${invoicesToSave.length > 1 ? 's' : ''}!`);
 
-        // Reset form and go back to dashboard
+        // Reset form
         document.getElementById('invoiceFile').value = '';
         document.getElementById('invoicePreview').style.display = 'none';
         document.getElementById('extractedData').style.display = 'none';
@@ -1130,12 +1488,13 @@
         document.getElementById('saveInvoiceBtn').style.display = 'none';
         currentInvoiceFile = null;
         currentOcrText = '';
+        extractedInvoices = [];
 
         showDashboard();
 
       } catch (error) {
-        console.error('Error saving invoice:', error);
-        alert('Error saving invoice: ' + error.message);
+        console.error('Error saving invoices:', error);
+        alert('Error saving invoices: ' + error.message);
       }
     }
 
