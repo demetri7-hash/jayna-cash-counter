@@ -418,19 +418,15 @@
       <div id="scanInvoice" style="display: none;">
         <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">Scan Invoice</h2>
 
-        <!-- Vendor Selection -->
-        <div class="form-group">
-          <label for="invoiceVendor">Vendor*</label>
-          <select id="invoiceVendor" class="form-select" required>
-            <option value="">Select Vendor</option>
-          </select>
-        </div>
+        <p style="margin-bottom: 16px; padding: 12px; background: var(--light-blue); border-left: 3px solid var(--primary-blue); font-size: 12px;">
+          📄 Upload your invoices (photo or PDF). The system will automatically detect vendors from each page.
+        </p>
 
         <!-- File Upload -->
         <div class="form-group">
           <label for="invoiceFile">Upload Invoice (Photo or PDF)*</label>
           <input type="file" id="invoiceFile" class="form-input" accept="image/*,application/pdf" capture="environment">
-          <p style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">Supported: Photos (JPG, PNG) or PDF files</p>
+          <p style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">Supported: Photos (JPG, PNG) or PDF files with multiple invoices</p>
         </div>
 
         <!-- Invoice Preview -->
@@ -546,6 +542,80 @@
     </div>
   </div>
 
+  <!-- Add Vendor Modal -->
+  <div id="addVendorModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; overflow-y: auto;">
+    <div style="max-width: 500px; margin: 40px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);">
+      <h3 style="margin-bottom: 16px; color: var(--gray-900); font-size: 16px;">Add New Vendor</h3>
+
+      <div class="form-group">
+        <label for="newVendorName">Vendor Name*</label>
+        <input type="text" id="newVendorName" class="form-input" readonly style="background: var(--gray-100);">
+      </div>
+
+      <div class="form-group">
+        <label>Order Days (Select all that apply)</label>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;">
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 12px;">
+            <input type="checkbox" id="orderDay_Monday" value="Monday"> Monday
+          </label>
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 12px;">
+            <input type="checkbox" id="orderDay_Tuesday" value="Tuesday"> Tuesday
+          </label>
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 12px;">
+            <input type="checkbox" id="orderDay_Wednesday" value="Wednesday"> Wednesday
+          </label>
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 12px;">
+            <input type="checkbox" id="orderDay_Thursday" value="Thursday"> Thursday
+          </label>
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 12px;">
+            <input type="checkbox" id="orderDay_Friday" value="Friday"> Friday
+          </label>
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 12px;">
+            <input type="checkbox" id="orderDay_Saturday" value="Saturday"> Saturday
+          </label>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label for="newVendorCutoffTime">Order Cutoff Time</label>
+          <input type="text" id="newVendorCutoffTime" class="form-input" placeholder="e.g., 3:00 PM">
+        </div>
+        <div class="form-group">
+          <label for="newVendorMethod">Order Method*</label>
+          <select id="newVendorMethod" class="form-select">
+            <option value="">Select...</option>
+            <option value="text">Text</option>
+            <option value="online">Online</option>
+            <option value="phone">Phone</option>
+            <option value="email">Email</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label for="newVendorRepName">Rep Name</label>
+          <input type="text" id="newVendorRepName" class="form-input" placeholder="Contact person">
+        </div>
+        <div class="form-group">
+          <label for="newVendorRepPhone">Rep Phone</label>
+          <input type="tel" id="newVendorRepPhone" class="form-input" placeholder="(555) 555-5555">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="newVendorNotes">Special Notes</label>
+        <textarea id="newVendorNotes" class="form-input" rows="3" placeholder="Any special ordering instructions, delivery notes, etc."></textarea>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 20px;">
+        <button class="submit-btn primary" onclick="saveNewVendor()" style="flex: 1;">Save Vendor</button>
+        <button class="submit-btn" onclick="closeAddVendorModal()" style="flex: 1;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -561,6 +631,7 @@
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentEditingId = null;
+    let currentInvoiceIndexForVendor = null; // Track which invoice is adding a vendor
 
     // Simple navigation
     function showDashboard() {
@@ -844,41 +915,37 @@
       document.getElementById('itemForm').style.display = 'block';
     }
 
+    let knownVendors = []; // Will load from database
+
     async function showScanInvoice() {
       document.getElementById('dashboard').style.display = 'none';
       document.getElementById('manageItems').style.display = 'none';
       document.getElementById('itemForm').style.display = 'none';
       document.getElementById('scanInvoice').style.display = 'block';
 
-      // Load vendors
-      await loadVendorsForInvoice();
+      // Load known vendors for auto-detection
+      await loadKnownVendors();
 
       // Setup file input listener
       const fileInput = document.getElementById('invoiceFile');
+      fileInput.removeEventListener('change', handleFileSelect); // Remove old listener
       fileInput.addEventListener('change', handleFileSelect);
     }
 
-    async function loadVendorsForInvoice() {
+    async function loadKnownVendors() {
       try {
         const { data, error } = await supabase
           .from('vendors')
-          .select('id, vendor_name')
+          .select('*')
           .eq('active', true)
           .order('vendor_name');
 
         if (error) throw error;
 
-        const select = document.getElementById('invoiceVendor');
-        select.innerHTML = '<option value="">Select Vendor</option>';
-
-        data.forEach(vendor => {
-          const option = document.createElement('option');
-          option.value = vendor.id;
-          option.textContent = vendor.vendor_name;
-          select.appendChild(option);
-        });
+        knownVendors = data;
       } catch (error) {
         console.error('Error loading vendors:', error);
+        knownVendors = [];
       }
     }
 
@@ -998,12 +1065,15 @@
 
         // Parse invoice data
         const parsedData = parseInvoiceText(ocrText);
+        const detectedVendor = detectVendorName(ocrText);
 
         // Store invoice with page number
         extractedInvoices.push({
           pageNumber: pageNum,
           ocrText: ocrText,
-          vendorName: parsedData.vendorName || detectVendorName(ocrText),
+          vendorName: detectedVendor.name,
+          vendorId: detectedVendor.id,
+          isKnownVendor: detectedVendor.isKnown,
           date: parsedData.date || '',
           invoiceNumber: parsedData.invoiceNumber || '',
           subtotal: parsedData.subtotal || 0,
@@ -1044,11 +1114,14 @@
       document.getElementById('ocrProgress').textContent = 'Parsing invoice data...';
 
       const parsedData = parseInvoiceText(currentOcrText);
+      const detectedVendor = detectVendorName(currentOcrText);
 
       extractedInvoices = [{
         pageNumber: 1,
         ocrText: currentOcrText,
-        vendorName: parsedData.vendorName || detectVendorName(currentOcrText),
+        vendorName: detectedVendor.name,
+        vendorId: detectedVendor.id,
+        isKnownVendor: detectedVendor.isKnown,
         date: parsedData.date || '',
         invoiceNumber: parsedData.invoiceNumber || '',
         subtotal: parsedData.subtotal || 0,
@@ -1068,23 +1141,40 @@
     }
 
     function detectVendorName(text) {
-      // Known vendor patterns
-      const vendorPatterns = {
-        'Mani Imports': /mani\s*imports?/i,
-        'Greenleaf': /greenleaf/i,
-        'Eatopia': /eatopia/i,
-        'EcoLab': /eco\s*lab/i,
-        'Restaurant Depot': /restaurant\s*depot/i,
-        'Performance Food Service': /performance\s*food|pfs/i
-      };
+      // Check against known vendors from database
+      for (const vendor of knownVendors) {
+        // Create flexible pattern from vendor name
+        const vendorWords = vendor.vendor_name.split(' ').filter(w => w.length > 2);
+        const pattern = new RegExp(vendorWords.join('\\s*'), 'i');
 
-      for (const [vendor, pattern] of Object.entries(vendorPatterns)) {
         if (pattern.test(text)) {
-          return vendor;
+          return {
+            name: vendor.vendor_name,
+            id: vendor.id,
+            isKnown: true
+          };
         }
       }
 
-      return '';
+      // Try to extract any company name from the invoice (usually at top)
+      const lines = text.split('\n').slice(0, 10); // Check first 10 lines
+      for (const line of lines) {
+        // Look for company-like patterns (2-4 words, capitalized)
+        const companyPattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}(?:\s+(?:Inc|LLC|Corp|Co|Ltd|Company|Foods?|Service|Market|Imports?))?)/.exec(line);
+        if (companyPattern) {
+          return {
+            name: companyPattern[1],
+            id: null,
+            isKnown: false
+          };
+        }
+      }
+
+      return {
+        name: '',
+        id: null,
+        isKnown: false
+      };
     }
 
     function parseInvoiceText(text) {
@@ -1317,10 +1407,25 @@
 
             <!-- Editable fields for this invoice -->
             <div class="form-group">
-              <label>Vendor</label>
-              <input type="text" class="form-input" value="${invoice.vendorName || ''}"
-                     onchange="extractedInvoices[${index}].vendorName = this.value"
-                     placeholder="Auto-detected or enter manually">
+              <label>Vendor ${invoice.isKnownVendor ? '<span style="color: var(--success);">✓ Recognized</span>' : '<span style="color: var(--warning);">⚠️ Unknown</span>'}</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" class="form-input" value="${invoice.vendorName || ''}"
+                       onchange="extractedInvoices[${index}].vendorName = this.value; extractedInvoices[${index}].isKnownVendor = false;"
+                       placeholder="${invoice.vendorName ? 'Edit if needed' : 'Enter vendor name'}"
+                       style="flex: 1;">
+                ${!invoice.isKnownVendor && invoice.vendorName ? `
+                  <button type="button" class="submit-btn primary"
+                          onclick="showAddVendorModal(${index})"
+                          style="width: auto; padding: 8px 16px; margin: 0; font-size: 11px;">
+                    + Add Vendor
+                  </button>
+                ` : ''}
+              </div>
+              ${!invoice.isKnownVendor && invoice.vendorName ? `
+                <p style="font-size: 10px; color: var(--warning); margin-top: 4px;">
+                  This vendor is not in the system. Click "+ Add Vendor" to set up ordering details.
+                </p>
+              ` : ''}
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -1424,24 +1529,13 @@
           if (!invoice.total || invoice.total === 0) {
             missingData.push(`Invoice ${index + 1}: missing total amount`);
           }
-
-          // Get vendor ID from vendor name
-          const vendorSelect = document.getElementById('invoiceVendor');
-          let vendorId = null;
-          let foundVendor = invoice.vendorName;
-
-          // Try to find vendor ID from dropdown by matching name
-          for (let option of vendorSelect.options) {
-            if (option.text.toLowerCase() === invoice.vendorName.toLowerCase()) {
-              vendorId = option.value;
-              foundVendor = option.text;
-              break;
-            }
+          if (!invoice.vendorName) {
+            missingData.push(`Invoice ${index + 1}: missing vendor name`);
           }
 
           invoicesToSave.push({
-            vendor_id: vendorId,
-            vendor_name: foundVendor || invoice.vendorName || 'Unknown',
+            vendor_id: invoice.vendorId || null,
+            vendor_name: invoice.vendorName || 'Unknown',
             invoice_date: invoice.date,
             invoice_number: invoice.invoiceNumber,
             total_amount: invoice.total,
@@ -1658,6 +1752,97 @@
       } catch (error) {
         console.error('Error deleting item:', error);
         alert('Error deleting item: ' + error.message);
+      }
+    }
+
+    // ========== Vendor Addition Modal ==========
+    function showAddVendorModal(invoiceIndex) {
+      currentInvoiceIndexForVendor = invoiceIndex;
+      const vendorName = extractedInvoices[invoiceIndex].vendorName;
+
+      // Pre-fill vendor name
+      document.getElementById('newVendorName').value = vendorName;
+
+      // Reset form fields
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      days.forEach(day => {
+        document.getElementById(`orderDay_${day}`).checked = false;
+      });
+      document.getElementById('newVendorCutoffTime').value = '';
+      document.getElementById('newVendorMethod').value = '';
+      document.getElementById('newVendorRepName').value = '';
+      document.getElementById('newVendorRepPhone').value = '';
+      document.getElementById('newVendorNotes').value = '';
+
+      // Show modal
+      document.getElementById('addVendorModal').style.display = 'block';
+    }
+
+    function closeAddVendorModal() {
+      document.getElementById('addVendorModal').style.display = 'none';
+      currentInvoiceIndexForVendor = null;
+    }
+
+    async function saveNewVendor() {
+      if (currentInvoiceIndexForVendor === null) return;
+
+      const vendorName = document.getElementById('newVendorName').value;
+      const orderMethod = document.getElementById('newVendorMethod').value;
+
+      if (!vendorName || !orderMethod) {
+        alert('Please fill in vendor name and order method');
+        return;
+      }
+
+      // Collect selected order days
+      const orderDays = [];
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      days.forEach(day => {
+        if (document.getElementById(`orderDay_${day}`).checked) {
+          orderDays.push(day);
+        }
+      });
+
+      try {
+        // Insert new vendor into database
+        const { data, error } = await supabase
+          .from('vendors')
+          .insert([{
+            vendor_name: vendorName,
+            order_days: orderDays.length > 0 ? orderDays : null,
+            order_cutoff_time: document.getElementById('newVendorCutoffTime').value || null,
+            order_method: orderMethod,
+            rep_name: document.getElementById('newVendorRepName').value || null,
+            rep_phone: document.getElementById('newVendorRepPhone').value || null,
+            special_notes: document.getElementById('newVendorNotes').value || null,
+            priority: 'normal',
+            active: true
+          }])
+          .select();
+
+        if (error) throw error;
+
+        const newVendor = data[0];
+
+        // Update the invoice with the new vendor ID
+        extractedInvoices[currentInvoiceIndexForVendor].vendorId = newVendor.id;
+        extractedInvoices[currentInvoiceIndexForVendor].vendorName = newVendor.vendor_name;
+        extractedInvoices[currentInvoiceIndexForVendor].isKnownVendor = true;
+
+        // Add to known vendors array
+        knownVendors.push(newVendor);
+
+        // Refresh the display
+        displayMultipleInvoices();
+
+        // Close modal
+        closeAddVendorModal();
+
+        alert(`✓ Vendor "${vendorName}" added successfully!`);
+
+      } catch (error) {
+        console.error('Error saving vendor:', error);
+        alert('Error saving vendor: ' + error.message);
       }
     }
   </script>
