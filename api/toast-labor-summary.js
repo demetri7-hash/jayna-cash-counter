@@ -97,16 +97,14 @@ export default async function handler(req, res) {
       const otHours = parseFloat(entry.overtimeHours) || 0;
       const wage = parseFloat(entry.hourlyWage) || 0;
 
-      // DEBUG: Log first few entries to understand wage structure
-      if (debugSample < 5 && (regHours > 0 || otHours > 0)) {
-        console.log(`TIME ENTRY DEBUG #${debugSample + 1}:`, {
-          employee: entry.employeeReference.guid.substring(0, 8),
-          regularHours: regHours,
-          overtimeHours: otHours,
-          hourlyWage: wage,
+      // DEBUG: Log first few entries to understand wage structure AND all available fields
+      if (debugSample < 3 && (regHours > 0 || otHours > 0)) {
+        console.log(`\n=== TIME ENTRY DEBUG #${debugSample + 1} - ALL FIELDS ===`);
+        console.log(JSON.stringify(entry, null, 2));
+        console.log('Calculated values:', {
           regularPay: regHours * wage,
-          overtimePay_current: otHours * wage * 1.5,
-          overtimePay_ifAlreadyIncluded: otHours * wage
+          overtimePay_at_1_5x: otHours * wage * 1.5,
+          overtimePay_at_2x: otHours * wage * 2
         });
         debugSample++;
       }
