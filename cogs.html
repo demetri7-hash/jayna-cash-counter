@@ -408,7 +408,7 @@
             <div class="icon">📊</div>
             <div class="label">View Reports</div>
           </div>
-          <div class="action-btn" onclick="showSection('manageItems')">
+          <div class="action-btn" onclick="showManageItems()">
             <div class="icon">🏷️</div>
             <div class="label">Manage Items</div>
           </div>
@@ -433,7 +433,7 @@
       </div>
 
       <!-- Manage Items Section -->
-      <div id="manageItems" class="form-section">
+      <div id="manageItems" class="form-section" style="display: none;">
         <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">Inventory Items</h2>
 
         <button class="submit-btn primary" onclick="showAddItemForm()">+ Add New Item</button>
@@ -465,7 +465,7 @@
       </div>
 
       <!-- Add/Edit Item Form -->
-      <div id="itemForm" class="form-section">
+      <div id="itemForm" class="form-section" style="display: none;">
         <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;" id="itemFormTitle">Add New Item</h2>
 
         <div class="form-group">
@@ -529,21 +529,21 @@
       </div>
 
       <!-- Scan Invoice Section -->
-      <div id="scanInvoice" class="form-section">
+      <div id="scanInvoice" class="form-section" style="display: none;">
         <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">Scan Invoice</h2>
         <p style="color: var(--gray-500); margin-bottom: 16px;">Coming in Day 2: Camera-based invoice scanning with OCR</p>
         <button class="submit-btn" onclick="showDashboard()">Back to Dashboard</button>
       </div>
 
       <!-- Daily Count Section -->
-      <div id="dailyCount" class="form-section">
+      <div id="dailyCount" class="form-section" style="display: none;">
         <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">Daily Inventory Count</h2>
         <p style="color: var(--gray-500); margin-bottom: 16px;">Coming in Day 3: Camera-assisted counting with manual adjustment</p>
         <button class="submit-btn" onclick="showDashboard()">Back to Dashboard</button>
       </div>
 
       <!-- Reports Section -->
-      <div id="viewReports" class="form-section">
+      <div id="viewReports" class="form-section" style="display: none;">
         <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">COGs Reports</h2>
         <p style="color: var(--gray-500); margin-bottom: 16px;">Coming in Day 3: Comprehensive COGs analysis and reporting</p>
         <button class="submit-btn" onclick="showDashboard()">Back to Dashboard</button>
@@ -590,7 +590,8 @@
     // Initialize COGs System
     async function initializeCOGs() {
       console.log('COGs system initialized');
-      await loadItems();
+      // Don't load items on page load - only when user clicks "Manage Items"
+      // Dashboard should be visible by default like index.html main menu
     }
 
     // Navigation Functions
@@ -606,6 +607,12 @@
 
     function showDashboard() {
       showSection('cogsDashboard');
+    }
+
+    // Show manage items section and load data
+    function showManageItems() {
+      showSection('manageItems');
+      loadItems(); // Only load when user navigates here
     }
 
     function showAddItemForm() {
@@ -624,7 +631,7 @@
 
     function cancelItemForm() {
       currentEditingId = null;
-      showSection('manageItems');
+      showManageItems(); // Use function that loads data
     }
 
     // Item Management Functions
@@ -737,8 +744,7 @@
 
         alert(currentEditingId ? 'Item updated successfully!' : 'Item added successfully!');
         currentEditingId = null;
-        showSection('manageItems');
-        loadItems();
+        showManageItems(); // Use function that loads data
 
       } catch (error) {
         console.error('Error saving item:', error);
@@ -788,7 +794,7 @@
         if (error) throw error;
 
         alert('Item deleted successfully!');
-        loadItems();
+        loadItems(); // Reload current view
 
       } catch (error) {
         console.error('Error deleting item:', error);
