@@ -1121,7 +1121,18 @@
           <input type="number" id="tdsDriverTips" class="form-input" step="0.01" inputmode="decimal" readonly style="background: #f8f9fa; color: #666;">
           <div id="tdsAutoFetchStatus" style="font-size: 14px; color: #666; margin-top: 5px;">Auto-calculated from Toast API when you calculate tip pool</div>
         </div>
-        
+
+        <div class="form-group">
+          <label for="manualLaborCost">Total Labor Cost from Toast Web (Optional):</label>
+          <input type="number" id="manualLaborCost" class="form-input" step="0.01" placeholder="e.g., 9637.82" inputmode="decimal">
+          <div style="font-size: 12px; color: #666; margin-top: 5px;">
+            <strong>Why?</strong> CA double-time rules make API labor cost inaccurate. Enter the "Total Cost" from Toast web labor report for exact calculations.
+          </div>
+          <div style="font-size: 11px; color: #999; margin-top: 3px;">
+            If left blank, will use API data (may be $100-150 low due to double-time hours)
+          </div>
+        </div>
+
         <div class="form-group">
           <label for="calculatedByName">Tips Calculated By:</label>
           <input type="text" id="calculatedByName" class="form-input" placeholder="Your Full Name">
@@ -6805,7 +6816,21 @@
       document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
 
       // Calculate labor metrics
-      const baseLaborCost = payrollData.totalLaborCost || 0;
+      const manualLaborCostInput = parseFloat(document.getElementById('manualLaborCost').value) || 0;
+      const apiLaborCost = payrollData.totalLaborCost || 0;
+
+      // Use manual labor cost if provided (includes CA double-time), otherwise use API
+      const baseLaborCost = manualLaborCostInput > 0 ? manualLaborCostInput : apiLaborCost;
+
+      // Log the difference for transparency
+      if (manualLaborCostInput > 0 && apiLaborCost > 0) {
+        const difference = manualLaborCostInput - apiLaborCost;
+        console.log(`Labor Cost Comparison:`);
+        console.log(`  Toast Web (manual): $${manualLaborCostInput.toFixed(2)}`);
+        console.log(`  API (base wages): $${apiLaborCost.toFixed(2)}`);
+        console.log(`  Difference (CA double-time): $${difference.toFixed(2)} (${(difference/apiLaborCost*100).toFixed(1)}%)`);
+      }
+
       const demetriSalary = 85000 / 52; // $85k annual salary / 52 weeks
       const subtotalLabor = baseLaborCost + demetriSalary;
       const payrollBurden = subtotalLabor * 0.33; // 33% for taxes, insurance, etc.
