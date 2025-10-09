@@ -294,6 +294,15 @@
           </div>
         </div>
 
+        <!-- Order Alerts Card -->
+        <div class="summary-card" style="margin-bottom: 16px; border: 2px solid var(--primary-blue);">
+          <h3>📋 Order Alerts Today</h3>
+          <div id="orderAlertsToday">
+            <p style="text-align: center; color: var(--gray-500); padding: 20px;">Loading order alerts...</p>
+          </div>
+        </div>
+
+        <!-- Summary Card -->
         <div class="summary-card">
           <h3>This Week Summary</h3>
           <div class="summary-stat">
@@ -505,7 +514,97 @@
       document.getElementById('dashboard').style.display = 'block';
       document.getElementById('manageItems').style.display = 'none';
       document.getElementById('itemForm').style.display = 'none';
+      document.getElementById('scanInvoice').style.display = 'none';
+
+      // Load order alerts
+      loadOrderAlerts();
     }
+
+    async function loadOrderAlerts() {
+      try {
+        const response = await fetch('/api/get-order-alerts');
+        const data = await response.json();
+
+        if (!data.success) throw new Error('Failed to load alerts');
+
+        const container = document.getElementById('orderAlertsToday');
+
+        if (!data.todayAlerts || data.todayAlerts.length === 0) {
+          container.innerHTML = `
+            <p style="text-align: center; color: var(--success); padding: 20px;">
+              ✓ No orders due today
+            </p>
+          `;
+          return;
+        }
+
+        let html = '';
+        data.todayAlerts.forEach(alert => {
+          const urgencyColor = alert.priority === 'high' ? 'var(--error)' :
+                               alert.priority === 'normal' ? 'var(--warning)' :
+                               'var(--gray-500)';
+
+          const timeWarning = alert.timeUntilCutoff !== null && alert.timeUntilCutoff < 2 ?
+            ` ⚠️ ${Math.floor(alert.timeUntilCutoff * 60)}min left!` : '';
+
+          html += `
+            <div style="padding: 12px; border-bottom: 1px solid var(--gray-300); background: ${alert.priority === 'high' ? 'var(--light-blue)' : 'transparent'};">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <strong style="color: ${urgencyColor};">${alert.vendorName}</strong>
+                  <p style="font-size: 11px; color: var(--gray-600); margin-top: 2px;">
+                    ${alert.orderMethod === 'text' ? '📱 Text' : alert.orderMethod === 'online' ? '🌐 Online' : '📞 Phone'}
+                    • Cutoff: ${alert.cutoffTime}${timeWarning}
+                  </p>
+                  ${alert.specialNotes ? `<p style="font-size: 10px; color: var(--gray-500); margin-top: 4px;">${alert.specialNotes}</p>` : ''}
+                </div>
+                <button onclick="startOrder('${alert.vendorName}', ${alert.vendorId})"
+                        style="padding: 6px 12px; background: var(--primary-blue); color: white; border: none; border-radius: 4px; font-size: 11px; cursor: pointer;">
+                  Order
+                </button>
+              </div>
+            </div>
+          `;
+        });
+
+        // Add upcoming orders
+        if (data.upcomingAlerts && data.upcomingAlerts.length > 0) {
+          html += '<div style="margin-top: 12px; padding-top: 12px; border-top: 2px solid var(--gray-300);"><strong style="font-size: 12px; color: var(--gray-600);">Upcoming:</strong></div>';
+
+          const upcomingByDay = {};
+          data.upcomingAlerts.forEach(alert => {
+            if (!upcomingByDay[alert.dayName]) {
+              upcomingByDay[alert.dayName] = [];
+            }
+            upcomingByDay[alert.dayName].push(alert);
+          });
+
+          Object.keys(upcomingByDay).forEach(day => {
+            const vendors = upcomingByDay[day].map(a => a.vendorName).join(', ');
+            html += `<p style="font-size: 11px; color: var(--gray-600); margin-top: 4px;">${day}: ${vendors}</p>`;
+          });
+        }
+
+        container.innerHTML = html;
+
+      } catch (error) {
+        console.error('Error loading order alerts:', error);
+        document.getElementById('orderAlertsToday').innerHTML =
+          '<p style="text-align: center; color: var(--error); padding: 20px;">Error loading alerts</p>';
+      }
+    }
+
+    function startOrder(vendorName, vendorId) {
+      alert(`Order workflow for ${vendorName} coming soon!\n\nWill show:\n- Suggested order quantities\n- Last order history\n- Quick order form`);
+      // TODO: Implement order workflow
+    }
+
+    // Load alerts on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      if (document.getElementById('dashboard').style.display !== 'none') {
+        loadOrderAlerts();
+      }
+    });
 
     function showManageItems() {
       document.getElementById('dashboard').style.display = 'none';
