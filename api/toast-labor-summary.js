@@ -85,6 +85,7 @@ export default async function handler(req, res) {
 
     // Step 3: Aggregate labor by employee
     const laborMap = {};
+    let debugSample = 0;
 
     timeEntries.forEach(entry => {
       if (!entry.employeeReference || !entry.employeeReference.guid) {
@@ -95,6 +96,20 @@ export default async function handler(req, res) {
       const regHours = parseFloat(entry.regularHours) || 0;
       const otHours = parseFloat(entry.overtimeHours) || 0;
       const wage = parseFloat(entry.hourlyWage) || 0;
+
+      // DEBUG: Log first few entries to understand wage structure
+      if (debugSample < 5 && (regHours > 0 || otHours > 0)) {
+        console.log(`TIME ENTRY DEBUG #${debugSample + 1}:`, {
+          employee: entry.employeeReference.guid.substring(0, 8),
+          regularHours: regHours,
+          overtimeHours: otHours,
+          hourlyWage: wage,
+          regularPay: regHours * wage,
+          overtimePay_current: otHours * wage * 1.5,
+          overtimePay_ifAlreadyIncluded: otHours * wage
+        });
+        debugSample++;
+      }
 
       if (!laborMap[empGuid]) {
         laborMap[empGuid] = {
