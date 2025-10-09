@@ -6278,8 +6278,7 @@
       // Update the display
       document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
 
-      // Auto-fetch TDS Driver tips when both dates are available
-      await autoFetchTdsDriverTips(startDate, endDate);
+      // TDS Driver tips are now auto-fetched with other data when dates change (no delay!)
 
     } catch (error) {
       console.error('Error calculating cash tips:', error);
@@ -6541,6 +6540,9 @@
           netSales: dbResult.data.netSales
         };
 
+        // Auto-fetch TDS Driver tips
+        await autoFetchTdsDriverTips(startDate, endDate);
+
         console.log('Auto-fetch complete (database + API labor):', { laborResult, salesData: dbResult.data });
         loadingOverlay.style.display = 'none';
         return;
@@ -6639,6 +6641,9 @@
         console.log(`Total Tips: $${salesResult.totalTips.toFixed(2)}`);
       }
       console.log(`===================\n`);
+
+      // Auto-fetch TDS Driver tips
+      await autoFetchTdsDriverTips(startDate, endDate);
 
       // Hide loading overlay on success
       loadingOverlay.style.display = 'none';
