@@ -1,59 +1,52 @@
 # CURRENT STATUS - Jayna Cash Counter
-**Last Updated:** 2025-10-08 (End of session - Toast API v7.4 complete)
+**Last Updated:** 2025-10-09 (End of session - COGs Day 1 complete + Labor cost fix)
 
 ---
 
 ## 🎯 Current Work Status
-**Status:** ✅ ALL COMPLETE - Credit tips 100% accurate, API 3x faster
+**Status:** ✅ COGs Day 1 COMPLETE + Labor cost manual input added
 
 ### Recently Completed (This Session):
 
-- ✅ **Toast API v7.4 - PERFECT ACCURACY** 🎯
-  - **Credit Tips:** $2,675.93 (100% match with Toast web!)
-  - **429 Retry Logic:** Exponential backoff (1s, 2s, 4s) - recovers all failed payments
-  - **VOIDED Tips:** Now INCLUDED in credit tips (matching Toast behavior)
-  - **Exact Date Range:** Removed 3-day before + 14-day after expansion
-  - **Speed:** 3x faster (7 dates vs 24) - fetches ~1,300 payments instead of 2,287
-  - **Success Rate:** 100.00% (0 failed payments after retries)
-  - **Version:** v7.4-exact-range-with-retry-20251008
+- ✅ **Manual Labor Cost Input** - Fixes CA double-time discrepancy
+  - Added optional "Total Labor Cost from Toast Web" field in tip pool
+  - Uses manual cost if provided (includes CA 2x OT), otherwise API data
+  - Shows comparison: Manual vs API labor cost in summary
+  - Fixes $144 labor cost gap (API: $9,494 vs Toast: $9,637)
+  - Why: Toast Labor API can't separate 1.5x from 2x overtime hours
 
-- ✅ **Email Parser Analysis** - NOT viable for tip data
-  - Toast Daily Performance Summary does NOT contain payment tender data
-  - No credit card totals, no cash totals, no tips
-  - Weekly email might have data (arrives Monday) - TBD
-  - Cron works perfectly, just waiting for right email format
+- ✅ **TDS Driver Tips Auto-Fetch** - Eliminates delay in workflow
+  - Moved TDS fetch from `calculateCashTips()` to `autoFetchOnDateChange()`
+  - Now loads simultaneously with credit tips and labor hours
+  - No more waiting after entering Real Envelope Deposit
 
-- ✅ **Toast API Auto-Fetch** - Already fully implemented
-  - Auto-triggers when user selects dates (if no files uploaded)
-  - Database first → Toast API fallback → Manual upload fallback
-  - Works perfectly as designed
-
-- ✅ **Tip Variance Tracking System** - Rolling carryover for compliance
-  - Fetches previous week's unpaid variance from database
-  - Adds carryover to current week's tip pool
-  - Displays variance in UI with orange warning badge
-  - Shows carryover in BOTH PDFs (Tip Pool + Combined Report)
-  - Saves final variance after equity adjustments
-
-- ✅ **Database Fixes**
-  - Created `tip_variance` table SQL schema
-  - Fixed missing `overtime_hours` and `regular_hours` columns in `weekly_employee_tips`
-
-- ✅ **Session Continuity System**
-  - Created CURRENT_STATUS.md
-  - Created SESSION_END_CHECKLIST.md
-  - Updated CLAUDE.md with mandatory session end protocol
+- ✅ **COGs System - Day 1 Foundation** 🎉
+  - **New page:** cogs.html with persistent navigation
+  - **Database:** 8 tables created with sample data (12 items)
+  - **Categories:** PRODUCE, MEAT, GYROS, BREADS, LIQUOR, BEER, WINE, DAIRY, NA DRINKS, JUICES
+  - **Item Management:** Add, edit, delete inventory items
+  - **Password Protection:** Same as other manager features (60min session)
+  - **Navigation:** COGs button added to main menu (darker grey)
+  - **Session Persistence:** Works across index.html ↔ cogs.html
 
 ### In Progress:
-- None - all work complete and deployed
+- 🔧 COGs page layout refinement (currently displays dashboard properly)
 
 ### Next Session TODO:
-- 🔴 **Cash Sales API Issue** (DO NOT START YET - user will return)
-  - Problem: Cash sales inaccurate after removing extended date range
-  - Solution: Create separate API endpoint for cash sales
-  - Should pull daily cash sales (like PM flow does)
-  - Match `pm_toast_sales` from Supabase cash_counts table for each day
-  - User will return to work on this
+- 📸 **COGs Day 2: Invoice Scanning** (Ready to start!)
+  - Camera access + photo capture UI
+  - Tesseract.js OCR integration
+  - Invoice parser (extract vendor, date, items, prices)
+  - Review/edit UI before saving to database
+  - Timeline: 8-10 hours
+
+- 📊 **COGs Day 3: Daily Counts & Reporting**
+  - Camera-assisted inventory counting
+  - Manual adjustment workflow
+  - COGs calculation engine
+  - Food cost % reporting
+  - Variance analysis (theoretical vs actual)
+  - Timeline: 8-10 hours
 
 ---
 
@@ -61,11 +54,13 @@
 **Git Status:** Clean - all work committed and pushed
 
 ### Recent Commits:
-- `a94e4ef` - feat(combined-report): Add variance carryover display to PDF
-- `4d8c741` - feat(tip-pool): Add variance save to BOTH PDF buttons
-- `cf80533` - feat(tip-pool): Add comprehensive variance tracking logging
-- `fe711c8` - docs: Add session continuity system for Claude Code
-- `b34c047` - feat(tip-pool): Add rolling variance tracker for tip compliance
+- `06dc69b` - fix(cogs): Apply index.html display pattern - dashboard stays visible
+- `c3df994` - fix(cogs): Fix vertical layout - content now flows below navigation
+- `bbd8c5d` - fix(cogs): Force visibility of dashboard with !important and inline styles
+- `0aee387` - feat(cogs): Day 1 - Foundation complete with navigation and item management
+- `729ba77` - feat(tip-pool): Show manual vs API labor cost in summary display
+- `5533613` - feat(tip-pool): Add manual labor cost input for CA double-time accuracy
+- `a2328d7` - feat(tip-pool): Auto-fetch TDS Driver tips with credit tips and labor data
 
 All commits pushed to main and deployed to Vercel ✅
 
@@ -74,71 +69,169 @@ All commits pushed to main and deployed to Vercel ✅
 ## 🚧 Blockers & Issues
 **Current Blockers:** None
 
-### User Action Required:
-1. **Run SQL in Supabase** (if not done):
-   - `create_tip_variance_table.sql` - Creates tip_variance table
-   - `fix_weekly_employee_tips_columns.sql` - Adds overtime/regular hours columns
-   - Disable RLS on tip_variance: `ALTER TABLE tip_variance DISABLE ROW LEVEL SECURITY;`
+### User Testing Required:
+1. **COGs page display** - User reported layout jumping/hiding
+   - Applied index.html pattern (dashboard visible, other sections hidden)
+   - Needs hard refresh + user confirmation it's working
+
+2. **Manual labor cost feature** - Ready for production use
+   - User should test with Toast web total cost ($9,637.82)
+   - Should see comparison in labor summary display
 
 ### Technical Notes:
-- 406 error on first run is EXPECTED (no previous variance exists yet)
-- After first PDF generation, variance will be saved for next week
-- Variance saves on BOTH buttons: "Download Tip Pool PDF" AND "Generate Combined Report"
+- COGs database schema run successfully in Supabase
+- 12 sample items created for testing
+- RLS disabled on all COGs tables (app can access directly)
+- Session management works across pages
 
 ---
 
 ## 🔜 Next Session Should Start With:
-1. Read this file first to understand current state
-2. Verify Supabase tables are created (tip_variance, weekly_employee_tips columns)
-3. Test the variance tracking workflow:
-   - Calculate tip pool
-   - Click "Generate Combined Report"
-   - Check console for variance save logs
-   - Verify variance appears in database
-4. Next week: Verify previous variance carryover appears
+1. **Confirm COGs page is working** (dashboard visible, no jumping)
+2. **Test item management** (add/edit/delete items)
+3. **Begin COGs Day 2** - Invoice scanning implementation:
+   - Add Tesseract.js CDN to cogs.html
+   - Build camera capture UI
+   - Implement OCR text extraction
+   - Create invoice parser logic
+   - Build review/edit form
+   - Save to invoices + invoice_items tables
 
 ---
 
 ## 📊 Production System Health
-**Last Deployed:** 2025-10-08 (Multiple deploys - all successful)
+**Last Deployed:** 2025-10-09 (Multiple deploys - COGs Day 1 + labor fix)
 **URL:** https://jayna-cash-counter.vercel.app
 **Status:** ✅ Operational
 
 ### Recent Deployments:
-- Variance tracking system (LIVE)
-- Session continuity docs (LIVE)
-- Database schema fixes (SQL files ready to run)
+- COGs system foundation (LIVE - Day 1 complete)
+- Manual labor cost input (LIVE)
+- TDS auto-fetch optimization (LIVE)
+- Database schema ready (SQL file ready to run)
 
 ---
 
 ## 🔐 Security Notes
 **Environment Variables:** All configured (no changes needed)
 **Secrets Status:** ✅ No hardcoded secrets in codebase
-**Database:** tip_variance table needs RLS disabled for app access
+**Database:** All COGs tables have RLS disabled for app access
 
 ---
 
 ## 💡 Key Implementation Details
 
-### Tip Variance System:
-- **Fetch:** `.lt('week_ending_date', endDate)` - only previous weeks
-- **Save:** `.upsert(record, { onConflict: 'week_ending_date' })` - overwrites duplicates
-- **Display:** Shows in UI when previousVariance > 0
-- **PDFs:** Appears at top of tip pool summary in both PDFs
-- **Calculation:** `pool - totalPaidOut = variance` (after equity adjustments)
+### Manual Labor Cost Feature:
+- **Input:** New field in tip pool form (optional)
+- **Usage:** Enter Toast web "Total Cost" when needed
+- **Calculation:** If provided, uses manual cost; otherwise uses API
+- **Display:** Shows "(TOAST WEB)" or "(API)" label with comparison
+- **Purpose:** Accounts for CA double-time (2x OT >12hrs/day) that API can't calculate
 
-### Expected Workflow:
+### COGs System Architecture:
+
+**Database Tables:**
 ```
-Week 1: No carryover → Calculate → Save $8.00 variance
-Week 2: Fetches $8.00 → Adds to pool → Save new variance
-Week 3: Fetches Week 2 variance → Adds to pool → Continues...
+inventory_items       - Product master list
+vendors              - Supplier information
+invoices             - Scanned invoice metadata
+invoice_items        - Line items from invoices
+inventory_counts     - Daily/weekly snapshots
+cogs_reports         - Generated analysis
+usage_tracking       - Theoretical vs actual
+count_schedules      - Count reminders
+```
+
+**Page Structure (cogs.html):**
+```
+Navigation (persistent)
+↓
+Dashboard (active by default)
+  - Quick Actions (4 buttons)
+  - This Week Summary (placeholder)
+↓
+Hidden Sections (display: none)
+  - Manage Items
+  - Scan Invoice (Day 2)
+  - Daily Count (Day 3)
+  - View Reports (Day 3)
+  - Item Form
+```
+
+**Display Pattern (copied from index.html):**
+- Dashboard: `class="active"` in HTML (visible on load)
+- Other sections: `style="display: none"` inline
+- No data loads on page load (only when user clicks)
+- `showSection(id)` hides all, shows selected
+
+### Labor Cost Discrepancy Analysis:
+```
+Toast Web:      $9,637.82
+API Calculated: $9,494.68
+Difference:     $143.14
+
+Cause: CA double-time overtime (2x pay for >12hrs/day)
+      Toast API only provides total overtimeHours
+      Cannot separate 1.5x from 2x overtime
+
+Examples:
+Huseyin: 26.9 OT hrs @ avg 1.78x (mix of 1.5x and 2x)
+Dilan:   16.4 OT hrs @ avg 1.56x (mostly 1.5x, some 2x)
+
+Solution: Manual input field for accurate Toast web total
 ```
 
 ---
 
+## 📋 COGs Implementation Status
+
+### Day 1: Foundation ✅ COMPLETE
+- [x] cogs.html page created
+- [x] Persistent navigation (all buttons visible)
+- [x] Password protection + session management
+- [x] Database schema (8 tables)
+- [x] Item master CRUD (add, edit, delete)
+- [x] 10 product categories
+- [x] Filter by category
+- [x] Sample data (12 items)
+- [x] Navigation button in main menu
+
+### Day 2: Invoice Scanning 🔜 NEXT
+- [ ] Camera access UI
+- [ ] Photo capture functionality
+- [ ] Tesseract.js OCR integration
+- [ ] Invoice text parser
+- [ ] Extract: vendor, date, items, prices
+- [ ] Review/edit form
+- [ ] Save to database (invoices + invoice_items)
+- [ ] Invoice history view
+
+### Day 3: Counts & Reporting 🔜 PENDING
+- [ ] Camera-assisted counting UI
+- [ ] Manual adjustment workflow
+- [ ] Save counts with photos
+- [ ] COGs calculation engine
+- [ ] Food cost % calculation
+- [ ] Variance analysis
+- [ ] Report generation
+- [ ] Chart/graph display
+
+---
+
 **⚠️ IMPORTANT FOR NEXT CLAUDE:**
-- Variance tracking is COMPLETE and DEPLOYED
-- User only uses "Generate Combined Report" button (not "Download Tip Pool PDF")
-- Variance saves on BOTH buttons for redundancy
-- First run will show 406 error (expected - no previous data)
-- Check console logs for detailed variance tracking info
+- COGs Day 1 is COMPLETE and DEPLOYED
+- User may report layout issues - pattern from index.html has been applied
+- Database schema already run in Supabase (8 tables + sample data)
+- Manual labor cost feature is LIVE and ready for production use
+- TDS auto-fetch is working (loads with credit tips and labor)
+- Next task: COGs Day 2 - Invoice Scanning with OCR
+
+**Files to reference:**
+- `COGS_IMPLEMENTATION_PLAN.md` - Complete 3-day plan
+- `database/cogs_schema.sql` - Database schema (already run)
+- `cogs.html` - COGs page (Day 1 complete)
+- `index.html` - Display pattern to copy if needed
+
+**Known Issues:**
+- None currently blocking
+- User testing COGs page layout (applied fix, awaiting confirmation)
