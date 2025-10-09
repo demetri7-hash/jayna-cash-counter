@@ -288,7 +288,7 @@
             <div class="icon">📦</div>
             <div class="label">Daily Count</div>
           </div>
-          <div class="action-btn" onclick="alert('Coming in Day 3: COGs reporting and analysis')">
+          <div class="action-btn" onclick="showReports()">
             <div class="icon">📊</div>
             <div class="label">View Reports</div>
           </div>
@@ -495,6 +495,54 @@
           <button class="submit-btn" onclick="showDashboard()">Cancel</button>
         </div>
       </div>
+
+      <!-- Reports Section -->
+      <div id="reportsView" style="display: none;">
+        <h2 style="margin-bottom: 20px; color: var(--gray-900); font-size: 18px; text-transform: uppercase;">Invoice Analysis & Reports</h2>
+
+        <!-- Date Range Filter -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+          <div class="form-group">
+            <label for="reportStartDate">From</label>
+            <input type="date" id="reportStartDate" class="form-input">
+          </div>
+          <div class="form-group">
+            <label for="reportEndDate">To</label>
+            <input type="date" id="reportEndDate" class="form-input">
+          </div>
+        </div>
+
+        <button class="submit-btn primary" onclick="loadReports()">Generate Report</button>
+
+        <!-- Report Results -->
+        <div id="reportResults" style="display: none; margin-top: 20px;">
+          <!-- Spending Overview -->
+          <div class="summary-card" style="margin-bottom: 16px;">
+            <h3>Spending Overview</h3>
+            <div id="spendingOverview"></div>
+          </div>
+
+          <!-- Vendor Breakdown -->
+          <div class="summary-card" style="margin-bottom: 16px;">
+            <h3>Vendor Breakdown</h3>
+            <div id="vendorBreakdown"></div>
+          </div>
+
+          <!-- Ordering Frequency -->
+          <div class="summary-card" style="margin-bottom: 16px;">
+            <h3>Ordering Frequency</h3>
+            <div id="orderingFrequency"></div>
+          </div>
+
+          <!-- Suggested Orders -->
+          <div class="summary-card">
+            <h3>Suggested Orders (Based on Par Levels)</h3>
+            <div id="suggestedOrders"></div>
+          </div>
+        </div>
+
+        <button class="submit-btn" onclick="showDashboard()" style="margin-top: 16px;">Back to Dashboard</button>
+      </div>
     </div>
   </div>
 
@@ -515,9 +563,170 @@
       document.getElementById('manageItems').style.display = 'none';
       document.getElementById('itemForm').style.display = 'none';
       document.getElementById('scanInvoice').style.display = 'none';
+      document.getElementById('reportsView').style.display = 'none';
 
       // Load order alerts
       loadOrderAlerts();
+    }
+
+    function showReports() {
+      document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('manageItems').style.display = 'none';
+      document.getElementById('itemForm').style.display = 'none';
+      document.getElementById('scanInvoice').style.display = 'none';
+      document.getElementById('reportsView').style.display = 'block';
+
+      // Set default date range (last 30 days)
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+
+      document.getElementById('reportEndDate').value = endDate.toISOString().split('T')[0];
+      document.getElementById('reportStartDate').value = startDate.toISOString().split('T')[0];
+    }
+
+    async function loadReports() {
+      const startDate = document.getElementById('reportStartDate').value;
+      const endDate = document.getElementById('reportEndDate').value;
+
+      if (!startDate || !endDate) {
+        alert('Please select date range');
+        return;
+      }
+
+      try {
+        // Call invoice analysis API
+        const response = await fetch('/api/analyze-invoices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ startDate, endDate })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) throw new Error('Failed to load report');
+
+        // Display results
+        displaySpendingOverview(data.analysis);
+        displayVendorBreakdown(data.analysis);
+        displayOrderingFrequency(data.analysis);
+        displaySuggestedOrders(data.suggestions);
+
+        document.getElementById('reportResults').style.display = 'block';
+
+      } catch (error) {
+        console.error('Error loading reports:', error);
+        alert('Error loading reports: ' + error.message);
+      }
+    }
+
+    function displaySpendingOverview(analysis) {
+      const container = document.getElementById('spendingOverview');
+
+      const html = `
+        <div class="summary-stat">
+          <span class="stat-label">Total Invoices</span>
+          <span class="stat-value">${analysis.totalInvoices}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="stat-label">Total Spent</span>
+          <span class="stat-value">$${analysis.totalSpent.toFixed(2)}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="stat-label">Average Invoice</span>
+          <span class="stat-value">$${analysis.averageInvoiceAmount.toFixed(2)}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="stat-label">Date Range</span>
+          <span class="stat-value" style="font-size: 12px;">${analysis.dateRange.start} to ${analysis.dateRange.end}</span>
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    function displayVendorBreakdown(analysis) {
+      const container = document.getElementById('vendorBreakdown');
+
+      let html = '<table class="items-table" style="font-size: 12px;"><thead><tr>';
+      html += '<th>Vendor</th><th>Orders</th><th>Total</th><th>Avg</th></tr></thead><tbody>';
+
+      Object.keys(analysis.vendorBreakdown).forEach(vendor => {
+        const data = analysis.vendorBreakdown[vendor];
+        const avg = data.totalSpent / data.count;
+
+        html += `<tr>
+          <td><strong>${vendor}</strong></td>
+          <td>${data.count}</td>
+          <td>$${data.totalSpent.toFixed(2)}</td>
+          <td>$${avg.toFixed(2)}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    function displayOrderingFrequency(analysis) {
+      const container = document.getElementById('orderingFrequency');
+
+      if (!analysis.frequencyByVendor || Object.keys(analysis.frequencyByVendor).length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--gray-500);">Not enough data to calculate frequency</p>';
+        return;
+      }
+
+      let html = '<table class="items-table" style="font-size: 12px;"><thead><tr>';
+      html += '<th>Vendor</th><th>Avg Days Between Orders</th><th>Total Orders</th></tr></thead><tbody>';
+
+      Object.keys(analysis.frequencyByVendor).forEach(vendor => {
+        const freq = analysis.frequencyByVendor[vendor];
+
+        html += `<tr>
+          <td><strong>${vendor}</strong></td>
+          <td>${freq.averageDaysBetweenOrders} days</td>
+          <td>${freq.orderCount}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    function displaySuggestedOrders(suggestions) {
+      const container = document.getElementById('suggestedOrders');
+
+      if (!suggestions || suggestions.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--gray-500);">No suggestions available. Set par levels for items.</p>';
+        return;
+      }
+
+      // Filter to only show items that need ordering
+      const needsOrder = suggestions.filter(s => s.suggestedOrderQty > 0);
+
+      if (needsOrder.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--success);">✓ All items at or above par level</p>';
+        return;
+      }
+
+      let html = '<table class="items-table" style="font-size: 11px;"><thead><tr>';
+      html += '<th>Item</th><th>Current</th><th>Par</th><th>Order Qty</th><th>Urgency</th></tr></thead><tbody>';
+
+      needsOrder.forEach(item => {
+        const urgencyColor = item.urgency === 'critical' ? 'var(--error)' :
+                            item.urgency === 'high' ? 'var(--warning)' :
+                            'var(--gray-500)';
+
+        html += `<tr>
+          <td><strong>${item.itemName}</strong><br><span style="font-size: 10px; color: var(--gray-500);">${item.category}</span></td>
+          <td>${item.currentStock}</td>
+          <td>${item.parLevel}</td>
+          <td><strong>${item.suggestedOrderQty}</strong></td>
+          <td><span style="color: ${urgencyColor}; font-weight: bold;">${item.urgency.toUpperCase()}</span></td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
     }
 
     async function loadOrderAlerts() {
