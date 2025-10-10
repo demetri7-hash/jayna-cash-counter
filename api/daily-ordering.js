@@ -23,7 +23,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Gmail configuration
 const GMAIL_USER = process.env.GMAIL_USER || 'demetri7@gmail.com';
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
+const ORDERS_GMAIL_APP_PASSWORD = process.env.ORDERS_GMAIL_APP_PASSWORD;
 const ORDER_EMAIL = process.env.ORDER_EMAIL || 'demetri7@gmail.com';
 
 // Vendor schedules
@@ -447,7 +447,7 @@ async function sendOrderEmail(order, orderDate) {
     service: 'gmail',
     auth: {
       user: GMAIL_USER,
-      pass: GMAIL_APP_PASSWORD
+      pass: ORDERS_GMAIL_APP_PASSWORD
     }
   });
 
