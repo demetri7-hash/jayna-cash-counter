@@ -619,6 +619,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
     // Configure PDF.js
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
@@ -1615,8 +1616,11 @@
         return;
       }
 
-      let html = `<div style="margin-bottom: 16px; padding: 12px; background: var(--light-blue); border: 2px solid var(--primary-blue);">
+      let html = `<div style="margin-bottom: 16px; padding: 12px; background: var(--light-blue); border: 2px solid var(--primary-blue); display: flex; justify-content: space-between; align-items: center;">
         <strong>✓ Found ${extractedInvoices.length} invoice${extractedInvoices.length > 1 ? 's' : ''} in this file</strong>
+        <button type="button" onclick="downloadDebugPDF()" class="submit-btn" style="margin: 0; padding: 8px 16px; font-size: 12px; width: auto; background: var(--primary-blue);">
+          📄 Download Debug PDF (for review)
+        </button>
       </div>`;
 
       extractedInvoices.forEach((invoice, index) => {
@@ -1828,6 +1832,179 @@
       document.getElementById('extractedVendor').closest('.form-group').style.display = 'none';
       document.getElementById('extractedDate').closest('.form-group').parentElement.style.display = 'none';
       document.getElementById('extractedTotal').closest('.form-group').style.display = 'none';
+    }
+
+    // ========== DEBUG PDF GENERATOR ==========
+    function downloadDebugPDF() {
+      if (!extractedInvoices || extractedInvoices.length === 0) {
+        alert('No invoices to export');
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const maxWidth = pageWidth - (margin * 2);
+      let yPos = margin;
+
+      // Title page
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('OCR Debug Report', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPos);
+      yPos += 6;
+      doc.text(`Total Pages: ${extractedInvoices.length}`, margin, yPos);
+      yPos += 15;
+
+      // Process each invoice
+      extractedInvoices.forEach((invoice, index) => {
+        // Start new page for each invoice (except first)
+        if (index > 0) {
+          doc.addPage();
+          yPos = margin;
+        }
+
+        // Header
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Page ${index + 1} ${invoice.pageNumber ? `(Original Page ${invoice.pageNumber})` : ''}`, margin, yPos);
+        yPos += 8;
+
+        // Add page image if available
+        if (invoice.pageImageUrl) {
+          try {
+            const imgWidth = maxWidth;
+            const imgHeight = (imgWidth * 11) / 8.5; // Maintain aspect ratio
+
+            if (yPos + imgHeight > pageHeight - margin) {
+              doc.addPage();
+              yPos = margin;
+            }
+
+            doc.addImage(invoice.pageImageUrl, 'JPEG', margin, yPos, imgWidth, imgHeight);
+            yPos += imgHeight + 8;
+          } catch (e) {
+            console.error('Error adding image to PDF:', e);
+          }
+        }
+
+        // Extracted Fields Section
+        if (yPos + 40 > pageHeight - margin) {
+          doc.addPage();
+          yPos = margin;
+        }
+
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 168, 225); // Primary blue
+        doc.text('EXTRACTED FIELDS:', margin, yPos);
+        yPos += 6;
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+
+        doc.text(`Vendor: ${invoice.vendorName || 'NOT FOUND'}`, margin, yPos);
+        yPos += 5;
+        doc.text(`Invoice #: ${invoice.invoiceNumber || 'NOT FOUND'}`, margin, yPos);
+        yPos += 5;
+        doc.text(`Date: ${invoice.date || 'NOT FOUND'}`, margin, yPos);
+        yPos += 5;
+        doc.text(`Total Amount: $${invoice.total ? invoice.total.toFixed(2) : 'NOT FOUND'}`, margin, yPos);
+        yPos += 10;
+
+        // Line Items Table
+        if (invoice.items && invoice.items.length > 0) {
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(0, 168, 225);
+          doc.text(`LINE ITEMS (${invoice.items.length}):`, margin, yPos);
+          yPos += 6;
+
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(0, 0, 0);
+
+          invoice.items.forEach((item, itemIndex) => {
+            if (yPos + 15 > pageHeight - margin) {
+              doc.addPage();
+              yPos = margin;
+            }
+
+            const itemNum = itemIndex + 1;
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${itemNum}. ${item.description || 'NO DESCRIPTION'}`, margin, yPos);
+            yPos += 5;
+
+            doc.setFont('helvetica', 'normal');
+            doc.text(`   Qty: ${item.quantity || '?'}  Unit: ${item.unit || 'N/A'}  Unit Price: $${item.unit_price ? item.unit_price.toFixed(2) : (item.price ? item.price.toFixed(2) : '?')}  Total: $${item.extended_price ? item.extended_price.toFixed(2) : (item.price ? item.price.toFixed(2) : '?')}`, margin, yPos);
+            yPos += 6;
+
+            // Math validation
+            if (item.quantity && item.unit_price && item.extended_price) {
+              const calculated = Math.round(item.quantity * item.unit_price * 100) / 100;
+              const diff = Math.abs(calculated - item.extended_price);
+              if (diff > 0.05) {
+                doc.setTextColor(255, 179, 0); // Warning color
+                doc.text(`   ⚠ Math Warning: ${item.quantity} × $${item.unit_price.toFixed(2)} = $${calculated.toFixed(2)} (not $${item.extended_price.toFixed(2)})`, margin, yPos);
+                doc.setTextColor(0, 0, 0);
+                yPos += 5;
+              }
+            }
+          });
+
+          yPos += 5;
+        } else {
+          doc.setTextColor(211, 47, 47); // Error color
+          doc.text('NO LINE ITEMS EXTRACTED', margin, yPos);
+          doc.setTextColor(0, 0, 0);
+          yPos += 8;
+        }
+
+        // Raw OCR Text Section
+        if (yPos + 20 > pageHeight - margin) {
+          doc.addPage();
+          yPos = margin;
+        }
+
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 168, 225);
+        doc.text('RAW OCR TEXT:', margin, yPos);
+        yPos += 6;
+
+        doc.setFontSize(8);
+        doc.setFont('courier', 'normal');
+        doc.setTextColor(0, 0, 0);
+
+        // Split OCR text into lines and wrap
+        const ocrLines = invoice.ocrText ? invoice.ocrText.split('\n') : ['No OCR text available'];
+        ocrLines.forEach(line => {
+          if (yPos + 4 > pageHeight - margin) {
+            doc.addPage();
+            yPos = margin;
+          }
+
+          // Wrap long lines
+          const wrappedLines = doc.splitTextToSize(line || ' ', maxWidth);
+          wrappedLines.forEach(wrappedLine => {
+            if (yPos + 4 > pageHeight - margin) {
+              doc.addPage();
+              yPos = margin;
+            }
+            doc.text(wrappedLine, margin, yPos);
+            yPos += 4;
+          });
+        });
+      });
+
+      // Save PDF
+      const filename = `ocr-debug-${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(filename);
     }
 
     async function saveInvoice() {
