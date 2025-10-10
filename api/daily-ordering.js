@@ -123,6 +123,17 @@ export default async function handler(req, res) {
           ? itemHistory[itemHistory.length - 1].counted_at
           : item.updated_at || null;
 
+        // Get last known cost from item_cost_history
+        const { data: lastCostData } = await supabase
+          .from('item_cost_history')
+          .select('unit_cost, effective_date')
+          .eq('item_id', item.id)
+          .order('effective_date', { ascending: false })
+          .limit(1);
+
+        const lastCost = lastCostData && lastCostData[0] ? lastCostData[0].unit_cost : item.current_unit_cost;
+        const lastCostDate = lastCostData && lastCostData[0] ? lastCostData[0].effective_date : null;
+
         if (orderCalc.orderQty > 0) {
           orderItems.push({
             itemId: item.id,  // Include item ID for order history tracking
@@ -132,6 +143,8 @@ export default async function handler(req, res) {
             stock: item.current_stock,
             par: item.par_level,
             lastCounted: lastCounted,
+            lastCost: lastCost,
+            lastCostDate: lastCostDate,
             reasoning: orderCalc.reasoning
           });
         }
@@ -502,11 +515,25 @@ function generateOrderEmailHTML(order, orderDate) {
       }
     }
 
+    // Format last cost and date
+    let lastCostStr = '';
+    if (item.lastCost) {
+      const costFormatted = `$${parseFloat(item.lastCost).toFixed(2)}`;
+      if (item.lastCostDate) {
+        const costDate = new Date(item.lastCostDate);
+        const costDateStr = costDate.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+        lastCostStr = `<div style="font-size: 11px; color: #999; margin-top: 2px;">Last price: ${costFormatted} (${costDateStr})</div>`;
+      } else {
+        lastCostStr = `<div style="font-size: 11px; color: #999; margin-top: 2px;">Last price: ${costFormatted}</div>`;
+      }
+    }
+
     return `
     <tr style="border-bottom: 1px solid #e8e8e8;">
       <td style="padding: 10px 12px; font-size: 13px; color: #2c2c2c;">
         ${item.name}
         <div style="font-size: 11px; color: #999; margin-top: 2px;">Last count: ${lastCountedStr}</div>
+        ${lastCostStr}
       </td>
       <td style="padding: 10px 12px; text-align: center; font-size: 14px; font-weight: 600; color: #000;">${item.qty}</td>
       <td style="padding: 10px 12px; text-align: center; font-size: 13px; color: #666;">${item.unit}</td>
