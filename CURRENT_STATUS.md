@@ -26,7 +26,7 @@
   - Ready to paste into EmailJS dashboard
 
 - ✅ **Environment Variables Documented**
-  - Generated CRON_SECRET: `qvWXJzyQCEdhvLrn9jvNcG2AtReSQtkGlNJkT3Oq0/M=`
+  - Generated CRON_SECRET: `<REDACTED - See VERCEL_ENV_VARIABLES.txt>`
   - All variables ready in: `VERCEL_ENV_VARIABLES.txt`
   - Copy-paste ready for Vercel dashboard
 
@@ -190,7 +190,7 @@ All commits pushed to main and deployed to Vercel ✅
    - Add these 3 variables:
      - `EMAILJS_TEMPLATE_ID_ORDERS=template_nxg1glf`
      - `ORDER_EMAIL=demetri7@gmail.com`
-     - `CRON_SECRET=qvWXJzyQCEdhvLrn9jvNcG2AtReSQtkGlNJkT3Oq0/M=`
+     - `CRON_SECRET=<REDACTED>`
    - Redeploy application
 
 **Phase 3: Test Dry Run**
