@@ -1361,16 +1361,6 @@
           }
         }
 
-        // Line items - flexible pattern for different invoice formats
-        const itemPatterns = [
-          // Pattern 1: Description Qty Price
-          /^(.{10,}?)\s+(\d+\.?\d*)\s+\$?\s*([\d,]+\.?\d*)$/,
-          // Pattern 2: Qty Description Price
-          /^(\d+\.?\d*)\s+(.{10,}?)\s+\$?\s*([\d,]+\.?\d*)$/,
-          // Pattern 3: Description Price (no qty)
-          /^(.{15,}?)\s+\$?\s*([\d,]+\.?\d*)$/
-        ];
-
         // Skip lines that are clearly not items
         const skipPatterns = [
           /lot\s*number/i,
@@ -1386,7 +1376,9 @@
           /f\.o\.b/i,
           /ship\s*via/i,
           /continued/i,
-          /customer\s*copy/i
+          /customer\s*copy/i,
+          /subtotal/i,
+          /ordered.*shipped.*uom/i  // Greenleaf header row
         ];
 
         let shouldSkip = false;
@@ -1398,45 +1390,182 @@
         }
 
         if (!shouldSkip) {
-          for (const pattern of itemPatterns) {
-            const match = line.match(pattern);
-            if (match && !line.toLowerCase().includes('total') &&
-                !line.toLowerCase().includes('tax') &&
-                !line.toLowerCase().includes('delivery') &&
-                !line.toLowerCase().includes('subtotal')) {
-
-              const item = {};
-
-              if (pattern === itemPatterns[0]) {
-                // Pattern 1: Description Qty Price
-                item.description = match[1].trim();
-                item.quantity = parseFloat(match[2]);
-                item.price = parseFloat(match[3].replace(/,/g, ''));
-              } else if (pattern === itemPatterns[1]) {
-                // Pattern 2: Qty Description Price
-                item.quantity = parseFloat(match[1]);
-                item.description = match[2].trim();
-                item.price = parseFloat(match[3].replace(/,/g, ''));
-              } else {
-                // Pattern 3 (no qty)
-                item.description = match[1].trim();
-                item.quantity = 1;
-                item.price = parseFloat(match[2].replace(/,/g, ''));
-              }
-
-              // Validate: price should be reasonable and description should be meaningful
-              if (item.price > 0.50 && item.price < 10000 &&
-                  item.quantity > 0 && item.quantity < 10000 &&
-                  item.description.length > 5) {
-                result.items.push(item);
-              }
-              break;
-            }
+          // Try to parse as enhanced line item with unit extraction
+          const item = parseLineItem(line);
+          if (item && item.description && item.description.length > 5) {
+            result.items.push(item);
           }
         }
       });
 
       return result;
+    }
+
+    // Enhanced line item parser with unit extraction and math validation
+    function parseLineItem(line) {
+      // Skip lines with keywords
+      const lowerLine = line.toLowerCase();
+      if (lowerLine.includes('total') || lowerLine.includes('tax') ||
+          lowerLine.includes('delivery') || lowerLine.includes('fee')) {
+        return null;
+      }
+
+      // Common units of measure
+      const unitPatterns = [
+        { regex: /\b(EA|EACH)\b/i, unit: 'EA' },
+        { regex: /\b(CS|CASE|CASES)\b/i, unit: 'CS' },
+        { regex: /\b(DZ|DOZEN)\b/i, unit: 'DZ' },
+        { regex: /\b(LB|LBS|POUND|POUNDS)\b/i, unit: 'LB' },
+        { regex: /\b(BUNCH)\b/i, unit: 'BUNCH' },
+        { regex: /\b(BAG|BAGS)\b/i, unit: 'BAG' },
+        { regex: /\b(BOX|BOXES)\b/i, unit: 'BOX' },
+        { regex: /\b(PKG|PACKAGE)\b/i, unit: 'PKG' },
+        { regex: /\b(GAL|GALLON|GALLONS)\b/i, unit: 'GAL' },
+        { regex: /\b(QT|QUART|QUARTS)\b/i, unit: 'QT' },
+        { regex: /\b(PT|PINT|PINTS)\b/i, unit: 'PT' },
+        { regex: /\b(OZ|OUNCE|OUNCES)\b/i, unit: 'OZ' }
+      ];
+
+      const item = {
+        description: '',
+        quantity: null,
+        unit: '',
+        unit_price: null,
+        extended_price: null,
+        price: null,  // For backwards compatibility
+        validation_status: ''
+      };
+
+      // Extract unit
+      for (const { regex, unit } of unitPatterns) {
+        if (regex.test(line)) {
+          item.unit = unit;
+          break;
+        }
+      }
+
+      // Extract all numbers from the line
+      const numbers = line.match(/\d+\.?\d*/g);
+      if (!numbers || numbers.length === 0) return null;
+
+      const nums = numbers.map(n => parseFloat(n));
+
+      // Try different invoice formats:
+
+      // Format 1: Greenleaf style - "| qty | qty | UOM | product# | description | unit_price | ext_price"
+      // Example: "| 4 | 4 | CS | 00267 | WILD ARUGULA 4#/CS | 11.639 | 46.56"
+      const greenleafMatch = line.match(/\|\s*(\d+\.?\d*)\s*\|\s*(\d+\.?\d*)\s*\|\s*(EA|CS|DZ|LB|BUNCH|BAG|BOX|PKG|GAL|QT|PT|OZ)[|\s]+([A-Z0-9\-]+)[|\s]+(.+?)\s*[|\s]+([\d,]+\.?\d*)\s*[|\s]+([\d,]+\.?\d*)/i);
+      if (greenleafMatch) {
+        item.quantity = parseFloat(greenleafMatch[2]);  // Use "shipped" qty (2nd column)
+        item.unit = greenleafMatch[3].toUpperCase();
+        item.description = greenleafMatch[5].trim();
+        item.unit_price = parseFloat(greenleafMatch[6].replace(/,/g, ''));
+        item.extended_price = parseFloat(greenleafMatch[7].replace(/,/g, ''));
+        item.price = item.extended_price;  // For backwards compatibility
+
+        // Math validation
+        const calculated = Math.round(item.quantity * item.unit_price * 100) / 100;
+        const tolerance = 0.05;
+        if (Math.abs(calculated - item.extended_price) <= tolerance) {
+          item.validation_status = 'valid';
+        } else {
+          item.validation_status = 'warning';
+          // Auto-calculate quantity from extended price if math doesn't match
+          const calculatedQty = Math.round((item.extended_price / item.unit_price) * 100) / 100;
+          item.quantity = calculatedQty;
+          item.validation_status = 'auto_calculated';
+        }
+
+        return item;
+      }
+
+      // Format 2: Simple format - "description qty price"
+      // Example: "WILD ARUGULA 4 46.56"
+      const simpleMatch1 = line.match(/^(.{10,}?)\s+(\d+\.?\d*)\s+\$?\s*([\d,]+\.?\d*)$/);
+      if (simpleMatch1) {
+        item.description = simpleMatch1[1].trim();
+        item.quantity = parseFloat(simpleMatch1[2]);
+        item.price = parseFloat(simpleMatch1[3].replace(/,/g, ''));
+        item.extended_price = item.price;
+        item.validation_status = 'simple_format';
+        return item;
+      }
+
+      // Format 3: Reverse - "qty description price"
+      // Example: "4 WILD ARUGULA 46.56"
+      const simpleMatch2 = line.match(/^(\d+\.?\d*)\s+(.{10,}?)\s+\$?\s*([\d,]+\.?\d*)$/);
+      if (simpleMatch2) {
+        item.quantity = parseFloat(simpleMatch2[1]);
+        item.description = simpleMatch2[2].trim();
+        item.price = parseFloat(simpleMatch2[3].replace(/,/g, ''));
+        item.extended_price = item.price;
+        item.validation_status = 'simple_format';
+        return item;
+      }
+
+      // Format 4: Description with price only (assume qty = 1)
+      // Example: "WILD ARUGULA 46.56"
+      const simpleMatch3 = line.match(/^(.{15,}?)\s+\$?\s*([\d,]+\.?\d*)$/);
+      if (simpleMatch3) {
+        item.description = simpleMatch3[1].trim();
+        item.quantity = 1;
+        item.price = parseFloat(simpleMatch3[2].replace(/,/g, ''));
+        item.extended_price = item.price;
+        item.validation_status = 'assumed_qty_1';
+        return item;
+      }
+
+      // Format 5: Multiple numbers - try to intelligently parse
+      // Look for pattern: smallest number = qty, middle = unit price, largest = extended
+      if (nums.length >= 2) {
+        // Extract text before numbers
+        const textMatch = line.match(/^([A-Za-z\s#\-\/]+)/);
+        if (textMatch) {
+          item.description = textMatch[1].trim();
+        }
+
+        // If we have 3+ numbers, assume: qty, unit_price, extended_price
+        if (nums.length >= 3) {
+          // Find the smallest (likely qty), and two prices
+          const sorted = [...nums].sort((a, b) => a - b);
+          item.quantity = sorted[0];
+          item.unit_price = sorted[sorted.length - 2];
+          item.extended_price = sorted[sorted.length - 1];
+          item.price = item.extended_price;
+
+          // Validate math
+          const calculated = Math.round(item.quantity * item.unit_price * 100) / 100;
+          if (Math.abs(calculated - item.extended_price) <= 0.05) {
+            item.validation_status = 'valid';
+          } else {
+            // Try recalculating qty
+            item.quantity = Math.round((item.extended_price / item.unit_price) * 100) / 100;
+            item.validation_status = 'auto_calculated';
+          }
+
+          if (item.description.length > 5) return item;
+        }
+
+        // If we have 2 numbers, assume: qty and price (or just price)
+        if (nums.length === 2) {
+          if (nums[0] < 100 && nums[1] > nums[0]) {
+            // Likely qty and price
+            item.quantity = nums[0];
+            item.price = nums[1];
+            item.extended_price = nums[1];
+            item.validation_status = 'simple_2_numbers';
+          } else {
+            // Just price
+            item.quantity = 1;
+            item.price = nums[nums.length - 1];
+            item.extended_price = item.price;
+            item.validation_status = 'assumed_qty_1';
+          }
+          if (item.description.length > 5) return item;
+        }
+      }
+
+      return null;
     }
 
     function parseDate(dateStr) {
@@ -1588,14 +1717,33 @@
                   <table class="items-table" style="font-size: 11px; width: 100%;">
                     <thead>
                       <tr>
-                        <th style="width: 50%;">Item Description</th>
-                        <th style="width: 15%;">Qty</th>
-                        <th style="width: 25%;">Price</th>
-                        <th style="width: 10%;"></th>
+                        <th style="width: 35%;">Item Description</th>
+                        <th style="width: 10%;">Qty</th>
+                        <th style="width: 10%;">Unit</th>
+                        <th style="width: 15%;">Unit Price</th>
+                        <th style="width: 15%;">Total</th>
+                        <th style="width: 10%;">✓</th>
+                        <th style="width: 5%;"></th>
                       </tr>
                     </thead>
                     <tbody id="itemsTable_${index}">
-                      ${invoice.items.map((item, itemIndex) => `
+                      ${invoice.items.map((item, itemIndex) => {
+                        // Calculate validation status
+                        let validationIcon = '';
+                        let validationColor = '';
+                        if (item.unit_price && item.extended_price && item.quantity) {
+                          const calculated = Math.round(item.quantity * item.unit_price * 100) / 100;
+                          const diff = Math.abs(calculated - item.extended_price);
+                          if (diff <= 0.05) {
+                            validationIcon = '✓';
+                            validationColor = 'var(--success)';
+                          } else {
+                            validationIcon = '⚠';
+                            validationColor = 'var(--warning)';
+                          }
+                        }
+
+                        return `
                         <tr>
                           <td>
                             <input type="text" class="form-input" value="${item.description || ''}"
@@ -1604,13 +1752,27 @@
                           </td>
                           <td>
                             <input type="number" class="form-input" value="${item.quantity || ''}" step="0.01"
-                                   onchange="extractedInvoices[${index}].items[${itemIndex}].quantity = parseFloat(this.value) || 0"
+                                   onchange="extractedInvoices[${index}].items[${itemIndex}].quantity = parseFloat(this.value) || 0; displayMultipleInvoices();"
                                    style="width: 100%; font-size: 11px; padding: 4px;">
                           </td>
                           <td>
-                            <input type="number" class="form-input" value="${item.price || ''}" step="0.01"
-                                   onchange="extractedInvoices[${index}].items[${itemIndex}].price = parseFloat(this.value) || 0"
+                            <input type="text" class="form-input" value="${item.unit || ''}"
+                                   onchange="extractedInvoices[${index}].items[${itemIndex}].unit = this.value.toUpperCase()"
+                                   placeholder="EA/CS/DZ"
+                                   style="width: 100%; font-size: 11px; padding: 4px; text-transform: uppercase;">
+                          </td>
+                          <td>
+                            <input type="number" class="form-input" value="${item.unit_price || item.price || ''}" step="0.01"
+                                   onchange="extractedInvoices[${index}].items[${itemIndex}].unit_price = parseFloat(this.value) || 0; extractedInvoices[${index}].items[${itemIndex}].price = parseFloat(this.value) || 0; displayMultipleInvoices();"
                                    style="width: 100%; font-size: 11px; padding: 4px;">
+                          </td>
+                          <td>
+                            <input type="number" class="form-input" value="${item.extended_price || item.price || ''}" step="0.01"
+                                   onchange="extractedInvoices[${index}].items[${itemIndex}].extended_price = parseFloat(this.value) || 0; extractedInvoices[${index}].items[${itemIndex}].price = parseFloat(this.value) || 0; displayMultipleInvoices();"
+                                   style="width: 100%; font-size: 11px; padding: 4px; font-weight: bold;">
+                          </td>
+                          <td style="text-align: center; color: ${validationColor}; font-size: 14px; font-weight: bold;">
+                            ${validationIcon}
                           </td>
                           <td style="text-align: center;">
                             <button type="button" onclick="deleteLineItem(${index}, ${itemIndex})"
@@ -1619,7 +1781,8 @@
                             </button>
                           </td>
                         </tr>
-                      `).join('')}
+                      `;
+                      }).join('')}
                     </tbody>
                   </table>
                 ` : '<p style="font-size: 11px; color: var(--gray-500); margin-top: 8px;">No line items extracted</p>'}
@@ -1926,7 +2089,11 @@
       extractedInvoices[invoiceIndex].items.push({
         description: '',
         quantity: 0,
-        price: 0
+        unit: '',
+        unit_price: 0,
+        extended_price: 0,
+        price: 0,
+        validation_status: 'manual'
       });
       displayMultipleInvoices();
     }
