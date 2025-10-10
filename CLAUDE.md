@@ -37,15 +37,25 @@ Watch for these user phrases (AUTO-TRIGGER checklist):
 ### Required Actions:
 When user signals session end, you MUST say:
 ```
-"Before we end, let me update the status files to preserve our progress..."
+"Before we end, let me save this chat session and update the status files to preserve our progress..."
 ```
 
-Then follow `SESSION_END_CHECKLIST.md` (all steps mandatory):
-1. ✅ Update `CURRENT_STATUS.md` (work status, blockers, next steps)
-2. ✅ Update `PROJECT_MASTER_LOG.md` (add new entry at TOP)
-3. ✅ Run `git status` and document uncommitted changes
-4. ✅ Provide session summary to user
-5. ✅ Confirm: "✅ Status files updated. See you next session!"
+Then follow this EXACT sequence (all steps mandatory):
+
+**STEP 0 (DO THIS FIRST):**
+1. ✅ Create unique RTF file in `/chat sessions/` folder
+   - Filename format: `session_YYYY-MM-DD_brief-description.rtf`
+   - Example: `session_2025-10-09_vendor-auto-detection.rtf`
+   - Copy entire chat conversation into RTF format
+   - Include: date, session context, user messages, assistant responses, code changes, git commits, outcomes
+   - Use proper RTF formatting with headers, bold, colors for readability
+
+**THEN follow `SESSION_END_CHECKLIST.md`:**
+2. ✅ Update `CURRENT_STATUS.md` (work status, blockers, next steps)
+3. ✅ Update `PROJECT_MASTER_LOG.md` (add new entry at TOP)
+4. ✅ Run `git status` and document uncommitted changes
+5. ✅ Provide session summary to user
+6. ✅ Confirm: "✅ Chat session saved to RTF. Status files updated. See you next session!"
 
 **See `SESSION_END_CHECKLIST.md` for complete protocol.**
 

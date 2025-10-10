@@ -38,6 +38,53 @@ Trigger words/phrases (watch for these):
 
 ## ✅ MANDATORY CHECKLIST (DO NOT SKIP)
 
+### Step 0: Save Chat Session to RTF (DO THIS FIRST!)
+```bash
+# Create RTF file in /chat sessions/ folder
+# Filename: session_YYYY-MM-DD_brief-description.rtf
+# Example: session_2025-10-09_vendor-auto-detection.rtf
+```
+
+**Required actions:**
+- [ ] Create `/chat sessions/` folder if it doesn't exist
+- [ ] Generate unique filename with date and brief description
+- [ ] Copy entire chat conversation into RTF format
+- [ ] Include these sections in RTF:
+  - Session date and title
+  - Context from previous session (if applicable)
+  - Complete conversation transcript (user + assistant messages)
+  - All code changes made
+  - Git commits with messages
+  - Deployment status
+  - Files modified list
+  - Testing notes
+  - Session outcome/results
+- [ ] Use proper RTF formatting:
+  - Headers with bold/larger font
+  - Color coding (blue for user, gray for assistant)
+  - Italics for metadata
+  - Line breaks for readability
+  - Code blocks with monospace font
+
+**Template structure:**
+```rtf
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Arial;}}
+{\colortbl;\red0\green0\blue0;\red0\green128\blue255;\red128\green128\blue128;}
+
+\f0\fs24
+{\b\fs32 Chat Session: [Title]}\par
+{\i Date: October 9, 2025}\par
+\line\par
+
+[Full conversation transcript with formatting]
+
+{\b\fs26 SESSION OUTCOME}\par
+Status: Complete/In Progress\par
+[Summary]
+}
+```
+
 ### Step 1: Update CURRENT_STATUS.md
 ```bash
 # Update these sections:
@@ -126,14 +173,15 @@ Provide user with clear summary:
 
 ### When User Says "Thanks" / "That's All":
 ```
-Before we end, let me update the status files to preserve our progress...
+Before we end, let me save this chat session and update the status files to preserve our progress...
 
-[Run checklist Steps 1-3]
+[Run checklist Steps 0-3]
 
-✅ Session complete! Status files updated.
+✅ Session complete! Chat saved to RTF and status files updated.
 
 Summary:
 - [brief summary]
+- Chat session saved to: /chat sessions/session_YYYY-MM-DD_description.rtf
 - Files updated: CURRENT_STATUS.md, PROJECT_MASTER_LOG.md
 - Next session will start with: [clear instruction]
 ```
@@ -165,7 +213,9 @@ Let me check our current status and update the files...
 ```
 User says goodbye
     ↓
-Trigger: "I'll update status files first..."
+Trigger: "I'll save the chat session and update status files first..."
+    ↓
+Step 0: Save chat to RTF file in /chat sessions/
     ↓
 Step 1: Update CURRENT_STATUS.md
     ↓
@@ -177,7 +227,7 @@ Step 4: Verify production (if applicable)
     ↓
 Step 5: Provide session summary
     ↓
-Confirm: "✅ All status files updated. See you next session!"
+Confirm: "✅ Chat session saved to RTF. Status files updated. See you next session!"
 ```
 
 ---
@@ -205,6 +255,8 @@ Confirm: "✅ All status files updated. See you next session!"
 ## 🎯 SUCCESS CRITERIA
 
 Session end is successful when:
+- ✅ Chat session saved to RTF file in /chat sessions/ folder
+- ✅ RTF file contains complete conversation with proper formatting
 - ✅ CURRENT_STATUS.md shows accurate current state
 - ✅ PROJECT_MASTER_LOG.md has new entry at TOP
 - ✅ Uncommitted changes are documented (or committed)
