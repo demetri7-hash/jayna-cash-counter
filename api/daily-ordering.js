@@ -125,6 +125,7 @@ export default async function handler(req, res) {
 
         if (orderCalc.orderQty > 0) {
           orderItems.push({
+            itemId: item.id,  // Include item ID for order history tracking
             name: item.item_name,
             qty: orderCalc.orderQty,
             unit: item.unit,
@@ -639,19 +640,53 @@ function calculateOverallTrend(items) {
  * Log order to database for tracking
  */
 async function logOrderToDatabase(order, orderDate, status, errorMessage = null) {
-  const { error } = await supabase
+  // Insert into order_log table
+  const { data: orderLog, error: orderLogError } = await supabase
     .from('order_log')
     .insert([{
       order_date: orderDate.toISOString().split('T')[0],
       vendor: order.vendor,
       order_items: order.items,
+      total_items: order.items.length,
       email_sent_at: status === 'sent' ? new Date().toISOString() : null,
       email_status: status,
       notes: errorMessage || `Automated order - ${order.items.length} items`,
       delivery_date: order.deliveryDate
-    }]);
+    }])
+    .select();
 
-  if (error) {
-    console.error('⚠️ Failed to log order to database:', error);
+  if (orderLogError) {
+    console.error('⚠️ Failed to log order to database:', orderLogError);
+    return;
+  }
+
+  const orderLogId = orderLog && orderLog[0] ? orderLog[0].id : null;
+
+  // Insert into item_order_history for each item
+  if (orderLogId && status === 'sent') {
+    const itemHistoryRecords = order.items.map(item => ({
+      item_id: item.itemId || null, // Will need to match by name if itemId not available
+      order_log_id: orderLogId,
+      order_date: orderDate.toISOString().split('T')[0],
+      vendor: order.vendor,
+      quantity_ordered: item.qty,
+      unit: item.unit,
+      stock_at_order: item.stock,
+      par_at_order: item.par,
+      ai_calculation_method: item.reasoning?.method || 'Predictive algorithm',
+      ai_reasoning: item.reasoning || null,
+      consumption_trend: calculateOverallTrend(order.items),
+      days_until_next_delivery: order.daysUntilNextDelivery,
+      was_auto_generated: true,
+      was_manually_adjusted: false
+    }));
+
+    const { error: historyError } = await supabase
+      .from('item_order_history')
+      .insert(itemHistoryRecords);
+
+    if (historyError) {
+      console.error('⚠️ Failed to log item order history:', historyError);
+    }
   }
 }
