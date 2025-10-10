@@ -617,6 +617,106 @@
     </div>
   </div>
 
+  <!-- Template Mapper Modal -->
+  <div id="templateMapperModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 1000; overflow-y: auto;">
+    <div style="max-width: 800px; margin: 20px auto; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+      <div style="background: var(--primary-blue); color: white; padding: 16px; border-radius: 8px 8px 0 0;">
+        <h3 style="margin: 0; font-size: 18px;">📍 Map Invoice Fields - <span id="mapperVendorName"></span></h3>
+        <p style="margin: 4px 0 0 0; font-size: 12px; opacity: 0.9;">Select text to teach the system where to find data</p>
+      </div>
+
+      <div style="padding: 20px;">
+        <!-- Step indicator -->
+        <div id="mapperSteps" style="margin-bottom: 20px;">
+          <div style="display: flex; gap: 12px; align-items: center; justify-content: center;">
+            <button id="stepBtn_invoice_number" class="mapper-step-btn active" onclick="setMappingField('invoice_number')">
+              1. Invoice #
+            </button>
+            <button id="stepBtn_invoice_date" class="mapper-step-btn" onclick="setMappingField('invoice_date')">
+              2. Date
+            </button>
+            <button id="stepBtn_total_amount" class="mapper-step-btn" onclick="setMappingField('total_amount')">
+              3. Total
+            </button>
+            <button id="stepBtn_line_items" class="mapper-step-btn" onclick="setMappingField('line_items')">
+              4. Line Items
+            </button>
+          </div>
+        </div>
+
+        <!-- Current field indicator -->
+        <div id="currentFieldIndicator" style="padding: 12px; background: var(--light-blue); border-left: 4px solid var(--primary-blue); margin-bottom: 16px;">
+          <strong>Mapping: <span id="currentFieldName">Invoice Number</span></strong>
+          <p id="currentFieldHelp" style="margin: 4px 0 0 0; font-size: 12px; color: var(--gray-700);">
+            Select the invoice number in the text below
+          </p>
+        </div>
+
+        <!-- OCR Text Display (selectable) -->
+        <div style="border: 2px solid var(--gray-300); border-radius: 4px; background: var(--gray-100); max-height: 400px; overflow-y: auto; padding: 16px; margin-bottom: 16px;">
+          <pre id="mapperOcrText" style="font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.6; margin: 0; white-space: pre-wrap; user-select: text; cursor: text;"></pre>
+        </div>
+
+        <!-- Selected text preview -->
+        <div id="selectedTextPreview" style="display: none; padding: 12px; background: var(--success); color: white; border-radius: 4px; margin-bottom: 16px;">
+          <strong>Selected:</strong> <span id="selectedTextValue"></span>
+          <button onclick="confirmSelection()" style="margin-left: 12px; background: white; color: var(--success); border: none; padding: 4px 12px; cursor: pointer; font-weight: bold; border-radius: 3px;">
+            ✓ Confirm
+          </button>
+        </div>
+
+        <!-- Mapped fields summary -->
+        <div id="mappedFieldsSummary" style="padding: 12px; background: var(--gray-100); border-radius: 4px; margin-bottom: 16px; font-size: 12px;">
+          <strong>Mapped Fields:</strong>
+          <div id="mappedFieldsList" style="margin-top: 8px;">
+            <em style="color: var(--gray-500);">No fields mapped yet</em>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div style="display: flex; gap: 8px;">
+          <button class="submit-btn primary" onclick="saveTemplate()" style="flex: 1;">
+            💾 Save Template
+          </button>
+          <button class="submit-btn" onclick="closeTemplateMapper()" style="flex: 1;">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .mapper-step-btn {
+      padding: 8px 16px;
+      background: var(--gray-300);
+      border: 2px solid var(--gray-400);
+      color: var(--gray-700);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .mapper-step-btn.active {
+      background: var(--primary-blue);
+      border-color: var(--primary-blue);
+      color: white;
+    }
+    .mapper-step-btn.completed {
+      background: var(--success);
+      border-color: var(--success);
+      color: white;
+    }
+    .mapper-step-btn:hover {
+      opacity: 0.9;
+    }
+    #mapperOcrText::selection {
+      background: #FFC107;
+      color: black;
+    }
+  </style>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -918,6 +1018,7 @@
     }
 
     let knownVendors = []; // Will load from database
+    let vendorTemplates = {}; // Will load from database: { vendor_id: template_object }
 
     async function showScanInvoice() {
       document.getElementById('dashboard').style.display = 'none';
@@ -927,6 +1028,7 @@
 
       // Load known vendors for auto-detection
       await loadKnownVendors();
+      await loadVendorTemplates();
 
       // Setup file input listener
       const fileInput = document.getElementById('invoiceFile');
@@ -948,6 +1050,45 @@
       } catch (error) {
         console.error('Error loading vendors:', error);
         knownVendors = [];
+      }
+    }
+
+    async function loadVendorTemplates() {
+      /*
+        SUPABASE TABLE SCHEMA (create if not exists):
+
+        CREATE TABLE vendor_templates (
+          id BIGSERIAL PRIMARY KEY,
+          vendor_id BIGINT REFERENCES vendors(id) UNIQUE,
+          vendor_name TEXT NOT NULL,
+          template_data JSONB NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      */
+
+      try {
+        const { data, error } = await supabase
+          .from('vendor_templates')
+          .select('*');
+
+        if (error) {
+          // Table might not exist yet
+          console.log('No vendor templates found (table may not exist yet)');
+          vendorTemplates = {};
+          return;
+        }
+
+        // Convert array to object keyed by vendor_id
+        vendorTemplates = {};
+        data.forEach(template => {
+          vendorTemplates[template.vendor_id] = JSON.parse(template.template_data);
+        });
+
+        console.log(`Loaded ${data.length} vendor templates`);
+      } catch (error) {
+        console.error('Error loading vendor templates:', error);
+        vendorTemplates = {};
       }
     }
 
@@ -1077,9 +1218,11 @@
         // Save canvas as image for preview
         const pageImageUrl = canvas.toDataURL('image/jpeg', 0.7); // 70% quality to reduce size
 
-        // Parse invoice data
-        const parsedData = parseInvoiceText(ocrText);
+        // Detect vendor first (to get ID for template lookup)
         const detectedVendor = detectVendorName(ocrText);
+
+        // Parse invoice data (with template if available)
+        const parsedData = parseInvoiceText(ocrText, detectedVendor.id);
 
         // Store invoice with page number and image
         extractedInvoices.push({
@@ -1163,8 +1306,11 @@
       // Save canvas as image for preview
       const pageImageUrl = canvas.toDataURL('image/jpeg', 0.7);
 
-      const parsedData = parseInvoiceText(currentOcrText);
+      // Detect vendor first (to get ID for template lookup)
       const detectedVendor = detectVendorName(currentOcrText);
+
+      // Parse invoice data (with template if available)
+      const parsedData = parseInvoiceText(currentOcrText, detectedVendor.id);
 
       extractedInvoices = [{
         pageNumber: 1,
@@ -1229,7 +1375,7 @@
       };
     }
 
-    function parseInvoiceText(text) {
+    function parseInvoiceText(text, vendorId = null) {
       const lines = text.split('\n').filter(line => line.trim());
 
       const result = {
@@ -1243,6 +1389,58 @@
         total: 0,
         items: []
       };
+
+      // ===== TEMPLATE-BASED EXTRACTION =====
+      // If we have a template for this vendor, use it for better accuracy
+      if (vendorId && vendorTemplates[vendorId]) {
+        const template = vendorTemplates[vendorId];
+        console.log(`Using template for vendor ${vendorId}:`, template);
+
+        // Extract fields using template patterns
+        if (template.fields) {
+          // Invoice Number
+          if (template.fields.invoice_number && template.fields.invoice_number.pattern) {
+            const pattern = eval(template.fields.invoice_number.pattern);
+            const match = text.match(pattern);
+            if (match && match[1]) {
+              result.invoiceNumber = match[1].trim();
+              console.log(`Template extracted invoice #: ${result.invoiceNumber}`);
+            }
+          }
+
+          // Invoice Date
+          if (template.fields.invoice_date && template.fields.invoice_date.pattern) {
+            const pattern = eval(template.fields.invoice_date.pattern);
+            const match = text.match(pattern);
+            if (match && match[1]) {
+              result.date = parseDate(match[1]);
+              console.log(`Template extracted date: ${result.date}`);
+            }
+          }
+
+          // Total Amount
+          if (template.fields.total_amount && template.fields.total_amount.pattern) {
+            const pattern = eval(template.fields.total_amount.pattern);
+            const match = text.match(pattern);
+            if (match && match[1]) {
+              result.total = parseFloat(match[1].replace(/,/g, ''));
+              console.log(`Template extracted total: ${result.total}`);
+            }
+          }
+        }
+
+        // If template extraction succeeded for key fields, skip generic parsing
+        if (result.invoiceNumber || result.date || result.total) {
+          console.log('Template extraction successful, using template data');
+          // Still try to parse line items with existing parser
+          result.items = parseLineItems(text);
+          return result;
+        }
+
+        console.log('Template extraction failed, falling back to generic parsing');
+      }
+
+      // ===== FALLBACK: GENERIC PATTERN MATCHING =====
 
       // Date patterns (multiple formats) - ordered by specificity
       const datePatterns = [
@@ -1668,10 +1866,22 @@
                     + Add Vendor
                   </button>
                 ` : ''}
+                ${invoice.vendorName && (!invoice.isKnownVendor || !vendorTemplates[invoice.vendorId]) ? `
+                  <button type="button" class="submit-btn"
+                          onclick="showTemplateMapper(${index})"
+                          style="width: auto; padding: 8px 16px; margin: 0; font-size: 11px; background: var(--warning); color: white;">
+                    📍 Map Fields
+                  </button>
+                ` : ''}
               </div>
               ${!invoice.isKnownVendor && invoice.vendorName ? `
                 <p style="font-size: 10px; color: var(--warning); margin-top: 4px;">
-                  This vendor is not in the system. Click "+ Add Vendor" to set up ordering details.
+                  This vendor is not in the system. Click "+ Add Vendor" to set up ordering details, then "📍 Map Fields" to teach the system where to find data.
+                </p>
+              ` : ''}
+              ${invoice.isKnownVendor && !vendorTemplates[invoice.vendorId] ? `
+                <p style="font-size: 10px; color: var(--warning); margin-top: 4px;">
+                  No template for this vendor. Click "📍 Map Fields" to create one for better accuracy.
                 </p>
               ` : ''}
             </div>
@@ -2448,6 +2658,272 @@
       } catch (error) {
         console.error('Error saving vendor:', error);
         alert('Error saving vendor: ' + error.message);
+      }
+    }
+
+    // ==================== TEMPLATE MAPPER FUNCTIONS ====================
+
+    let currentMapperInvoiceIndex = null;
+    let currentMappingField = 'invoice_number';
+    let templateMappings = {
+      vendor_name: '',
+      vendor_id: null,
+      keywords: [],
+      fields: {},
+      line_items_config: {},
+      rotation_hint: 0
+    };
+
+    const fieldConfigs = {
+      invoice_number: {
+        name: 'Invoice Number',
+        help: 'Select the invoice number in the text below',
+        next: 'invoice_date'
+      },
+      invoice_date: {
+        name: 'Invoice Date',
+        help: 'Select the date in the text below',
+        next: 'total_amount'
+      },
+      total_amount: {
+        name: 'Total Amount',
+        help: 'Select the total amount in the text below',
+        next: 'line_items'
+      },
+      line_items: {
+        name: 'Line Items Table',
+        help: 'Select a sample line item (quantity, description, price)',
+        next: null
+      }
+    };
+
+    function showTemplateMapper(invoiceIndex) {
+      currentMapperInvoiceIndex = invoiceIndex;
+      const invoice = extractedInvoices[invoiceIndex];
+
+      // Reset mappings
+      templateMappings = {
+        vendor_name: invoice.vendorName,
+        vendor_id: invoice.vendorId,
+        keywords: [invoice.vendorName],
+        fields: {},
+        line_items_config: {},
+        rotation_hint: 0
+      };
+      currentMappingField = 'invoice_number';
+
+      // Set vendor name
+      document.getElementById('mapperVendorName').textContent = invoice.vendorName;
+
+      // Show OCR text
+      document.getElementById('mapperOcrText').textContent = invoice.ocrText || 'No OCR text available';
+
+      // Reset UI
+      resetMapperSteps();
+      updateCurrentFieldUI();
+      updateMappedFieldsSummary();
+
+      // Show modal
+      document.getElementById('templateMapperModal').style.display = 'block';
+
+      // Add text selection listener
+      document.getElementById('mapperOcrText').addEventListener('mouseup', handleTextSelection);
+    }
+
+    function closeTemplateMapper() {
+      document.getElementById('templateMapperModal').style.display = 'none';
+      document.getElementById('mapperOcrText').removeEventListener('mouseup', handleTextSelection);
+      currentMapperInvoiceIndex = null;
+    }
+
+    function setMappingField(fieldName) {
+      currentMappingField = fieldName;
+      updateCurrentFieldUI();
+
+      // Update step buttons
+      document.querySelectorAll('.mapper-step-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.getElementById(`stepBtn_${fieldName}`).classList.add('active');
+    }
+
+    function updateCurrentFieldUI() {
+      const config = fieldConfigs[currentMappingField];
+      document.getElementById('currentFieldName').textContent = config.name;
+      document.getElementById('currentFieldHelp').textContent = config.help;
+    }
+
+    function resetMapperSteps() {
+      document.querySelectorAll('.mapper-step-btn').forEach(btn => {
+        btn.classList.remove('completed');
+        btn.classList.remove('active');
+      });
+      document.getElementById('stepBtn_invoice_number').classList.add('active');
+    }
+
+    function handleTextSelection() {
+      const selection = window.getSelection();
+      const selectedText = selection.toString().trim();
+
+      if (selectedText.length > 0) {
+        // Show preview
+        document.getElementById('selectedTextValue').textContent = selectedText;
+        document.getElementById('selectedTextPreview').style.display = 'block';
+      } else {
+        document.getElementById('selectedTextPreview').style.display = 'none';
+      }
+    }
+
+    function confirmSelection() {
+      const selectedText = document.getElementById('selectedTextValue').textContent;
+
+      if (!selectedText) return;
+
+      // Generate regex pattern from selected text
+      const pattern = generatePatternFromSelection(selectedText, currentMappingField);
+
+      // Save mapping
+      templateMappings.fields[currentMappingField] = {
+        pattern: pattern,
+        example: selectedText,
+        required: true
+      };
+
+      // Mark step as completed
+      document.getElementById(`stepBtn_${currentMappingField}`).classList.add('completed');
+
+      // Move to next field
+      const config = fieldConfigs[currentMappingField];
+      if (config.next) {
+        setMappingField(config.next);
+      }
+
+      // Update summary
+      updateMappedFieldsSummary();
+
+      // Hide preview
+      document.getElementById('selectedTextPreview').style.display = 'none';
+      window.getSelection().removeAllRanges();
+    }
+
+    function generatePatternFromSelection(text, fieldType) {
+      // Escape special regex characters
+      const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      if (fieldType === 'invoice_number') {
+        // Extract just the number/ID pattern
+        const numberMatch = text.match(/([A-Z0-9\-]+)/);
+        if (numberMatch) {
+          return `/(?:invoice|inv|#)?\\s*(?:number|no|#)?\\s*[:#]?\\s*(${numberMatch[1].replace(/[0-9]/g, '\\d')})/i`;
+        }
+        return `/(?:invoice|inv|#)?\\s*(?:number|no|#)?\\s*[:#]?\\s*([A-Z0-9\\-]+)/i`;
+      }
+
+      if (fieldType === 'invoice_date') {
+        // Detect date format and create pattern
+        if (/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(text)) {
+          return `/(?:date|invoice date)[:\\s]*(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4})/i`;
+        }
+        if (/\d{4}-\d{1,2}-\d{1,2}/.test(text)) {
+          return `/(?:date|invoice date)[:\\s]*(\\d{4}-\\d{1,2}-\\d{1,2})/i`;
+        }
+        return `/(?:date|invoice date)[:\\s]*([\\d\\/\\-]+)/i`;
+      }
+
+      if (fieldType === 'total_amount') {
+        // Extract number pattern
+        const amountMatch = text.match(/([\d,]+\.?\d*)/);
+        if (amountMatch) {
+          return `/(?:total|amount|grand total)[:\\s]*\\$?\\s*([\\d,]+\\.\\d{2})/i`;
+        }
+        return `/(?:total|amount)[:\\s]*\\$?\\s*([\\d,]+\\.\\d{2})/i`;
+      }
+
+      if (fieldType === 'line_items') {
+        // For line items, save the example format
+        return `/${escaped}/i`;
+      }
+
+      return `/${escaped}/i`;
+    }
+
+    function updateMappedFieldsSummary() {
+      const listDiv = document.getElementById('mappedFieldsList');
+      const mappedFields = Object.keys(templateMappings.fields);
+
+      if (mappedFields.length === 0) {
+        listDiv.innerHTML = '<em style="color: var(--gray-500);">No fields mapped yet</em>';
+        return;
+      }
+
+      let html = '<div style="display: flex; flex-direction: column; gap: 6px;">';
+      mappedFields.forEach(field => {
+        const config = fieldConfigs[field];
+        const mapping = templateMappings.fields[field];
+        html += `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px; background: white; border-radius: 3px;">
+            <span><strong>${config.name}:</strong> ${mapping.example}</span>
+            <button onclick="removeMappedField('${field}')" style="background: var(--error); color: white; border: none; padding: 2px 8px; cursor: pointer; font-size: 10px; border-radius: 3px;">
+              ✕
+            </button>
+          </div>
+        `;
+      });
+      html += '</div>';
+
+      listDiv.innerHTML = html;
+    }
+
+    function removeMappedField(fieldName) {
+      delete templateMappings.fields[fieldName];
+      document.getElementById(`stepBtn_${fieldName}`).classList.remove('completed');
+      updateMappedFieldsSummary();
+    }
+
+    async function saveTemplate() {
+      if (Object.keys(templateMappings.fields).length === 0) {
+        alert('Please map at least one field before saving');
+        return;
+      }
+
+      const invoice = extractedInvoices[currentMapperInvoiceIndex];
+
+      if (!invoice.vendorId) {
+        alert('Please add the vendor first before creating a template');
+        return;
+      }
+
+      try {
+        // Save template to database
+        const { data, error } = await supabase
+          .from('vendor_templates')
+          .upsert([{
+            vendor_id: invoice.vendorId,
+            vendor_name: invoice.vendorName,
+            template_data: JSON.stringify(templateMappings),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }], {
+            onConflict: 'vendor_id'
+          })
+          .select();
+
+        if (error) throw error;
+
+        // Update local templates cache
+        vendorTemplates[invoice.vendorId] = templateMappings;
+
+        // Refresh display
+        displayMultipleInvoices();
+
+        // Close modal
+        closeTemplateMapper();
+
+        alert(`✓ Template saved for ${invoice.vendorName}!\n\nMapped fields: ${Object.keys(templateMappings.fields).join(', ')}`);
+
+      } catch (error) {
+        console.error('Error saving template:', error);
+        alert('Error saving template: ' + error.message);
       }
     }
   </script>
