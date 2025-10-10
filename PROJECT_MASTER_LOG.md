@@ -1,5 +1,131 @@
 # PROJECT MASTER LOG - JAYNA CASH COUNTER
-Last Updated: October 8, 2025
+Last Updated: October 9, 2025
+
+---
+
+## [2025-10-09 16:00] - OCR Improvements + Editable Line Items
+**Worked on by:** Claude Code CLI
+**Focus:** Fix OCR accuracy + add editable line items with delete functionality
+**Result:** ✅ Accuracy significantly improved + full editing capabilities
+
+### Problem Solved:
+- OCR extracting junk data (Lot Numbers, Salesperson info as items)
+- Aggressive binarization creating artifacts in whitespace
+- No way to edit or delete extracted line items
+- Difficult to match physical invoices during bulk upload
+
+### Solution Implemented:
+
+**1. Editable Line Items with Full Control:**
+- Replaced read-only table with editable input fields (description, qty, price)
+- Added red ✕ delete buttons on each row with confirmation
+- Added "+ Add Line Item" button to manually insert missing items
+- All changes saved directly to extractedInvoices array
+- Users can now fix ALL OCR extraction errors
+
+**2. Prominent Invoice Date Display:**
+- Large blue/red header bar showing date, vendor, invoice number
+- Format: "Sep 4, 2025 • Mani Imports Inc. • #0078866-IN"
+- Makes physical invoice matching easy during bulk upload
+- Enhanced date extraction with 6 different patterns
+
+**3. Page Preview Images:**
+- Canvas saved as JPEG data URL (70% quality for low file size)
+- Clickable preview images for each page
+- Click to view full-size in new tab
+- Auto-deleted after save to conserve memory
+
+**4. Better Line Item Parsing:**
+- Skip patterns filter out junk: Lot Number, Salesperson, headers
+- Better validation: price > $0.50, description > 5 chars
+- Prevents invoice headers from being extracted as items
+
+**5. Research-Based OCR Preprocessing (CRITICAL FIX):**
+- **Problem:** Aggressive binarization made accuracy WORSE, created artifacts
+- **User Feedback:** "its way worse... adding a lot of artifacts to the pages"
+- **Research:** Studied Tesseract documentation + best practices
+- **Solution:**
+  - Replaced aggressive threshold (value > 128 ? 255 : 0) with gentle Gaussian blur (3x3 kernel)
+  - Changed to PSM 4 (single column - optimal for invoice columnar data)
+  - Enabled auto-rotation detection (rotate_enabled: true)
+  - Added character whitelist for invoice data
+  - Gentle 1.2x contrast (no artifacts from hard thresholding)
+- **Result:** "working WAY better" per user feedback
+
+### Files Modified:
+- `cogs.html`:
+  - Lines 1476-1626: Editable line items display with delete buttons
+  - Lines 1790-1808: Line item management functions (delete, add)
+  - Lines 1231-1239: Enhanced date extraction patterns
+  - Lines 1453-1467: Date formatting function
+  - Lines 1468-1484: Prominent date header display
+  - Lines 1073-1074, 1157: Page image storage
+  - Lines 1631-1647: Page preview display
+  - Lines 1721-1724: Auto-delete images after save
+  - Lines 1359-1383: Skip patterns for line item parsing
+  - Lines 1930-1991: Preprocessing function (Gaussian blur, PSM 4)
+  - Lines 1060-1063, 1145-1148: Tesseract config (PSM 4, rotation, whitelist)
+
+### Decisions Made:
+
+**1. Preprocessing Approach - Gentle vs Aggressive:**
+- Initial attempt: Aggressive binarization (threshold 128, pure black/white)
+- User feedback: Made accuracy worse, created artifacts
+- Research finding: Proper preprocessing uses gentle blur, not hard thresholding
+- Final decision: Gaussian blur + gentle contrast, no fixed threshold
+- **Impact:** Significantly better OCR accuracy
+
+**2. PSM Mode Selection:**
+- Initially used PSM 1 (Automatic page segmentation with OSD)
+- Research showed PSM 4 optimal for invoice columnar data
+- Changed to PSM 4 (single column of text)
+- **Impact:** Better accuracy on table-based invoice layouts
+
+**3. Editable vs Read-Only:**
+- Could have kept read-only + manual database edits
+- Decided to make ALL fields editable inline
+- **Rationale:** Faster workflow, immediate corrections
+- **Impact:** Users can fix errors without leaving page
+
+**4. Image Storage - Data URL vs Server:**
+- Could have uploaded images to server/database
+- Decided to use data URLs in memory, delete after save
+- **Rationale:** Low file size (JPEG 70%), no database bloat
+- **Impact:** Memory efficient, fast preview, auto-cleanup
+
+### Commands Run:
+```bash
+git add cogs.html
+git commit -m "feat(cogs): Editable line items + image preprocessing for better OCR"
+git push origin main
+
+git add cogs.html
+git commit -m "feat(cogs): Prominent date display + page preview images for invoice matching"
+git push origin main
+
+git add cogs.html
+git commit -m "fix(cogs): Replace aggressive binarization with proper OCR preprocessing"
+git push origin main
+
+git add "chat sessions/session_2025-10-09_ocr-improvements-editable-items.rtf"
+git commit -m "docs: Save chat session - OCR improvements and editable line items"
+git push origin main
+```
+
+### Status: ✅ DEPLOYED - User testing confirmed "working WAY better"
+
+### User Feedback:
+- ✅ "working WAY better" (OCR accuracy significantly improved)
+- 🔜 NEW REQUEST: Extract quantities AND units (ea, dz, lb, bunch, case)
+- 🔜 NEW REQUEST: Add math validation (qty = total / price)
+- 🔜 NEW REQUEST: Save corrections for machine learning
+
+### Next Steps (New Feature Request):
+1. Extract quantity units (ea, dz, lb, bunch, case, etc.)
+2. Add math validation: compare total amount vs (qty × price)
+3. Auto-calculate qty if missing: qty = total / price
+4. Save user corrections for learning engine
+5. Handle variable quantity column positions
 
 ---
 
