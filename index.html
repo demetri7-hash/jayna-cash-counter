@@ -9343,21 +9343,34 @@
    * Start the ordering system
    */
   async function startOrderingSystem() {
-    console.log('startOrderingSystem() called');
+    console.log('==== startOrderingSystem() called ====');
     hideAllSections();
-    document.getElementById('orderingSystemForm').classList.add('active');
+
+    const orderingForm = document.getElementById('orderingSystemForm');
+    console.log('orderingForm element:', orderingForm);
+    console.log('orderingForm classes before:', orderingForm.className);
+
+    orderingForm.classList.add('active');
+    console.log('orderingForm classes after adding active:', orderingForm.className);
+    console.log('orderingForm computed display:', window.getComputedStyle(orderingForm).display);
 
     // Expand container for wider content
     const container = document.querySelector('.container');
     if (container) {
       container.style.maxWidth = '1400px';
+      console.log('Container maxWidth set to 1400px');
     }
 
     try {
+      console.log('Loading inventory data...');
       await loadInventoryData();
+      console.log('Calculating upcoming orders...');
       calculateUpcomingOrders();
+      console.log('Rendering inventory list...');
       renderInventoryList();
+      console.log('Rendering stock count list...');
       renderStockCountList();
+      console.log('==== Ordering system initialized successfully ====');
     } catch (error) {
       console.error('Error starting ordering system:', error);
       showMessage(`Error: ${error.message}`, 'error');
