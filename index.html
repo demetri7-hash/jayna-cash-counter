@@ -728,6 +728,7 @@
         <button class="menu-btn" onclick="requirePasswordFor('Weekly Cashbox Count', showCashbox)">Weekly Cashbox</button>
         <button class="menu-btn" onclick="requirePasswordFor('Manager Dashboard', () => window.location.href='manager.html')">Manager</button>
         <button class="menu-btn" onclick="requirePasswordFor('COGs Management', accessCOGs)" style="background: #616161; color: white; border-color: #616161;">COGs</button>
+        <button class="menu-btn" onclick="requirePasswordFor('Ordering System', startOrderingSystem)" style="background: #2e7d32; color: white; border-color: #2e7d32;">Ordering System</button>
       </div>
       
       <!-- AM Count Form -->
@@ -1309,6 +1310,111 @@
           </div>
 
           <button class="submit-btn" onclick="saveCashboxCount()" style="margin-top: 20px;">Save Cashbox Count</button>
+        </div>
+
+        <button class="submit-btn" onclick="goHome()" style="margin-top: 20px;">Back to Menu</button>
+      </div>
+
+      <!-- Ordering System Section -->
+      <div id="orderingSystemForm" class="form-section" style="display: none;">
+        <h2 style="margin-bottom: 20px; color: #1e3c72;">Restaurant Ordering System</h2>
+
+        <!-- Tab Navigation -->
+        <div class="tabs" style="display: flex; border-bottom: 2px solid #1e3c72; margin-bottom: 20px;">
+          <button class="tab-link active" onclick="openOrderTab(event, 'upcomingOrders')" style="
+            flex: 1;
+            padding: 12px 20px;
+            background: #1e3c72;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+          ">Upcoming Orders</button>
+          <button class="tab-link" onclick="openOrderTab(event, 'manageInventory')" style="
+            flex: 1;
+            padding: 12px 20px;
+            background: #f5f5f5;
+            color: #1e3c72;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+          ">Manage Inventory</button>
+          <button class="tab-link" onclick="openOrderTab(event, 'updateCounts')" style="
+            flex: 1;
+            padding: 12px 20px;
+            background: #f5f5f5;
+            color: #1e3c72;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+          ">Update Counts</button>
+        </div>
+
+        <!-- Tab Content: Upcoming Orders -->
+        <div id="upcomingOrders" class="tab-content" style="display: block;">
+          <div style="text-align: center; padding: 20px;">
+            <p>Loading orders...</p>
+          </div>
+        </div>
+
+        <!-- Tab Content: Manage Inventory -->
+        <div id="manageInventory" class="tab-content" style="display: none;">
+          <!-- Add New Item Form -->
+          <div style="background: #f0f4f8; padding: 20px; border-radius: 4px; margin-bottom: 30px;">
+            <h3 style="margin-bottom: 15px; color: #1e3c72;">Add New Inventory Item</h3>
+            <form id="addItemForm" onsubmit="handleAddItem(event)" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div class="form-group">
+                <label for="newItemName">Item Name:</label>
+                <input type="text" id="newItemName" class="form-input" placeholder="e.g., Wild Arugula 4#/CS" required>
+              </div>
+              <div class="form-group">
+                <label for="newItemVendor">Vendor:</label>
+                <select id="newItemVendor" class="form-select" required>
+                  <option value="">Select Vendor</option>
+                  <option value="Greenleaf">Greenleaf</option>
+                  <option value="Performance">Performance</option>
+                  <option value="Mani Imports">Mani Imports</option>
+                  <option value="Eatopia Foods">Eatopia Foods</option>
+                  <option value="Ecolab">Ecolab</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="newItemUnit">Unit:</label>
+                <input type="text" id="newItemUnit" class="form-input" placeholder="e.g., CS, EA, LB" required>
+              </div>
+              <div class="form-group">
+                <label for="newItemPar">Par Level:</label>
+                <input type="number" id="newItemPar" class="form-input" min="0" value="0" required>
+              </div>
+              <div style="grid-column: 1 / -1;">
+                <button type="submit" class="submit-btn">Add Item</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Inventory List -->
+          <h3 style="margin-bottom: 15px; color: #1e3c72;">Inventory Items</h3>
+          <div id="inventoryList" style="max-height: 600px; overflow-y: auto;">
+            <p style="text-align: center; padding: 20px;">Loading inventory...</p>
+          </div>
+        </div>
+
+        <!-- Tab Content: Update Counts -->
+        <div id="updateCounts" class="tab-content" style="display: none;">
+          <div style="margin-bottom: 20px;">
+            <button class="submit-btn" onclick="saveAllStockCounts()" style="background: #2e7d32;">
+              Save All Changes
+            </button>
+          </div>
+          <div id="stockCountList" style="max-height: 600px; overflow-y: auto;">
+            <p style="text-align: center; padding: 20px;">Loading items...</p>
+          </div>
         </div>
 
         <button class="submit-btn" onclick="goHome()" style="margin-top: 20px;">Back to Menu</button>
@@ -9187,6 +9293,932 @@
       </div>
     `;
   }
+
+  // ====================================
+  // ORDERING SYSTEM - START
+  // ====================================
+
+  /**
+   * @typedef {Object} InventoryItem
+   * @property {number} id - Database ID
+   * @property {string} itemName - Full name with packaging
+   * @property {string} vendor - Vendor name
+   * @property {number} parLevel - Target stock level
+   * @property {number} currentStock - Current on-hand quantity
+   * @property {string} unit - Unit of measurement (CS, EA, LB, etc.)
+   * @property {string} [lastCountedDate] - Last stock count date
+   */
+
+  /**
+   * @typedef {Object} CalculatedOrder
+   * @property {string} vendor - Vendor name
+   * @property {Date} orderDate - When to place order
+   * @property {string} cutoffTime - Order deadline
+   * @property {Date} deliveryDate - Expected delivery
+   * @property {OrderItem[]} items - Items to order
+   * @property {string} [notes] - Special instructions
+   */
+
+  /**
+   * @typedef {Object} OrderItem
+   * @property {string} itemName - Item name
+   * @property {number} quantity - Quantity to order
+   * @property {string} unit - Unit of measurement
+   * @property {number} parLevel - Par level for reference
+   * @property {number} currentStock - Current stock for reference
+   */
+
+  /**
+   * Global state for ordering system
+   */
+  const orderingSystemState = {
+    items: [],
+    calculatedOrders: [],
+    currentTab: 'upcomingOrders',
+    lastUpdated: null,
+    pendingStockUpdates: new Map() // Track unsaved stock updates
+  };
+
+  /**
+   * Start the ordering system
+   */
+  async function startOrderingSystem() {
+    console.log('startOrderingSystem() called');
+    hideAllSections();
+    document.getElementById('orderingSystemForm').style.display = 'block';
+
+    // Expand container for wider content
+    const container = document.querySelector('.container');
+    if (container) {
+      container.style.maxWidth = '1400px';
+    }
+
+    try {
+      await loadInventoryData();
+      calculateUpcomingOrders();
+      renderInventoryList();
+      renderStockCountList();
+    } catch (error) {
+      console.error('Error starting ordering system:', error);
+      showMessage(`Error: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Switch between tabs
+   */
+  function openOrderTab(event, tabName) {
+    console.log('openOrderTab:', tabName);
+
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => content.style.display = 'none');
+
+    // Remove active class from all tab links
+    const tabLinks = document.querySelectorAll('.tab-link');
+    tabLinks.forEach(link => {
+      link.style.background = '#f5f5f5';
+      link.style.color = '#1e3c72';
+    });
+
+    // Show selected tab and mark button as active
+    document.getElementById(tabName).style.display = 'block';
+    if (event && event.target) {
+      event.target.style.background = '#1e3c72';
+      event.target.style.color = 'white';
+    }
+
+    orderingSystemState.currentTab = tabName;
+  }
+
+  /**
+   * Load inventory data from database
+   */
+  async function loadInventoryData() {
+    if (!supabase) throw new Error('Database not connected');
+
+    showLoading('Loading Inventory', 'Fetching items from database...');
+
+    try {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select('*')
+        .order('vendor', { ascending: true })
+        .order('item_name', { ascending: true });
+
+      if (error) throw error;
+
+      orderingSystemState.items = (data || []).map(item => ({
+        id: item.id,
+        itemName: item.item_name,
+        vendor: item.vendor,
+        parLevel: item.par_level || 0,
+        currentStock: item.current_stock || 0,
+        unit: item.unit,
+        lastCountedDate: item.last_counted_date
+      }));
+
+      orderingSystemState.lastUpdated = new Date();
+      hideLoading();
+    } catch (error) {
+      hideLoading();
+      throw new Error(`Failed to load inventory: ${error.message}`);
+    }
+  }
+
+  /**
+   * Calculate upcoming orders for next 7 days
+   */
+  function calculateUpcomingOrders() {
+    console.log('calculateUpcomingOrders() called');
+    const now = new Date();
+    const orders = [];
+
+    // Check next 7 days
+    for (let i = 0; i < 7; i++) {
+      const checkDate = new Date(now);
+      checkDate.setDate(checkDate.getDate() + i);
+      const dayName = checkDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+      // Greenleaf - Daily orders (except Saturday)
+      if (dayName !== 'Saturday') {
+        const greenleafOrder = calculateGreenleafOrder(checkDate, dayName);
+        if (greenleafOrder) orders.push(greenleafOrder);
+      }
+
+      // Performance - Sunday and Wednesday
+      if (dayName === 'Sunday' || dayName === 'Wednesday') {
+        const performanceOrder = calculatePerformanceOrder(checkDate, dayName);
+        if (performanceOrder) orders.push(performanceOrder);
+      }
+
+      // Mani Imports - Tuesday and Thursday
+      if (dayName === 'Tuesday' || dayName === 'Thursday') {
+        const maniOrder = calculateManiOrder(checkDate, dayName);
+        if (maniOrder) orders.push(maniOrder);
+      }
+
+      // Eatopia - Any Wednesday for Thursday delivery
+      if (dayName === 'Wednesday') {
+        const eatopiaOrder = calculateEatopiaOrder(checkDate);
+        if (eatopiaOrder) orders.push(eatopiaOrder);
+      }
+    }
+
+    orderingSystemState.calculatedOrders = orders;
+    renderUpcomingOrders();
+  }
+
+  /**
+   * Calculate Greenleaf order
+   */
+  function calculateGreenleafOrder(orderDate, dayName) {
+    const isFriday = dayName === 'Friday';
+    const multiplier = isFriday ? 2 : 1; // Friday covers Sat + Sun
+
+    const items = orderingSystemState.items
+      .filter(item => item.vendor === 'Greenleaf')
+      .map(item => ({
+        itemName: item.itemName,
+        quantity: Math.max(0, Math.ceil((item.parLevel - item.currentStock) * multiplier)),
+        unit: item.unit,
+        parLevel: item.parLevel,
+        currentStock: item.currentStock
+      }))
+      .filter(item => item.quantity > 0);
+
+    if (items.length === 0) return null;
+
+    const deliveryDate = new Date(orderDate);
+    deliveryDate.setDate(deliveryDate.getDate() + 1);
+
+    return {
+      vendor: 'Greenleaf',
+      orderDate: orderDate,
+      cutoffTime: '10:00 PM',
+      deliveryDate: deliveryDate,
+      items: items,
+      notes: isFriday ? '🚨 2-DAY SUPPLY for Saturday and Sunday' : null
+    };
+  }
+
+  /**
+   * Calculate Performance order
+   */
+  function calculatePerformanceOrder(orderDate, dayName) {
+    const items = orderingSystemState.items
+      .filter(item => item.vendor === 'Performance')
+      .map(item => ({
+        itemName: item.itemName,
+        quantity: Math.max(0, item.parLevel - item.currentStock),
+        unit: item.unit,
+        parLevel: item.parLevel,
+        currentStock: item.currentStock
+      }))
+      .filter(item => item.quantity > 0);
+
+    if (items.length === 0) return null;
+
+    const deliveryDate = new Date(orderDate);
+    deliveryDate.setDate(deliveryDate.getDate() + 1);
+
+    return {
+      vendor: 'Performance',
+      orderDate: orderDate,
+      cutoffTime: '3:00 PM',
+      deliveryDate: deliveryDate,
+      items: items,
+      notes: dayName === 'Sunday' ? 'Delivery Monday morning' : 'Delivery Thursday morning'
+    };
+  }
+
+  /**
+   * Calculate Mani Imports order
+   */
+  function calculateManiOrder(orderDate, dayName) {
+    const isThursday = dayName === 'Thursday';
+    const multiplier = isThursday ? 5 : 3; // Thursday = 5 days, Tuesday = 3 days
+
+    const items = orderingSystemState.items
+      .filter(item => item.vendor === 'Mani Imports')
+      .map(item => ({
+        itemName: item.itemName,
+        quantity: Math.max(0, Math.ceil((item.parLevel - item.currentStock) * (multiplier / 7))),
+        unit: item.unit,
+        parLevel: item.parLevel,
+        currentStock: item.currentStock
+      }))
+      .filter(item => item.quantity > 0);
+
+    if (items.length === 0) return null;
+
+    const deliveryDate = new Date(orderDate);
+    deliveryDate.setDate(deliveryDate.getDate() + 1);
+
+    return {
+      vendor: 'Mani Imports',
+      orderDate: orderDate,
+      cutoffTime: '3:00 PM',
+      deliveryDate: deliveryDate,
+      items: items,
+      notes: isThursday ? '🚨 LARGE ORDER - 5-day supply covering weekend' : 'Small order - 3-day supply'
+    };
+  }
+
+  /**
+   * Calculate Eatopia order
+   */
+  function calculateEatopiaOrder(orderDate) {
+    const items = orderingSystemState.items
+      .filter(item => item.vendor === 'Eatopia Foods')
+      .map(item => ({
+        itemName: item.itemName,
+        quantity: Math.max(0, item.parLevel - item.currentStock),
+        unit: item.unit,
+        parLevel: item.parLevel,
+        currentStock: item.currentStock
+      }))
+      .filter(item => item.quantity > 0);
+
+    if (items.length === 0) return null;
+
+    const deliveryDate = new Date(orderDate);
+    deliveryDate.setDate(deliveryDate.getDate() + 1); // Thursday delivery
+
+    return {
+      vendor: 'Eatopia Foods',
+      orderDate: orderDate,
+      cutoffTime: 'Flexible',
+      deliveryDate: deliveryDate,
+      items: items,
+      notes: 'Delivery always on Thursday'
+    };
+  }
+
+  /**
+   * Render upcoming orders
+   */
+  function renderUpcomingOrders() {
+    const container = document.getElementById('upcomingOrders');
+
+    if (orderingSystemState.calculatedOrders.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px; background: #f0f4f8; border-radius: 4px;">
+          <p style="font-size: 16px; color: #666;">✅ No orders needed in the next 7 days!</p>
+          <p style="font-size: 14px; color: #999; margin-top: 10px;">All inventory levels are sufficient.</p>
+        </div>
+      `;
+      return;
+    }
+
+    let html = `
+      <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <button class="submit-btn" onclick="generateAllPDFs()" style="background: #d32f2f;">
+          📄 Generate All PDFs
+        </button>
+        <button class="submit-btn" onclick="calculateUpcomingOrders()" style="background: #0288d1;">
+          🔄 Refresh Orders
+        </button>
+      </div>
+      <div style="font-size: 12px; color: #666; margin-bottom: 20px;">
+        Last updated: ${orderingSystemState.lastUpdated ? orderingSystemState.lastUpdated.toLocaleString() : 'Never'}
+      </div>
+    `;
+
+    orderingSystemState.calculatedOrders.forEach((order, index) => {
+      const orderDateStr = order.orderDate.toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+      const deliveryDateStr = order.deliveryDate.toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+
+      html += `
+        <div class="order-card" id="order-${index}" style="
+          border: 2px solid #1e3c72;
+          margin-bottom: 20px;
+          padding: 20px;
+          border-radius: 8px;
+          background: white;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        ">
+          <h3 style="color: #1e3c72; margin-bottom: 15px; font-size: 20px;">
+            📦 ${order.vendor} - Order #${index + 1}
+          </h3>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+            <div>
+              <div style="font-weight: bold; color: #666; font-size: 12px;">ORDER DATE</div>
+              <div style="font-size: 14px; margin-top: 5px;">${orderDateStr}</div>
+            </div>
+            <div>
+              <div style="font-weight: bold; color: #666; font-size: 12px;">CUTOFF TIME</div>
+              <div style="font-size: 14px; margin-top: 5px;">${order.cutoffTime}</div>
+            </div>
+            <div>
+              <div style="font-weight: bold; color: #666; font-size: 12px;">DELIVERY DATE</div>
+              <div style="font-size: 14px; margin-top: 5px;">${deliveryDateStr}</div>
+            </div>
+            <div>
+              <div style="font-weight: bold; color: #666; font-size: 12px;">ITEMS</div>
+              <div style="font-size: 14px; margin-top: 5px;">${order.items.length} items</div>
+            </div>
+          </div>
+
+          ${order.notes ? `
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin-bottom: 15px; border-radius: 4px;">
+              <strong>Note:</strong> ${order.notes}
+            </div>
+          ` : ''}
+
+          <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <thead>
+              <tr style="background: #1e3c72; color: white;">
+                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Item</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Qty</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Unit</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Par</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Current</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${order.items.map((item, i) => `
+                <tr style="background: ${i % 2 === 0 ? '#f8f9fa' : 'white'};">
+                  <td style="padding: 10px; border: 1px solid #ddd;">${item.itemName}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd; font-weight: bold; color: #d32f2f;">${item.quantity}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.unit}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.parLevel}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.currentStock}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <button class="submit-btn" onclick="printOrder(${index})" style="flex: 1; background: #2e7d32;">
+              🖨️ Print Order
+            </button>
+            <button class="submit-btn" onclick="generateOrderPDF(${index})" style="flex: 1; background: #d32f2f;">
+              📄 Generate PDF
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  /**
+   * Render inventory list for managing par levels
+   */
+  function renderInventoryList() {
+    const container = document.getElementById('inventoryList');
+
+    if (orderingSystemState.items.length === 0) {
+      container.innerHTML = '<p style="text-align: center; padding: 20px;">No inventory items found. Add items using the form above.</p>';
+      return;
+    }
+
+    // Group by vendor
+    const itemsByVendor = {};
+    orderingSystemState.items.forEach(item => {
+      if (!itemsByVendor[item.vendor]) {
+        itemsByVendor[item.vendor] = [];
+      }
+      itemsByVendor[item.vendor].push(item);
+    });
+
+    let html = '';
+    Object.keys(itemsByVendor).sort().forEach(vendor => {
+      const items = itemsByVendor[vendor];
+      html += `
+        <div style="margin-bottom: 30px;">
+          <h4 style="background: #1e3c72; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+            ${vendor} (${items.length} items)
+          </h4>
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: #f8f9fa;">
+                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Item Name</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 100px;">Unit</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Par Level</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Current Stock</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((item, i) => `
+                <tr style="background: ${i % 2 === 0 ? 'white' : '#f8f9fa'};">
+                  <td style="padding: 10px; border: 1px solid #ddd;">${item.itemName}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.unit}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
+                    <input
+                      type="number"
+                      value="${item.parLevel}"
+                      min="0"
+                      onchange="updateParLevel(${item.id}, this.value)"
+                      style="width: 80px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px;"
+                    />
+                  </td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd; color: #666;">${item.currentStock}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
+                    <button onclick="deleteInventoryItem(${item.id})" style="
+                      background: #d32f2f;
+                      color: white;
+                      border: none;
+                      padding: 5px 10px;
+                      border-radius: 4px;
+                      cursor: pointer;
+                      font-size: 12px;
+                    ">Delete</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  /**
+   * Render stock count list for updating inventory
+   */
+  function renderStockCountList() {
+    const container = document.getElementById('stockCountList');
+
+    if (orderingSystemState.items.length === 0) {
+      container.innerHTML = '<p style="text-align: center; padding: 20px;">No inventory items found.</p>';
+      return;
+    }
+
+    // Group by vendor
+    const itemsByVendor = {};
+    orderingSystemState.items.forEach(item => {
+      if (!itemsByVendor[item.vendor]) {
+        itemsByVendor[item.vendor] = [];
+      }
+      itemsByVendor[item.vendor].push(item);
+    });
+
+    let html = '';
+    Object.keys(itemsByVendor).sort().forEach(vendor => {
+      const items = itemsByVendor[vendor];
+      html += `
+        <div style="margin-bottom: 30px;">
+          <h4 style="background: #2e7d32; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+            ${vendor} (${items.length} items)
+          </h4>
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: #f8f9fa;">
+                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Item Name</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 100px;">Unit</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Par Level</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 150px;">Current Stock</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Last Counted</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((item, i) => {
+                const lastCounted = item.lastCountedDate
+                  ? new Date(item.lastCountedDate).toLocaleDateString()
+                  : 'Never';
+                return `
+                  <tr style="background: ${i % 2 === 0 ? 'white' : '#f8f9fa'};">
+                    <td style="padding: 10px; border: 1px solid #ddd;">${item.itemName}</td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.unit}</td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd; color: #666;">${item.parLevel}</td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
+                      <input
+                        type="number"
+                        id="stock-${item.id}"
+                        value="${item.currentStock}"
+                        min="0"
+                        onchange="trackStockUpdate(${item.id}, this.value)"
+                        style="width: 100px; padding: 8px; text-align: center; border: 2px solid #2e7d32; border-radius: 4px; font-weight: bold;"
+                      />
+                    </td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd; font-size: 12px; color: #999;">${lastCounted}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  /**
+   * Track stock updates before saving
+   */
+  function trackStockUpdate(itemId, newValue) {
+    orderingSystemState.pendingStockUpdates.set(itemId, parseInt(newValue));
+    console.log('Tracked stock update:', itemId, newValue);
+  }
+
+  /**
+   * Save all pending stock count updates
+   */
+  async function saveAllStockCounts() {
+    if (orderingSystemState.pendingStockUpdates.size === 0) {
+      showMessage('No changes to save!', 'info');
+      return;
+    }
+
+    showLoading('Saving Stock Counts', `Updating ${orderingSystemState.pendingStockUpdates.size} items...`);
+
+    try {
+      const updates = [];
+      for (const [itemId, newStock] of orderingSystemState.pendingStockUpdates.entries()) {
+        updates.push(
+          supabase
+            .from('inventory_items')
+            .update({
+              current_stock: newStock,
+              last_counted_date: new Date().toISOString()
+            })
+            .eq('id', itemId)
+        );
+
+        // Update local state
+        const item = orderingSystemState.items.find(i => i.id === itemId);
+        if (item) {
+          item.currentStock = newStock;
+          item.lastCountedDate = new Date().toISOString();
+        }
+      }
+
+      await Promise.all(updates);
+
+      // Clear pending updates
+      orderingSystemState.pendingStockUpdates.clear();
+
+      // Recalculate orders
+      calculateUpcomingOrders();
+      renderStockCountList();
+
+      hideLoading();
+      showMessage(`✅ Successfully updated ${updates.length} items!`, 'success');
+    } catch (error) {
+      hideLoading();
+      showMessage(`Error saving stock counts: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Update par level for an item
+   */
+  async function updateParLevel(itemId, newParLevel) {
+    showLoading('Updating Par Level', 'Saving changes...');
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ par_level: parseInt(newParLevel) })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.parLevel = parseInt(newParLevel);
+      }
+
+      // Recalculate orders
+      calculateUpcomingOrders();
+
+      hideLoading();
+      showMessage('✅ Par level updated!', 'success');
+    } catch (error) {
+      hideLoading();
+      showMessage(`Error updating par level: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Handle add new item form submission
+   */
+  async function handleAddItem(event) {
+    event.preventDefault();
+
+    const itemName = document.getElementById('newItemName').value.trim();
+    const vendor = document.getElementById('newItemVendor').value;
+    const unit = document.getElementById('newItemUnit').value.trim();
+    const parLevel = parseInt(document.getElementById('newItemPar').value);
+
+    if (!itemName || !vendor || !unit) {
+      showMessage('Please fill in all required fields!', 'error');
+      return;
+    }
+
+    showLoading('Adding Item', 'Saving to database...');
+
+    try {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .insert([{
+          item_name: itemName,
+          vendor: vendor,
+          unit: unit,
+          par_level: parLevel,
+          current_stock: 0,
+          created_date: new Date().toISOString()
+        }])
+        .select();
+
+      if (error) throw error;
+
+      // Add to local state
+      orderingSystemState.items.push({
+        id: data[0].id,
+        itemName: data[0].item_name,
+        vendor: data[0].vendor,
+        parLevel: data[0].par_level,
+        currentStock: data[0].current_stock,
+        unit: data[0].unit,
+        lastCountedDate: null
+      });
+
+      // Reset form
+      document.getElementById('addItemForm').reset();
+
+      // Refresh displays
+      renderInventoryList();
+      renderStockCountList();
+      calculateUpcomingOrders();
+
+      hideLoading();
+      showMessage('✅ Item added successfully!', 'success');
+    } catch (error) {
+      hideLoading();
+      showMessage(`Error adding item: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Delete an inventory item
+   */
+  async function deleteInventoryItem(itemId) {
+    if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+      return;
+    }
+
+    showLoading('Deleting Item', 'Removing from database...');
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Remove from local state
+      orderingSystemState.items = orderingSystemState.items.filter(i => i.id !== itemId);
+
+      // Refresh displays
+      renderInventoryList();
+      renderStockCountList();
+      calculateUpcomingOrders();
+
+      hideLoading();
+      showMessage('✅ Item deleted successfully!', 'success');
+    } catch (error) {
+      hideLoading();
+      showMessage(`Error deleting item: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Print a specific order
+   */
+  function printOrder(orderIndex) {
+    const order = orderingSystemState.calculatedOrders[orderIndex];
+    if (!order) return;
+
+    const orderCard = document.getElementById(`order-${orderIndex}`);
+    if (!orderCard) return;
+
+    const printWindow = window.open('', '', 'height=800,width=800');
+    printWindow.document.write('<html><head><title>Order - ' + order.vendor + '</title>');
+    printWindow.document.write('<style>body{font-family: Arial, sans-serif; padding: 20px;} table{width:100%; border-collapse: collapse;} th, td{border: 1px solid #ddd; padding: 8px; text-align: left;} th{background: #1e3c72; color: white;}</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(orderCard.innerHTML);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.print();
+  }
+
+  /**
+   * Generate PDF for a specific order
+   */
+  async function generateOrderPDF(orderIndex) {
+    const order = orderingSystemState.calculatedOrders[orderIndex];
+    if (!order) return;
+
+    showLoading('Generating PDF', 'Creating order document...');
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Header
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text('JAYNA GYRO', 105, 20, { align: 'center' });
+
+      doc.setFontSize(16);
+      doc.text(`${order.vendor} Order`, 105, 30, { align: 'center' });
+
+      // Order details
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Order Date: ${order.orderDate.toLocaleDateString()}`, 20, 45);
+      doc.text(`Cutoff Time: ${order.cutoffTime}`, 20, 52);
+      doc.text(`Delivery Date: ${order.deliveryDate.toLocaleDateString()}`, 20, 59);
+
+      if (order.notes) {
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Notes: ${order.notes}`, 20, 66);
+      }
+
+      // Table
+      const tableData = order.items.map(item => [
+        item.itemName,
+        item.quantity.toString(),
+        item.unit,
+        item.parLevel.toString(),
+        item.currentStock.toString()
+      ]);
+
+      doc.autoTable({
+        head: [['Item', 'Qty to Order', 'Unit', 'Par Level', 'Current Stock']],
+        body: tableData,
+        startY: order.notes ? 75 : 68,
+        theme: 'grid',
+        headStyles: { fillColor: [30, 60, 114] },
+        styles: { fontSize: 9 }
+      });
+
+      // Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 285);
+        doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: 'right' });
+      }
+
+      doc.save(`${order.vendor}_Order_${order.orderDate.toISOString().split('T')[0]}.pdf`);
+
+      hideLoading();
+      showMessage('✅ PDF generated successfully!', 'success');
+    } catch (error) {
+      hideLoading();
+      showMessage(`Error generating PDF: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Generate combined PDF with all orders
+   */
+  async function generateAllPDFs() {
+    if (orderingSystemState.calculatedOrders.length === 0) {
+      showMessage('No orders to generate!', 'info');
+      return;
+    }
+
+    showLoading('Generating Combined PDF', 'Creating document with all orders...');
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Cover page
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text('JAYNA GYRO', 105, 40, { align: 'center' });
+
+      doc.setFontSize(18);
+      doc.text('Weekly Order Summary', 105, 55, { align: 'center' });
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 105, 70, { align: 'center' });
+      doc.text(`Total Orders: ${orderingSystemState.calculatedOrders.length}`, 105, 80, { align: 'center' });
+
+      // Add each order
+      orderingSystemState.calculatedOrders.forEach((order, index) => {
+        doc.addPage();
+
+        // Header
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${order.vendor} - Order #${index + 1}`, 105, 20, { align: 'center' });
+
+        // Order details
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Order Date: ${order.orderDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 20, 35);
+        doc.text(`Cutoff Time: ${order.cutoffTime}`, 20, 42);
+        doc.text(`Delivery Date: ${order.deliveryDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 20, 49);
+
+        if (order.notes) {
+          doc.setFont('helvetica', 'bold');
+          doc.text(`Notes: ${order.notes}`, 20, 56);
+        }
+
+        // Table
+        const tableData = order.items.map(item => [
+          item.itemName,
+          item.quantity.toString(),
+          item.unit,
+          item.parLevel.toString(),
+          item.currentStock.toString()
+        ]);
+
+        doc.autoTable({
+          head: [['Item', 'Qty', 'Unit', 'Par', 'Stock']],
+          body: tableData,
+          startY: order.notes ? 65 : 58,
+          theme: 'grid',
+          headStyles: { fillColor: [30, 60, 114] },
+          styles: { fontSize: 9 }
+        });
+      });
+
+      // Footer on all pages
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Jayna Gyro Ordering System`, 20, 285);
+        doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: 'right' });
+      }
+
+      const filename = `Jayna_All_Orders_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(filename);
+
+      hideLoading();
+      showMessage('✅ Combined PDF generated successfully!', 'success');
+    } catch (error) {
+      hideLoading();
+      showMessage(`Error generating PDF: ${error.message}`, 'error');
+    }
+  }
+
+  // ====================================
+  // ORDERING SYSTEM - END
+  // ====================================
 </script>
 </body>
 </html>
