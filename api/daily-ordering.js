@@ -9,11 +9,12 @@
  * 3. Determine which vendors need orders today
  * 4. Calculate optimal order quantities using predictive algorithms
  * 5. Generate HTML order sheets
- * 6. Send via EmailJS
+ * 6. Send via EmailJS Node.js SDK (SAME AS PM FLOW)
  * 7. Log results to database
  */
 
 import { createClient } from '@supabase/supabase-js';
+import emailjs from '@emailjs/nodejs';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -440,11 +441,11 @@ function suggestParLevelAdjustment(item, historicalData) {
 }
 
 /**
- * Send order email via EmailJS
+ * Send order email via EmailJS Node.js SDK
+ * Uses EXACT same pattern as PM flow (browser SDK)
  */
 async function sendOrderEmail(order, orderDate) {
-  // Format data for EmailJS template
-  // Research confirmed: EmailJS REST API DOES support arrays with {{#each}} loops
+  // Format data for EmailJS template - SAME STRUCTURE AS PM FLOW
   const templateParams = {
     to_email: ORDER_EMAIL,
     vendor: order.vendor,
@@ -461,12 +462,12 @@ async function sendOrderEmail(order, orderDate) {
     historical_days: '30',
     consumption_trend: calculateOverallTrend(order.items) || 'Stable',
 
-    // Special notes (only include if present)
+    // Special notes
     special_notes: order.daysUntilNextDelivery > 1
       ? `This order covers ${order.daysUntilNextDelivery} days until next delivery`
       : '',
 
-    // Order items as ACTUAL ARRAY (EmailJS REST API supports {{#each}} loops)
+    // Order items array - EXACTLY like PM flow handles arrays
     items: order.items.map(item => ({
       name: String(item.name),
       qty: String(item.qty),
@@ -475,10 +476,10 @@ async function sendOrderEmail(order, orderDate) {
       par: String(item.par)
     })),
 
-    // Alerts as array of STRINGS (template uses {{this}})
+    // Alerts as array of strings
     alerts: order.alerts.map(a => String(a.message)),
 
-    // Par suggestions as ACTUAL ARRAY of objects
+    // Par suggestions array
     par_suggestions: order.parSuggestions.map(p => ({
       item: String(p.item),
       current: String(p.current),
@@ -487,32 +488,21 @@ async function sendOrderEmail(order, orderDate) {
     }))
   };
 
-  // Send via EmailJS API
-  // IMPORTANT: Only send variables that exist in the HTML template
-  const emailData = {
-    service_id: EMAILJS_SERVICE_ID,
-    template_id: EMAILJS_TEMPLATE_ID_ORDERS,
-    user_id: EMAILJS_USER_ID,
-    accessToken: EMAILJS_PRIVATE_KEY,
-    template_params: templateParams  // ONLY variables in the template HTML
-  };
+  console.log('📧 Sending email via EmailJS SDK for', order.vendor);
 
-  console.log('📧 Sending email with params:', JSON.stringify(emailData, null, 2));
+  // Send using EmailJS Node.js SDK - EXACT SAME AS PM FLOW
+  // emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, options)
+  const response = await emailjs.send(
+    EMAILJS_SERVICE_ID,
+    EMAILJS_TEMPLATE_ID_ORDERS,
+    templateParams,
+    {
+      publicKey: EMAILJS_USER_ID,
+      privateKey: EMAILJS_PRIVATE_KEY
+    }
+  );
 
-  const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(emailData)
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`EmailJS API error: ${response.status} - ${errorText}`);
-  }
-
-  console.log(`✅ Order email sent for ${order.vendor}`);
+  console.log(`✅ Order email sent for ${order.vendor}:`, response.status, response.text);
   return true;
 }
 
