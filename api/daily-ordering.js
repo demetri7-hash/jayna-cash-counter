@@ -465,25 +465,37 @@ async function sendOrderEmail(order, orderDate) {
       ? `This order covers ${order.daysUntilNextDelivery} days until next delivery`
       : '',
 
-    // Order items array
-    items: order.items.map(item => ({
-      name: String(item.name || ''),
-      qty: String(item.qty || 0),
-      unit: String(item.unit || ''),
-      stock: String(item.stock || 0),
-      par: String(item.par || 0)
-    })),
+    // Order items as individual numbered params (EmailJS REST API doesn't handle arrays well)
+    items_count: order.items.length,
+    items_html: order.items.map((item, i) =>
+      `<tr style="border-bottom: 1px solid #e0e0e0;">
+        <td style="padding: 12px; color: #212121; font-size: 14px;">${item.name}</td>
+        <td style="padding: 12px; text-align: center; color: #d32f2f; font-weight: 700; font-size: 16px;">${item.qty}</td>
+        <td style="padding: 12px; text-align: center; color: #424242; font-size: 13px;">${item.unit}</td>
+        <td style="padding: 12px; text-align: center; color: #666; font-size: 13px;">${item.stock}</td>
+        <td style="padding: 12px; text-align: center; color: #666; font-size: 13px;">${item.par}</td>
+      </tr>`
+    ).join(''),
 
-    // Alerts array
-    alerts: order.alerts.length > 0 ? order.alerts.map(a => String(a.message)) : [],
+    // Alerts as HTML (REST API doesn't handle arrays)
+    alerts_html: order.alerts.length > 0 ?
+      `<ul style="margin: 0; padding-left: 20px; color: #424242; font-size: 13px; line-height: 1.8;">
+        ${order.alerts.map(a => `<li>${a.message}</li>`).join('')}
+      </ul>` : '',
+    has_alerts: order.alerts.length > 0 ? 'true' : '',
 
-    // Par suggestions array
-    par_suggestions: order.parSuggestions.length > 0 ? order.parSuggestions.map(p => ({
-      item: String(p.item || ''),
-      current: String(p.current || 0),
-      suggested: String(p.suggested || 0),
-      reason: String(p.reason || '')
-    })) : []
+    // Par suggestions as HTML (REST API doesn't handle arrays)
+    par_suggestions_html: order.parSuggestions.length > 0 ?
+      `<table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        ${order.parSuggestions.map(p =>
+          `<tr style="border-bottom: 1px solid #c8e6c9;">
+            <td style="padding: 8px 0; color: #424242;"><strong>${p.item}</strong></td>
+            <td style="padding: 8px 0; color: #666; text-align: right;">Par: ${p.current} → ${p.suggested}</td>
+            <td style="padding: 8px 0; color: #666; text-align: right; font-style: italic;">${p.reason}</td>
+          </tr>`
+        ).join('')}
+      </table>` : '',
+    has_par_suggestions: order.parSuggestions.length > 0 ? 'true' : ''
   };
 
   // Send via EmailJS API
