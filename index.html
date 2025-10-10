@@ -2821,7 +2821,7 @@
   
   async function storeAMData(data) {
     if (!supabase) throw new Error('Database not connected');
-    
+
     const { error } = await supabase
       .from('cash_counts')
       .upsert({
@@ -2838,8 +2838,11 @@
         am_drawer2_skip_reason: data.drawer2.skipReason,
         am_drawer2_data: data.drawer2.counts,
         am_notes: data.notes
+      }, {
+        onConflict: 'date',
+        ignoreDuplicates: false
       });
-    
+
     if (error) throw new Error(`Database error: ${error.message}`);
   }
   
