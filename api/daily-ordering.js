@@ -118,6 +118,11 @@ export default async function handler(req, res) {
         // Calculate optimal order quantity
         const orderCalc = calculateOptimalOrder(item, itemHistory, daysUntilNextDelivery);
 
+        // Get last counted date from most recent history
+        const lastCounted = itemHistory.length > 0
+          ? itemHistory[itemHistory.length - 1].counted_at
+          : item.updated_at || null;
+
         if (orderCalc.orderQty > 0) {
           orderItems.push({
             name: item.item_name,
@@ -125,6 +130,7 @@ export default async function handler(req, res) {
             unit: item.unit,
             stock: item.current_stock,
             par: item.par_level,
+            lastCounted: lastCounted,
             reasoning: orderCalc.reasoning
           });
         }
@@ -479,15 +485,34 @@ function generateOrderEmailHTML(order, orderDate) {
   const consumptionTrend = calculateOverallTrend(order.items) || 'Stable';
 
   // Generate items HTML
-  const itemsHTML = order.items.map(item => `
+  const itemsHTML = order.items.map(item => {
+    // Format last counted date
+    let lastCountedStr = 'Unknown';
+    if (item.lastCounted) {
+      const lastCountedDate = new Date(item.lastCounted);
+      const now = new Date();
+      const diffHours = Math.floor((now - lastCountedDate) / (1000 * 60 * 60));
+
+      if (diffHours < 24) {
+        lastCountedStr = `${diffHours}h ago`;
+      } else {
+        const diffDays = Math.floor(diffHours / 24);
+        lastCountedStr = `${diffDays}d ago`;
+      }
+    }
+
+    return `
     <tr style="border-bottom: 1px solid #e8e8e8;">
-      <td style="padding: 10px 12px; font-size: 13px; color: #2c2c2c;">${item.name}</td>
+      <td style="padding: 10px 12px; font-size: 13px; color: #2c2c2c;">
+        ${item.name}
+        <div style="font-size: 11px; color: #999; margin-top: 2px;">Last count: ${lastCountedStr}</div>
+      </td>
       <td style="padding: 10px 12px; text-align: center; font-size: 14px; font-weight: 600; color: #000;">${item.qty}</td>
       <td style="padding: 10px 12px; text-align: center; font-size: 13px; color: #666;">${item.unit}</td>
       <td style="padding: 10px 12px; text-align: center; font-size: 13px; color: #666;">${item.stock}</td>
       <td style="padding: 10px 12px; text-align: center; font-size: 13px; color: #666;">${item.par}</td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 
   // Generate AI suggestions HTML
   let aiSuggestionsHTML = '';
@@ -549,7 +574,8 @@ function generateOrderEmailHTML(order, orderDate) {
 
     <!-- Header -->
     <div style="margin-bottom: 8px;">
-      <h1 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: #000;">AUTOMATED ORDER</h1>
+      <h1 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: #000;">AUTO-GENERATED ORDER SUGGESTION</h1>
+      <p style="margin: 4px 0 0 0; font-size: 11px; color: #999; font-weight: 400;">Please double-check all quantities and inventory levels before placing this order.</p>
     </div>
     <div style="margin-bottom: 24px; padding-bottom: 24px; border-bottom: 2px solid #000;">
       <div style="font-size: 24px; font-weight: 600; color: #000; margin-bottom: 4px;">${order.vendor}</div>
