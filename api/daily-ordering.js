@@ -24,6 +24,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE_ID_ORDERS = process.env.EMAILJS_TEMPLATE_ID_ORDERS || 'template_daily_orders';
 const EMAILJS_USER_ID = process.env.EMAILJS_USER_ID;
+const EMAILJS_PRIVATE_KEY = process.env.EMAILJS_PRIVATE_KEY;
 const ORDER_EMAIL = process.env.ORDER_EMAIL || 'demetri7@gmail.com';
 
 // Vendor schedules
@@ -487,6 +488,7 @@ async function sendOrderEmail(order, orderDate) {
       service_id: EMAILJS_SERVICE_ID,
       template_id: EMAILJS_TEMPLATE_ID_ORDERS,
       user_id: EMAILJS_USER_ID,
+      accessToken: EMAILJS_PRIVATE_KEY,
       template_params: templateParams
     })
   });
