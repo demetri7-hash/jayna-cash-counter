@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Empatik Liderlik Eğitimi</title>
+  <style>
+    :root {
+      --primary: #00A8E1;
+      --success: #00C853;
+      --error: #D32F2F;
+      --warning: #FFB300;
+      --gray-100: #F5F5F5;
+      --gray-300: #E0E0E0;
+      --gray-700: #424242;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--gray-100);
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      color: var(--primary);
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 2em;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--gray-700);
+      margin-bottom: 30px;
+      font-size: 1.2em;
+    }
+
+    .progress-bar {
+      height: 30px;
+      background: var(--gray-300);
+      border-radius: 15px;
+      margin-bottom: 30px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--success));
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+
+    .section {
+      display: none;
+    }
+
+    .section.active {
+      display: block;
+      animation: fadeIn 0.5s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-title {
+      color: var(--primary);
+      font-size: 1.8em;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 3px solid var(--primary);
+    }
+
+    .section-content {
+      font-size: 1.05em;
+      margin-bottom: 30px;
+    }
+
+    .section-content h3 {
+      color: var(--success);
+      margin-top: 25px;
+      margin-bottom: 15px;
+      font-size: 1.3em;
+    }
+
+    .section-content h4 {
+      color: var(--primary);
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    .section-content ul {
+      margin-left: 25px;
+      margin-bottom: 15px;
+    }
+
+    .section-content li {
+      margin-bottom: 8px;
+    }
+
+    .highlight {
+      background: #FFF9C4;
+      padding: 15px;
+      border-left: 4px solid var(--warning);
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+
+    .example {
+      background: #E3F2FD;
+      padding: 15px;
+      border-left: 4px solid var(--primary);
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+
+    .quiz {
+      background: var(--gray-100);
+      padding: 30px;
+      border-radius: 8px;
+      margin-top: 40px;
+    }
+
+    .quiz-title {
+      font-size: 1.4em;
+      color: var(--primary);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .question {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .question-text {
+      font-weight: bold;
+      margin-bottom: 15px;
+      font-size: 1.1em;
+      color: var(--gray-700);
+    }
+
+    .answer-option {
+      display: block;
+      padding: 12px;
+      margin: 8px 0;
+      background: white;
+      border: 2px solid var(--gray-300);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .answer-option:hover {
+      border-color: var(--primary);
+      background: #E3F4FC;
+    }
+
+    .answer-option input[type="radio"] {
+      margin-right: 10px;
+    }
+
+    .answer-option.correct {
+      border-color: var(--success);
+      background: #E8F5E9;
+    }
+
+    .answer-option.incorrect {
+      border-color: var(--error);
+      background: #FFEBEE;
+    }
+
+    .submit-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 15px 40px;
+      font-size: 1.1em;
+      border-radius: 8px;
+      cursor: pointer;
+      display: block;
+      margin: 30px auto 0;
+      transition: background 0.2s;
+    }
+
+    .submit-btn:hover {
+      background: var(--success);
+    }
+
+    .submit-btn:disabled {
+      background: var(--gray-300);
+      cursor: not-allowed;
+    }
+
+    .result-message {
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      text-align: center;
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+
+    .result-message.success {
+      background: var(--success);
+      color: white;
+    }
+
+    .result-message.error {
+      background: var(--error);
+      color: white;
+    }
+
+    .completion-card {
+      text-align: center;
+      padding: 60px 40px;
+    }
+
+    .completion-card h2 {
+      color: var(--success);
+      font-size: 2.5em;
+      margin-bottom: 20px;
+    }
+
+    .completion-card p {
+      font-size: 1.3em;
+      margin: 15px 0;
+    }
+
+    .trophy {
+      font-size: 5em;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>EMPATİK LİDERLİK EĞİTİMİ</h1>
+    <p class="subtitle">Eylemlerinizin Ekibinizi Nasıl Etkilediğini Anlamak</p>
+
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress">0%</div>
+    </div>
+
+    <!-- SECTION 1: INTRODUCTION -->
+    <div class="section active" data-section="1">
+      <h2 class="section-title">Giriş: Bu Neden Önemli?</h2>
+      <div class="section-content">
+        <div class="highlight">
+          <p><strong>Ekibiniz yaptığınız her şeyi izler.</strong> Araştırmalar, çalışanların işleri hakkında nasıl hissettiklerinin %70'inin doğrudan süpervizörlerinden geldiğini gösteriyor (Gallup Çalışması).</p>
+        </div>
+
+        <h3>Empati ile liderlik ettiğinizde, ekibiniz:</h3>
+        <ul>
+          <li>Sizin için daha çok çalışır</li>
+          <li>Daha az hata yapar</li>
+          <li>İşte daha uzun süre kalır</li>
+          <li>Size daha fazla saygı duyar</li>
+        </ul>
+
+        <p><strong>"Patron" olmak yeterli değildir.</strong> İnsanlar unvanları takip etmez—kendilerini değerli hissettiren liderleri takip ederler.</p>
+
+        <div class="example">
+          <strong>Önemli Not:</strong> Bu eğitim, liderlik tarzınızı geliştirmenize ve ekibinizle daha iyi ilişkiler kurmanıza yardımcı olacaktır. Her bölümü dikkatlice okuyun ve test sorularını %100 başarıyla tamamlayın.
+        </div>
+      </div>
+
+      <div class="quiz">
+        <h3 class="quiz-title">📝 Bölüm 1 Testi</h3>
+        <div id="quiz-1"></div>
+        <button class="submit-btn" onclick="checkAnswers(1)">Cevapları Kontrol Et</button>
+        <div id="result-1"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: PART 1 -->
+    <div class="section" data-section="2">
+      <h2 class="section-title">Bölüm 1: Doğal Tarzınızı Anlamak</h2>
+      <div class="section-content">
+        <h3>Zorluğunuz: Yüksek Ses + Ciddi Yüz = Korku</h3>
+
+        <div class="highlight">
+          <p><strong>Sizin düşünceniz:</strong> "Ben sadece normal konuşuyorum" veya "Bu sadece benim yüzüm"</p>
+          <p><strong>Ekibinizin gördüğü:</strong> Öfke, onaylamama, tehlike</p>
+        </div>
+
+        <h4>Bu neden önemli:</h4>
+        <p>İnsan beyni bir "tehdit dedektörüne" sahiptir (amigdala). İnsanlar yüksek sesler duyduklarında veya kızgın yüzler gördüklerinde, beyinleri düşünür: "TEHLİKE! Kendimi korumam gerek." Bu olduğunda:</p>
+        <ul>
+          <li>Net düşünmeyi bırakırlar</li>
+          <li>Daha fazla hata yaparlar</li>
+          <li>Sizinle konuşmaktan kaçınırlar</li>
+          <li>Bütün gün stresli hissederler</li>
+        </ul>
+
+        <div class="example">
+          <strong>Bilimsel gerçek:</strong> Çalışmalar, insanlar işte tehdit altında hissettiklerinde performanslarının %30-40 düştüğünü gösteriyor (Harvard Business Review). Ekibiniz korku içindeyken kelimenin tam anlamıyla en iyi işlerini yapamazlar.
+        </div>
+
+        <h4>Çözüm:</h4>
+        <p>Ses tonunuzu ve yüz ifadenizi kontrol altına almayı öğrenmek, ekibinizin sizinle rahat çalışmasını sağlar. Bu sadece "kibar olmak" değil—iş performansını doğrudan etkileyen bir bilim meselesidir.</p>
+      </div>
+
+      <div class="quiz">
+        <h3 class="quiz-title">📝 Bölüm 2 Testi</h3>
+        <div id="quiz-2"></div>
+        <button class="submit-btn" onclick="checkAnswers(2)">Cevapları Kontrol Et</button>
+        <div id="result-2"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 3: THE DO'S -->
+    <div class="section" data-section="3">
+      <h2 class="section-title">Bölüm 2: Yapılacaklar - Her Gün Güven İnşa Edin</h2>
+      <div class="section-content">
+
+        <h3>✓ YAPIN: Ses Seviyenizi Düşürün</h3>
+        <p><strong>Neden:</strong> Yumuşak sesler = güvenlik. Yüksek sesler = tehdit. Kızgın olmasanız bile, ses seviyesi korku tepkilerini tetikler.</p>
+        <p><strong>Nasıl yapılır:</strong></p>
+        <ul>
+          <li>Konuşmadan önce bir nefes alın</li>
+          <li>Kütüphanede olduğunuzu hayal edin</li>
+          <li>Biri sizi 3 metre öteden duyabiliyorsa, çok yüksek konuşuyorsunuz</li>
+          <li>Bir iş arkadaşınızla pratik yapın: çok yüksek olduğunuzda işaret etmelerini isteyin</li>
+        </ul>
+        <div class="example">
+          <strong>Gerçek örnek:</strong> Mutfağın diğer ucundan "BU NEDEN BİTMEDİ?" diye bağırmak yerine, yaklaşın ve sessizce "Hey, bu nasıl gidiyor?" deyin.
+        </div>
+
+        <h3>✓ YAPIN: Yüzünüzü Yumuşatın</h3>
+        <p><strong>Neden:</strong> Yüzünüz insanların gördüğü ilk şeydir. Araştırmalar, birinin hakkınızda fikir oluşturmasının sadece 7 saniye sürdüğünü ve yüz ifadenizin bu fikrin %55'ini oluşturduğunu gösteriyor.</p>
+        <p><strong>Nasıl yapılır:</strong></p>
+        <ul>
+          <li>Kaşlarınızı gevşetin (kızgın yüzlerde kaşlar gergindir)</li>
+          <li>Gülümsediğinizde dişlerinizi gösterin—küçük bir gülümseme bile yardımcı olur</li>
+          <li>Biriyle konuşmadan önce, 2 saniye sizi mutlu eden bir şey düşünün</li>
+          <li>Evde aynada pratik yapın</li>
+        </ul>
+
+        <h3>✓ YAPIN: Her Görevin Arkasındaki "Neden"i Açıklayın</h3>
+        <p><strong>Neden:</strong> İnsanlar BİR şeyi NEDEN yaptıklarını anladıklarında, %40 daha iyi yaparlar (Teresa Amabile, Harvard). "Neden" olmadan görevler anlamsız ve sinir bozucu hissedilir.</p>
+        <div class="example">
+          <strong>Gerçek örnek:</strong><br>
+          ❌ "Bu sebzeleri şimdi kes."<br>
+          ✓ "Bu sebzeleri şimdi kes, böylece akşam ekibi her şeyi hazır bulur. Hazırlık doğru yapıldığında, tüm restoran sorunsuz çalışır."
+        </div>
+
+        <h3>✓ YAPIN: HER Seferinde "Lütfen" ve "Teşekkür Ederim" Deyin</h3>
+        <p><strong>Neden:</strong> Bu kelimeler insanlara "Seni bir makine değil, bir insan olarak görüyorum" der. Çalışmalar, takdir edilen çalışanların %50 daha üretken olduğunu ve işten ayrılma olasılığının %44 daha az olduğunu gösteriyor.</p>
+
+        <h3>✓ YAPIN: Kontrol Edin, Sadece Denetlemeyin</h3>
+        <p><strong>Fark:</strong> "İşini yapıyor musun?" (denetleme = güvensizlik) ile "Nasıl gidiyor? Bir şeye ihtiyacın var mı?" (kontrol etme = destek) arasında fark var.</p>
+
+        <h3>✓ YAPIN: Özel Düzeltin, Açıkça Övün</h3>
+        <p><strong>Neden:</strong> Başkalarının önünde düzeltilmek utancı tetikler. Utanç insanları savunmacı ve kızgın yapar—öğrenmeyi bırakırlar. Ama başkalarının önünde övgü güven oluşturur.</p>
+      </div>
+
+      <div class="quiz">
+        <h3 class="quiz-title">📝 Bölüm 3 Testi</h3>
+        <div id="quiz-3"></div>
+        <button class="submit-btn" onclick="checkAnswers(3)">Cevapları Kontrol Et</button>
+        <div id="result-3"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: THE DON'TS -->
+    <div class="section" data-section="4">
+      <h2 class="section-title">Bölüm 3: Yapılmayacaklar - Güveni Kıran Şeyler</h2>
+      <div class="section-content">
+
+        <h3>✗ YAPMAYIN: Alay veya Alaycılık Kullanmayın</h3>
+        <p><strong>Neden:</strong> Size şaka gibi gelen şey, onlara aşağılama gibi gelebilir. Alaycılık kaygı yaratır çünkü insanlar ciddi mi yoksa şaka mı yaptığınızı asla bilemezler.</p>
+        <div class="example">
+          <strong>Gerçek örnek:</strong><br>
+          ❌ "Vay canına, sebze kesmeyi dün mü öğrendin?" (Hakaret gibi hissedilir)<br>
+          ✓ "Bu kesimler daha düzgün olmalı. Burada nasıl yaptığımızı göstereyim." (Öğretim gibi hissedilir)
+        </div>
+
+        <h3>✗ YAPMAYIN: İnsanların Duygularını Görmezden Gelin</h3>
+        <p><strong>Neden:</strong> "Duygularını kapıda bırak" işe yaramaz. Sinirbilim, duyguları işten ayıramayacağımızı kanıtlıyor—duygularımız yaptığımız her şeyi etkiler.</p>
+        <p><strong>Bunun yerine ne yapmalı:</strong></p>
+        <ul>
+          <li>Biri üzgün görünüyorsa, sorun: "İyi misin?"</li>
+          <li>Sorunlarını çözmeniz gerekmiyor—sadece onaylamanız yeterli</li>
+          <li>"Bunun sinir bozucu olduğunu anlıyorum" demek size hiçbir şeye mal olmaz ama her şey demektir</li>
+        </ul>
+
+        <h3>✗ YAPMAYIN: Kayırma Yapmayın</h3>
+        <p><strong>Neden:</strong> Saygınızı kaybetmenin en hızlı yolu insanlara farklı davranmaktır. İnsanlar haksız muamele gördüklerinde, size olan güvenlerini tamamen kaybederler.</p>
+        <p><strong>Nasıl kaçınılır:</strong></p>
+        <ul>
+          <li>Herkese aynı molaları verin</li>
+          <li>Kuralları herkes için aynı şekilde uygulayın</li>
+          <li>İyi ve kötü görevleri adil dağıtın</li>
+          <li>Bazı insanlarla şakalaşıp diğerlerini görmezden gelmeyin</li>
+        </ul>
+
+        <h3>✗ YAPMAYIN: Onların Çalışmalarının Hakkını Yemeyin</h3>
+        <p><strong>Neden:</strong> Morali bozan hiçbir şey bu kadar hızlı değildir. Hakkını yediğinizde, insanlar görünmez ve kullanılmış hissederler.</p>
+        <div class="example">
+          <strong>Bunun yerine ne yapmalı:</strong> Patron iyi bir şey kimin yaptığını sorduğunda, ekip üyenizin adını söyleyin. "Maria bunu yaptı" deyin, "Biz bunu yaptık" veya "Ben bunu yaptım" değil.
+        </div>
+
+        <h3>✗ YAPMAYIN: Kızgınken Liderlik Etmeyin</h3>
+        <p><strong>Neden:</strong> Öfke bulaşıcıdır. Kızgın olduğunuzda, ekibiniz endişelenir, hatalar yapar ve tüm mutfak zarar görür. Araştırmalar, kızgın liderlerin ekip performansını %35 düşürdüğünü gösteriyor.</p>
+        <p><strong>Bunun yerine ne yapmalı:</strong></p>
+        <ul>
+          <li>Kızgın mı hissediyorsunuz? Ekipten 2 dakika uzaklaşın</li>
+          <li>5 kez yavaşça nefes alın</li>
+          <li>Sakinleştiğinizde geri dönün</li>
+          <li>Sorunları yine de ele alabilirsiniz—sadece sakince yapın</li>
+        </ul>
+      </div>
+
+      <div class="quiz">
+        <h3 class="quiz-title">📝 Bölüm 4 Testi</h3>
+        <div id="quiz-4"></div>
+        <button class="submit-btn" onclick="checkAnswers(4)">Cevapları Kontrol Et</button>
+        <div id="result-4"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 5: DAILY PRACTICE -->
+    <div class="section" data-section="5">
+      <h2 class="section-title">Bölüm 4: Günlük Uygulama</h2>
+      <div class="section-content">
+
+        <h3>Her Vardiyaya Doğru Başlayın</h3>
+        <ol>
+          <li><strong>Herkesi ismiyle selamlayın</strong> (onları birey olarak gördüğünüzü gösterir)</li>
+          <li><strong>Konuşmadan önce yüzünüzü yumuşatın</strong></li>
+          <li><strong>Günün hedeflerini ve neden önemli olduklarını açıklayın</strong></li>
+        </ol>
+
+        <h3>Vardiya Sırasında</h3>
+        <ol>
+          <li><strong>Ses seviyenizi düşürün</strong> (her saat kendinizi kontrol edin)</li>
+          <li><strong>Lütfen ve teşekkür ederim deyin</strong> (vardiya başına en az 10 kez)</li>
+          <li><strong>Gerektiğinde özel düzeltin</strong></li>
+          <li><strong>Hak edildiğinde açıkça övün</strong></li>
+        </ol>
+
+        <h3>Her Vardiyayı Güçlü Bitirin</h3>
+        <ol>
+          <li><strong>Ekibe çalışmaları için teşekkür edin</strong></li>
+          <li><strong>Neyin iyi gittiğini kabul edin</strong> (küçük olsa bile)</li>
+          <li><strong>Olumlu bir notla ayrılın</strong>—son sözleriniz onlarda kalır</li>
+        </ol>
+
+        <div class="highlight">
+          <h4>SAYGI HAKKINDAKİ GERÇEK</h4>
+          <p><strong>Düşünebilirsiniz:</strong> "Çok kibar olursam, bana saygı duymayacaklar."</p>
+          <p><strong>Gerçek:</strong> Araştırmalar tam tersini kanıtlıyor. En saygı duyulan liderler:</p>
+          <ul>
+            <li>Beklentiler konusunda net</li>
+            <li>Adil ve tutarlı</li>
+            <li>Sert ama nazik</li>
+            <li>İnsanları sorumlu tutar VE onlara saygıyla davranır</li>
+          </ul>
+          <p><strong>Güçlü VE empatik olabilirsiniz.</strong> Aslında, empatik liderler daha iyi sonuçlar alır çünkü ekipleri onlar için gerçekten çok çalışmak ister.</p>
+        </div>
+
+        <div class="example">
+          <h4>GÜNLÜK HATIRLATICANİZ</h4>
+          <p>Ekibinizdeki herhangi biriyle konuşmadan önce kendinize sorun:</p>
+          <ol>
+            <li>"Sesim sakin mi?"</li>
+            <li>"Yüzüm yumuşak mı?"</li>
+            <li>"Saygı gösteriyor muyum?"</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="quiz">
+        <h3 class="quiz-title">📝 Bölüm 5 Testi</h3>
+        <div id="quiz-5"></div>
+        <button class="submit-btn" onclick="checkAnswers(5)">Cevapları Kontrol Et</button>
+        <div id="result-5"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 6: FINAL THOUGHTS -->
+    <div class="section" data-section="6">
+      <h2 class="section-title">Son Düşünceler</h2>
+      <div class="section-content">
+
+        <div class="highlight">
+          <h3>Ekibinizin mükemmel bir lidere ihtiyacı yok. İhtiyaç duydukları lider:</h3>
+          <ul>
+            <li>Onları anlamaya çalışır</li>
+            <li>Onlara saygıyla davranır</li>
+            <li>Başarılı olmalarına yardımcı olur</li>
+          </ul>
+          <p style="color: var(--error); font-weight: bold; font-size: 1.2em; margin-top: 20px;">O lider siz olabilirsiniz.</p>
+        </div>
+
+        <h3>SON DÜŞÜNCE</h3>
+        <p style="font-size: 1.15em;">Liderlik en yüksek sesli veya en sert olmakla ilgili değildir. Ekibinizin en iyi işlerini yapabilecek kadar güvende hissetmelerini sağlamakla ilgilidir.</p>
+
+        <div class="example">
+          <p><strong>Ekibiniz sizinle saygılı, değerli ve güvende hissettiğinde:</strong></p>
+          <ul style="font-size: 1.1em;">
+            <li>Daha çok çalışırlar</li>
+            <li>Daha fazla önem verirler</li>
+            <li>Sizi iyi gösterirler</li>
+            <li>Mutfağın daha iyi çalışmasını sağlarlar</li>
+          </ul>
+          <p style="color: var(--error); font-weight: bold; font-size: 1.3em; text-align: center; margin-top: 20px;">
+            Sizin başarınız = Onların başarısı = Herkes kazanır
+          </p>
+        </div>
+
+        <div class="highlight">
+          <h4>Bu Eğitimden Hatırlanması Gerekenler:</h4>
+          <ol style="font-size: 1.05em;">
+            <li><strong>Ses tonunuz</strong> ekibinizin performansını doğrudan etkiler</li>
+            <li><strong>Yüz ifadeniz</strong> güven veya korku yaratabilir</li>
+            <li><strong>"Neden"i açıklamak</strong> motivasyonu %40 artırır</li>
+            <li><strong>Lütfen ve teşekkür ederim</strong> sadece nezaket değil, iş aracıdır</li>
+            <li><strong>Özel düzeltin, açıkça övün</strong> - bu basit kural güven oluşturur</li>
+            <li><strong>Duygular gerçektir</strong> - onları görmezden gelemezsiniz</li>
+            <li><strong>Adil olun</strong> - kayırma güveni yok eder</li>
+            <li><strong>Sakin kalın</strong> - öfke performansı %35 düşürür</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="quiz">
+        <h3 class="quiz-title">📝 Final Testi</h3>
+        <div id="quiz-6"></div>
+        <button class="submit-btn" onclick="checkAnswers(6)">Cevapları Kontrol Et</button>
+        <div id="result-6"></div>
+      </div>
+    </div>
+
+    <!-- COMPLETION SCREEN -->
+    <div class="section" data-section="completion">
+      <div class="completion-card">
+        <div class="trophy">🏆</div>
+        <h2>TEBRİKLER!</h2>
+        <p>Empatik Liderlik Eğitimini Başarıyla Tamamladınız!</p>
+        <p style="margin-top: 30px; font-size: 1.1em;">
+          Artık ekibinizle daha güçlü ilişkiler kurmak ve onların performansını artırmak için gerekli araçlara sahipsiniz.
+        </p>
+        <p style="margin-top: 20px; color: var(--primary); font-weight: bold;">
+          Öğrendiklerinizi her gün uygulayın ve farkı görün!
+        </p>
+        <button class="submit-btn" onclick="window.print()" style="margin-top: 40px;">
+          📄 Sertifikayı Yazdır
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Question bank for each section (4 questions per section, show 2 randomly)
+    const questionBank = {
+      1: [
+        {
+          question: "Araştırmalara göre, çalışanların işleri hakkında nasıl hissettiklerinin yüzde kaçı doğrudan süpervizörlerinden gelir?",
+          options: ["50%", "70%", "85%", "60%"],
+          correct: 1
+        },
+        {
+          question: "Empati ile liderlik ettiğinizde ekibinizde OLMAYAN değişiklik hangisidir?",
+          options: ["Daha çok çalışırlar", "Daha fazla maaş isterler", "Daha az hata yaparlar", "İşte daha uzun süre kalırlar"],
+          correct: 1
+        },
+        {
+          question: "İnsanlar ne takip ederler?",
+          options: ["Unvanları", "Maaşı", "Kendilerini değerli hissettiren liderleri", "Kuralları"],
+          correct: 2
+        },
+        {
+          question: "Başarılı liderlik için en önemli faktör nedir?",
+          options: ["Yüksek sesle konuşmak", "Sert olmak", "Ekibi değerli hissettirmek", "Çok kuralcı olmak"],
+          correct: 2
+        }
+      ],
+      2: [
+        {
+          question: "Yüksek ses ve ciddi yüz ekipte ne yaratır?",
+          options: ["Saygı", "Korku", "Motivasyon", "Verimlilik"],
+          correct: 1
+        },
+        {
+          question: "İnsanlar işte tehdit altında hissettiklerinde performansları ne kadar düşer?",
+          options: ["10-20%", "20-30%", "30-40%", "40-50%"],
+          correct: 2
+        },
+        {
+          question: "Beynin 'tehdit dedektörü' hangi bölgesidir?",
+          options: ["Hipokampus", "Serebellum", "Amigdala", "Korteks"],
+          correct: 2
+        },
+        {
+          question: "Ekip korku içindeyken NE olur?",
+          options: ["Daha hızlı çalışırlar", "Net düşünemezler ve daha fazla hata yaparlar", "Daha dikkatli olurlar", "Performansları artar"],
+          correct: 1
+        }
+      ],
+      3: [
+        {
+          question: "Ses seviyesini düşürmenin amacı nedir?",
+          options: ["Yorulmamak için", "Güvenlik hissi yaratmak", "Daha az konuşmak", "Enerji tasarrufu"],
+          correct: 1
+        },
+        {
+          question: "Birinin hakkınızda ilk izlenim oluşturması kaç saniye sürer?",
+          options: ["3 saniye", "7 saniye", "10 saniye", "15 saniye"],
+          correct: 1
+        },
+        {
+          question: "İnsanlar bir görevin 'neden'ini anladıklarında ne kadar daha iyi yaparlar?",
+          options: ["20%", "30%", "40%", "50%"],
+          correct: 2
+        },
+        {
+          question: "Hatayı düzeltirken ne yapmalısınız?",
+          options: ["Herkesin önünde söyleyin", "Yüksek sesle uyarın", "Kişiyi kenara çekip özel konuşun", "E-posta gönderin"],
+          correct: 2
+        }
+      ],
+      4: [
+        {
+          question: "Alaycılık işyerinde stresi ne kadar artırır?",
+          options: ["30%", "40%", "50%", "60%"],
+          correct: 3
+        },
+        {
+          question: "'Duygularını kapıda bırak' yaklaşımı neden işe yaramaz?",
+          options: ["Çalışanlar izin vermez", "Duygular işten ayrılamaz", "Zaman kaybıdır", "Yasalara aykırıdır"],
+          correct: 1
+        },
+        {
+          question: "Kayırma yapmak güveni nasıl etkiler?",
+          options: ["Artırır", "Etkilemez", "Tamamen yok eder", "Sadece azaltır"],
+          correct: 2
+        },
+        {
+          question: "Kızgın liderler ekip performansını ne kadar düşürür?",
+          options: ["15%", "25%", "35%", "45%"],
+          correct: 2
+        }
+      ],
+      5: [
+        {
+          question: "Vardiyaya nasıl başlamalısınız?",
+          options: ["Sessizce", "Herkesi ismiyle selamlayarak", "Kurallari hatırlatarak", "Görevleri dağıtarak"],
+          correct: 1
+        },
+        {
+          question: "Vardiya başına kaç kez 'lütfen' ve 'teşekkür ederim' demelisiniz?",
+          options: ["3-5 kez", "5-7 kez", "En az 10 kez", "En az 20 kez"],
+          correct: 2
+        },
+        {
+          question: "En saygı duyulan liderler HANGİSİ değildir?",
+          options: ["Tutarlı", "Adil", "Sert ve mesafeli", "Net"],
+          correct: 2
+        },
+        {
+          question: "Günlük hatırlatıcı sorulardan biri HANGİSİ değildir?",
+          options: ["Sesim sakin mi?", "Yüzüm yumuşak mı?", "Saygı gösteriyor muyum?", "Yeterince sert miyim?"],
+          correct: 3
+        }
+      ],
+      6: [
+        {
+          question: "Liderlik en çok NEYİ gerektirir?",
+          options: ["Yüksek ses", "Sertlik", "Ekibi güvende hissettirmek", "Çok kural"],
+          correct: 2
+        },
+        {
+          question: "Empatik liderler neden daha iyi sonuç alır?",
+          options: ["Daha yumuşaktırlar", "Ekip onlar için çalışmak ister", "Daha az çalışırlar", "Kuralsızdırlar"],
+          correct: 1
+        },
+        {
+          question: "Ekip güvende hissettiğinde NE olmaz?",
+          options: ["Daha çok çalışırlar", "Daha az önem verirler", "Lideri iyi gösterirler", "Mutfak daha iyi çalışır"],
+          correct: 1
+        },
+        {
+          question: "Hangi ifade DOĞRU değildir?",
+          options: ["Ses tonu performansı etkiler", "Duygular görmezden gelinebilir", "Açıklama yapmak motivasyonu artırır", "Öfke performansı düşürür"],
+          correct: 1
+        }
+      ]
+    };
+
+    let currentSection = 1;
+    let usedQuestions = {};
+    let attemptCounts = {};
+
+    // Initialize quiz for each section
+    function initQuiz(section) {
+      usedQuestions[section] = [];
+      attemptCounts[section] = 0;
+      loadQuestions(section);
+    }
+
+    // Load random 2 questions from the 4 available
+    function loadQuestions(section) {
+      const allQuestions = questionBank[section];
+      const available = allQuestions.filter((_, idx) => !usedQuestions[section].includes(idx));
+
+      // Reset if all questions have been used
+      if (available.length < 2) {
+        usedQuestions[section] = [];
+      }
+
+      const selected = [];
+      const availableIndices = allQuestions
+        .map((_, idx) => idx)
+        .filter(idx => !usedQuestions[section].includes(idx));
+
+      // Pick 2 random questions
+      while (selected.length < 2 && availableIndices.length > 0) {
+        const randomIdx = Math.floor(Math.random() * availableIndices.length);
+        const questionIdx = availableIndices[randomIdx];
+        selected.push(questionIdx);
+        availableIndices.splice(randomIdx, 1);
+      }
+
+      usedQuestions[section].push(...selected);
+
+      // Render questions
+      const quizContainer = document.getElementById(`quiz-${section}`);
+      quizContainer.innerHTML = '';
+
+      selected.forEach((qIdx, displayIdx) => {
+        const q = allQuestions[qIdx];
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'question';
+        questionDiv.setAttribute('data-question-idx', qIdx);
+
+        let html = `<div class="question-text">Soru ${displayIdx + 1}: ${q.question}</div>`;
+
+        q.options.forEach((option, optIdx) => {
+          html += `
+            <label class="answer-option">
+              <input type="radio" name="q${section}_${displayIdx}" value="${optIdx}">
+              ${option}
+            </label>
+          `;
+        });
+
+        questionDiv.innerHTML = html;
+        quizContainer.appendChild(questionDiv);
+      });
+    }
+
+    // Check answers
+    function checkAnswers(section) {
+      const quizContainer = document.getElementById(`quiz-${section}`);
+      const questions = quizContainer.querySelectorAll('.question');
+      let correctCount = 0;
+      let incorrectIndices = [];
+
+      questions.forEach((questionDiv, displayIdx) => {
+        const qIdx = parseInt(questionDiv.getAttribute('data-question-idx'));
+        const q = questionBank[section][qIdx];
+        const selected = document.querySelector(`input[name="q${section}_${displayIdx}"]:checked`);
+
+        if (!selected) {
+          incorrectIndices.push(displayIdx);
+          return;
+        }
+
+        const selectedValue = parseInt(selected.value);
+        const options = questionDiv.querySelectorAll('.answer-option');
+
+        options.forEach((option, optIdx) => {
+          option.classList.remove('correct', 'incorrect');
+          if (optIdx === q.correct) {
+            option.classList.add('correct');
+          } else if (optIdx === selectedValue && selectedValue !== q.correct) {
+            option.classList.add('incorrect');
+          }
+        });
+
+        if (selectedValue === q.correct) {
+          correctCount++;
+        } else {
+          incorrectIndices.push(displayIdx);
+        }
+      });
+
+      const resultDiv = document.getElementById(`result-${section}`);
+
+      if (correctCount === 2) {
+        resultDiv.innerHTML = '<div class="result-message success">✓ Tebrikler! Tüm soruları doğru cevapladınız. Bir sonraki bölüme geçebilirsiniz.</div>';
+
+        setTimeout(() => {
+          currentSection++;
+          if (currentSection <= 6) {
+            showSection(currentSection);
+            initQuiz(currentSection);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            showSection('completion');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }, 2000);
+      } else {
+        const wrongCount = 2 - correctCount;
+        resultDiv.innerHTML = `<div class="result-message error">✗ ${wrongCount} soru yanlış. Lütfen tekrar deneyin. Yeni sorular yükleniyor...</div>`;
+
+        attemptCounts[section]++;
+
+        setTimeout(() => {
+          resultDiv.innerHTML = '';
+
+          // Remove the specific wrong questions from usedQuestions to get new ones
+          if (incorrectIndices.length > 0) {
+            const newUsed = usedQuestions[section].filter((_, idx) =>
+              !incorrectIndices.includes(idx)
+            );
+            usedQuestions[section] = newUsed;
+          }
+
+          loadQuestions(section);
+        }, 2500);
+      }
+    }
+
+    // Show specific section
+    function showSection(sectionNum) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.querySelector(`[data-section="${sectionNum}"]`).classList.add('active');
+
+      // Update progress
+      if (sectionNum !== 'completion') {
+        const progress = ((sectionNum - 1) / 6) * 100;
+        document.getElementById('progress').style.width = progress + '%';
+        document.getElementById('progress').textContent = Math.round(progress) + '%';
+      } else {
+        document.getElementById('progress').style.width = '100%';
+        document.getElementById('progress').textContent = '100%';
+      }
+    }
+
+    // Initialize first quiz
+    initQuiz(1);
+  </script>
+</body>
+</html>
