@@ -443,44 +443,48 @@ function suggestParLevelAdjustment(item, historicalData) {
  * Send order email via EmailJS
  */
 async function sendOrderEmail(order, orderDate) {
-  // Format data for EmailJS template
+  // Format data for EmailJS template - matching PM flow structure
   const templateParams = {
+    to_email: ORDER_EMAIL,
     vendor: order.vendor,
     order_date: orderDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
     delivery_date: order.deliveryDate,
     cutoff_time: order.cutoffTime,
-    total_items: order.items.length,
+    total_items: order.items.length.toString(),
     generated_time: new Date().toLocaleTimeString('en-US'),
     generated_timestamp: new Date().toISOString(),
 
-    // Order items (remove reasoning field - not in template)
-    items: order.items.map(item => ({
-      name: item.name,
-      qty: item.qty,
-      unit: item.unit,
-      stock: item.stock,
-      par: item.par
-    })),
-
     // Algorithm insights
     calculation_method: 'AI-powered predictive ordering with historical consumption analysis',
-    days_covered: order.daysUntilNextDelivery,
-    historical_days: 30,
-    consumption_trend: calculateOverallTrend(order.items)
+    days_covered: order.daysUntilNextDelivery.toString(),
+    historical_days: '30',
+    consumption_trend: calculateOverallTrend(order.items) || 'Stable',
+
+    // Special notes
+    special_notes: order.daysUntilNextDelivery > 1
+      ? `This order covers ${order.daysUntilNextDelivery} days until next delivery`
+      : '',
+
+    // Order items array
+    items: order.items.map(item => ({
+      name: String(item.name || ''),
+      qty: String(item.qty || 0),
+      unit: String(item.unit || ''),
+      stock: String(item.stock || 0),
+      par: String(item.par || 0)
+    })),
+
+    // Alerts array
+    alerts: order.alerts.length > 0 ? order.alerts.map(a => String(a.message)) : [],
+
+    // Par suggestions array
+    par_suggestions: order.parSuggestions.length > 0 ? order.parSuggestions.map(p => ({
+      item: String(p.item || ''),
+      current: String(p.current || 0),
+      suggested: String(p.suggested || 0),
+      reason: String(p.reason || '')
+    })) : []
   };
-
-  // Only add optional fields if they have values (EmailJS doesn't like null)
-  if (order.daysUntilNextDelivery > 1) {
-    templateParams.special_notes = `This order covers ${order.daysUntilNextDelivery} days until next delivery`;
-  }
-
-  if (order.alerts.length > 0) {
-    templateParams.alerts = order.alerts.map(a => a.message);
-  }
-
-  if (order.parSuggestions.length > 0) {
-    templateParams.par_suggestions = order.parSuggestions;
-  }
 
   // Send via EmailJS API
   // IMPORTANT: Only send variables that exist in the HTML template
