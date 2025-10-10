@@ -22,9 +22,9 @@ const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Gmail configuration
-const GMAIL_USER = process.env.GMAIL_USER || 'demetri7@gmail.com';
+const GMAIL_USER = 'jaynascans@gmail.com';  // Sending account
 const ORDERS_GMAIL_APP_PASSWORD = process.env.ORDERS_GMAIL_APP_PASSWORD;
-const ORDER_EMAIL = process.env.ORDER_EMAIL || 'demetri7@gmail.com';
+const ORDER_EMAIL = process.env.ORDER_EMAIL || 'demetri7@gmail.com';  // Recipient
 
 // Vendor schedules
 const VENDOR_SCHEDULES = {
