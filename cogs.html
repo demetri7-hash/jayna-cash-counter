@@ -1248,6 +1248,9 @@
         });
       }
 
+      // Merge multi-page invoices from same vendor
+      mergeMultiPageInvoices();
+
       // Display all extracted invoices
       displayMultipleInvoices();
 
@@ -2300,12 +2303,19 @@
 
         if (error) throw error;
 
+        // Process and save line items to inventory
+        const itemsProcessed = await processLineItemsToInventory(extractedInvoices);
+
         // Clear page images to free memory (they're large data URLs)
         extractedInvoices.forEach(invoice => {
           delete invoice.pageImageUrl;
         });
 
-        alert(`✓ Successfully saved ${invoicesToSave.length} invoice${invoicesToSave.length > 1 ? 's' : ''}!`);
+        let successMessage = `✓ Successfully saved ${invoicesToSave.length} invoice${invoicesToSave.length > 1 ? 's' : ''}!`;
+        if (itemsProcessed.created > 0 || itemsProcessed.updated > 0) {
+          successMessage += `\n\nInventory Items:\n- Created: ${itemsProcessed.created}\n- Updated: ${itemsProcessed.updated}\n- Skipped: ${itemsProcessed.skipped}`;
+        }
+        alert(successMessage);
 
         // Reset form
         document.getElementById('invoiceFile').value = '';
@@ -2709,6 +2719,200 @@
 
       ctx.putImageData(new ImageData(smoothed, width, height), 0, 0);
       return canvas;
+    }
+
+    // ========== Line Items to Inventory Processing ==========
+    async function processLineItemsToInventory(invoices) {
+      const stats = { created: 0, updated: 0, skipped: 0 };
+
+      try {
+        // First, load all existing inventory items
+        const { data: existingItems, error: loadError } = await supabase
+          .from('inventory_items')
+          .select('*');
+
+        if (loadError) {
+          console.error('Error loading inventory items:', loadError);
+          return stats;
+        }
+
+        // Process each invoice's line items
+        for (const invoice of invoices) {
+          if (!invoice.items || invoice.items.length === 0) continue;
+
+          for (const lineItem of invoice.items) {
+            // Skip invalid items
+            if (!lineItem.description || lineItem.description.trim().length < 3) {
+              stats.skipped++;
+              continue;
+            }
+
+            const itemName = lineItem.description.trim().toUpperCase();
+
+            // Check if item exists (fuzzy match by name)
+            const existingItem = existingItems.find(item =>
+              item.item_name.toUpperCase() === itemName ||
+              item.item_name.toUpperCase().includes(itemName) ||
+              itemName.includes(item.item_name.toUpperCase())
+            );
+
+            if (existingItem) {
+              // Update existing item with new cost/vendor
+              const updates = {};
+              let shouldUpdate = false;
+
+              // Update cost if we have unit price
+              if (lineItem.unit_price && lineItem.unit_price > 0) {
+                updates.cost = lineItem.unit_price;
+                shouldUpdate = true;
+              }
+
+              // Update vendor if we have vendor ID
+              if (invoice.vendorId && existingItem.vendor_id !== invoice.vendorId) {
+                updates.vendor_id = invoice.vendorId;
+                shouldUpdate = true;
+              }
+
+              // Update vendor name
+              if (invoice.vendorName) {
+                updates.vendor = invoice.vendorName;
+                shouldUpdate = true;
+              }
+
+              // Update unit if we have it
+              if (lineItem.unit) {
+                updates.unit = lineItem.unit;
+                shouldUpdate = true;
+              }
+
+              if (shouldUpdate) {
+                const { error: updateError } = await supabase
+                  .from('inventory_items')
+                  .update(updates)
+                  .eq('id', existingItem.id);
+
+                if (!updateError) {
+                  stats.updated++;
+                  console.log(`Updated inventory item: ${itemName}`);
+                } else {
+                  console.error('Error updating item:', updateError);
+                  stats.skipped++;
+                }
+              } else {
+                stats.skipped++;
+              }
+            } else {
+              // Create new inventory item
+              const newItem = {
+                item_name: itemName,
+                category: 'Uncategorized', // Default category
+                unit: lineItem.unit || 'EA',
+                par_level: null,
+                cost: lineItem.unit_price || 0,
+                vendor_id: invoice.vendorId || null,
+                vendor: invoice.vendorName || null,
+                barcode: null,
+                order_frequency: 'weekly'
+              };
+
+              const { error: createError } = await supabase
+                .from('inventory_items')
+                .insert([newItem]);
+
+              if (!createError) {
+                stats.created++;
+                console.log(`Created inventory item: ${itemName}`);
+                // Add to existingItems array for future matches in same batch
+                existingItems.push({ ...newItem, id: Date.now() }); // Temporary ID
+              } else {
+                console.error('Error creating item:', createError);
+                stats.skipped++;
+              }
+            }
+          }
+        }
+
+        console.log('Line items processing complete:', stats);
+        return stats;
+
+      } catch (error) {
+        console.error('Error processing line items to inventory:', error);
+        return stats;
+      }
+    }
+
+    // ========== Multi-Page Invoice Merging ==========
+    function mergeMultiPageInvoices() {
+      if (!extractedInvoices || extractedInvoices.length < 2) return;
+
+      const merged = [];
+      let i = 0;
+
+      while (i < extractedInvoices.length) {
+        const current = extractedInvoices[i];
+        let mergedInvoice = { ...current };
+        let pagesToMerge = [current.pageNumber];
+
+        // Look ahead for consecutive pages from same vendor
+        let j = i + 1;
+        while (j < extractedInvoices.length) {
+          const next = extractedInvoices[j];
+
+          // Check if same vendor and consecutive pages
+          const isSameVendor = (current.vendorId && next.vendorId && current.vendorId === next.vendorId) ||
+                               (current.vendorName && next.vendorName &&
+                                current.vendorName.toLowerCase().trim() === next.vendorName.toLowerCase().trim());
+
+          const isConsecutivePage = next.pageNumber === current.pageNumber + (j - i);
+
+          if (isSameVendor && isConsecutivePage) {
+            console.log(`Merging page ${next.pageNumber} with page ${current.pageNumber} (${current.vendorName})`);
+
+            // Merge line items
+            mergedInvoice.items = [...(mergedInvoice.items || []), ...(next.items || [])];
+
+            // Use the LAST page's totals (usually page 2 has the final total)
+            mergedInvoice.total = next.total || mergedInvoice.total;
+            mergedInvoice.subtotal = next.subtotal || mergedInvoice.subtotal;
+            mergedInvoice.tax = next.tax || mergedInvoice.tax;
+            mergedInvoice.deliveryFee = next.deliveryFee || mergedInvoice.deliveryFee;
+            mergedInvoice.driverFee = next.driverFee || mergedInvoice.driverFee;
+
+            // Use better invoice number/date if found on later pages
+            if (!mergedInvoice.invoiceNumber && next.invoiceNumber) {
+              mergedInvoice.invoiceNumber = next.invoiceNumber;
+            }
+            if (!mergedInvoice.date && next.date) {
+              mergedInvoice.date = next.date;
+            }
+
+            // Combine OCR text
+            mergedInvoice.ocrText = (mergedInvoice.ocrText || '') + '\n\n--- PAGE ' + next.pageNumber + ' ---\n\n' + (next.ocrText || '');
+
+            // Track merged pages
+            pagesToMerge.push(next.pageNumber);
+
+            j++;
+          } else {
+            break; // Not same vendor or not consecutive
+          }
+        }
+
+        // Update page number display if merged
+        if (pagesToMerge.length > 1) {
+          mergedInvoice.pageNumber = `${pagesToMerge[0]}-${pagesToMerge[pagesToMerge.length - 1]}`;
+          console.log(`Merged ${pagesToMerge.length} pages into one invoice: ${mergedInvoice.vendorName} (pages ${mergedInvoice.pageNumber})`);
+        }
+
+        merged.push(mergedInvoice);
+        i = j; // Skip merged pages
+      }
+
+      // Update extractedInvoices with merged data
+      if (merged.length < extractedInvoices.length) {
+        console.log(`Reduced ${extractedInvoices.length} pages to ${merged.length} invoices after merging`);
+        extractedInvoices = merged;
+      }
     }
 
     // ========== Vendor Selection ==========
