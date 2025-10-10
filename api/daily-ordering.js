@@ -483,18 +483,23 @@ async function sendOrderEmail(order, orderDate) {
   }
 
   // Send via EmailJS API
+  // IMPORTANT: Only send variables that exist in the HTML template
+  const emailData = {
+    service_id: EMAILJS_SERVICE_ID,
+    template_id: EMAILJS_TEMPLATE_ID_ORDERS,
+    user_id: EMAILJS_USER_ID,
+    accessToken: EMAILJS_PRIVATE_KEY,
+    template_params: templateParams  // ONLY variables in the template HTML
+  };
+
+  console.log('📧 Sending email with params:', JSON.stringify(emailData, null, 2));
+
   const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      service_id: EMAILJS_SERVICE_ID,
-      template_id: EMAILJS_TEMPLATE_ID_ORDERS,
-      user_id: EMAILJS_USER_ID,
-      accessToken: EMAILJS_PRIVATE_KEY,
-      template_params: templateParams
-    })
+    body: JSON.stringify(emailData)
   });
 
   if (!response.ok) {
