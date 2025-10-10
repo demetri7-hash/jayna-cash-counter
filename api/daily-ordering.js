@@ -453,29 +453,34 @@ async function sendOrderEmail(order, orderDate) {
     generated_time: new Date().toLocaleTimeString('en-US'),
     generated_timestamp: new Date().toISOString(),
 
-    // Special notes for multi-day orders
-    special_notes: order.daysUntilNextDelivery > 1
-      ? `This order covers ${order.daysUntilNextDelivery} days until next delivery`
-      : null,
-
-    // Order items
-    items: order.items,
+    // Order items (remove reasoning field - not in template)
+    items: order.items.map(item => ({
+      name: item.name,
+      qty: item.qty,
+      unit: item.unit,
+      stock: item.stock,
+      par: item.par
+    })),
 
     // Algorithm insights
     calculation_method: 'AI-powered predictive ordering with historical consumption analysis',
     days_covered: order.daysUntilNextDelivery,
     historical_days: 30,
-    consumption_trend: calculateOverallTrend(order.items),
-
-    // Alerts (send as array of strings, or null if none)
-    alerts: order.alerts.length > 0 ? order.alerts.map(a => a.message) : null,
-
-    // Par level suggestions (send as array, or null if none)
-    par_suggestions: order.parSuggestions.length > 0 ? order.parSuggestions : null,
-
-    // Email destination
-    to_email: ORDER_EMAIL
+    consumption_trend: calculateOverallTrend(order.items)
   };
+
+  // Only add optional fields if they have values (EmailJS doesn't like null)
+  if (order.daysUntilNextDelivery > 1) {
+    templateParams.special_notes = `This order covers ${order.daysUntilNextDelivery} days until next delivery`;
+  }
+
+  if (order.alerts.length > 0) {
+    templateParams.alerts = order.alerts.map(a => a.message);
+  }
+
+  if (order.parSuggestions.length > 0) {
+    templateParams.par_suggestions = order.parSuggestions;
+  }
 
   // Send via EmailJS API
   const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
