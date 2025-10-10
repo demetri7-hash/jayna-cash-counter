@@ -9378,6 +9378,28 @@
 
       // Alert to confirm completion
       console.log('%c🎯 If you can see this log but NOT the yellow form, check browser zoom or viewport!', 'background: orange; color: black; font-size: 16px; padding: 10px;');
+
+      // EMERGENCY FIX: If width is 0, force it directly
+      const rect = form.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        console.error('%c❌ FORM HAS ZERO DIMENSIONS! Applying emergency fix...', 'background: red; color: white; font-size: 16px; padding: 10px;');
+
+        // Check parent container
+        const content = form.parentElement;
+        const container = content ? content.parentElement : null;
+        console.log('Parent .content element:', content);
+        console.log('Parent .content rect:', content ? content.getBoundingClientRect() : 'N/A');
+        console.log('Grandparent .container element:', container);
+        console.log('Grandparent .container rect:', container ? container.getBoundingClientRect() : 'N/A');
+
+        // Force dimensions on form
+        form.style.width = '100%';
+        form.style.maxWidth = '1200px';
+        form.style.margin = '0 auto';
+        form.style.display = 'block';
+        console.log('Applied emergency width fix');
+        console.log('New rect:', form.getBoundingClientRect());
+      }
     } catch (error) {
       console.error('Error loading ordering system data:', error);
       showMessage(`Error: ${error.message}`, 'error');
