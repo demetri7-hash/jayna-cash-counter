@@ -1044,7 +1044,12 @@
           viewport: viewport
         }).promise;
 
-        // Run OCR on canvas
+        // Preprocess image for better OCR accuracy
+        document.getElementById('ocrProgress').textContent =
+          `Preprocessing page ${pageNum} for better accuracy...`;
+        preprocessImage(canvas);
+
+        // Run OCR on preprocessed canvas
         document.getElementById('ocrProgress').textContent =
           `Reading text from page ${pageNum}... 0%`;
 
@@ -1052,6 +1057,8 @@
           canvas,
           'eng',
           {
+            tessedit_pageseg_mode: '1', // Automatic page segmentation with OSD
+            preserve_interword_spaces: '1',
             logger: (m) => {
               if (m.status === 'recognizing text') {
                 document.getElementById('ocrProgress').textContent =
@@ -1096,12 +1103,41 @@
     }
 
     async function processSingleImageInvoice() {
-      document.getElementById('ocrProgress').textContent = 'Loading OCR engine...';
+      document.getElementById('ocrProgress').textContent = 'Loading image...';
+
+      // Load image into canvas for preprocessing
+      const img = new Image();
+      const imageUrl = URL.createObjectURL(currentInvoiceFile);
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      // Create canvas with high resolution
+      const canvas = document.createElement('canvas');
+      const scale = 2.0; // Higher resolution for better OCR
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      URL.revokeObjectURL(imageUrl);
+
+      // Preprocess image for better OCR accuracy
+      document.getElementById('ocrProgress').textContent = 'Preprocessing image for better accuracy...';
+      preprocessImage(canvas);
+
+      // Run OCR on preprocessed canvas
+      document.getElementById('ocrProgress').textContent = 'Recognizing text... 0%';
 
       const result = await Tesseract.recognize(
-        currentInvoiceFile,
+        canvas,
         'eng',
         {
+          tessedit_pageseg_mode: '1', // Automatic page segmentation with OSD
+          preserve_interword_spaces: '1',
           logger: (m) => {
             if (m.status === 'recognizing text') {
               document.getElementById('ocrProgress').textContent = `Recognizing text... ${Math.round(m.progress * 100)}%`;
@@ -1320,37 +1356,67 @@
           /^(.{15,}?)\s+\$?\s*([\d,]+\.?\d*)$/
         ];
 
-        for (const pattern of itemPatterns) {
-          const match = line.match(pattern);
-          if (match && !line.toLowerCase().includes('total') &&
-              !line.toLowerCase().includes('tax') &&
-              !line.toLowerCase().includes('delivery') &&
-              !line.toLowerCase().includes('subtotal')) {
+        // Skip lines that are clearly not items
+        const skipPatterns = [
+          /lot\s*number/i,
+          /salesperson/i,
+          /customer\s*number/i,
+          /ship\s*to/i,
+          /sold\s*to/i,
+          /invoice\s*number/i,
+          /invoice\s*date/i,
+          /order\s*date/i,
+          /order\s*number/i,
+          /terms/i,
+          /f\.o\.b/i,
+          /ship\s*via/i,
+          /continued/i,
+          /customer\s*copy/i
+        ];
 
-            const item = {};
-
-            if (pattern === itemPatterns[0]) {
-              // Pattern 1
-              item.description = match[1].trim();
-              item.quantity = parseFloat(match[2]);
-              item.price = parseFloat(match[3].replace(/,/g, ''));
-            } else if (pattern === itemPatterns[1]) {
-              // Pattern 2
-              item.quantity = parseFloat(match[1]);
-              item.description = match[2].trim();
-              item.price = parseFloat(match[3].replace(/,/g, ''));
-            } else {
-              // Pattern 3 (no qty)
-              item.description = match[1].trim();
-              item.quantity = 1;
-              item.price = parseFloat(match[2].replace(/,/g, ''));
-            }
-
-            // Only add if price seems reasonable (not a date or something else)
-            if (item.price > 0 && item.price < 10000) {
-              result.items.push(item);
-            }
+        let shouldSkip = false;
+        for (const skipPattern of skipPatterns) {
+          if (skipPattern.test(line)) {
+            shouldSkip = true;
             break;
+          }
+        }
+
+        if (!shouldSkip) {
+          for (const pattern of itemPatterns) {
+            const match = line.match(pattern);
+            if (match && !line.toLowerCase().includes('total') &&
+                !line.toLowerCase().includes('tax') &&
+                !line.toLowerCase().includes('delivery') &&
+                !line.toLowerCase().includes('subtotal')) {
+
+              const item = {};
+
+              if (pattern === itemPatterns[0]) {
+                // Pattern 1: Description Qty Price
+                item.description = match[1].trim();
+                item.quantity = parseFloat(match[2]);
+                item.price = parseFloat(match[3].replace(/,/g, ''));
+              } else if (pattern === itemPatterns[1]) {
+                // Pattern 2: Qty Description Price
+                item.quantity = parseFloat(match[1]);
+                item.description = match[2].trim();
+                item.price = parseFloat(match[3].replace(/,/g, ''));
+              } else {
+                // Pattern 3 (no qty)
+                item.description = match[1].trim();
+                item.quantity = 1;
+                item.price = parseFloat(match[2].replace(/,/g, ''));
+              }
+
+              // Validate: price should be reasonable and description should be meaningful
+              if (item.price > 0.50 && item.price < 10000 &&
+                  item.quantity > 0 && item.quantity < 10000 &&
+                  item.description.length > 5) {
+                result.items.push(item);
+              }
+              break;
+            }
           }
         }
       });
@@ -1473,25 +1539,57 @@
             </div>
 
             <!-- Line items -->
-            ${invoice.items && invoice.items.length > 0 ? `
-              <details style="margin-top: 12px;">
-                <summary style="cursor: pointer; font-size: 12px; font-weight: bold;">
-                  ${invoice.items.length} line item${invoice.items.length > 1 ? 's' : ''} extracted
-                </summary>
-                <table class="items-table" style="font-size: 11px; margin-top: 8px;">
-                  <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
-                  <tbody>
-                    ${invoice.items.map(item => `
+            <details style="margin-top: 12px;" open>
+              <summary style="cursor: pointer; font-size: 12px; font-weight: bold;">
+                ${invoice.items && invoice.items.length > 0 ? invoice.items.length : '0'} line item${invoice.items && invoice.items.length !== 1 ? 's' : ''} extracted
+              </summary>
+              <div style="margin-top: 8px;">
+                ${invoice.items && invoice.items.length > 0 ? `
+                  <table class="items-table" style="font-size: 11px; width: 100%;">
+                    <thead>
                       <tr>
-                        <td>${item.description}</td>
-                        <td>${item.quantity}</td>
-                        <td>$${item.price.toFixed(2)}</td>
+                        <th style="width: 50%;">Item Description</th>
+                        <th style="width: 15%;">Qty</th>
+                        <th style="width: 25%;">Price</th>
+                        <th style="width: 10%;"></th>
                       </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </details>
-            ` : '<p style="font-size: 11px; color: var(--gray-500); margin-top: 8px;">No line items extracted</p>'}
+                    </thead>
+                    <tbody id="itemsTable_${index}">
+                      ${invoice.items.map((item, itemIndex) => `
+                        <tr>
+                          <td>
+                            <input type="text" class="form-input" value="${item.description || ''}"
+                                   onchange="extractedInvoices[${index}].items[${itemIndex}].description = this.value"
+                                   style="width: 100%; font-size: 11px; padding: 4px;">
+                          </td>
+                          <td>
+                            <input type="number" class="form-input" value="${item.quantity || ''}" step="0.01"
+                                   onchange="extractedInvoices[${index}].items[${itemIndex}].quantity = parseFloat(this.value) || 0"
+                                   style="width: 100%; font-size: 11px; padding: 4px;">
+                          </td>
+                          <td>
+                            <input type="number" class="form-input" value="${item.price || ''}" step="0.01"
+                                   onchange="extractedInvoices[${index}].items[${itemIndex}].price = parseFloat(this.value) || 0"
+                                   style="width: 100%; font-size: 11px; padding: 4px;">
+                          </td>
+                          <td style="text-align: center;">
+                            <button type="button" onclick="deleteLineItem(${index}, ${itemIndex})"
+                                    style="background: var(--error); color: white; border: none; padding: 4px 8px; cursor: pointer; font-size: 10px; border-radius: 3px;">
+                              ✕
+                            </button>
+                          </td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                ` : '<p style="font-size: 11px; color: var(--gray-500); margin-top: 8px;">No line items extracted</p>'}
+                <button type="button" onclick="addLineItem(${index})"
+                        class="submit-btn"
+                        style="margin-top: 8px; padding: 6px 12px; font-size: 11px; width: auto;">
+                  + Add Line Item
+                </button>
+              </div>
+            </details>
 
             <!-- Raw OCR text for this invoice -->
             <details style="margin-top: 12px;">
@@ -1753,6 +1851,62 @@
         console.error('Error deleting item:', error);
         alert('Error deleting item: ' + error.message);
       }
+    }
+
+    // ========== Line Item Management ==========
+    function deleteLineItem(invoiceIndex, itemIndex) {
+      if (confirm('Delete this line item?')) {
+        extractedInvoices[invoiceIndex].items.splice(itemIndex, 1);
+        displayMultipleInvoices();
+      }
+    }
+
+    function addLineItem(invoiceIndex) {
+      if (!extractedInvoices[invoiceIndex].items) {
+        extractedInvoices[invoiceIndex].items = [];
+      }
+      extractedInvoices[invoiceIndex].items.push({
+        description: '',
+        quantity: 0,
+        price: 0
+      });
+      displayMultipleInvoices();
+    }
+
+    // ========== Image Preprocessing for Better OCR ==========
+    function preprocessImage(canvas) {
+      const ctx = canvas.getContext('2d');
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // Convert to grayscale
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        data[i] = avg;     // R
+        data[i + 1] = avg; // G
+        data[i + 2] = avg; // B
+      }
+
+      // Increase contrast and apply threshold (binarization)
+      const threshold = 128;
+      const contrast = 1.5;
+
+      for (let i = 0; i < data.length; i += 4) {
+        let value = data[i];
+
+        // Increase contrast
+        value = ((value - 128) * contrast) + 128;
+
+        // Apply threshold (convert to pure black or white)
+        value = value > threshold ? 255 : 0;
+
+        data[i] = value;
+        data[i + 1] = value;
+        data[i + 2] = value;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
     }
 
     // ========== Vendor Addition Modal ==========
