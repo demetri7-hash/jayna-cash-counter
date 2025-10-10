@@ -9408,16 +9408,25 @@
    * Load inventory data from database
    */
   async function loadInventoryData() {
-    if (!supabase) throw new Error('Database not connected');
+    if (!supabase) {
+      console.error('Supabase is not initialized!');
+      throw new Error('Database not connected');
+    }
 
+    console.log('showLoading called...');
     showLoading('Loading Inventory', 'Fetching items from database...');
 
     try {
+      console.log('Querying inventory_items table...');
       const { data, error } = await supabase
         .from('inventory_items')
         .select('*')
         .order('vendor', { ascending: true })
         .order('item_name', { ascending: true });
+
+      console.log('Query result - error:', error);
+      console.log('Query result - data:', data);
+      console.log('Number of items loaded:', data?.length || 0);
 
       if (error) throw error;
 
@@ -9431,10 +9440,15 @@
         lastCountedDate: item.last_counted_date
       }));
 
+      console.log('orderingSystemState.items:', orderingSystemState.items);
+      console.log('orderingSystemState.items.length:', orderingSystemState.items.length);
+
       orderingSystemState.lastUpdated = new Date();
       hideLoading();
+      console.log('hideLoading called');
     } catch (error) {
       hideLoading();
+      console.error('loadInventoryData error:', error);
       throw new Error(`Failed to load inventory: ${error.message}`);
     }
   }
