@@ -470,58 +470,71 @@ async function sendOrderEmail(order, orderDate) {
 }
 
 /**
- * Generate HTML email for order
+ * Generate HTML email for order - Clean, simple, modern design
  */
 function generateOrderEmailHTML(order, orderDate) {
-  const orderDateStr = orderDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  const generatedTime = new Date().toLocaleTimeString('en-US');
-  const generatedTimestamp = new Date().toISOString();
+  const orderDateStr = orderDate.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+  const generatedDateStr = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+  const generatedTimeStr = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   const consumptionTrend = calculateOverallTrend(order.items) || 'Stable';
-
-  const specialNotes = order.daysUntilNextDelivery > 1
-    ? `This order covers ${order.daysUntilNextDelivery} days until next delivery`
-    : '';
 
   // Generate items HTML
   const itemsHTML = order.items.map(item => `
-    <tr style="border-bottom: 1px solid #e0e0e0;">
-      <td style="padding: 12px; color: #212121; font-size: 14px;">${item.name}</td>
-      <td style="padding: 12px; text-align: center; color: #d32f2f; font-weight: 700; font-size: 16px;">${item.qty}</td>
-      <td style="padding: 12px; text-align: center; color: #424242; font-size: 13px;">${item.unit}</td>
-      <td style="padding: 12px; text-align: center; color: #666; font-size: 13px;">${item.stock}</td>
-      <td style="padding: 12px; text-align: center; color: #666; font-size: 13px;">${item.par}</td>
+    <tr style="border-bottom: 1px solid #e8e8e8;">
+      <td style="padding: 10px 12px; font-size: 13px; color: #2c2c2c;">${item.name}</td>
+      <td style="padding: 10px 12px; text-align: center; font-size: 14px; font-weight: 600; color: #000;">${item.qty}</td>
+      <td style="padding: 10px 12px; text-align: center; font-size: 13px; color: #666;">${item.unit}</td>
+      <td style="padding: 10px 12px; text-align: center; font-size: 13px; color: #666;">${item.stock}</td>
+      <td style="padding: 10px 12px; text-align: center; font-size: 13px; color: #666;">${item.par}</td>
     </tr>
   `).join('');
 
-  // Generate alerts HTML
-  const alertsHTML = order.alerts.length > 0 ? `
-    <div style="padding: 0 20px 20px 20px;">
-      <div style="background-color: #ffebee; border-left: 4px solid #d32f2f; padding: 15px;">
-        <h3 style="margin: 0 0 10px 0; color: #c62828; font-size: 16px;">⚠️ Inventory Alerts</h3>
-        <ul style="margin: 0; padding-left: 20px; color: #424242; font-size: 13px; line-height: 1.8;">
-          ${order.alerts.map(a => `<li>${a.message}</li>`).join('')}
-        </ul>
+  // Generate AI suggestions HTML
+  let aiSuggestionsHTML = '';
+  if (order.parSuggestions.length > 0) {
+    aiSuggestionsHTML = `
+    <div style="margin-top: 24px;">
+      <h3 style="margin: 0 0 12px 0; font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: #666;">AI PAR LEVEL SUGGESTIONS</h3>
+      <div style="background: #f9f9f9; padding: 16px; border-radius: 4px;">
+        ${order.parSuggestions.map(p => `
+          <div style="margin-bottom: 8px; font-size: 13px; color: #2c2c2c;">
+            <strong>${p.item}:</strong> Par ${p.current} → ${p.suggested} <span style="color: #666; font-style: italic;">(${p.reason})</span>
+          </div>
+        `).join('')}
       </div>
-    </div>
-  ` : '';
+    </div>`;
+  }
 
-  // Generate par suggestions HTML
-  const parSuggestionsHTML = order.parSuggestions.length > 0 ? `
-    <div style="padding: 0 20px 20px 20px;">
-      <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px;">
-        <h3 style="margin: 0 0 10px 0; color: #1b5e20; font-size: 16px;">💡 Par Level Suggestions</h3>
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-          ${order.parSuggestions.map(p => `
-            <tr style="border-bottom: 1px solid #c8e6c9;">
-              <td style="padding: 8px 0; color: #424242;"><strong>${p.item}</strong></td>
-              <td style="padding: 8px 0; color: #666; text-align: right;">Par: ${p.current} → ${p.suggested}</td>
-              <td style="padding: 8px 0; color: #666; text-align: right; font-style: italic;">${p.reason}</td>
-            </tr>
-          `).join('')}
-        </table>
+  // Generate alerts HTML
+  let alertsHTML = '';
+  if (order.alerts.length > 0) {
+    alertsHTML = `
+    <div style="margin-top: 24px;">
+      <h3 style="margin: 0 0 12px 0; font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: #666;">INVENTORY ALERTS</h3>
+      <div style="background: #fff4e6; padding: 16px; border-radius: 4px; border-left: 3px solid #ff9800;">
+        ${order.alerts.map(a => `
+          <div style="margin-bottom: 6px; font-size: 13px; color: #2c2c2c;">${a.message}</div>
+        `).join('')}
       </div>
-    </div>
-  ` : '';
+    </div>`;
+  }
+
+  // AI Learning section
+  const aiLearningHTML = `
+    <div style="margin-top: 24px;">
+      <h3 style="margin: 0 0 12px 0; font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: #666;">AI ANALYSIS</h3>
+      <div style="background: #f9f9f9; padding: 16px; border-radius: 4px;">
+        <div style="margin-bottom: 8px; font-size: 13px; color: #2c2c2c;">
+          <strong>Consumption Trend:</strong> ${consumptionTrend}
+        </div>
+        <div style="margin-bottom: 8px; font-size: 13px; color: #2c2c2c;">
+          <strong>Days Covered:</strong> ${order.daysUntilNextDelivery} days until next delivery
+        </div>
+        <div style="font-size: 13px; color: #2c2c2c;">
+          <strong>Historical Data:</strong> 30-day consumption analysis with predictive ordering
+        </div>
+      </div>
+    </div>`;
 
   return `
 <!DOCTYPE html>
@@ -529,78 +542,33 @@ function generateOrderEmailHTML(order, orderDate) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily Order - ${order.vendor}</title>
+  <title>Order - ${order.vendor}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
-  <div style="max-width: 800px; margin: 0 auto; background-color: #ffffff; padding: 0;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; background-color: #ffffff; color: #2c2c2c;">
+  <div style="max-width: 650px; margin: 0 auto; padding: 32px 24px;">
 
     <!-- Header -->
-    <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 30px; text-align: center;">
-      <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: 700;">Jayna Gyro</h1>
-      <h2 style="margin: 0; font-size: 18px; font-weight: 400; opacity: 0.9;">Daily Order Sheet</h2>
+    <div style="margin-bottom: 8px;">
+      <h1 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: #000;">AUTOMATED ORDER</h1>
     </div>
-
-    <!-- Order Info Bar -->
-    <div style="background-color: #f8f9fa; padding: 20px; border-bottom: 2px solid #e0e0e0;">
-      <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 8px 0; width: 50%;">
-            <strong style="color: #424242;">Vendor:</strong>
-            <span style="color: #1e3c72; font-size: 18px; font-weight: 600; margin-left: 10px;">${order.vendor}</span>
-          </td>
-          <td style="padding: 8px 0; width: 50%; text-align: right;">
-            <strong style="color: #424242;">Order Date:</strong>
-            <span style="color: #424242; margin-left: 10px;">${orderDateStr}</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0;">
-            <strong style="color: #424242;">Delivery Date:</strong>
-            <span style="color: #424242; margin-left: 10px;">${order.deliveryDate}</span>
-          </td>
-          <td style="padding: 8px 0; text-align: right;">
-            <strong style="color: #424242;">Cutoff Time:</strong>
-            <span style="color: #d32f2f; font-weight: 600; margin-left: 10px;">${order.cutoffTime}</span>
-          </td>
-        </tr>
-      </table>
+    <div style="margin-bottom: 24px; padding-bottom: 24px; border-bottom: 2px solid #000;">
+      <div style="font-size: 24px; font-weight: 600; color: #000; margin-bottom: 4px;">${order.vendor}</div>
+      <div style="font-size: 13px; color: #666;">
+        Order Date: ${orderDateStr} | Cutoff: ${order.cutoffTime} | Delivery: ${order.deliveryDate}
+      </div>
     </div>
-
-    <!-- Order Summary -->
-    <div style="padding: 20px; background-color: #e3f4fc; border-left: 4px solid #00A8E1;">
-      <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 5px 0;">
-            <strong style="color: #0081C6;">Total Items:</strong>
-            <span style="color: #212121; font-weight: 600; margin-left: 10px;">${order.items.length}</span>
-          </td>
-          <td style="padding: 5px 0; text-align: right;">
-            <strong style="color: #0081C6;">Generated:</strong>
-            <span style="color: #212121; margin-left: 10px;">${generatedTime}</span>
-          </td>
-        </tr>
-      </table>
-    </div>
-
-    ${specialNotes ? `
-    <!-- Special Notes -->
-    <div style="padding: 15px 20px; background-color: #fff3cd; border-left: 4px solid #ffc107; margin: 0;">
-      <p style="margin: 0; color: #856404; font-size: 14px;">
-        <strong>⚠️ Note:</strong> ${specialNotes}
-      </p>
-    </div>
-    ` : ''}
 
     <!-- Order Table -->
-    <div style="padding: 20px;">
-      <table style="width: 100%; border-collapse: collapse; border: 2px solid #1e3c72;">
+    <div style="margin-bottom: 24px;">
+      <h3 style="margin: 0 0 12px 0; font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: #666;">ORDER ITEMS (${order.items.length})</h3>
+      <table style="width: 100%; border-collapse: collapse; border: 1px solid #e8e8e8;">
         <thead>
-          <tr style="background-color: #1e3c72; color: white;">
-            <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Item Name</th>
-            <th style="padding: 12px; text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 80px;">Order Qty</th>
-            <th style="padding: 12px; text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 70px;">Unit</th>
-            <th style="padding: 12px; text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 80px;">On Hand</th>
-            <th style="padding: 12px; text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 70px;">Par</th>
+          <tr style="background-color: #fafafa;">
+            <th style="padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #666; border-bottom: 1px solid #e8e8e8;">ITEM</th>
+            <th style="padding: 10px 12px; text-align: center; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #666; border-bottom: 1px solid #e8e8e8; width: 70px;">ORDER</th>
+            <th style="padding: 10px 12px; text-align: center; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #666; border-bottom: 1px solid #e8e8e8; width: 60px;">UNIT</th>
+            <th style="padding: 10px 12px; text-align: center; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #666; border-bottom: 1px solid #e8e8e8; width: 70px;">ON HAND</th>
+            <th style="padding: 10px 12px; text-align: center; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #666; border-bottom: 1px solid #e8e8e8; width: 60px;">PAR</th>
           </tr>
         </thead>
         <tbody>
@@ -609,52 +577,13 @@ function generateOrderEmailHTML(order, orderDate) {
       </table>
     </div>
 
-    <!-- Algorithm Insights -->
-    <div style="padding: 0 20px 20px 20px;">
-      <div style="background-color: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 4px; padding: 15px;">
-        <div style="font-weight: 600; color: #1e3c72; font-size: 14px; margin-bottom: 10px;">
-          📊 Algorithm Insights
-        </div>
-        <div style="padding-top: 10px; border-top: 1px solid #e0e0e0;">
-          <p style="margin: 0 0 10px 0; color: #424242; font-size: 13px; line-height: 1.6;">
-            <strong>Calculation Method:</strong> AI-powered predictive ordering with historical consumption analysis
-          </p>
-          <p style="margin: 0 0 10px 0; color: #424242; font-size: 13px; line-height: 1.6;">
-            <strong>Days Covered:</strong> ${order.daysUntilNextDelivery} days (until next delivery)
-          </p>
-          <p style="margin: 0 0 10px 0; color: #424242; font-size: 13px; line-height: 1.6;">
-            <strong>Historical Data Used:</strong> 30 days of consumption data
-          </p>
-          <p style="margin: 0 0 10px 0; color: #424242; font-size: 13px; line-height: 1.6;">
-            <strong>Consumption Trend:</strong>
-            <span style="color: #2e7d32; font-weight: 600;">${consumptionTrend}</span>
-          </p>
-        </div>
-      </div>
-    </div>
-
+    ${aiLearningHTML}
+    ${aiSuggestionsHTML}
     ${alertsHTML}
-    ${parSuggestionsHTML}
 
-    <!-- Contact Info -->
-    <div style="padding: 20px; background-color: #f8f9fa; border-top: 2px solid #e0e0e0; text-align: center;">
-      <p style="margin: 0 0 10px 0; color: #424242; font-size: 14px;">
-        <strong>Jayna Gyro</strong> | Phone: <a href="tel:+14155551234" style="color: #1e3c72; text-decoration: none;">+1 (415) 555-1234</a>
-      </p>
-      <p style="margin: 0 0 10px 0; color: #666; font-size: 12px;">
-        Email: <a href="mailto:orders@jaynagyro.com" style="color: #1e3c72; text-decoration: none;">orders@jaynagyro.com</a>
-      </p>
-      <p style="margin: 0; color: #999; font-size: 11px; font-style: italic;">
-        This order was generated automatically by Jayna Gyro's intelligent ordering system.
-      </p>
-    </div>
-
-    <!-- Footer -->
-    <div style="padding: 15px; background-color: #1e3c72; color: white; text-align: center; font-size: 11px;">
-      <p style="margin: 0;">
-        🤖 Generated with AI-powered ordering algorithms |
-        <span style="opacity: 0.8;">Timestamp: ${generatedTimestamp}</span>
-      </p>
+    <!-- Audit Footer -->
+    <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e8e8e8; font-size: 11px; color: #999;">
+      Generated: ${generatedDateStr} at ${generatedTimeStr}
     </div>
 
   </div>
