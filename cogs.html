@@ -1630,9 +1630,15 @@
           <div style="margin-bottom: 24px; padding: 16px; border: 2px solid var(--gray-300); background: white;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <strong style="font-size: 14px;">Invoice ${index + 1} ${invoice.pageNumber ? `(Page ${invoice.pageNumber})` : ''}</strong>
-              <span style="font-size: 12px; color: ${hasData ? 'var(--success)' : 'var(--warning)'};">
-                ${hasData ? '✓ Data Found' : '⚠️ Review Needed'}
-              </span>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="font-size: 12px; color: ${hasData ? 'var(--success)' : 'var(--warning)'};">
+                  ${hasData ? '✓ Data Found' : '⚠️ Review Needed'}
+                </span>
+                <button type="button" onclick="deleteInvoice(${index})"
+                        style="background: var(--error); color: white; border: none; padding: 6px 12px; cursor: pointer; font-size: 11px; border-radius: 3px; font-weight: bold;">
+                  🗑️ Delete Page
+                </button>
+              </div>
             </div>
             <div style="margin-bottom: 12px; padding: 8px; background: var(--light-blue); border-left: 3px solid ${dateColor};">
               <strong style="color: ${dateColor}; font-size: 13px;">📅 ${displayDate}</strong>
@@ -2074,7 +2080,20 @@
       }
     }
 
-    // ========== Line Item Management ==========
+    // ========== Invoice & Line Item Management ==========
+    function deleteInvoice(invoiceIndex) {
+      if (confirm('⚠️ Delete this entire invoice/page?\n\nThis will remove all line items and cannot be undone.')) {
+        extractedInvoices.splice(invoiceIndex, 1);
+        displayMultipleInvoices();
+
+        // Show message if no invoices left
+        if (extractedInvoices.length === 0) {
+          document.getElementById('extractedItemsList').innerHTML =
+            '<p style="text-align: center; color: var(--gray-500); padding: 20px;">All pages removed. Upload a new file to start over.</p>';
+        }
+      }
+    }
+
     function deleteLineItem(invoiceIndex, itemIndex) {
       if (confirm('Delete this line item?')) {
         extractedInvoices[invoiceIndex].items.splice(itemIndex, 1);
