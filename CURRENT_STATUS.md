@@ -1,12 +1,37 @@
 # CURRENT STATUS - Jayna Cash Counter
-**Last Updated:** 2025-10-09 (OCR Improvements + Editable Line Items Session)
+**Last Updated:** 2025-10-09 (Scribe.js Research + OCR Accuracy Analysis)
 
 ---
 
 ## 🎯 Current Work Status
-**Status:** ✅ COGs Invoice OCR - Editable Items + Preprocessing Complete
+**Status:** 🔴 **CRITICAL: Tesseract OCR Insufficient - Scribe.js Migration Required**
 
 ### Recently Completed (This Session):
+
+- ✅ **OCR Accuracy Analysis Complete**
+  - Tested with 11-page multi-vendor PDF (Performance, Greenleaf, Mani, Alsco, Eatopia)
+  - Generated debug PDF comparing original vs OCR extraction
+  - **CRITICAL FINDINGS:**
+    - Invoice numbers: 10% accuracy (extracting fragments like "Co", "OICE")
+    - Line item quantities: 20% accuracy (15 → 1606, 2.00 → 6.2)
+    - Vendor detection: 60% accuracy (Alsco → "Doe Sep")
+    - Page 1 complete failure (Performance invoice rotated 90°)
+    - Unit extraction: 30% accuracy (EA/CS/DZ often → "N/A")
+
+- ✅ **Scribe.js Research Complete**
+  - Found **40-90% slower BUT significantly more accurate** alternative to Tesseract
+  - Built-in table extraction (export to Excel)
+  - Better font recognition + PDF text layer support
+  - Designed for proofreading workflow (98% → 100% accuracy)
+  - AGPL 3.0 license (requires commercial license for proprietary use)
+
+- ✅ **invoice2data Template System Research**
+  - Template-based vendor-specific extraction (YAML/JSON)
+  - Keyword matching for auto-vendor detection
+  - Regex patterns for field locations
+  - GitHub: https://github.com/invoice-x/invoice2data
+
+### Recently Completed (Previous Session):
 
 - ✅ **Editable Line Items with Delete Buttons**
   - Replaced read-only table with fully editable input fields (description, qty, price)
@@ -39,15 +64,34 @@
   - Gentle 1.2x contrast (no artifacts from hard thresholding)
 
 ### In Progress:
-- 🧪 **User Testing Required** - OCR accuracy improvements need real invoice validation
+- 🔴 **CRITICAL: OCR System Overhaul Required**
+  - Current Tesseract.js accuracy too low for production use
+  - Need to migrate to Scribe.js for better accuracy
+  - Need vendor template system for field extraction
 
-### Next Session TODO:
-- 📊 **Test OCR Improvements** - User to test with real invoice PDFs
-  - Verify accuracy improvements from preprocessing changes
-  - If insufficient, implement Scribe.js (40-90% slower but more accurate)
+### Next Session TODO (HIGH PRIORITY):
+- 🚨 **Implement Scribe.js OCR Engine**
+  - Replace Tesseract.js with Scribe.js
+  - Integrate table extraction feature
+  - Add auto-rotation detection (fix Performance invoices)
+  - Test with same multi-vendor PDF
 
-- 📸 **COGs Day 2 Continuation** - Additional invoice scanning features
-  - Vendor auto-detection refinement
+- 📋 **Build Vendor Template System**
+  - Create template structure (YAML/JSON)
+  - Implement keyword-based vendor auto-detection
+  - Build vendor dropdown with "Create New Vendor" option
+  - Template wizard for mapping unknown vendors
+
+- 🗺️ **Map Top 3 Vendor Templates** (user to prioritize)
+  - Get vendor scanning frequency from user
+  - Create templates for Greenleaf, Mani, Performance (or user's top 3)
+  - Define field locations, regex patterns, keywords per vendor
+
+- 📊 **Vendor Mapping Questions for User:**
+  - Which vendor scanned MOST frequently? (prioritize first)
+  - Greenleaf: Always 2 pages? Invoice # location? Total location?
+  - Mani: Typical page count? Any multi-page invoices?
+  - Performance: Why is page 1 rotated? Scanner issue or normal?
   - Invoice history view
   - Batch processing optimization
 
@@ -78,14 +122,16 @@ All commits pushed to main and deployed to Vercel ✅
 ---
 
 ## 🚧 Blockers & Issues
-**Current Blockers:** None
+**Current Blockers:** OCR Accuracy Too Low for Production
 
-### User Testing Required:
-1. **OCR Accuracy Validation** - CRITICAL TESTING PHASE
-   - User needs to test with real invoice PDFs
-   - Verify preprocessing improvements (Gaussian blur, PSM 4, auto-rotation)
-   - If accuracy still insufficient, implement Scribe.js as fallback
-   - User is doing bulk scanning to build dataset
+### CRITICAL Issues Found:
+1. **Tesseract OCR Insufficient for Invoice Extraction**
+   - ✅ User tested with 11-page multi-vendor PDF
+   - ❌ Invoice numbers: 10% accuracy (CRITICAL)
+   - ❌ Line item quantities: 20% accuracy (CRITICAL)
+   - ❌ Unit extraction: 30% accuracy
+   - ❌ Page rotation not detected (Performance invoice failed)
+   - **SOLUTION:** Migrate to Scribe.js + vendor template system
 
 ### Technical Notes:
 - OCR preprocessing changed from aggressive threshold to gentle blur
@@ -98,10 +144,20 @@ All commits pushed to main and deployed to Vercel ✅
 
 ## 🔜 Next Session Should Start With:
 1. **Read last 3 RTF chat sessions** from `/chat sessions/` folder
-2. **Ask user for OCR testing results** - Did accuracy improve?
-3. **If accuracy good:** Continue with COGs features (vendor refinement, invoice history)
-4. **If accuracy insufficient:** Implement Scribe.js (research shows 40-90% slower but more accurate)
-5. **Next major feature:** COGs Day 3 - Daily counts & reporting
+2. **OCR testing COMPLETE - Tesseract FAILED**
+   - Accuracy too low for production (10-30% on critical fields)
+   - User approved Scribe.js migration
+3. **ASK USER: Vendor Priority**
+   - Which vendor scanned MOST frequently?
+   - Greenleaf, Mani, or Performance first?
+   - Get template mapping details (page count, field locations)
+4. **IMPLEMENT: Scribe.js Migration**
+   - Replace Tesseract.js with Scribe.js
+   - Add auto-rotation detection
+   - Build vendor template system
+5. **CREATE: Top 3 Vendor Templates**
+   - Based on user's priority order
+   - Test with same multi-vendor PDF
 
 ---
 
@@ -261,18 +317,27 @@ Solution: Manual input field for accurate Toast web total
 
 **⚠️ IMPORTANT FOR NEXT CLAUDE:**
 - **CRITICAL:** Read last 3 RTF chat sessions from `/chat sessions/` folder first!
-- OCR improvements deployed - TESTING PHASE (user validating with real invoices)
-- All invoice scanning features working (editable items, delete, add, date display, previews)
-- Preprocessing changed from aggressive binarization to gentle Gaussian blur
-- User is doing bulk scanning to build dataset and test system
-- If OCR accuracy insufficient, implement Scribe.js (40-90% slower but more accurate)
+- **OCR TESTING COMPLETE - Tesseract.js FAILED** (10-30% accuracy on critical fields)
+- **APPROVED:** Scribe.js migration + vendor template system
+- User needs to provide vendor priority order (Greenleaf, Mani, or Performance first)
+- Ask vendor-specific questions to build templates (page count, field locations, etc.)
 
 **Files to reference:**
-- `/chat sessions/session_2025-10-09_ocr-improvements-editable-items.rtf` - Complete OCR session
-- `cogs.html` - Invoice scanning page (lines 1930-1991: preprocessing function)
+- `/chat sessions/session_2025-10-09_scribe-ocr-research-vendor-templates.rtf` - Latest session (OCR analysis + Scribe.js research)
+- `/chat sessions/session_2025-10-09_ocr-improvements-editable-items.rtf` - Previous OCR session
+- `cogs.html` - Invoice scanning page (lines 1930-1991: preprocessing function - NEEDS REPLACEMENT)
+- `/Users/demetrigregorakis/Downloads/Epson_10092025164750.pdf` - Original test invoices (11 pages, multi-vendor)
+- `/Users/demetrigregorakis/Downloads/ocr-debug-2025-10-10.pdf` - Tesseract extraction results (for comparison)
 - `AI_PROJECT_INSTRUCTIONS.md` - Startup protocol
 - `CURRENT_PROJECT_DOCUMENTATION.md` - System overview
 
 **Known Issues:**
-- None currently blocking
-- User testing OCR accuracy improvements (awaiting feedback)
+- Tesseract.js OCR accuracy insufficient for production (CRITICAL)
+- Page rotation not detected (Performance invoices fail completely)
+- Invoice numbers extracted as fragments (10% accuracy)
+- Line item quantities off by 10x-100x (20% accuracy)
+
+**Next Implementation:**
+- Scribe.js: https://github.com/scribeocr/scribe.js/
+- invoice2data templates: https://github.com/invoice-x/invoice2data
+- Table extraction docs: http://docs.scribeocr.com/tables.html
