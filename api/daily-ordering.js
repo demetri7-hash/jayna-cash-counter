@@ -121,11 +121,11 @@ export default async function handler(req, res) {
 
         if (orderCalc.orderQty > 0) {
           orderItems.push({
-            itemName: item.item_name,
-            orderQty: orderCalc.orderQty,
+            name: item.item_name,
+            qty: orderCalc.orderQty,
             unit: item.unit,
-            currentStock: item.current_stock,
-            parLevel: item.par_level,
+            stock: item.current_stock,
+            par: item.par_level,
             reasoning: orderCalc.reasoning
           });
         }
@@ -138,8 +138,10 @@ export default async function handler(req, res) {
         const parSuggestion = suggestParLevelAdjustment(item, itemHistory);
         if (parSuggestion) {
           parSuggestions.push({
-            ...parSuggestion,
-            itemName: item.item_name
+            item: item.item_name,
+            current: parSuggestion.currentPar,
+            suggested: parSuggestion.suggestedPar,
+            reason: parSuggestion.reason
           });
         }
       }
@@ -452,10 +454,9 @@ async function sendOrderEmail(order, orderDate) {
     generated_timestamp: new Date().toISOString(),
 
     // Special notes for multi-day orders
-    if_special_notes: order.daysUntilNextDelivery > 1,
     special_notes: order.daysUntilNextDelivery > 1
       ? `This order covers ${order.daysUntilNextDelivery} days until next delivery`
-      : '',
+      : null,
 
     // Order items
     items: order.items,
@@ -466,13 +467,11 @@ async function sendOrderEmail(order, orderDate) {
     historical_days: 30,
     consumption_trend: calculateOverallTrend(order.items),
 
-    // Alerts
-    if_alerts: order.alerts.length > 0,
-    alerts: order.alerts,
+    // Alerts (send as array of strings, or null if none)
+    alerts: order.alerts.length > 0 ? order.alerts.map(a => a.message) : null,
 
-    // Par level suggestions
-    if_par_suggestions: order.parSuggestions.length > 0,
-    par_suggestions: order.parSuggestions,
+    // Par level suggestions (send as array, or null if none)
+    par_suggestions: order.parSuggestions.length > 0 ? order.parSuggestions : null,
 
     // Email destination
     to_email: ORDER_EMAIL
