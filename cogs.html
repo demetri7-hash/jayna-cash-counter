@@ -1445,7 +1445,30 @@
         if (result.invoiceNumber || result.date || result.total) {
           console.log('Template extraction successful, using template data');
           // Still try to parse line items with existing parser
-          result.items = parseLineItems(text);
+          lines.forEach((line, index) => {
+            // Skip header/footer patterns
+            const skipPatterns = [
+              /page\s*\d+/i,
+              /continued/i,
+              /subtotal/i,
+              /ordered.*shipped.*uom/i
+            ];
+
+            let shouldSkip = false;
+            for (const pattern of skipPatterns) {
+              if (pattern.test(line)) {
+                shouldSkip = true;
+                break;
+              }
+            }
+
+            if (!shouldSkip) {
+              const item = parseLineItem(line);
+              if (item && item.description && item.description.length > 5) {
+                result.items.push(item);
+              }
+            }
+          });
           return result;
         }
 
