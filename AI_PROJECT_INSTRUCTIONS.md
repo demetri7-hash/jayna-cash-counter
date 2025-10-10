@@ -5,13 +5,25 @@
 
 ## ⚡ READ THIS FIRST - EVERY SESSION
 
-When starting ANY Claude Code session in this project:
-1. ✅ **Read this file completely**
-2. ✅ **Read PROJECT_MASTER_LOG.md for full history** (if exists)
-3. ✅ **Read CURRENT_PROJECT_DOCUMENTATION.md** for system overview
-4. ✅ **Ask: "What are we working on today?"**
-5. ✅ **Create START_POINT_[DATE].md after user confirms**
-6. ✅ **Update PROJECT_MASTER_LOG.md with new session entry**
+When starting ANY Claude Code session in this project (IN THIS ORDER):
+
+1. ✅ **Read last 3 RTF chat sessions** from `/chat sessions/` folder
+   - Sort files by name (newest first)
+   - Read the 3 most recent `session_YYYY-MM-DD_*.rtf` files
+   - These contain complete conversation history with full context
+   - Pay attention to: what was built, decisions made, blockers, user preferences
+
+2. ✅ **Read CURRENT_STATUS.md** - Current work state, blockers, next steps
+
+3. ✅ **Read this file (AI_PROJECT_INSTRUCTIONS.md) completely**
+
+4. ✅ **Read PROJECT_MASTER_LOG.md for full history** (last 3 entries minimum)
+
+5. ✅ **Read CURRENT_PROJECT_DOCUMENTATION.md** for system overview
+
+6. ✅ **Ask: "What are we working on today?"**
+
+7. ✅ **Update CURRENT_STATUS.md with session start time**
 
 ---
 

@@ -15,13 +15,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Essential Reading on Session Start
 
-**ALWAYS read these files at the start of every session:**
-1. `CURRENT_STATUS.md` - **READ THIS FIRST** - Current work state, blockers, next steps
-2. `AI_PROJECT_INSTRUCTIONS.md` - Complete project context and authorization levels
-3. `PROJECT_MASTER_LOG.md` - Session history (newest entries first, read last 3 entries)
-4. `CURRENT_PROJECT_DOCUMENTATION.md` - System overview (if needed for context)
+**ALWAYS read these files at the start of every session (IN THIS ORDER):**
 
-After reading, ask the user: "What are we working on today?" Then update `CURRENT_STATUS.md` with session start time.
+1. **Last 3 RTF Chat Sessions** (most recent conversation context)
+   - Go to `/chat sessions/` folder
+   - Sort by filename (newest first)
+   - Read the 3 most recent `session_YYYY-MM-DD_*.rtf` files
+   - These contain complete conversation history with full context
+   - Pay attention to: what was built, decisions made, blockers encountered
+
+2. `CURRENT_STATUS.md` - **READ SECOND** - Current work state, blockers, next steps
+   - Shows what's in progress
+   - Lists uncommitted changes
+   - Documents blockers
+   - Provides clear next steps
+
+3. `AI_PROJECT_INSTRUCTIONS.md` - Complete project context and authorization levels
+
+4. `PROJECT_MASTER_LOG.md` - Session history (newest entries first, read last 3 entries)
+
+5. `CURRENT_PROJECT_DOCUMENTATION.md` - System overview (if needed for context)
+
+**After reading, ask the user:** "What are we working on today?" Then update `CURRENT_STATUS.md` with session start time.
 
 ## 🚨 CRITICAL: Session End Protocol
 
