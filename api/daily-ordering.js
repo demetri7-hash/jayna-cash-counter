@@ -14,18 +14,16 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import emailjs from '@emailjs/nodejs';
+import nodemailer from 'nodemailer';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// EmailJS configuration
-const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID;
-const EMAILJS_TEMPLATE_ID_ORDERS = process.env.EMAILJS_TEMPLATE_ID_ORDERS || 'template_daily_orders';
-const EMAILJS_USER_ID = process.env.EMAILJS_USER_ID;
-const EMAILJS_PRIVATE_KEY = process.env.EMAILJS_PRIVATE_KEY;
+// Gmail configuration
+const GMAIL_USER = process.env.GMAIL_USER || 'demetri7@gmail.com';
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const ORDER_EMAIL = process.env.ORDER_EMAIL || 'demetri7@gmail.com';
 
 // Vendor schedules
@@ -441,69 +439,228 @@ function suggestParLevelAdjustment(item, historicalData) {
 }
 
 /**
- * Send order email via EmailJS Node.js SDK
- * Uses EXACT same pattern as PM flow (browser SDK)
+ * Send order email via Gmail (nodemailer)
  */
 async function sendOrderEmail(order, orderDate) {
-  // Format data for EmailJS template - SAME STRUCTURE AS PM FLOW
-  const templateParams = {
-    to_email: ORDER_EMAIL,
-    vendor: order.vendor,
-    order_date: orderDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
-    delivery_date: order.deliveryDate,
-    cutoff_time: order.cutoffTime,
-    total_items: order.items.length.toString(),
-    generated_time: new Date().toLocaleTimeString('en-US'),
-    generated_timestamp: new Date().toISOString(),
+  // Create transporter
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: GMAIL_USER,
+      pass: GMAIL_APP_PASSWORD
+    }
+  });
 
-    // Algorithm insights
-    calculation_method: 'AI-powered predictive ordering with historical consumption analysis',
-    days_covered: order.daysUntilNextDelivery.toString(),
-    historical_days: '30',
-    consumption_trend: calculateOverallTrend(order.items) || 'Stable',
+  // Generate HTML email
+  const html = generateOrderEmailHTML(order, orderDate);
 
-    // Special notes
-    special_notes: order.daysUntilNextDelivery > 1
-      ? `This order covers ${order.daysUntilNextDelivery} days until next delivery`
-      : '',
-
-    // Order items array - EXACTLY like PM flow handles arrays
-    items: order.items.map(item => ({
-      name: String(item.name),
-      qty: String(item.qty),
-      unit: String(item.unit),
-      stock: String(item.stock),
-      par: String(item.par)
-    })),
-
-    // Alerts as array of strings
-    alerts: order.alerts.map(a => String(a.message)),
-
-    // Par suggestions array
-    par_suggestions: order.parSuggestions.map(p => ({
-      item: String(p.item),
-      current: String(p.current),
-      suggested: String(p.suggested),
-      reason: String(p.reason)
-    }))
+  // Send email
+  const mailOptions = {
+    from: `Jayna Gyro Orders <${GMAIL_USER}>`,
+    to: ORDER_EMAIL,
+    subject: `Daily Order - ${order.vendor}`,
+    html: html
   };
 
-  console.log('📧 Sending email via EmailJS SDK for', order.vendor);
+  console.log('📧 Sending email via Gmail for', order.vendor);
 
-  // Send using EmailJS Node.js SDK - EXACT SAME AS PM FLOW
-  // emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, options)
-  const response = await emailjs.send(
-    EMAILJS_SERVICE_ID,
-    EMAILJS_TEMPLATE_ID_ORDERS,
-    templateParams,
-    {
-      publicKey: EMAILJS_USER_ID,
-      privateKey: EMAILJS_PRIVATE_KEY
-    }
-  );
-
-  console.log(`✅ Order email sent for ${order.vendor}:`, response.status, response.text);
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`✅ Order email sent for ${order.vendor}:`, info.messageId);
   return true;
+}
+
+/**
+ * Generate HTML email for order
+ */
+function generateOrderEmailHTML(order, orderDate) {
+  const orderDateStr = orderDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const generatedTime = new Date().toLocaleTimeString('en-US');
+  const generatedTimestamp = new Date().toISOString();
+  const consumptionTrend = calculateOverallTrend(order.items) || 'Stable';
+
+  const specialNotes = order.daysUntilNextDelivery > 1
+    ? `This order covers ${order.daysUntilNextDelivery} days until next delivery`
+    : '';
+
+  // Generate items HTML
+  const itemsHTML = order.items.map(item => `
+    <tr style="border-bottom: 1px solid #e0e0e0;">
+      <td style="padding: 12px; color: #212121; font-size: 14px;">${item.name}</td>
+      <td style="padding: 12px; text-align: center; color: #d32f2f; font-weight: 700; font-size: 16px;">${item.qty}</td>
+      <td style="padding: 12px; text-align: center; color: #424242; font-size: 13px;">${item.unit}</td>
+      <td style="padding: 12px; text-align: center; color: #666; font-size: 13px;">${item.stock}</td>
+      <td style="padding: 12px; text-align: center; color: #666; font-size: 13px;">${item.par}</td>
+    </tr>
+  `).join('');
+
+  // Generate alerts HTML
+  const alertsHTML = order.alerts.length > 0 ? `
+    <div style="padding: 0 20px 20px 20px;">
+      <div style="background-color: #ffebee; border-left: 4px solid #d32f2f; padding: 15px;">
+        <h3 style="margin: 0 0 10px 0; color: #c62828; font-size: 16px;">⚠️ Inventory Alerts</h3>
+        <ul style="margin: 0; padding-left: 20px; color: #424242; font-size: 13px; line-height: 1.8;">
+          ${order.alerts.map(a => `<li>${a.message}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+  ` : '';
+
+  // Generate par suggestions HTML
+  const parSuggestionsHTML = order.parSuggestions.length > 0 ? `
+    <div style="padding: 0 20px 20px 20px;">
+      <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px;">
+        <h3 style="margin: 0 0 10px 0; color: #1b5e20; font-size: 16px;">💡 Par Level Suggestions</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          ${order.parSuggestions.map(p => `
+            <tr style="border-bottom: 1px solid #c8e6c9;">
+              <td style="padding: 8px 0; color: #424242;"><strong>${p.item}</strong></td>
+              <td style="padding: 8px 0; color: #666; text-align: right;">Par: ${p.current} → ${p.suggested}</td>
+              <td style="padding: 8px 0; color: #666; text-align: right; font-style: italic;">${p.reason}</td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+    </div>
+  ` : '';
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Order - ${order.vendor}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+  <div style="max-width: 800px; margin: 0 auto; background-color: #ffffff; padding: 0;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 30px; text-align: center;">
+      <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: 700;">Jayna Gyro</h1>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 400; opacity: 0.9;">Daily Order Sheet</h2>
+    </div>
+
+    <!-- Order Info Bar -->
+    <div style="background-color: #f8f9fa; padding: 20px; border-bottom: 2px solid #e0e0e0;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; width: 50%;">
+            <strong style="color: #424242;">Vendor:</strong>
+            <span style="color: #1e3c72; font-size: 18px; font-weight: 600; margin-left: 10px;">${order.vendor}</span>
+          </td>
+          <td style="padding: 8px 0; width: 50%; text-align: right;">
+            <strong style="color: #424242;">Order Date:</strong>
+            <span style="color: #424242; margin-left: 10px;">${orderDateStr}</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0;">
+            <strong style="color: #424242;">Delivery Date:</strong>
+            <span style="color: #424242; margin-left: 10px;">${order.deliveryDate}</span>
+          </td>
+          <td style="padding: 8px 0; text-align: right;">
+            <strong style="color: #424242;">Cutoff Time:</strong>
+            <span style="color: #d32f2f; font-weight: 600; margin-left: 10px;">${order.cutoffTime}</span>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Order Summary -->
+    <div style="padding: 20px; background-color: #e3f4fc; border-left: 4px solid #00A8E1;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 5px 0;">
+            <strong style="color: #0081C6;">Total Items:</strong>
+            <span style="color: #212121; font-weight: 600; margin-left: 10px;">${order.items.length}</span>
+          </td>
+          <td style="padding: 5px 0; text-align: right;">
+            <strong style="color: #0081C6;">Generated:</strong>
+            <span style="color: #212121; margin-left: 10px;">${generatedTime}</span>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    ${specialNotes ? `
+    <!-- Special Notes -->
+    <div style="padding: 15px 20px; background-color: #fff3cd; border-left: 4px solid #ffc107; margin: 0;">
+      <p style="margin: 0; color: #856404; font-size: 14px;">
+        <strong>⚠️ Note:</strong> ${specialNotes}
+      </p>
+    </div>
+    ` : ''}
+
+    <!-- Order Table -->
+    <div style="padding: 20px;">
+      <table style="width: 100%; border-collapse: collapse; border: 2px solid #1e3c72;">
+        <thead>
+          <tr style="background-color: #1e3c72; color: white;">
+            <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Item Name</th>
+            <th style="padding: 12px; text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 80px;">Order Qty</th>
+            <th style="padding: 12px; text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 70px;">Unit</th>
+            <th style="padding: 12px; text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 80px;">On Hand</th>
+            <th style="padding: 12px; text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 70px;">Par</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHTML}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Algorithm Insights -->
+    <div style="padding: 0 20px 20px 20px;">
+      <div style="background-color: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 4px; padding: 15px;">
+        <div style="font-weight: 600; color: #1e3c72; font-size: 14px; margin-bottom: 10px;">
+          📊 Algorithm Insights
+        </div>
+        <div style="padding-top: 10px; border-top: 1px solid #e0e0e0;">
+          <p style="margin: 0 0 10px 0; color: #424242; font-size: 13px; line-height: 1.6;">
+            <strong>Calculation Method:</strong> AI-powered predictive ordering with historical consumption analysis
+          </p>
+          <p style="margin: 0 0 10px 0; color: #424242; font-size: 13px; line-height: 1.6;">
+            <strong>Days Covered:</strong> ${order.daysUntilNextDelivery} days (until next delivery)
+          </p>
+          <p style="margin: 0 0 10px 0; color: #424242; font-size: 13px; line-height: 1.6;">
+            <strong>Historical Data Used:</strong> 30 days of consumption data
+          </p>
+          <p style="margin: 0 0 10px 0; color: #424242; font-size: 13px; line-height: 1.6;">
+            <strong>Consumption Trend:</strong>
+            <span style="color: #2e7d32; font-weight: 600;">${consumptionTrend}</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    ${alertsHTML}
+    ${parSuggestionsHTML}
+
+    <!-- Contact Info -->
+    <div style="padding: 20px; background-color: #f8f9fa; border-top: 2px solid #e0e0e0; text-align: center;">
+      <p style="margin: 0 0 10px 0; color: #424242; font-size: 14px;">
+        <strong>Jayna Gyro</strong> | Phone: <a href="tel:+14155551234" style="color: #1e3c72; text-decoration: none;">+1 (415) 555-1234</a>
+      </p>
+      <p style="margin: 0 0 10px 0; color: #666; font-size: 12px;">
+        Email: <a href="mailto:orders@jaynagyro.com" style="color: #1e3c72; text-decoration: none;">orders@jaynagyro.com</a>
+      </p>
+      <p style="margin: 0; color: #999; font-size: 11px; font-style: italic;">
+        This order was generated automatically by Jayna Gyro's intelligent ordering system.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding: 15px; background-color: #1e3c72; color: white; text-align: center; font-size: 11px;">
+      <p style="margin: 0;">
+        🤖 Generated with AI-powered ordering algorithms |
+        <span style="opacity: 0.8;">Timestamp: ${generatedTimestamp}</span>
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
+  `;
 }
 
 /**
