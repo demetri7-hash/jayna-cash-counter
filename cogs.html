@@ -1070,13 +1070,17 @@
 
         const ocrText = result.data.text;
 
+        // Save canvas as image for preview
+        const pageImageUrl = canvas.toDataURL('image/jpeg', 0.7); // 70% quality to reduce size
+
         // Parse invoice data
         const parsedData = parseInvoiceText(ocrText);
         const detectedVendor = detectVendorName(ocrText);
 
-        // Store invoice with page number
+        // Store invoice with page number and image
         extractedInvoices.push({
           pageNumber: pageNum,
+          pageImageUrl: pageImageUrl,
           ocrText: ocrText,
           vendorName: detectedVendor.name,
           vendorId: detectedVendor.id,
@@ -1149,11 +1153,15 @@
       currentOcrText = result.data.text;
       document.getElementById('ocrProgress').textContent = 'Parsing invoice data...';
 
+      // Save canvas as image for preview
+      const pageImageUrl = canvas.toDataURL('image/jpeg', 0.7);
+
       const parsedData = parseInvoiceText(currentOcrText);
       const detectedVendor = detectVendorName(currentOcrText);
 
       extractedInvoices = [{
         pageNumber: 1,
+        pageImageUrl: pageImageUrl,
         ocrText: currentOcrText,
         vendorName: detectedVendor.name,
         vendorId: detectedVendor.id,
@@ -1228,11 +1236,14 @@
         items: []
       };
 
-      // Date patterns (multiple formats)
+      // Date patterns (multiple formats) - ordered by specificity
       const datePatterns = [
-        /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/,
+        /invoice\s*date[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+        /order\s*date[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+        /date[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+        /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/,  // Prefer 4-digit year
         /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
-        /(?:date|dated)[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i
+        /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2})/    // 2-digit year as fallback
       ];
 
       // Invoice number patterns
@@ -1447,6 +1458,22 @@
       return '';
     }
 
+    function formatDateForDisplay(dateStr) {
+      // Convert YYYY-MM-DD to readable format: "Sep 4, 2025"
+      if (!dateStr) return 'No Date';
+
+      try {
+        const date = new Date(dateStr + 'T12:00:00'); // Add time to avoid timezone issues
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = months[date.getMonth()];
+        const day = date.getDate();
+        const year = date.getFullYear();
+        return `${month} ${day}, ${year}`;
+      } catch (e) {
+        return dateStr; // Return as-is if parsing fails
+      }
+    }
+
     function displayMultipleInvoices() {
       const container = document.getElementById('extractedItemsList');
 
@@ -1462,13 +1489,22 @@
       extractedInvoices.forEach((invoice, index) => {
         const hasData = invoice.date || invoice.invoiceNumber || invoice.vendorName;
 
+        // Format date for display
+        const displayDate = invoice.date ? formatDateForDisplay(invoice.date) : 'No Date';
+        const dateColor = invoice.date ? 'var(--primary-blue)' : 'var(--error)';
+
         html += `
           <div style="margin-bottom: 24px; padding: 16px; border: 2px solid var(--gray-300); background: white;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <strong style="font-size: 14px;">Invoice ${index + 1} ${invoice.pageNumber ? `(Page ${invoice.pageNumber})` : ''}</strong>
               <span style="font-size: 12px; color: ${hasData ? 'var(--success)' : 'var(--warning)'};">
                 ${hasData ? '✓ Data Found' : '⚠️ Review Needed'}
               </span>
+            </div>
+            <div style="margin-bottom: 12px; padding: 8px; background: var(--light-blue); border-left: 3px solid ${dateColor};">
+              <strong style="color: ${dateColor}; font-size: 13px;">📅 ${displayDate}</strong>
+              ${invoice.vendorName ? `<span style="margin-left: 12px; color: var(--gray-700); font-size: 12px;">• ${invoice.vendorName}</span>` : ''}
+              ${invoice.invoiceNumber ? `<span style="margin-left: 12px; color: var(--gray-700); font-size: 12px;">• #${invoice.invoiceNumber}</span>` : ''}
             </div>
 
             <!-- Editable fields for this invoice -->
@@ -1591,10 +1627,23 @@
               </div>
             </details>
 
-            <!-- Raw OCR text for this invoice -->
+            <!-- Page preview and raw OCR text -->
             <details style="margin-top: 12px;">
-              <summary style="cursor: pointer; font-size: 11px; color: var(--gray-500);">View Raw OCR Text</summary>
-              <textarea readonly style="width: 100%; min-height: 150px; margin-top: 8px; font-family: monospace; font-size: 10px; padding: 8px; border: 1px solid var(--gray-300);">${invoice.ocrText}</textarea>
+              <summary style="cursor: pointer; font-size: 11px; color: var(--gray-500);">View Page Image & Raw OCR Text</summary>
+              <div style="margin-top: 8px;">
+                ${invoice.pageImageUrl ? `
+                  <div style="margin-bottom: 12px;">
+                    <strong style="font-size: 11px; color: var(--gray-700);">Page Preview:</strong>
+                    <img src="${invoice.pageImageUrl}"
+                         style="width: 100%; max-width: 400px; border: 2px solid var(--gray-300); margin-top: 4px; cursor: pointer;"
+                         onclick="window.open(this.src, '_blank')"
+                         alt="Invoice page ${invoice.pageNumber}">
+                    <p style="font-size: 10px; color: var(--gray-500); margin-top: 4px;">Click image to view full size • Images removed after saving</p>
+                  </div>
+                ` : ''}
+                <strong style="font-size: 11px; color: var(--gray-700);">Raw OCR Text:</strong>
+                <textarea readonly style="width: 100%; min-height: 150px; margin-top: 4px; font-family: monospace; font-size: 10px; padding: 8px; border: 1px solid var(--gray-300);">${invoice.ocrText}</textarea>
+              </div>
             </details>
           </div>
         `;
@@ -1668,6 +1717,11 @@
           .select();
 
         if (error) throw error;
+
+        // Clear page images to free memory (they're large data URLs)
+        extractedInvoices.forEach(invoice => {
+          delete invoice.pageImageUrl;
+        });
 
         alert(`✓ Successfully saved ${invoicesToSave.length} invoice${invoicesToSave.length > 1 ? 's' : ''}!`);
 
