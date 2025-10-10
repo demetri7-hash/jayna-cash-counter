@@ -1863,10 +1863,20 @@
             <!-- Editable fields for this invoice -->
             <div class="form-group">
               <label>Vendor ${invoice.isKnownVendor ? '<span style="color: var(--success);">✓ Recognized</span>' : '<span style="color: var(--warning);">⚠️ Unknown</span>'}</label>
+
+              ${!invoice.isKnownVendor && !invoice.vendorName ? `
+                <!-- No vendor detected - show dropdown -->
+                <select class="form-input" onchange="selectExistingVendor(${index}, this.value)" style="margin-bottom: 8px;">
+                  <option value="">Select from existing vendors...</option>
+                  ${knownVendors.map(v => `<option value="${v.id}">${v.vendor_name}</option>`).join('')}
+                  <option value="new">+ Add New Vendor</option>
+                </select>
+              ` : ''}
+
               <div style="display: flex; gap: 8px; align-items: center;">
                 <input type="text" class="form-input" value="${invoice.vendorName || ''}"
                        onchange="extractedInvoices[${index}].vendorName = this.value; extractedInvoices[${index}].isKnownVendor = false;"
-                       placeholder="${invoice.vendorName ? 'Edit if needed' : 'Enter vendor name'}"
+                       placeholder="${invoice.vendorName ? 'Edit if needed' : 'Or type vendor name'}"
                        style="flex: 1;">
                 ${!invoice.isKnownVendor && invoice.vendorName ? `
                   <button type="button" class="submit-btn primary"
@@ -2517,24 +2527,32 @@
     }
 
     // ========== Image Preprocessing for Better OCR ==========
-    // ========== DESKEW CORRECTION ==========
+    // ========== ROTATION & DESKEW CORRECTION ==========
     async function detectAndCorrectSkew(canvas) {
       try {
-        // Use Tesseract OSD (Orientation and Script Detection) to detect skew angle
-        const result = await Tesseract.recognize(canvas, 'eng', {
-          logger: () => {}, // Suppress logs for OSD
-          tessedit_pageseg_mode: '0' // PSM 0 = OSD only
+        // First try: Detect major rotations (90°, 180°, 270°) using image analysis
+        const majorRotation = detectMajorRotation(canvas);
+        if (majorRotation !== 0) {
+          console.log(`Detected ${majorRotation}° rotation, correcting...`);
+          canvas = rotateCanvas(canvas, majorRotation);
+        }
+
+        // Second try: Detect small skew angles using Tesseract OSD
+        const result = await Tesseract.detect(canvas, {
+          logger: () => {} // Suppress logs
         });
 
-        const rotation = result.data.orientation_degrees || 0;
-        const skew = result.data.orientation_confidence > 0.5 ? rotation : 0;
+        if (result && result.data) {
+          const rotation = result.data.orientation_degrees || 0;
+          const confidence = result.data.orientation_confidence || 0;
 
-        console.log(`Detected rotation: ${rotation}°, confidence: ${result.data.orientation_confidence}`);
+          console.log(`OSD detected rotation: ${rotation}°, confidence: ${confidence}`);
 
-        if (Math.abs(skew) > 1) { // Only correct if skew > 1 degree
-          console.log(`Correcting skew: ${skew}°`);
-          const correctedCanvas = rotateCanvas(canvas, -skew);
-          return correctedCanvas;
+          // Only correct small skews (not major rotations, we handled those)
+          if (confidence > 0.3 && Math.abs(rotation) > 1 && Math.abs(rotation) < 45) {
+            console.log(`Correcting skew: ${rotation}°`);
+            canvas = rotateCanvas(canvas, -rotation);
+          }
         }
 
         return canvas;
@@ -2542,6 +2560,65 @@
         console.error('Skew detection failed:', error);
         return canvas; // Return original if detection fails
       }
+    }
+
+    // Detect 90°/180°/270° rotations by analyzing image edges
+    function detectMajorRotation(canvas) {
+      const ctx = canvas.getContext('2d');
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      const width = canvas.width;
+      const height = canvas.height;
+
+      // Sample edge pixels to detect orientation
+      let topEdgeDark = 0, bottomEdgeDark = 0;
+      let leftEdgeDark = 0, rightEdgeDark = 0;
+
+      // Sample top edge
+      for (let x = 0; x < width; x += 10) {
+        const idx = (0 * width + x) * 4;
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+        if (brightness < 200) topEdgeDark++;
+      }
+
+      // Sample bottom edge
+      for (let x = 0; x < width; x += 10) {
+        const idx = ((height - 1) * width + x) * 4;
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+        if (brightness < 200) bottomEdgeDark++;
+      }
+
+      // Sample left edge
+      for (let y = 0; y < height; y += 10) {
+        const idx = (y * width + 0) * 4;
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+        if (brightness < 200) leftEdgeDark++;
+      }
+
+      // Sample right edge
+      for (let y = 0; y < height; y += 10) {
+        const idx = (y * width + (width - 1)) * 4;
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+        if (brightness < 200) rightEdgeDark++;
+      }
+
+      console.log(`Edge analysis: top=${topEdgeDark}, bottom=${bottomEdgeDark}, left=${leftEdgeDark}, right=${rightEdgeDark}`);
+
+      // If left/right edges have significantly more content than top/bottom, it's rotated 90° or 270°
+      const horizontalContent = topEdgeDark + bottomEdgeDark;
+      const verticalContent = leftEdgeDark + rightEdgeDark;
+
+      if (verticalContent > horizontalContent * 1.5) {
+        // Likely rotated 90° or 270°
+        // Check which way by comparing aspect ratio
+        if (width > height) {
+          return -90; // Rotate -90° to correct
+        } else {
+          return 90; // Rotate 90° to correct
+        }
+      }
+
+      return 0; // No major rotation detected
     }
 
     function rotateCanvas(sourceCanvas, angleDegrees) {
@@ -2632,6 +2709,29 @@
 
       ctx.putImageData(new ImageData(smoothed, width, height), 0, 0);
       return canvas;
+    }
+
+    // ========== Vendor Selection ==========
+    function selectExistingVendor(invoiceIndex, vendorId) {
+      if (!vendorId) return;
+
+      if (vendorId === 'new') {
+        // Show add vendor modal with empty name
+        showAddVendorModal(invoiceIndex);
+        return;
+      }
+
+      // Find vendor in known vendors
+      const vendor = knownVendors.find(v => v.id == vendorId);
+      if (!vendor) return;
+
+      // Update invoice with selected vendor
+      extractedInvoices[invoiceIndex].vendorId = vendor.id;
+      extractedInvoices[invoiceIndex].vendorName = vendor.vendor_name;
+      extractedInvoices[invoiceIndex].isKnownVendor = true;
+
+      // Refresh display
+      displayMultipleInvoices();
     }
 
     // ========== Vendor Addition Modal ==========
