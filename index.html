@@ -1350,6 +1350,35 @@
             </button>
           </div>
 
+          <!-- Count Session Selector (for prep tracking) -->
+          <div style="margin-bottom: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #ff6b35;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333; font-size: 14px;">
+              📋 Count Session (for prep item tracking):
+            </label>
+            <select
+              id="countSessionSelector"
+              onchange="updateCountSession()"
+              style="
+                width: 100%;
+                max-width: 400px;
+                padding: 10px 14px;
+                border: 2px solid #ff6b35;
+                border-radius: 6px;
+                font-size: 14px;
+                background: white;
+                cursor: pointer;
+                font-weight: 500;
+              "
+            >
+              <option value="morning_prep">🌅 Morning Prep (7:00 AM)</option>
+              <option value="afternoon_prep">☀️ Afternoon Prep (3:00-4:00 PM)</option>
+              <option value="closing_line">🌙 Closing Line (End of Day)</option>
+            </select>
+            <p style="margin-top: 8px; font-size: 12px; color: #666; font-style: italic;">
+              Select which count session this is. System will track consumption patterns between sessions.
+            </p>
+          </div>
+
           <!-- Search and Filter Controls -->
           <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
             <input
@@ -9430,7 +9459,9 @@
     calculatedOrders: [],
     currentTab: 'upcomingOrders',
     lastUpdated: null,
-    pendingStockUpdates: new Map() // Track unsaved stock updates
+    pendingStockUpdates: new Map(), // Track unsaved stock updates
+    currentCountSession: 'morning_prep', // Track current prep count session
+    previousCounts: new Map() // Track previous counts for consumption calculation (itemId -> {count, session})
   };
 
   /**
@@ -9515,7 +9546,8 @@
         unit: item.unit,
         lastCountedDate: item.last_counted_date,
         currentUnitCost: item.current_unit_cost,
-        lastCostUpdate: item.last_cost_update
+        lastCostUpdate: item.last_cost_update,
+        itemType: item.item_type || 'ingredient' // Track if item is 'prep' or 'ingredient'
       }));
 
       console.log('orderingSystemState.items:', orderingSystemState.items);
@@ -10422,6 +10454,37 @@
   }
 
   /**
+   * Update current count session and create/update session record
+   */
+  async function updateCountSession() {
+    const selector = document.getElementById('countSessionSelector');
+    const newSession = selector.value;
+    orderingSystemState.currentCountSession = newSession;
+
+    // Create or update prep_count_sessions record for today
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+    try {
+      const { error } = await supabase
+        .from('prep_count_sessions')
+        .upsert({
+          count_date: today,
+          session_type: newSession,
+          session_timestamp: new Date().toISOString(),
+          notes: 'Session started'
+        }, {
+          onConflict: 'count_date,session_type'
+        });
+
+      if (error) throw error;
+
+      console.log(`Count session updated to: ${newSession} for ${today}`);
+    } catch (error) {
+      console.error('Failed to update session record:', error);
+    }
+  }
+
+  /**
    * Track stock updates before saving (legacy - kept for compatibility)
    */
   function trackStockUpdate(itemId, newValue) {
@@ -10433,7 +10496,7 @@
    * Auto-save stock count when input loses focus
    */
   async function autoSaveStockCount(itemId, newValue, inputElement) {
-    const stockValue = parseInt(newValue);
+    const stockValue = parseFloat(newValue); // Support decimal counts (0.25, 0.5, 0.75)
     if (isNaN(stockValue)) return;
 
     // Visual feedback - saving state
@@ -10459,6 +10522,47 @@
       if (item) {
         item.currentStock = stockValue;
         item.lastCountedDate = new Date().toISOString();
+      }
+
+      // PREP CONSUMPTION TRACKING: Track consumption between sessions
+      if (item && item.itemType === 'prep') {
+        const currentSession = orderingSystemState.currentCountSession;
+        const previousData = orderingSystemState.previousCounts.get(itemId);
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+        // If we have a previous count from a different session, calculate consumption
+        if (previousData && previousData.session !== currentSession) {
+          const consumption = previousData.count - stockValue;
+
+          // Only log if there was consumption (or waste if negative)
+          if (consumption !== 0) {
+            try {
+              await supabase
+                .from('prep_consumption_log')
+                .insert({
+                  item_id: itemId,
+                  count_date: today,
+                  from_session: previousData.session,
+                  to_session: currentSession,
+                  starting_count: previousData.count,
+                  ending_count: stockValue,
+                  consumption_amount: consumption > 0 ? consumption : 0,
+                  waste_amount: consumption < 0 ? Math.abs(consumption) : 0
+                });
+
+              console.log(`Consumption tracked: ${item.itemName} - ${consumption} units from ${previousData.session} to ${currentSession}`);
+            } catch (err) {
+              console.error('Failed to log consumption:', err);
+              // Don't block the save if consumption logging fails
+            }
+          }
+        }
+
+        // Update previous counts with current data
+        orderingSystemState.previousCounts.set(itemId, {
+          count: stockValue,
+          session: currentSession
+        });
       }
 
       // Success feedback - green flash
