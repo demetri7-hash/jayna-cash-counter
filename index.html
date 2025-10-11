@@ -9835,6 +9835,28 @@
       console.log('orderingSystemState.items:', orderingSystemState.items);
       console.log('orderingSystemState.items.length:', orderingSystemState.items.length);
 
+      // LEARNING: Load aliases from past successful matches
+      console.log('Loading learned aliases from invoice history...');
+      const { data: aliasData, error: aliasError } = await supabase
+        .from('invoice_items')
+        .select('detected_item_name, inventory_item_id')
+        .eq('checked_in', true)
+        .not('detected_item_name', 'is', null)
+        .not('inventory_item_id', 'is', null);
+
+      if (!aliasError && aliasData) {
+        orderingSystemState.aliases = {};
+        aliasData.forEach(alias => {
+          const normalized = alias.detected_item_name.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+          // Keep the most recent match for each detected name
+          orderingSystemState.aliases[normalized] = {
+            inventory_item_id: alias.inventory_item_id,
+            detected_name: alias.detected_item_name
+          };
+        });
+        console.log('✅ Loaded', Object.keys(orderingSystemState.aliases).length, 'learned aliases');
+      }
+
       orderingSystemState.lastUpdated = new Date();
       hideLoading();
       console.log('hideLoading called');
@@ -12878,6 +12900,22 @@
     if (!detectedName || orderingSystemState.items.length === 0) return null;
 
     const normalizedDetected = detectedName.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+
+    // LEARNING: Check if we've matched this exact name before (aliases)
+    if (orderingSystemState.aliases && orderingSystemState.aliases[normalizedDetected]) {
+      const aliasMatch = orderingSystemState.aliases[normalizedDetected];
+      const item = orderingSystemState.items.find(i => i.id === aliasMatch.inventory_item_id);
+      if (item) {
+        console.log('✅ LEARNED MATCH:', detectedName, '→', item.itemName);
+        return {
+          id: item.id,
+          itemName: item.itemName, // ALWAYS uses existing name, never overwrites
+          confidence: 1.0 // 100% confidence from learned alias
+        };
+      }
+    }
+
+    // If no learned match, do fuzzy matching
     let bestMatch = null;
     let bestScore = 0;
 
