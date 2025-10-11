@@ -1229,7 +1229,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             transition: all 0.15s ease;
-          ">COUNT</button>
+          ">MANAGE</button>
           <button class="tab-link" onclick="openOrderTab(event, 'updateCounts')" style="
             flex: 0 0 auto;
             padding: 8px 6px;
@@ -1243,7 +1243,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             transition: all 0.15s ease;
-          ">UPDATE</button>
+          ">COUNT</button>
           <button class="tab-link" onclick="openOrderTab(event, 'prepSheet')" style="
             flex: 0 0 auto;
             padding: 8px 6px;
@@ -1299,9 +1299,14 @@
                   <option value="Greenleaf">Greenleaf</option>
                   <option value="Performance">Performance</option>
                   <option value="Mani Imports">Mani Imports</option>
-                  <option value="Eatopia Foods">Eatopia Foods</option>
-                  <option value="Ecolab">Ecolab</option>
+                  <option value="Eatopia">Eatopia</option>
+                  <option value="Restaurant Depot">Restaurant Depot</option>
                   <option value="Alsco">Alsco</option>
+                  <option value="SRC Pumping">SRC Pumping</option>
+                  <option value="Southern Glazer's">Southern Glazer's</option>
+                  <option value="Breakthru Beverage">Breakthru Beverage</option>
+                  <option value="Ecolab">Ecolab</option>
+                  <option value="OTHER">OTHER (Add New Vendor)</option>
                 </select>
               </div>
               <div class="form-group">
@@ -1450,9 +1455,64 @@
 
         <!-- Tab Content: Prep Sheet -->
         <div id="prepSheet" class="tab-content" style="display: none;">
+          <!-- Add New Prep Item Form -->
+          <div style="background: var(--gray-100); padding: 20px; border-radius: 0; margin-bottom: 30px; border: 2px solid var(--gray-300);">
+            <h3 style="margin-bottom: 15px; color: var(--gray-900); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Add New Prep Item</h3>
+            <form id="addPrepItemForm" onsubmit="handleAddPrepItem(event)" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div class="form-group">
+                <label for="newPrepItemName" style="display: block; margin-bottom: 6px; color: var(--gray-700); font-size: 12px; font-weight: 700; text-transform: uppercase;">Item Name:</label>
+                <input type="text" id="newPrepItemName" class="form-input" placeholder="e.g., Marinated Tomatoes" required style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;">
+              </div>
+              <div class="form-group">
+                <label for="newPrepItemVendor" style="display: block; margin-bottom: 6px; color: var(--gray-700); font-size: 12px; font-weight: 700; text-transform: uppercase;">Vendor:</label>
+                <select id="newPrepItemVendor" class="form-select" required style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; background: var(--white);">
+                  <option value="">Select Vendor</option>
+                  <option value="Greenleaf">Greenleaf</option>
+                  <option value="Performance">Performance</option>
+                  <option value="Mani Imports">Mani Imports</option>
+                  <option value="Eatopia">Eatopia</option>
+                  <option value="Restaurant Depot">Restaurant Depot</option>
+                  <option value="Alsco">Alsco</option>
+                  <option value="SRC Pumping">SRC Pumping</option>
+                  <option value="Southern Glazer's">Southern Glazer's</option>
+                  <option value="Breakthru Beverage">Breakthru Beverage</option>
+                  <option value="PREP">PREP (House-made)</option>
+                  <option value="OTHER">OTHER (Add New Vendor)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="newPrepItemUnit" style="display: block; margin-bottom: 6px; color: var(--gray-700); font-size: 12px; font-weight: 700; text-transform: uppercase;">Unit:</label>
+                <input type="text" id="newPrepItemUnit" class="form-input" placeholder="e.g., CS, EA, LB" required style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;">
+              </div>
+              <div class="form-group">
+                <label for="newPrepItemPar" style="display: block; margin-bottom: 6px; color: var(--gray-700); font-size: 12px; font-weight: 700; text-transform: uppercase;">Par Level:</label>
+                <input type="number" id="newPrepItemPar" class="form-input" min="0" step="0.25" value="0" required style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;">
+              </div>
+              <div class="form-group">
+                <label for="newPrepItemLifespan" style="display: block; margin-bottom: 6px; color: var(--gray-700); font-size: 12px; font-weight: 700; text-transform: uppercase;">Batch Lifespan (hours):</label>
+                <input type="number" id="newPrepItemLifespan" class="form-input" min="0" value="48" required style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;">
+              </div>
+              <div class="form-group">
+                <label for="newPrepItemStorage" style="display: block; margin-bottom: 6px; color: var(--gray-700); font-size: 12px; font-weight: 700; text-transform: uppercase;">Storage Location:</label>
+                <select id="newPrepItemStorage" class="form-select" style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; background: var(--white);">
+                  <option value="">Select Location</option>
+                  <option value="Walk-in Cooler">Walk-in Cooler</option>
+                  <option value="Reach-in Fridge">Reach-in Fridge</option>
+                  <option value="Freezer">Freezer</option>
+                  <option value="Dry Storage">Dry Storage</option>
+                  <option value="Line Station">Line Station</option>
+                  <option value="Prep Station">Prep Station</option>
+                </select>
+              </div>
+              <div style="grid-column: 1 / -1;">
+                <button type="submit" class="submit-btn" style="background: var(--gray-700); color: var(--white); border: none; padding: 12px 24px; cursor: pointer; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; width: 100%;">Add Prep Item</button>
+              </div>
+            </form>
+          </div>
+
           <div style="margin-bottom: 20px;">
-            <h3 style="color: #ff6b35; margin-bottom: 10px;">🍳 Today's Prep Recommendations</h3>
-            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+            <h3 style="color: var(--gray-900); margin-bottom: 10px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Today's Prep Recommendations</h3>
+            <p style="color: var(--gray-500); font-size: 13px; margin-bottom: 20px;">
               Smart recommendations based on current stock levels, consumption patterns, and batch lifespans.
             </p>
           </div>
@@ -11165,13 +11225,23 @@
     event.preventDefault();
 
     const itemName = document.getElementById('newItemName').value.trim();
-    const vendor = document.getElementById('newItemVendor').value;
+    let vendor = document.getElementById('newItemVendor').value;
     const unit = document.getElementById('newItemUnit').value.trim();
     const parLevel = parseInt(document.getElementById('newItemPar').value);
 
     if (!itemName || !vendor || !unit) {
       showMessage('Please fill in all required fields!', 'error');
       return;
+    }
+
+    // Handle new vendor creation
+    if (vendor === 'OTHER') {
+      const newVendor = prompt('Enter new vendor name:');
+      if (!newVendor || newVendor.trim() === '') {
+        showMessage('Vendor name is required', 'error');
+        return;
+      }
+      vendor = newVendor.trim();
     }
 
     showLoading('Adding Item', 'Saving to database...');
@@ -11215,6 +11285,84 @@
     } catch (error) {
       hideLoading();
       showMessage(`Error adding item: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Handle adding a new prep item
+   */
+  async function handleAddPrepItem(event) {
+    event.preventDefault();
+
+    const itemName = document.getElementById('newPrepItemName').value.trim();
+    let vendor = document.getElementById('newPrepItemVendor').value;
+    const unit = document.getElementById('newPrepItemUnit').value.trim().toUpperCase();
+    const parLevel = parseFloat(document.getElementById('newPrepItemPar').value);
+    const batchLifespan = parseInt(document.getElementById('newPrepItemLifespan').value);
+    const storageLocation = document.getElementById('newPrepItemStorage').value;
+
+    if (!itemName || !vendor || !unit) {
+      showMessage('Please fill in all required fields!', 'error');
+      return;
+    }
+
+    // Handle new vendor creation
+    if (vendor === 'OTHER') {
+      const newVendor = prompt('Enter new vendor name:');
+      if (!newVendor || newVendor.trim() === '') {
+        showMessage('Vendor name is required', 'error');
+        return;
+      }
+      vendor = newVendor.trim();
+    }
+
+    showLoading('Adding Prep Item', 'Saving to database...');
+
+    try {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .insert([{
+          item_name: itemName,
+          vendor: vendor,
+          unit: unit,
+          par_level: parLevel,
+          current_stock: 0,
+          category: 'PREP',
+          batch_lifespan: batchLifespan,
+          storage_location: storageLocation,
+          created_date: new Date().toISOString()
+        }])
+        .select();
+
+      if (error) throw error;
+
+      // Add to local state
+      orderingSystemState.items.push({
+        id: data[0].id,
+        itemName: data[0].item_name,
+        vendor: data[0].vendor,
+        parLevel: data[0].par_level,
+        currentStock: data[0].current_stock,
+        unit: data[0].unit,
+        category: 'PREP',
+        batchLifespan: data[0].batch_lifespan,
+        storageLocation: data[0].storage_location,
+        lastCountedDate: null
+      });
+
+      // Reset form
+      document.getElementById('addPrepItemForm').reset();
+
+      // Refresh displays
+      renderInventoryList();
+      renderStockCountList();
+      refreshPrepSheet(); // Refresh prep recommendations
+
+      hideLoading();
+      showMessage('Prep item added successfully!', 'success');
+    } catch (error) {
+      hideLoading();
+      showMessage(`Error adding prep item: ${error.message}`, 'error');
     }
   }
 
@@ -12199,6 +12347,89 @@
       document.body.removeChild(overlay);
     };
     buttonRow.appendChild(cancelBtn);
+
+    const createNewBtn = document.createElement('button');
+    createNewBtn.textContent = 'CREATE NEW';
+    createNewBtn.style.cssText = 'flex: 1; padding: 12px; background: var(--gray-700); color: var(--white); border: 2px solid var(--gray-700); border-radius: 0; font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
+    createNewBtn.onclick = async function() {
+      // Prompt for new item details
+      const newItemName = prompt('Enter item name:', item.detectedName || '');
+      if (!newItemName || newItemName.trim() === '') {
+        showMessage('Item name is required', 'error');
+        return;
+      }
+
+      const vendorOptions = ['Greenleaf', 'Performance', 'Mani Imports', 'Eatopia', 'Restaurant Depot', 'Alsco', 'SRC Pumping', 'Southern Glazer\'s', 'Breakthru Beverage', 'PREP'];
+      const vendorChoice = prompt('Enter vendor name (or choose from: ' + vendorOptions.join(', ') + '):', '');
+      if (!vendorChoice || vendorChoice.trim() === '') {
+        showMessage('Vendor is required', 'error');
+        return;
+      }
+
+      const unit = prompt('Enter unit (e.g., CS, EA, LB):', '');
+      if (!unit || unit.trim() === '') {
+        showMessage('Unit is required', 'error');
+        return;
+      }
+
+      const parLevel = prompt('Enter par level (default 0):', '0');
+      const category = confirm('Is this a PREP item? (OK = Yes, Cancel = No)') ? 'PREP' : 'INVENTORY';
+
+      // Create the item
+      document.body.removeChild(overlay);
+      showLoading('Creating New Item', 'Saving to database...');
+
+      try {
+        const insertData = {
+          item_name: newItemName.trim(),
+          vendor: vendorChoice.trim(),
+          unit: unit.trim().toUpperCase(),
+          par_level: parseFloat(parLevel) || 0,
+          current_stock: 0,
+          category: category,
+          created_date: new Date().toISOString()
+        };
+
+        // Add prep-specific fields if category is PREP
+        if (category === 'PREP') {
+          const batchLifespan = prompt('Enter batch lifespan in hours (default 48):', '48');
+          insertData.batch_lifespan = parseInt(batchLifespan) || 48;
+        }
+
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .insert([insertData])
+          .select();
+
+        if (error) throw error;
+
+        // Add to local state
+        orderingSystemState.items.push({
+          id: data[0].id,
+          itemName: data[0].item_name,
+          vendor: data[0].vendor,
+          parLevel: data[0].par_level,
+          currentStock: data[0].current_stock,
+          unit: data[0].unit,
+          category: data[0].category,
+          batchLifespan: data[0].batch_lifespan,
+          lastCountedDate: null
+        });
+
+        // Auto-match the newly created item
+        orderingSystemState.extractedInvoiceItems[itemIndex].matchedInventoryId = data[0].id;
+        orderingSystemState.extractedInvoiceItems[itemIndex].matchedItemName = data[0].item_name;
+        orderingSystemState.extractedInvoiceItems[itemIndex].matchConfidence = 1.0;
+
+        hideLoading();
+        renderExtractedItems();
+        showMessage('New item created and matched!', 'success');
+      } catch (error) {
+        hideLoading();
+        showMessage('Error creating item: ' + error.message, 'error');
+      }
+    };
+    buttonRow.appendChild(createNewBtn);
 
     const skipBtn = document.createElement('button');
     skipBtn.textContent = 'SKIP';
