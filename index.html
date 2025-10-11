@@ -10260,64 +10260,73 @@
           <h4 style="background: ${headerColor}; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
             ${isPrepCategory ? '🍳 ' : ''}${vendor} (${items.length} items)
           </h4>
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="background: #f8f9fa;">
-                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Item Name</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 150px;">Vendor</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 100px;">Unit</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Par Level</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Current Stock</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 100px;">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${items.map((item, i) => `
-                <tr style="background: ${i % 2 === 0 ? 'white' : '#f8f9fa'};">
-                  <td style="padding: 10px; border: 1px solid #ddd;">${item.itemName}</td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
-                    <select
-                      value="${item.vendor}"
-                      onchange="updateItemVendor(${item.id}, this.value)"
-                      style="width: 140px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
-                    >
-                      ${getAllVendors().map(v => `<option value="${v}" ${v === item.vendor ? 'selected' : ''}>${v}</option>`).join('')}
-                    </select>
-                  </td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
-                    <input
-                      type="text"
-                      value="${item.unit}"
-                      onchange="updateItemUnit(${item.id}, this.value)"
-                      style="width: 80px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
-                      placeholder="e.g., CS, EA"
-                    />
-                  </td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
-                    <input
-                      type="number"
-                      value="${item.parLevel}"
-                      min="0"
-                      onchange="updateParLevel(${item.id}, this.value)"
-                      style="width: 80px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px;"
-                    />
-                  </td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd; color: #666;">${item.currentStock}</td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
-                    <button data-delete-item="${item.id}" class="delete-item-btn" style="
-                      background: #d32f2f;
-                      color: white;
-                      border: none;
-                      padding: 5px 10px;
-                      border-radius: 4px;
-                      cursor: pointer;
-                      font-size: 12px;
-                    ">Delete</button>
-                  </td>
+          <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+              <thead>
+                <tr style="background: #f8f9fa;">
+                  <th style="padding: 8px; text-align: left; border: 1px solid #ddd; font-size: 12px;">Item Name</th>
+                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 110px; font-size: 12px;">Vendor</th>
+                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 70px; font-size: 12px;">Unit</th>
+                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 80px; font-size: 12px;">Par</th>
+                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 80px; font-size: 12px;">Stock</th>
+                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 80px; font-size: 12px;">Action</th>
                 </tr>
-              `).join('')}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                ${items.map((item, i) => `
+                  <tr style="background: ${i % 2 === 0 ? 'white' : '#f8f9fa'};">
+                    <td style="padding: 8px; border: 1px solid #ddd; font-size: 13px;">${item.itemName}</td>
+                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
+                      <select
+                        value="${item.vendor}"
+                        onchange="updateItemVendor(${item.id}, this.value)"
+                        style="width: 100%; max-width: 105px; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px;"
+                      >
+                        ${getAllVendors().map(v => `<option value="${v}" ${v === item.vendor ? 'selected' : ''}>${v}</option>`).join('')}
+                      </select>
+                    </td>
+                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
+                      <input
+                        type="text"
+                        value="${item.unit}"
+                        onchange="updateItemUnit(${item.id}, this.value)"
+                        style="width: 100%; max-width: 60px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; box-sizing: border-box;"
+                        placeholder="CS"
+                      />
+                    </td>
+                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
+                      <input
+                        type="number"
+                        value="${item.parLevel}"
+                        min="0"
+                        step="0.25"
+                        onchange="updateParLevel(${item.id}, this.value)"
+                        style="width: 100%; max-width: 70px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; box-sizing: border-box;"
+                      />
+                    </td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #ddd; color: #666; font-size: 13px; font-weight: 600;">${item.currentStock}</td>
+                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
+                      <button
+                        data-delete-item="${item.id}"
+                        class="delete-item-btn"
+                        onclick="deleteInventoryItem(${item.id}); return false;"
+                        style="
+                          background: #d32f2f;
+                          color: white;
+                          border: none;
+                          padding: 5px 8px;
+                          border-radius: 4px;
+                          cursor: pointer;
+                          font-size: 11px;
+                          white-space: nowrap;
+                        "
+                      >Del</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
         </div>
       `;
     });
@@ -10815,64 +10824,73 @@
           <h4 style="background: ${headerColor}; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
             ${isPrepCategory ? '🍳 ' : ''}${vendor} (${items.length} items)
           </h4>
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="background: #f8f9fa;">
-                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Item Name</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 150px;">Vendor</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 100px;">Unit</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Par Level</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Current Stock</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 100px;">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${items.map((item, i) => `
-                <tr style="background: ${i % 2 === 0 ? 'white' : '#f8f9fa'};">
-                  <td style="padding: 10px; border: 1px solid #ddd;">${item.itemName}</td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
-                    <select
-                      value="${item.vendor}"
-                      onchange="updateItemVendor(${item.id}, this.value)"
-                      style="width: 140px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
-                    >
-                      ${getAllVendors().map(v => `<option value="${v}" ${v === item.vendor ? 'selected' : ''}>${v}</option>`).join('')}
-                    </select>
-                  </td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
-                    <input
-                      type="text"
-                      value="${item.unit}"
-                      onchange="updateItemUnit(${item.id}, this.value)"
-                      style="width: 80px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
-                      placeholder="e.g., CS, EA"
-                    />
-                  </td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
-                    <input
-                      type="number"
-                      value="${item.parLevel}"
-                      min="0"
-                      onchange="updateParLevel(${item.id}, this.value)"
-                      style="width: 80px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px;"
-                    />
-                  </td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd; color: #666;">${item.currentStock}</td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
-                    <button data-delete-item="${item.id}" class="delete-item-btn" style="
-                      background: #d32f2f;
-                      color: white;
-                      border: none;
-                      padding: 5px 10px;
-                      border-radius: 4px;
-                      cursor: pointer;
-                      font-size: 12px;
-                    ">Delete</button>
-                  </td>
+          <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+              <thead>
+                <tr style="background: #f8f9fa;">
+                  <th style="padding: 8px; text-align: left; border: 1px solid #ddd; font-size: 12px;">Item Name</th>
+                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 110px; font-size: 12px;">Vendor</th>
+                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 70px; font-size: 12px;">Unit</th>
+                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 80px; font-size: 12px;">Par</th>
+                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 80px; font-size: 12px;">Stock</th>
+                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 80px; font-size: 12px;">Action</th>
                 </tr>
-              `).join('')}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                ${items.map((item, i) => `
+                  <tr style="background: ${i % 2 === 0 ? 'white' : '#f8f9fa'};">
+                    <td style="padding: 8px; border: 1px solid #ddd; font-size: 13px;">${item.itemName}</td>
+                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
+                      <select
+                        value="${item.vendor}"
+                        onchange="updateItemVendor(${item.id}, this.value)"
+                        style="width: 100%; max-width: 105px; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px;"
+                      >
+                        ${getAllVendors().map(v => `<option value="${v}" ${v === item.vendor ? 'selected' : ''}>${v}</option>`).join('')}
+                      </select>
+                    </td>
+                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
+                      <input
+                        type="text"
+                        value="${item.unit}"
+                        onchange="updateItemUnit(${item.id}, this.value)"
+                        style="width: 100%; max-width: 60px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; box-sizing: border-box;"
+                        placeholder="CS"
+                      />
+                    </td>
+                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
+                      <input
+                        type="number"
+                        value="${item.parLevel}"
+                        min="0"
+                        step="0.25"
+                        onchange="updateParLevel(${item.id}, this.value)"
+                        style="width: 100%; max-width: 70px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; box-sizing: border-box;"
+                      />
+                    </td>
+                    <td style="padding: 8px; text-align: center; border: 1px solid #ddd; color: #666; font-size: 13px; font-weight: 600;">${item.currentStock}</td>
+                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
+                      <button
+                        data-delete-item="${item.id}"
+                        class="delete-item-btn"
+                        onclick="deleteInventoryItem(${item.id}); return false;"
+                        style="
+                          background: #d32f2f;
+                          color: white;
+                          border: none;
+                          padding: 5px 8px;
+                          border-radius: 4px;
+                          cursor: pointer;
+                          font-size: 11px;
+                          white-space: nowrap;
+                        "
+                      >Del</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
         </div>
       `;
     });
