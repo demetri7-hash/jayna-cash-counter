@@ -1233,6 +1233,17 @@
             font-weight: 600;
             transition: all 0.3s;
           ">Update Counts</button>
+          <button class="tab-link" onclick="openOrderTab(event, 'prepSheet')" style="
+            flex: 1;
+            padding: 12px 20px;
+            background: #f5f5f5;
+            color: #ff6b35;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+          ">🍳 Prep Sheet</button>
         </div>
 
         <!-- Tab Content: Upcoming Orders -->
@@ -1425,6 +1436,44 @@
 
           <div id="stockCountList" style="max-height: 600px; overflow-y: auto;">
             <p style="text-align: center; padding: 20px;">Loading items...</p>
+          </div>
+        </div>
+
+        <!-- Tab Content: Prep Sheet -->
+        <div id="prepSheet" class="tab-content" style="display: none;">
+          <div style="margin-bottom: 20px;">
+            <h3 style="color: #ff6b35; margin-bottom: 10px;">🍳 Today's Prep Recommendations</h3>
+            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+              Smart recommendations based on current stock levels, consumption patterns, and batch lifespans.
+            </p>
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+            <button class="submit-btn" onclick="refreshPrepSheet()" style="background: #ff6b35;">
+              🔄 Refresh Recommendations
+            </button>
+            <button class="submit-btn" onclick="generatePrepSheetPDF()" style="background: #1e3c72;">
+              📄 Generate PDF
+            </button>
+            <button class="submit-btn" onclick="printPrepSheet()" style="background: #2e7d32;">
+              🖨️ Print Sheet
+            </button>
+          </div>
+
+          <!-- Prep Summary Stats -->
+          <div id="prepSummaryStats" style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+          ">
+            <!-- Will be populated by JavaScript -->
+          </div>
+
+          <!-- Prep Recommendations List -->
+          <div id="prepRecommendationsList" style="max-height: 600px; overflow-y: auto;">
+            <p style="text-align: center; padding: 20px;">Loading prep recommendations...</p>
           </div>
         </div>
 
@@ -9509,6 +9558,11 @@
     }
 
     orderingSystemState.currentTab = tabName;
+
+    // Auto-refresh prep sheet when tab is opened
+    if (tabName === 'prepSheet') {
+      refreshPrepSheet();
+    }
   }
 
   /**
@@ -10957,6 +11011,300 @@
       renameVendor(vendorName, newName);
       closeVendorManagement();
     }
+  }
+
+  // ============================================
+  // PREP SHEET SYSTEM
+  // ============================================
+
+  /**
+   * Refresh prep sheet with current recommendations
+   */
+  async function refreshPrepSheet() {
+    console.log('Refreshing prep sheet...');
+    const prepItems = orderingSystemState.items.filter(item => item.itemType === 'prep');
+
+    if (prepItems.length === 0) {
+      document.getElementById('prepRecommendationsList').innerHTML = `
+        <div style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 8px;">
+          <p style="color: #666; font-size: 16px;">No prep items found. Add prep items to get started!</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Fetch consumption data for all prep items
+    const today = new Date().toISOString().split('T')[0];
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    try {
+      const { data: consumptionData, error } = await supabase
+        .from('prep_consumption_log')
+        .select('*')
+        .gte('count_date', sevenDaysAgo)
+        .lte('count_date', today);
+
+      if (error) throw error;
+
+      // Calculate recommendations for each prep item
+      const recommendations = prepItems.map(item => {
+        return calculatePrepRecommendation(item, consumptionData);
+      });
+
+      // Sort by priority (lowest stock % first, then by consumption rate)
+      recommendations.sort((a, b) => {
+        if (a.stockPercentage !== b.stockPercentage) {
+          return a.stockPercentage - b.stockPercentage;
+        }
+        return (b.avgConsumptionRate || 0) - (a.avgConsumptionRate || 0);
+      });
+
+      // Render summary stats
+      renderPrepSummaryStats(recommendations);
+
+      // Render recommendations list
+      renderPrepRecommendations(recommendations);
+
+    } catch (error) {
+      console.error('Error refreshing prep sheet:', error);
+      showMessage(`Error loading prep data: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Calculate recommendation for a single prep item
+   */
+  function calculatePrepRecommendation(item, consumptionData) {
+    // Filter consumption data for this item
+    const itemConsumption = consumptionData.filter(c => c.item_id === item.id);
+
+    // Calculate average consumption rate
+    let avgConsumptionRate = 0;
+    let totalConsumption = 0;
+    if (itemConsumption.length > 0) {
+      totalConsumption = itemConsumption.reduce((sum, c) => sum + (c.consumption_amount || 0), 0);
+      avgConsumptionRate = totalConsumption / itemConsumption.length;
+    }
+
+    // Calculate stock percentage (current / par)
+    const stockPercentage = item.parLevel > 0 ? (item.currentStock / item.parLevel) * 100 : 0;
+
+    // Determine recommendation amount
+    let recommendedAmount = 0;
+    let priority = 'low';
+    let reasoning = '';
+
+    if (item.currentStock === 0) {
+      // Out of stock - urgent
+      recommendedAmount = Math.max(item.parLevel, Math.ceil(avgConsumptionRate * 2)); // At least par or 2x consumption
+      priority = 'urgent';
+      reasoning = 'Out of stock - make immediately';
+    } else if (stockPercentage < 50) {
+      // Low stock - high priority
+      recommendedAmount = Math.ceil(item.parLevel - item.currentStock);
+      priority = 'high';
+      reasoning = `Stock below 50% (${stockPercentage.toFixed(0)}%)`;
+    } else if (stockPercentage < 75 && avgConsumptionRate > 0) {
+      // Medium stock but consuming - medium priority
+      recommendedAmount = Math.ceil(avgConsumptionRate * 1.5);
+      priority = 'medium';
+      reasoning = `Stock at ${stockPercentage.toFixed(0)}%, consuming ${avgConsumptionRate.toFixed(1)}/session`;
+    } else {
+      // Stock is good
+      priority = 'low';
+      reasoning = `Stock good (${stockPercentage.toFixed(0)}%)`;
+    }
+
+    return {
+      id: item.id,
+      itemName: item.itemName,
+      currentStock: item.currentStock,
+      parLevel: item.parLevel,
+      unit: item.unit,
+      stockPercentage,
+      avgConsumptionRate,
+      recommendedAmount,
+      priority,
+      reasoning,
+      lastCountedDate: item.lastCountedDate
+    };
+  }
+
+  /**
+   * Render summary statistics
+   */
+  function renderPrepSummaryStats(recommendations) {
+    const urgent = recommendations.filter(r => r.priority === 'urgent').length;
+    const high = recommendations.filter(r => r.priority === 'high').length;
+    const medium = recommendations.filter(r => r.priority === 'medium').length;
+    const low = recommendations.filter(r => r.priority === 'low').length;
+
+    const totalToPrepare = recommendations.filter(r => r.recommendedAmount > 0).length;
+
+    document.getElementById('prepSummaryStats').innerHTML = `
+      <div style="background: #ffebee; padding: 16px; border-radius: 8px; border-left: 4px solid #d32f2f;">
+        <div style="font-size: 24px; font-weight: 700; color: #d32f2f;">${urgent}</div>
+        <div style="font-size: 13px; color: #666; margin-top: 4px;">Urgent Items</div>
+      </div>
+      <div style="background: #fff3e0; padding: 16px; border-radius: 8px; border-left: 4px solid #ff9800;">
+        <div style="font-size: 24px; font-weight: 700; color: #ff9800;">${high}</div>
+        <div style="font-size: 13px; color: #666; margin-top: 4px;">High Priority</div>
+      </div>
+      <div style="background: #fff9c4; padding: 16px; border-radius: 8px; border-left: 4px solid #fbc02d;">
+        <div style="font-size: 24px; font-weight: 700; color: #f57f17;">${medium}</div>
+        <div style="font-size: 13px; color: #666; margin-top: 4px;">Medium Priority</div>
+      </div>
+      <div style="background: #e8f5e9; padding: 16px; border-radius: 8px; border-left: 4px solid #2e7d32;">
+        <div style="font-size: 24px; font-weight: 700; color: #2e7d32;">${totalToPrepare}</div>
+        <div style="font-size: 13px; color: #666; margin-top: 4px;">Total to Prepare</div>
+      </div>
+    `;
+  }
+
+  /**
+   * Render prep recommendations list
+   */
+  function renderPrepRecommendations(recommendations) {
+    const container = document.getElementById('prepRecommendationsList');
+
+    if (recommendations.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          <p style="color: #666;">All prep items are well-stocked! 🎉</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Group by priority
+    const urgent = recommendations.filter(r => r.priority === 'urgent');
+    const high = recommendations.filter(r => r.priority === 'high');
+    const medium = recommendations.filter(r => r.priority === 'medium');
+    const low = recommendations.filter(r => r.priority === 'low');
+
+    let html = '';
+
+    // Render each priority group
+    if (urgent.length > 0) {
+      html += renderPriorityGroup('🚨 URGENT - Out of Stock', urgent, '#d32f2f', '#ffebee');
+    }
+    if (high.length > 0) {
+      html += renderPriorityGroup('⚠️ HIGH PRIORITY - Low Stock', high, '#ff9800', '#fff3e0');
+    }
+    if (medium.length > 0) {
+      html += renderPriorityGroup('📋 MEDIUM PRIORITY', medium, '#fbc02d', '#fff9c4');
+    }
+    if (low.length > 0) {
+      html += renderPriorityGroup('✅ LOW PRIORITY - Stock Good', low, '#2e7d32', '#e8f5e9');
+    }
+
+    container.innerHTML = html;
+  }
+
+  /**
+   * Render a priority group of recommendations
+   */
+  function renderPriorityGroup(title, items, borderColor, bgColor) {
+    const itemsHTML = items.map(item => {
+      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+      const stockStatus = item.currentStock === 0 ? '❌ OUT' : `${item.currentStock} ${item.unit}`;
+
+      return `
+        <div style="
+          display: grid;
+          grid-template-columns: 2fr 1fr 1fr 1fr 2fr;
+          gap: 12px;
+          padding: 12px 16px;
+          border-bottom: 1px solid #e0e0e0;
+          align-items: center;
+        ">
+          <div>
+            <div style="font-weight: 600; font-size: 14px; color: #333;">${item.itemName}</div>
+            <div style="font-size: 11px; color: #999; margin-top: 2px;">Last count: ${lastCountStr}</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-weight: 600; font-size: 16px; color: ${item.currentStock === 0 ? '#d32f2f' : '#333'};">${stockStatus}</div>
+            <div style="font-size: 11px; color: #666;">Current</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-weight: 600; font-size: 16px; color: #666;">${item.parLevel} ${item.unit}</div>
+            <div style="font-size: 11px; color: #666;">Par</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-weight: 700; font-size: 18px; color: ${borderColor};">${item.recommendedAmount > 0 ? item.recommendedAmount : '—'}</div>
+            <div style="font-size: 11px; color: #666;">To Make</div>
+          </div>
+          <div style="font-size: 12px; color: #666; font-style: italic;">
+            ${item.reasoning}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div style="margin-bottom: 24px;">
+        <h4 style="
+          background: ${bgColor};
+          color: ${borderColor};
+          padding: 12px 16px;
+          border-radius: 6px 6px 0 0;
+          border-left: 4px solid ${borderColor};
+          margin: 0;
+          font-size: 15px;
+        ">
+          ${title} (${items.length} items)
+        </h4>
+        <div style="background: white; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 6px 6px;">
+          <!-- Header Row -->
+          <div style="
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 2fr;
+            gap: 12px;
+            padding: 10px 16px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+          ">
+            <div>Item Name</div>
+            <div style="text-align: center;">Current</div>
+            <div style="text-align: center;">Par</div>
+            <div style="text-align: center;">Recommend</div>
+            <div>Reasoning</div>
+          </div>
+          ${itemsHTML}
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Generate prep sheet PDF
+   */
+  async function generatePrepSheetPDF() {
+    showMessage('Generating prep sheet PDF...', 'info');
+    // TODO: Implement PDF generation using jsPDF
+    showMessage('PDF generation coming soon!', 'info');
+  }
+
+  /**
+   * Print prep sheet
+   */
+  function printPrepSheet() {
+    const prepSheet = document.getElementById('prepRecommendationsList');
+    if (!prepSheet) return;
+
+    const printWindow = window.open('', '', 'height=800,width=1000');
+    printWindow.document.write('<html><head><title>Prep Sheet - ' + new Date().toLocaleDateString() + '</title>');
+    printWindow.document.write('<style>body{font-family: Arial, sans-serif; padding: 20px;} table{width:100%; border-collapse: collapse;} th, td{border: 1px solid #ddd; padding: 8px; text-align: left;} th{background: #ff6b35; color: white;}</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write('<h1 style="color: #ff6b35;">🍳 Prep Sheet - ' + new Date().toLocaleDateString() + '</h1>');
+    printWindow.document.write(prepSheet.innerHTML);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.print();
   }
 
   /**
