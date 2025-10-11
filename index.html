@@ -9815,6 +9815,203 @@
       refreshPrepSheet();
       updateCountSessionDisplay(); // Update session info each time PREP tab is opened
     }
+
+    // Load pending orders when ORDERS tab is opened
+    if (tabName === 'upcomingOrders') {
+      renderPendingOrders();
+    }
+  }
+
+  /**
+   * Render pending orders on ORDERS tab
+   */
+  async function renderPendingOrders() {
+    console.log('Rendering pending orders...');
+    const container = document.getElementById('upcomingOrders');
+
+    // Show loading state
+    container.innerHTML = '<div style="text-align: center; padding: 40px;"><p style="color: var(--gray-500);">Loading pending orders...</p></div>';
+
+    try {
+      // Fetch all pending orders
+      const { data: orders, error } = await supabase
+        .from('pending_orders')
+        .select(`
+          *,
+          pending_order_items (
+            id,
+            inventory_item_id,
+            quantity_ordered,
+            unit,
+            item_name,
+            quantity_received,
+            variance
+          )
+        `)
+        .in('status', ['pending', 'partial'])
+        .order('expected_delivery_date', { ascending: true });
+
+      if (error) throw error;
+
+      console.log('Loaded pending orders:', orders?.length || 0);
+
+      // Clear container
+      container.innerHTML = '';
+
+      // Group orders by delivery status
+      const today = new Date().toISOString().split('T')[0];
+      const ordersToday = orders?.filter(o => o.expected_delivery_date === today) || [];
+      const ordersUpcoming = orders?.filter(o => o.expected_delivery_date > today) || [];
+      const ordersPast = orders?.filter(o => o.expected_delivery_date < today) || [];
+
+      // Alert for orders due today
+      if (ordersToday.length > 0) {
+        const alert = document.createElement('div');
+        alert.style.cssText = 'background: #fef3c7; border: 2px solid #f59e0b; padding: 16px; margin-bottom: 24px;';
+
+        const alertTitle = document.createElement('h4');
+        alertTitle.textContent = `⚠️ ${ordersToday.length} ORDER(S) DUE TODAY`;
+        alertTitle.style.cssText = 'color: #92400e; margin: 0 0 8px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+        alert.appendChild(alertTitle);
+
+        const alertText = document.createElement('p');
+        alertText.textContent = 'Check in these orders in the CHECK-IN tab when they arrive.';
+        alertText.style.cssText = 'color: #78350f; margin: 0; font-size: 12px;';
+        alert.appendChild(alertText);
+
+        container.appendChild(alert);
+      }
+
+      // Alert for overdue orders
+      if (ordersPast.length > 0) {
+        const alert = document.createElement('div');
+        alert.style.cssText = 'background: #fee2e2; border: 2px solid #ef4444; padding: 16px; margin-bottom: 24px;';
+
+        const alertTitle = document.createElement('h4');
+        alertTitle.textContent = `🚨 ${ordersPast.length} OVERDUE ORDER(S)`;
+        alertTitle.style.cssText = 'color: #7f1d1d; margin: 0 0 8px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+        alert.appendChild(alertTitle);
+
+        const alertText = document.createElement('p');
+        alertText.textContent = 'These orders were expected but have not been checked in yet.';
+        alertText.style.cssText = 'color: #991b1b; margin: 0; font-size: 12px;';
+        alert.appendChild(alertText);
+
+        container.appendChild(alert);
+      }
+
+      // Display all orders
+      const allOrders = [...ordersPast, ...ordersToday, ...ordersUpcoming];
+
+      if (allOrders.length === 0) {
+        const emptyState = document.createElement('div');
+        emptyState.style.cssText = 'text-align: center; padding: 60px 20px;';
+
+        const emptyIcon = document.createElement('div');
+        emptyIcon.textContent = '📦';
+        emptyIcon.style.cssText = 'font-size: 48px; margin-bottom: 16px;';
+        emptyState.appendChild(emptyIcon);
+
+        const emptyText = document.createElement('p');
+        emptyText.textContent = 'No pending orders';
+        emptyText.style.cssText = 'color: var(--gray-500); font-size: 14px; margin: 0;';
+        emptyState.appendChild(emptyText);
+
+        const emptyHint = document.createElement('p');
+        emptyHint.textContent = 'Create an order in the CHECK-IN tab by selecting "ORDER" type';
+        emptyHint.style.cssText = 'color: var(--gray-400); font-size: 12px; margin-top: 8px;';
+        emptyState.appendChild(emptyHint);
+
+        container.appendChild(emptyState);
+        return;
+      }
+
+      // Render each order
+      allOrders.forEach(order => {
+        const card = document.createElement('div');
+        card.style.cssText = 'background: white; border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 16px;';
+
+        // Header row
+        const header = document.createElement('div');
+        header.style.cssText = 'display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;';
+
+        const leftSide = document.createElement('div');
+
+        const vendor = document.createElement('h4');
+        vendor.textContent = order.vendor;
+        vendor.style.cssText = 'color: var(--gray-900); margin: 0 0 4px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;';
+        leftSide.appendChild(vendor);
+
+        const orderDate = document.createElement('div');
+        orderDate.textContent = `Ordered: ${new Date(order.order_date).toLocaleDateString()}`;
+        orderDate.style.cssText = 'color: var(--gray-600); font-size: 11px;';
+        leftSide.appendChild(orderDate);
+
+        header.appendChild(leftSide);
+
+        const rightSide = document.createElement('div');
+        rightSide.style.textAlign = 'right';
+
+        const deliveryDate = document.createElement('div');
+        const daysUntil = Math.ceil((new Date(order.expected_delivery_date) - new Date(today)) / (1000 * 60 * 60 * 24));
+        let dateText = `Expected: ${new Date(order.expected_delivery_date).toLocaleDateString()}`;
+        if (daysUntil === 0) dateText += ' (TODAY)';
+        else if (daysUntil < 0) dateText += ` (${Math.abs(daysUntil)} days overdue)`;
+        else if (daysUntil === 1) dateText += ' (Tomorrow)';
+        else if (daysUntil <= 7) dateText += ` (in ${daysUntil} days)`;
+
+        deliveryDate.textContent = dateText;
+        deliveryDate.style.cssText = daysUntil === 0 ? 'color: #f59e0b; font-size: 11px; font-weight: 700;' : (daysUntil < 0 ? 'color: #ef4444; font-size: 11px; font-weight: 700;' : 'color: var(--gray-600); font-size: 11px;');
+        rightSide.appendChild(deliveryDate);
+
+        const itemCount = document.createElement('div');
+        itemCount.textContent = `${order.total_items} item(s)`;
+        itemCount.style.cssText = 'color: var(--gray-500); font-size: 10px; margin-top: 4px;';
+        rightSide.appendChild(itemCount);
+
+        header.appendChild(rightSide);
+        card.appendChild(header);
+
+        // Items list (collapsible)
+        if (order.pending_order_items && order.pending_order_items.length > 0) {
+          const itemsList = document.createElement('div');
+          itemsList.style.cssText = 'border-top: 1px solid var(--gray-200); padding-top: 12px; margin-top: 8px;';
+
+          order.pending_order_items.forEach(item => {
+            const itemRow = document.createElement('div');
+            itemRow.style.cssText = 'display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px;';
+
+            const itemName = document.createElement('span');
+            itemName.textContent = item.item_name;
+            itemName.style.cssText = 'color: var(--gray-700);';
+            itemRow.appendChild(itemName);
+
+            const itemQty = document.createElement('span');
+            itemQty.textContent = `${item.quantity_ordered} ${item.unit}`;
+            itemQty.style.cssText = 'color: var(--gray-500); font-weight: 700;';
+            itemRow.appendChild(itemQty);
+
+            itemsList.appendChild(itemRow);
+          });
+
+          card.appendChild(itemsList);
+        }
+
+        // Notes if any
+        if (order.notes) {
+          const notes = document.createElement('div');
+          notes.textContent = `Notes: ${order.notes}`;
+          notes.style.cssText = 'color: var(--gray-500); font-size: 11px; margin-top: 12px; font-style: italic;';
+          card.appendChild(notes);
+        }
+
+        container.appendChild(card);
+      });
+
+    } catch (error) {
+      console.error('Error loading pending orders:', error);
+      container.innerHTML = `<div style="text-align: center; padding: 40px;"><p style="color: #ef4444;">Error loading orders: ${error.message}</p></div>`;
+    }
   }
 
   /**
@@ -13160,13 +13357,73 @@
       container.appendChild(card);
     });
 
-    // Add check-in button at the bottom
-    const checkInButton = document.createElement('button');
-    checkInButton.textContent = 'CHECK IN ALL ITEMS';
-    checkInButton.className = 'submit-btn';
-    checkInButton.style.cssText = 'width: 100%; padding: 14px; background: var(--gray-100); color: var(--gray-900); border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; cursor: pointer; margin-top: 20px;';
-    checkInButton.onclick = checkInInvoiceItems;
-    container.appendChild(checkInButton);
+    // Add order-specific fields if type is 'order'
+    if (orderingSystemState.invoiceType === 'order') {
+      // Vendor selector
+      const vendorSection = document.createElement('div');
+      vendorSection.style.cssText = 'margin-top: 24px; padding: 16px; background: white; border: 2px solid var(--gray-300);';
+
+      const vendorLabel = document.createElement('label');
+      vendorLabel.textContent = 'VENDOR:';
+      vendorLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;';
+      vendorSection.appendChild(vendorLabel);
+
+      const vendorSelect = document.createElement('select');
+      vendorSelect.id = 'orderVendorSelect';
+      vendorSelect.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; background: white;';
+
+      // Get unique vendors from inventory
+      const vendors = [...new Set(orderingSystemState.items.map(item => item.vendor).filter(v => v))];
+      vendors.sort();
+
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.textContent = 'Select vendor...';
+      vendorSelect.appendChild(defaultOption);
+
+      vendors.forEach(vendor => {
+        const option = document.createElement('option');
+        option.value = vendor;
+        option.textContent = vendor;
+        vendorSelect.appendChild(option);
+      });
+
+      vendorSection.appendChild(vendorSelect);
+      container.appendChild(vendorSection);
+
+      // Delivery date picker
+      const dateSection = document.createElement('div');
+      dateSection.style.cssText = 'margin-top: 16px; padding: 16px; background: white; border: 2px solid var(--gray-300);';
+
+      const dateLabel = document.createElement('label');
+      dateLabel.textContent = 'EXPECTED DELIVERY DATE:';
+      dateLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;';
+      dateSection.appendChild(dateLabel);
+
+      const dateInput = document.createElement('input');
+      dateInput.type = 'date';
+      dateInput.id = 'orderDeliveryDate';
+      dateInput.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;';
+      dateInput.min = new Date().toISOString().split('T')[0]; // Can't be in the past
+      dateSection.appendChild(dateInput);
+
+      container.appendChild(dateSection);
+    }
+
+    // Add action button at the bottom
+    const actionButton = document.createElement('button');
+    actionButton.className = 'submit-btn';
+    actionButton.style.cssText = 'width: 100%; padding: 14px; background: var(--gray-100); color: var(--gray-900); border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; cursor: pointer; margin-top: 20px;';
+
+    if (orderingSystemState.invoiceType === 'order') {
+      actionButton.textContent = 'SAVE ORDER';
+      actionButton.onclick = savePendingOrder;
+    } else {
+      actionButton.textContent = 'CHECK IN ALL ITEMS';
+      actionButton.onclick = checkInInvoiceItems;
+    }
+
+    container.appendChild(actionButton);
   }
 
   /**
@@ -13414,6 +13671,112 @@
 
     // Focus search input
     searchInput.focus();
+  }
+
+  /**
+   * Save order as pending order for future delivery check-in
+   */
+  async function savePendingOrder() {
+    console.log('savePendingOrder called');
+    const items = orderingSystemState.extractedInvoiceItems;
+
+    if (items.length === 0) {
+      showMessage('No items to save', 'warning');
+      return;
+    }
+
+    // Get vendor and delivery date
+    const vendorSelect = document.getElementById('orderVendorSelect');
+    const dateInput = document.getElementById('orderDeliveryDate');
+
+    if (!vendorSelect || !vendorSelect.value) {
+      showMessage('Please select a vendor', 'warning');
+      return;
+    }
+
+    if (!dateInput || !dateInput.value) {
+      showMessage('Please select an expected delivery date', 'warning');
+      return;
+    }
+
+    const vendor = vendorSelect.value;
+    const deliveryDate = dateInput.value;
+
+    // Filter matched items (exclude skipped and flagged as new)
+    const matchedItems = items.filter(item => item.matchedInventoryId && !item.flaggedAsNew && !item.skipped);
+
+    console.log('Matched items to save:', matchedItems.length);
+
+    if (matchedItems.length === 0) {
+      showMessage('Please match items to inventory first', 'warning');
+      return;
+    }
+
+    showLoading('Saving Order', 'Creating pending order...');
+
+    try {
+      // Create pending order record
+      const { data: orderData, error: orderError } = await supabase
+        .from('pending_orders')
+        .insert({
+          vendor: vendor,
+          order_date: new Date().toISOString().split('T')[0],
+          expected_delivery_date: deliveryDate,
+          status: 'pending',
+          created_by: 'System',
+          notes: 'Created from OCR order sheet',
+          total_items: matchedItems.length
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const orderId = orderData.id;
+      console.log('Created pending order:', orderId);
+
+      // Create order items
+      const orderItems = matchedItems.map(item => ({
+        order_id: orderId,
+        inventory_item_id: item.matchedInventoryId,
+        quantity_ordered: item.detectedQuantity || 0,
+        unit: orderingSystemState.items.find(i => i.id === item.matchedInventoryId)?.unit || 'EA',
+        item_name: item.matchedItemName,
+        vendor: vendor
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('pending_order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      hideLoading();
+      showMessage(`✅ Order saved! ${matchedItems.length} items ordered from ${vendor}`, 'success');
+
+      // Clear state
+      orderingSystemState.extractedInvoiceItems = [];
+      orderingSystemState.currentInvoiceImage = null;
+
+      // Clear the extracted items display
+      const container = document.getElementById('extractedInvoiceItems');
+      if (container) {
+        container.innerHTML = '';
+      }
+
+      // Clear the image preview
+      const preview = document.getElementById('invoiceImagePreview');
+      if (preview) {
+        preview.innerHTML = '';
+      }
+
+      console.log('✅ Pending order saved successfully');
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error saving pending order:', error);
+      showMessage('Failed to save order: ' + error.message, 'error');
+    }
   }
 
   /**
