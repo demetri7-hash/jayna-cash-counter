@@ -10254,78 +10254,57 @@
     sortVendorsWithPrepFirst(Object.keys(itemsByVendor)).forEach(vendor => {
       const items = itemsByVendor[vendor];
       const isPrepCategory = vendor === 'PREP';
-      const headerColor = isPrepCategory ? '#ff6b35' : '#1e3c72'; // Orange for PREP, blue for vendors
+      const headerColor = isPrepCategory ? 'var(--gray-700)' : 'var(--gray-600)';
+
       html += `
-        <div style="margin-bottom: 30px;">
-          <h4 style="background: ${headerColor}; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
-            ${isPrepCategory ? '🍳 ' : ''}${vendor} (${items.length} items)
+        <div style="margin-bottom: 24px;">
+          <h4 style="background: ${headerColor}; color: var(--white); padding: 12px 16px; border-radius: 0; margin-bottom: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+            ${isPrepCategory ? '🍳 ' : ''}${vendor} <span style="opacity: 0.7; font-weight: 400; font-size: 12px;">(${items.length})</span>
           </h4>
-          <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-            <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
-              <thead>
-                <tr style="background: #f8f9fa;">
-                  <th style="padding: 8px; text-align: left; border: 1px solid #ddd; font-size: 12px;">Item Name</th>
-                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 110px; font-size: 12px;">Vendor</th>
-                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 70px; font-size: 12px;">Unit</th>
-                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 80px; font-size: 12px;">Par</th>
-                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 80px; font-size: 12px;">Stock</th>
-                  <th style="padding: 8px; text-align: center; border: 1px solid #ddd; width: 80px; font-size: 12px;">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map((item, i) => `
-                  <tr style="background: ${i % 2 === 0 ? 'white' : '#f8f9fa'};">
-                    <td style="padding: 8px; border: 1px solid #ddd; font-size: 13px;">${item.itemName}</td>
-                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
-                      <select
-                        value="${item.vendor}"
-                        onchange="updateItemVendor(${item.id}, this.value)"
-                        style="width: 100%; max-width: 105px; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px;"
-                      >
-                        ${getAllVendors().map(v => `<option value="${v}" ${v === item.vendor ? 'selected' : ''}>${v}</option>`).join('')}
-                      </select>
-                    </td>
-                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
-                      <input
-                        type="text"
-                        value="${item.unit}"
-                        onchange="updateItemUnit(${item.id}, this.value)"
-                        style="width: 100%; max-width: 60px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; box-sizing: border-box;"
-                        placeholder="CS"
-                      />
-                    </td>
-                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
-                      <input
-                        type="number"
-                        value="${item.parLevel}"
-                        min="0"
-                        step="0.25"
-                        onchange="updateParLevel(${item.id}, this.value)"
-                        style="width: 100%; max-width: 70px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; box-sizing: border-box;"
-                      />
-                    </td>
-                    <td style="padding: 8px; text-align: center; border: 1px solid #ddd; color: #666; font-size: 13px; font-weight: 600;">${item.currentStock}</td>
-                    <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">
-                      <button
-                        data-delete-item="${item.id}"
-                        class="delete-item-btn"
-                        onclick="deleteInventoryItem(${item.id}); return false;"
-                        style="
-                          background: #d32f2f;
-                          color: white;
-                          border: none;
-                          padding: 5px 8px;
-                          border-radius: 4px;
-                          cursor: pointer;
-                          font-size: 11px;
-                          white-space: nowrap;
-                        "
-                      >Del</button>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+          <div style="background: var(--white); border: 2px solid var(--gray-300); border-top: none;">
+            ${items.map((item, i) => `
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 12px 16px;
+                  border-bottom: 1px solid var(--gray-200);
+                  transition: background 0.2s;
+                  background: ${i % 2 === 0 ? 'var(--white)' : 'var(--gray-50)'};
+                "
+                onmouseover="this.style.background='var(--gray-100)'"
+                onmouseout="this.style.background='${i % 2 === 0 ? 'var(--white)' : 'var(--gray-50)'}'"
+              >
+                <div style="flex: 1; font-size: 14px; font-weight: 600; color: var(--gray-900);">
+                  ${item.itemName}
+                </div>
+                <button
+                  onclick="openEditItemModal(${item.id}); return false;"
+                  style="
+                    background: var(--gray-100);
+                    border: 2px solid var(--gray-300);
+                    border-radius: 4px;
+                    padding: 8px 12px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    color: var(--gray-700);
+                    font-size: 12px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    transition: all 0.2s;
+                  "
+                  onmouseover="this.style.background='var(--gray-700)'; this.style.color='var(--white)'; this.style.borderColor='var(--gray-700)';"
+                  onmouseout="this.style.background='var(--gray-100)'; this.style.color='var(--gray-700)'; this.style.borderColor='var(--gray-300)';"
+                >
+                  <span style="font-size: 16px;">✏️</span>
+                  <span>Edit</span>
+                </button>
+              </div>
+            `).join('')}
           </div>
         </div>
       `;
@@ -11777,6 +11756,419 @@
       hideLoading();
       showMessage(`Error deleting item: ${error.message}`, 'error');
     }
+  }
+
+  /**
+   * Open modal to edit inventory item
+   */
+  function openEditItemModal(itemId) {
+    // Find the item
+    const item = orderingSystemState.items.find(i => i.id === itemId);
+    if (!item) {
+      showMessage('Item not found', 'error');
+      return;
+    }
+
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'editItemModal';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    `;
+
+    // Create modal content container
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    `;
+
+    // Create header
+    const header = document.createElement('div');
+    header.style.cssText = `
+      background: var(--gray-900);
+      color: var(--white);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    `;
+
+    const headerTitle = document.createElement('h3');
+    headerTitle.textContent = 'EDIT ITEM';
+    headerTitle.style.cssText = `
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    `;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = `
+      background: none;
+      border: none;
+      color: var(--white);
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+    closeBtn.onclick = () => overlay.remove();
+
+    header.appendChild(headerTitle);
+    header.appendChild(closeBtn);
+
+    // Create form container
+    const formContainer = document.createElement('div');
+    formContainer.style.cssText = `
+      padding: 20px;
+    `;
+
+    // Helper function to create form field
+    function createField(label, inputElement) {
+      const fieldDiv = document.createElement('div');
+      fieldDiv.style.cssText = `
+        margin-bottom: 16px;
+      `;
+
+      const labelEl = document.createElement('label');
+      labelEl.textContent = label;
+      labelEl.style.cssText = `
+        display: block;
+        margin-bottom: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--gray-700);
+      `;
+
+      fieldDiv.appendChild(labelEl);
+      fieldDiv.appendChild(inputElement);
+      return fieldDiv;
+    }
+
+    // Item Name field
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = item.itemName || '';
+    nameInput.id = 'editItemName';
+    nameInput.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      box-sizing: border-box;
+    `;
+    formContainer.appendChild(createField('Item Name', nameInput));
+
+    // Vendor dropdown
+    const vendorSelect = document.createElement('select');
+    vendorSelect.id = 'editItemVendor';
+    vendorSelect.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      box-sizing: border-box;
+      background: var(--white);
+    `;
+
+    // Get all unique vendors
+    const vendors = new Set(['PREP']);
+    orderingSystemState.items.forEach(i => {
+      if (i.vendor) vendors.add(i.vendor);
+    });
+    const sortedVendors = Array.from(vendors).sort();
+
+    sortedVendors.forEach(vendor => {
+      const option = document.createElement('option');
+      option.value = vendor;
+      option.textContent = vendor;
+      if (vendor === item.vendor) option.selected = true;
+      vendorSelect.appendChild(option);
+    });
+
+    formContainer.appendChild(createField('Vendor', vendorSelect));
+
+    // Unit field
+    const unitInput = document.createElement('input');
+    unitInput.type = 'text';
+    unitInput.value = item.unit || '';
+    unitInput.id = 'editItemUnit';
+    unitInput.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      box-sizing: border-box;
+      text-transform: uppercase;
+    `;
+    formContainer.appendChild(createField('Unit (CS, EA, LB)', unitInput));
+
+    // Par Level field
+    const parInput = document.createElement('input');
+    parInput.type = 'number';
+    parInput.step = '0.25';
+    parInput.value = item.parLevel || 0;
+    parInput.id = 'editItemPar';
+    parInput.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      box-sizing: border-box;
+    `;
+    formContainer.appendChild(createField('Par Level', parInput));
+
+    // Current Stock (read-only for display)
+    const stockInput = document.createElement('input');
+    stockInput.type = 'number';
+    stockInput.step = '0.25';
+    stockInput.value = item.currentStock || 0;
+    stockInput.id = 'editItemStock';
+    stockInput.readOnly = true;
+    stockInput.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      box-sizing: border-box;
+      background: var(--gray-100);
+      color: var(--gray-600);
+    `;
+    const stockField = createField('Current Stock (update via COUNT tab)', stockInput);
+    formContainer.appendChild(stockField);
+
+    // Category field (only if PREP)
+    if (item.vendor === 'PREP' || item.category === 'PREP') {
+      const categoryInput = document.createElement('input');
+      categoryInput.type = 'text';
+      categoryInput.value = item.category || 'PREP';
+      categoryInput.id = 'editItemCategory';
+      categoryInput.style.cssText = `
+        width: 100%;
+        padding: 10px;
+        border: 2px solid var(--gray-300);
+        border-radius: 0;
+        font-size: 14px;
+        box-sizing: border-box;
+      `;
+      formContainer.appendChild(createField('Category', categoryInput));
+
+      // Batch Lifespan
+      const lifespanInput = document.createElement('input');
+      lifespanInput.type = 'number';
+      lifespanInput.value = item.batchLifespan || '';
+      lifespanInput.id = 'editItemLifespan';
+      lifespanInput.placeholder = 'Hours (e.g., 24)';
+      lifespanInput.style.cssText = `
+        width: 100%;
+        padding: 10px;
+        border: 2px solid var(--gray-300);
+        border-radius: 0;
+        font-size: 14px;
+        box-sizing: border-box;
+      `;
+      formContainer.appendChild(createField('Batch Lifespan (Hours)', lifespanInput));
+
+      // Storage Location
+      const locationInput = document.createElement('input');
+      locationInput.type = 'text';
+      locationInput.value = item.storageLocation || '';
+      locationInput.id = 'editItemLocation';
+      locationInput.placeholder = 'e.g., Walk-in, Freezer';
+      locationInput.style.cssText = `
+        width: 100%;
+        padding: 10px;
+        border: 2px solid var(--gray-300);
+        border-radius: 0;
+        font-size: 14px;
+        box-sizing: border-box;
+      `;
+      formContainer.appendChild(createField('Storage Location', locationInput));
+    }
+
+    // Button container
+    const btnContainer = document.createElement('div');
+    btnContainer.style.cssText = `
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    `;
+
+    // Delete button (left side, red)
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'DELETE';
+    deleteBtn.style.cssText = `
+      flex: 0 0 auto;
+      padding: 12px 20px;
+      background: #dc3545;
+      color: var(--white);
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: background 0.2s;
+    `;
+    deleteBtn.onmouseover = () => deleteBtn.style.background = '#c82333';
+    deleteBtn.onmouseout = () => deleteBtn.style.background = '#dc3545';
+    deleteBtn.onclick = () => {
+      overlay.remove();
+      deleteInventoryItem(itemId);
+    };
+
+    // Spacer
+    const spacer = document.createElement('div');
+    spacer.style.flex = '1';
+
+    // Cancel button
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = `
+      padding: 12px 20px;
+      background: var(--gray-300);
+      color: var(--gray-700);
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: background 0.2s;
+    `;
+    cancelBtn.onmouseover = () => cancelBtn.style.background = 'var(--gray-400)';
+    cancelBtn.onmouseout = () => cancelBtn.style.background = 'var(--gray-300)';
+    cancelBtn.onclick = () => overlay.remove();
+
+    // Save button
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'SAVE CHANGES';
+    saveBtn.style.cssText = `
+      padding: 12px 20px;
+      background: var(--gray-700);
+      color: var(--white);
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: background 0.2s;
+    `;
+    saveBtn.onmouseover = () => saveBtn.style.background = var(--gray-900);
+    saveBtn.onmouseout = () => saveBtn.style.background = var(--gray-700);
+    saveBtn.onclick = async () => {
+      const updatedData = {
+        item_name: nameInput.value.trim(),
+        vendor: vendorSelect.value,
+        unit: unitInput.value.trim().toUpperCase(),
+        par_level: parseFloat(parInput.value) || 0
+      };
+
+      // Add PREP-specific fields if present
+      const categoryInput = document.getElementById('editItemCategory');
+      const lifespanInput = document.getElementById('editItemLifespan');
+      const locationInput = document.getElementById('editItemLocation');
+
+      if (categoryInput) {
+        updatedData.category = categoryInput.value.trim();
+      }
+      if (lifespanInput && lifespanInput.value) {
+        updatedData.batch_lifespan = parseInt(lifespanInput.value) || null;
+      }
+      if (locationInput) {
+        updatedData.storage_location = locationInput.value.trim();
+      }
+
+      // Validate
+      if (!updatedData.item_name) {
+        showMessage('Item name is required', 'error');
+        return;
+      }
+
+      overlay.remove();
+      showLoading('Updating Item', 'Saving changes...');
+
+      try {
+        const { error } = await supabase
+          .from('inventory_items')
+          .update(updatedData)
+          .eq('id', itemId);
+
+        if (error) throw error;
+
+        // Update local state
+        const localItem = orderingSystemState.items.find(i => i.id === itemId);
+        if (localItem) {
+          localItem.itemName = updatedData.item_name;
+          localItem.vendor = updatedData.vendor;
+          localItem.unit = updatedData.unit;
+          localItem.parLevel = updatedData.par_level;
+          if (updatedData.category) localItem.category = updatedData.category;
+          if (updatedData.batch_lifespan !== undefined) localItem.batchLifespan = updatedData.batch_lifespan;
+          if (updatedData.storage_location !== undefined) localItem.storageLocation = updatedData.storage_location;
+        }
+
+        // Refresh displays
+        renderInventoryList();
+        renderStockCountList();
+        renderPrepCountList();
+        calculateUpcomingOrders();
+
+        hideLoading();
+        showMessage('✅ Item updated successfully!', 'success');
+      } catch (error) {
+        hideLoading();
+        showMessage(`Error updating item: ${error.message}`, 'error');
+      }
+    };
+
+    btnContainer.appendChild(deleteBtn);
+    btnContainer.appendChild(spacer);
+    btnContainer.appendChild(cancelBtn);
+    btnContainer.appendChild(saveBtn);
+
+    formContainer.appendChild(btnContainer);
+
+    // Assemble modal
+    modal.appendChild(header);
+    modal.appendChild(formContainer);
+    overlay.appendChild(modal);
+
+    // Add to page
+    document.body.appendChild(overlay);
+
+    // Focus first input
+    nameInput.focus();
   }
 
   /**

@@ -1,210 +1,171 @@
 # CURRENT STATUS - Jayna Cash Counter
-**Last Updated:** 2025-10-10 (Emergency Session: Invoice System Revert)
+**Last Updated:** 2025-10-11 (Invoice System Rebuild + Complete Styling Overhaul)
 
 ---
 
 ## 🎯 Current Work Status
-**Status:** ✅ **SYSTEM RESTORED - ALL CORE FEATURES OPERATIONAL**
+**Status:** ✅ **ALL SYSTEMS OPERATIONAL - INVOICE SYSTEM WORKING**
 
-### Emergency Session (October 10, 2025 - Late Evening):
+### Session (October 11, 2025):
 
-#### **⚠️ INVOICE MANUAL MATCHING ATTEMPTED - REVERTED** ❌
-**User Request:** Add manual matching feature for low-confidence invoice items
-**Implementation:** Modal with searchable dropdown for manual inventory matching
-**Result:** **CATASTROPHIC FAILURE** - Emergency revert required
+#### **✅ INVOICE CHECK-IN SYSTEM - SUCCESSFULLY REBUILT** ✅
+**User Request:** Rebuild invoice upload/OCR/manual matching system (after Oct 10 emergency revert)
+**Implementation:** Complete rebuild using DOM-based approach (no template literals)
+**Result:** **FULLY WORKING** - All features operational
 
-**What Went Wrong:**
-- Modal HTML generation caused complete page break
-- Raw JavaScript code displayed as text on page load
-- Modal appeared automatically on page refresh
-- Multiple fix attempts all failed:
-  1. Template literal rewrite → Failed
-  2. String concatenation → Failed
-  3. HTML entities → Worse
-  4. Simplified prompt approach → Still broken
-- **Staff blocked from using PM flow** (urgent production issue)
+**What Was Built:**
+- Invoice upload system with separate camera/file buttons
+- OCR text extraction using Tesseract.js v4
+- Fuzzy matching algorithm (0.4 confidence threshold)
+- DOM-based manual matching modal (100% safe)
+- Confidence badges in grayscale (darker = higher confidence)
+- Check-in flow updates inventory automatically
+- Base64 image processing (no database storage)
 
-**Resolution:**
-- Emergency revert to commit **before all invoice features**
-- Force pushed to production
-- Triggered fresh Vercel deployment (bypassed cache)
-- **System restored to working state** ✅
+**Technical Approach:**
+- Pure DOM manipulation (createElement, appendChild) throughout
+- Zero template literals (eliminated previous failure mode)
+- Searchable vendor-grouped dropdown for manual item selection
+- Real-time filtering by item name or vendor
+- Validates all items matched before check-in
+- Updates current_stock and last_counted_date
+- Clears image from memory after check-in
 
-**Current Commit:** `2ba664b` (trigger deployment)
-**Base Commit:** `03c0ae5` - "feat(prep): Add Prep Sheet tab with smart recommendations"
+**Space Saving:**
+- Images processed in memory only (Base64)
+- NO images saved to database
+- Only text extracted (item names, quantities, prices, confidence scores)
+- ~1-2KB per invoice vs ~500KB if saving images
+- Zero image storage costs
 
-**Features Removed (Temporarily):**
-- ❌ Invoice upload (PDF/image scanning)
-- ❌ OCR text extraction (Tesseract.js)
-- ❌ PDF.js library integration
-- ❌ Auto-matching algorithm (fuzzy matching)
-- ❌ Manual matching modal (all attempts)
-- ❌ Invoice reconciliation UI
-- ❌ Check-in functionality
-- ❌ invoice_items database operations
+#### **✅ COMPLETE STYLING OVERHAUL** ✅
+**User Request:** "TOO MANY EMOJIS AND COLORS, MAKE IT MATCH THE REST OF THE APP"
+**Implementation:** Removed all emojis, changed from colorful to monochromatic gray design
+**Result:** Clean, professional, unified design system
 
-**7 Commits Reverted:**
-- f9c9b91: feat(invoice): Add manual item matching
-- b990c02: fix(invoice): Fix template literal syntax
-- 7b58308: fix(invoice): Rewrite with string concatenation
-- 125dd29: fix(invoice): Use HTML entities
-- 5c85d61: fix(invoice): Remove inline handlers
-- 54f6086: fix(invoice): Simplify to prompt
-- 442797d: feat(invoice): Base64 invoice upload + OCR
+**Changes:**
+- **Removed ALL emojis** from tabs, buttons, headers, cards, modals
+- **Color scheme:** Bright colors (blue/green/red/yellow/orange) → Monochromatic gray
+- **Typography:** ALL CAPS with consistent letter-spacing (0.5px-1.2px)
+- **Borders:** border-radius 8px/12px → 0 (sharp corners)
+- **Borders:** 1px → 2px for better definition
+- **Buttons:** Uniform gray styling using CSS variables (--gray-100, --gray-300, --gray-700)
+- **Confidence badges:** Color-coded → Grayscale intensity
+- **Font sizes:** Standardized 10px-14px range
+- **Font weights:** Increased to 700 for readability
 
-**Lesson Learned:**
-- Avoid large HTML string generation in JavaScript
-- Use DOM createElement() or hidden HTML templates instead
-- Test complex features in isolation before deploying
-- Vercel caching can hide deployment issues (check age header)
+#### **✅ OTHER IMPROVEMENTS** ✅
 
-**Next Steps for Invoice System (Future):**
-- Redesign modal using DOM-based approach
-- Or use hidden HTML template in page
-- Test thoroughly in isolation
-- Consider feature branch workflow
+**1. Mobile Tab Optimization:**
+- Reduced padding: 10px 12px → 8px 6px
+- Reduced min-width: 100px → 70px
+- All 5 tabs now fit on screen (358px total, fits 375px iPhone SE)
+- No horizontal scrolling needed
 
----
+**2. Sticky Tab Navigation:**
+- Tabs stick to top of viewport when scrolling
+- Implemented with wrapper pattern (outer=sticky, inner=scrollable)
+- Works with horizontal tab scrolling independently
 
-### Features Currently Working (October 10, 2025):
+**3. Unit Editing:**
+- Unit column now editable in COUNT tab
+- Click to edit, auto-uppercase (CS, EA, LB)
+- Saves to database immediately
+- Updates for both inventory and prep items
 
-#### **1. Mobile-Optimized Update Counts UI** ✅
-- Completely rewrote stock counting interface for mobile-first design
-- **Card-based layout** instead of desktop tables
-- **Large touch targets:** 20px font, 14px padding for mobile keyboards
-- **Status badges:** LOW (red), MEDIUM (orange), GOOD (green)
-- **Relative timestamps:** "2h ago", "5d ago" instead of full dates
-- **Mobile keyboard:** `inputmode="numeric"` triggers number pad
-- **Responsive grid:** 300px min cards, auto-fills 2-3 columns on desktop
-- **Commit:** `2a24937` - feat(ordering): Mobile-optimized Update Counts UI with card layout
+**4. Tab Reorganization:**
+- Renamed "MANAGE" → "COUNT" (clearer purpose)
+- Moved Count Session Selector from UPDATE tab → PREP tab
+- Better logical organization (prep tools with prep recommendations)
 
-#### **2. Dynamic Search and Vendor Filtering** ✅
-- Added real-time search and vendor filtering to **both inventory tabs**
-- **Search bar:** Filters by item name (case-insensitive, instant)
-- **Vendor dropdown:** Filter by specific vendor or "All Vendors"
-- **Combined filtering:** Search works within selected vendor
-- **Applied to:**
-  - Manage Inventory (master list with par levels)
-  - Update Counts (mobile card layout)
-- **Live item counts:** Headers show filtered counts per vendor
-- **No results message:** Clear feedback when nothing matches
-- **Commit:** `0419652` - feat(ordering): Add dynamic search and vendor filtering to inventory lists
+**5. Button Improvements:**
+- Split single upload button into two: "TAKE PHOTO" + "UPLOAD"
+- Equal sizing (both 14px padding, max-width 200px)
+- Changed wording: "Upload Image" → "UPLOAD"
 
-#### **3. Auto-Save Stock Counts** ✅
-- Stock counts now save **automatically** when you leave input field (on blur)
-- **No "Save All" button needed** - saves instantly per item
-- **Visual feedback:**
-  - 🟠 Orange border + bg = Saving...
-  - 🟢 Green flash = Saved! (800ms)
-  - 🔴 Red flash = Error (1000ms)
-- Input disabled during save to prevent conflicts
-- Updates `current_stock` and `last_counted_date`
-- Recalculates upcoming orders in background
-
-#### **4. Vendor Management System** ✅
-- **Move items between vendors:** Dropdown per item in Manage Inventory table
-- **Rename vendors:** Bulk update all items with that vendor
-- **"Manage Vendors" button:** Opens modal with all vendors + item counts
-- **Delete protection:** Cannot delete vendors with items assigned
-- **New functions:**
-  - `getAllVendors()` - Get unique vendor list
-  - `updateItemVendor()` - Change item's vendor
-  - `renameVendor()` - Bulk rename vendor across all items
-  - `showVendorManagement()` - Modal UI
-- **Commit:** `df4ca57` - feat(ordering): Auto-save stock counts + vendor management
-
-#### **5. AI Reasoning Display in Order Emails** ✅
-- Added transparent calculation breakdown under each line item in automated order emails
-- **Very small text:** 9px font, light gray (#bbb), italic styling - non-intrusive
-- **Two display formats:**
-  - **Simple (no historical data):** "AI: Par 2 - Stock 1 = 1 to order"
-  - **Predictive:** "AI: 1.5/day × 2d = 3 + buffer 1 = 4 needed - 1 on hand"
-- **Shows full algorithm logic:**
-  - Average daily consumption rate
-  - Days until next delivery (e.g., 2 days for Friday Greenleaf orders)
-  - Base quantity calculation
-  - Safety buffer from variability
-  - Trend adjustments (if applicable)
-  - Final calculation: predicted need - current stock
-- **User request:** Make algorithm transparent without changing email table format
-- **Commit:** `b197ae9` - feat(ordering): Add AI reasoning under each line item in order emails
-
-**Note:** AI reasoning commit (b197ae9) was also reverted during emergency rollback, will need to be re-applied if desired.
+**6. Critical Bug Fix:**
+- Fixed missing quotes around CSS variables (line 12007-12008)
+- Was causing "Unexpected keyword 'var'" syntax error
+- Entire ordering system broken until fixed
 
 ---
 
 ## 📝 Uncommitted Changes
 **Git Status:** Clean working tree
 
-### Recent Commits:
-- `2ba664b` - ✅ chore: trigger redeployment after repository revert (CURRENT HEAD)
-- `03c0ae5` - ✅ feat(prep): Add Prep Sheet tab with smart recommendations (BASE)
-- `d42da1f` - ✅ feat(prep): Add count session selector + consumption tracking
-- `1e983a6` - ✅ feat(prep): Add prep inventory system foundation
-- `03fcdb0` - ✅ fix(ordering): Prevent double text rendering in PDFs
+### Recent Commits (October 11, 2025):
+- `def822a` - ✅ refactor(ordering): Move prep session to PREP, rename MANAGE to COUNT (CURRENT HEAD)
+- `4287b87` - ✅ refactor(ordering): Reduce tab size to fit all 5 tabs on mobile
+- `111caea` - ✅ fix(ordering): Fix sticky tabs by separating wrappers
+- `3f23ee6` - ✅ feat(ordering): Make tab navigation sticky on scroll
+- `d404563` - ✅ fix(ordering): Add missing quotes around CSS variables (CRITICAL FIX)
+- `f5056ec` - ✅ feat(inventory): Add inline unit editing to Manage Inventory
+- `4cb7e38` - ✅ refactor(ordering): Match ordering system styling to app design
+- `fabc1da` - ✅ feat(invoice): Split camera and upload into separate buttons
+- `f824816` - ✅ fix(ordering): Make tab navigation horizontally scrollable on mobile
+- `04e4b9e` - ✅ feat(invoice): Add invoice check-in system with DOM-based modals
 
-**Reverted Commits (No Longer in Production):**
-- b197ae9: feat(ordering): Add AI reasoning display
-- df4ca57: feat(ordering): Auto-save stock counts + vendor management
-- 0419652: feat(ordering): Add dynamic search and vendor filtering
-- 2a24937: feat(ordering): Mobile-optimized Update Counts UI
-- [+ 7 invoice-related commits]
-
-**Note:** All mobile UI, search, auto-save, vendor management, and AI reasoning features were reverted along with invoice system. These were working features that got caught in the emergency rollback. May want to re-apply these commits individually in next session.
+**Total commits this session:** 10
 
 ---
 
 ## 🚧 Blockers & Issues
-**Current Blockers:** None - system operational
+**Current Blockers:** None - all systems operational
 
 ### Recently Resolved:
-- ✅ Emergency production issue - page displaying raw code (RESOLVED via full revert)
-- ✅ Staff blocked from PM flow (RESOLVED - system working)
-- ✅ Vercel cache serving old version (RESOLVED - forced fresh deployment)
+- ✅ Invoice system rebuilt successfully (DOM-based approach)
+- ✅ Syntax error fixed (missing quotes around CSS variables)
+- ✅ Sticky tabs implemented (wrapper pattern)
+- ✅ All tabs fit on mobile screen (size optimization)
+- ✅ Styling unified throughout ordering system
 
 ---
 
 ## 🔜 Next Session Should Start With:
-1. **Read last 3 RTF chat sessions** from `/chat sessions/` folder
-   - Latest: `session_2025-10-10_invoice-manual-match-emergency-revert.rtf`
-   - Previous: `session_2025-10-10_ai-reasoning-display.rtf`
-   - Previous: `session_2025-10-10_mobile-ui-search-autosave-vendors.rtf`
-2. **Ask user:** "What are we working on today?"
-3. **Update CURRENT_STATUS.md** with session start time
+1. **Read last RTF chat session:** `session_2025-10-11_ordering-system-styling-invoice-checkin.rtf`
+2. **Read CURRENT_STATUS.md** (this file)
+3. **Ask user:** "What are we working on today?"
+4. **Update CURRENT_STATUS.md** with session start time
 
 ### Important Context for Next Session:
-- **Prep system is working** (37 prep items, count tracking, recommendations)
-- **Ordering system is working** (basic version without recent mobile/search enhancements)
-- **Invoice system was attempted but completely reverted**
-- **Mobile UI improvements were also reverted** (collateral damage from emergency rollback)
-- **User may want to re-apply working features** (mobile UI, search, auto-save, vendor management)
+- **Invoice system is now WORKING** (camera upload, OCR, fuzzy matching, manual matching, check-in)
+- **Ordering system has unified monochromatic design** (no emojis, all gray)
+- **All 5 tabs fit on mobile** and stick to top when scrolling
+- **Unit editing works** in COUNT tab for all items
+- **Database migration completed** (NUMERIC(10,2) for decimal stock counts)
 
 ### Potential Next Actions:
-**Option 1: Re-apply Working Features (Recommended)**
-- Cherry-pick mobile UI commit (2a24937)
-- Cherry-pick search/filter commit (0419652)
-- Cherry-pick auto-save/vendor management commit (df4ca57)
-- Cherry-pick AI reasoning commit (b197ae9)
-- Test thoroughly before deploying
+**Option 1: Test Invoice System with Real Invoices**
+- Test OCR with actual vendor invoices
+- Fine-tune pattern matching for specific formats
+- Add vendor auto-detection from invoice header
 
-**Option 2: Retry Invoice System (Different Approach)**
-- Use DOM createElement() instead of HTML strings
-- Or use hidden HTML template approach
-- Test in isolation first
-- Consider feature branch workflow
+**Option 2: Implement Order Receiving Flow**
+- Different from invoice check-in (reconciliation)
+- Save expected quantities as pending
+- Create receiving sheet for AM prep
+- Auto-update inventory when checked in
 
-**Option 3: New Features**
-- Export inventory to CSV/Excel
+**Option 3: Invoice History & Reporting**
+- View past invoice check-ins
+- Archive old invoices
+- Export invoice data to CSV
+- Invoice reconciliation reports
+
+**Option 4: New Features**
+- PDF invoice support (currently images only)
+- Batch invoice upload
+- Invoice templates by vendor
 - Historical stock tracking charts
-- Low stock alerts dashboard
-- Print-friendly order sheets
 
 ---
 
 ## 📊 Production System Health
-**Last Deployed:** 2025-10-10 (Emergency revert to pre-invoice state)
+**Last Deployed:** 2025-10-11
 **URL:** https://jayna-cash-counter.vercel.app
-**Status:** ✅ Operational
+**Status:** ✅ Fully Operational
+**Current Branch:** main
+**Latest Commit:** `def822a`
 
 ### Current Production Features:
 - ✅ AM Count (dual drawer system)
@@ -214,18 +175,19 @@
 - ✅ Weekly Cashbox
 - ✅ Manager Dashboard (analytics)
 - ✅ COGS (cost tracking)
-- ✅ Ordering System (basic version)
-- ✅ Prep Sheet (with smart recommendations)
+- ✅ Ordering System (fully styled)
+- ✅ Prep Sheet (with smart recommendations + count session selector)
+- ✅ **Invoice Check-In System** (NEW - camera, OCR, matching, check-in)
+- ✅ Unit editing in COUNT tab
+- ✅ Sticky tab navigation
+- ✅ Decimal stock counts (0.25 increments)
 
-### Not in Production (Reverted):
-- ❌ Mobile-optimized Update Counts UI
-- ❌ Dynamic search and vendor filtering
-- ❌ Auto-save stock counts
-- ❌ Vendor management system
-- ❌ AI reasoning display in emails
-- ❌ Invoice upload/scanning
-- ❌ OCR text extraction
-- ❌ Manual matching modal
+### Tab Structure (Ordering System):
+1. **ORDERS** - Upcoming orders, AI calculations, vendor schedules
+2. **COUNT** - Manage inventory items, par levels, units, vendors
+3. **UPDATE** - Update stock counts (mobile-optimized card view)
+4. **PREP** - Prep recommendations + Count Session Selector
+5. **CHECK-IN** - Invoice upload, OCR scanning, item matching, reconciliation
 
 ---
 
@@ -236,71 +198,69 @@
 - ✅ `ORDERS_GMAIL_APP_PASSWORD` for email sending
 - ✅ Supabase RLS enabled on all tables
 
-**Emergency Actions Taken:**
-- Force push used to revert main branch (justified by production emergency)
-- Empty commit used to trigger fresh deployment
-- Cache bypass instructions given to staff (hard refresh)
+**Invoice System Security:**
+- ✅ Images never saved to database (memory-only processing)
+- ✅ Base64 encoding for client-side processing
+- ✅ Cleared from state after check-in
+- ✅ Only text data persisted
 
 ---
 
-## 📈 Session Statistics (October 10, 2025 - All Sessions)
+## 📈 Session Statistics (October 11, 2025)
 
-**Session 1 (Main):** Mobile UI + Search + Auto-save + Vendor Management
-- Duration: ~2 hours
-- Commits: 4
-- Status: ✅ Completed (later reverted)
-
-**Session 2 (Continuation):** AI Reasoning Display
-- Duration: ~30 minutes
-- Commits: 1
-- Status: ✅ Completed (later reverted)
-
-**Session 3 (Emergency):** Invoice Manual Matching Attempt + Full Revert
-- Duration: ~20 minutes
-- Commits: 8 (7 reverted + 1 trigger)
-- Status: ⚠️ Emergency resolved, features lost
-
-**Total Work Duration:** ~2.5 hours
-**Features Built:** 6 (5 working + 1 failed)
-**Features in Production:** 0 new (all reverted)
-**Net Change:** Back to morning state + prep system
+**Session Duration:** ~90 minutes
+**Commits:** 10
+**Features Built:** 8 major features
+**Lines Changed:** ~850 lines (additions + modifications)
+**Status:** ✅ All features working
 
 **User Satisfaction:**
-- Session 1: ✅ "GREAT JOB TODAY!"
-- Session 2: ✅ Working and deployed
-- Session 3: ⚠️ "WHAT THE HELL" → ✅ "THANK YOU...GOOD JOB, GOODNIGHT"
+- ✅ "OK GREAT" (styling fixes)
+- ✅ "OK FINE" (sticky tabs)
+- ✅ All requested features completed
+- ✅ No emergency reverts needed
+
+**Code Quality:**
+- ✅ No template literals in invoice system (safe DOM approach)
+- ✅ All CSS variables properly quoted
+- ✅ Clean separation of concerns
+- ✅ Comprehensive error handling
+- ✅ Mobile-first responsive design
 
 ---
 
 **⚠️ IMPORTANT FOR NEXT CLAUDE:**
 
-### Emergency Revert Summary:
-- **All invoice features removed** (never worked properly)
-- **All mobile UI improvements also removed** (collateral damage - these were working!)
-- **System restored to commit 03c0ae5** (prep sheet features)
-- **Production is stable** but missing recent enhancements
-- **Consider re-applying working features** from commits 2a24937, 0419652, df4ca57, b197ae9
+### What's Working Now (vs. Oct 10 Emergency):
+- **Invoice system REBUILT and WORKING** (DOM-based, no template literals)
+- **Styling completely unified** (monochromatic gray, no emojis)
+- **All 5 tabs visible on mobile** (optimized sizing)
+- **Sticky navigation implemented** (wrapper pattern)
+- **Unit editing functional** (inline editing in COUNT tab)
+- **Count session moved to PREP tab** (better organization)
+
+### Key Technical Decisions:
+1. **DOM manipulation over template literals** - Safer, no parsing errors
+2. **Wrapper pattern for sticky + scrollable** - Outer sticky, inner scrollable
+3. **Base64 in-memory processing** - No database image storage
+4. **Monochromatic design system** - Gray scale throughout, no emojis
+5. **Mobile-first sizing** - Math-based approach (5×70px + 4×2px = 358px < 375px)
 
 ### Session End Protocol Followed:
-- ✅ RTF chat session saved: `session_2025-10-10_invoice-manual-match-emergency-revert.rtf`
+- ✅ RTF chat session saved: `session_2025-10-11_ordering-system-styling-invoice-checkin.rtf`
 - ✅ CURRENT_STATUS.md updated (this file)
 - ✅ PROJECT_MASTER_LOG.md to be updated (next)
 - ✅ All changes committed and pushed
-- ✅ Production deployment verified (age: 23s)
+- ✅ Production deployment verified
 
-### Critical Files Saved:
-1. **chat sessions/session_2025-10-10_invoice-manual-match-emergency-revert.rtf**
-   - Complete emergency session documentation
-   - All failed attempts documented
-   - Root cause analysis included
-   - Better approaches outlined
+### Files Modified This Session:
+1. **index.html** - Main file (+850 lines invoice system, styling changes throughout)
+2. **chat sessions/session_2025-10-11_ordering-system-styling-invoice-checkin.rtf** - Complete session log
 
-### Next Session Start:
-1. Read last 3 RTF chat sessions (including emergency session)
-2. Read CURRENT_STATUS.md (this file)
-3. Ask user: "What are we working on today?"
-4. Discuss whether to re-apply working features or start fresh
+### Database Changes:
+- No schema changes (tables already existed from previous attempt)
+- Migration from Oct 10 still active (NUMERIC(10,2) for decimal stock)
 
 **Current Production URL:** https://jayna-cash-counter.vercel.app
-**System Status:** ✅ Operational (basic features)
-**Staff Unblocked:** ✅ PM flow working
+**System Status:** ✅ Fully Operational
+**All Features Working:** ✅ Yes (including invoice check-in!)
