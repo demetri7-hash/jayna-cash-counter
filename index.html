@@ -10931,28 +10931,38 @@
         startY: order.notes ? 75 : 68,
         theme: 'grid',
         headStyles: { fillColor: [30, 60, 114] },
-        styles: { fontSize: 9 },
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: {
+          0: { cellWidth: 80 } // Wider first column for multi-line content
+        },
+        willDrawCell: function(data) {
+          // Prevent default text rendering for Item column - clear BEFORE drawing
+          if (data.column.index === 0 && data.cell.section === 'body' && data.cell.text.length > 1) {
+            data.cell.text = []; // This prevents the default rendering
+          }
+        },
         didDrawCell: function(data) {
           // Custom rendering for Item column with metadata
           if (data.column.index === 0 && data.cell.section === 'body') {
-            const text = data.cell.text;
-            if (text.length > 1) {
-              // Clear the cell
-              data.cell.text = [];
+            const cellData = tableData[data.row.index][0];
+            const lines = cellData.split('\n');
 
-              let yPos = data.cell.y + 4;
+            if (lines.length > 1) {
+              let yPos = data.cell.y + 5;
               const lineHeight = 4;
 
               // Draw each line with appropriate styling
-              text.forEach((line, index) => {
+              lines.forEach((line, index) => {
                 if (index === 0) {
                   // Item name - normal size, black
                   doc.setFontSize(9);
+                  doc.setFont('helvetica', 'normal');
                   doc.setTextColor(0, 0, 0);
                   doc.text(line, data.cell.x + 2, yPos);
                 } else if (line.startsWith('Last count:') || line.startsWith('Last price:')) {
                   // Metadata - smaller, gray
                   doc.setFontSize(8);
+                  doc.setFont('helvetica', 'normal');
                   doc.setTextColor(120, 120, 120);
                   doc.text(line, data.cell.x + 2, yPos);
                 } else if (line.startsWith('AI:')) {
@@ -10966,7 +10976,8 @@
                 yPos += lineHeight;
               });
 
-              // Reset text color
+              // Reset to defaults
+              doc.setFont('helvetica', 'normal');
               doc.setTextColor(0, 0, 0);
             }
           }
@@ -11085,28 +11096,38 @@
           startY: order.notes ? 65 : 58,
           theme: 'grid',
           headStyles: { fillColor: [30, 60, 114] },
-          styles: { fontSize: 9 },
+          styles: { fontSize: 9, cellPadding: 3 },
+          columnStyles: {
+            0: { cellWidth: 80 } // Wider first column for multi-line content
+          },
+          willDrawCell: function(data) {
+            // Prevent default text rendering for Item column - clear BEFORE drawing
+            if (data.column.index === 0 && data.cell.section === 'body' && data.cell.text.length > 1) {
+              data.cell.text = []; // This prevents the default rendering
+            }
+          },
           didDrawCell: function(data) {
             // Custom rendering for Item column with metadata
             if (data.column.index === 0 && data.cell.section === 'body') {
-              const text = data.cell.text;
-              if (text.length > 1) {
-                // Clear the cell
-                data.cell.text = [];
+              const cellData = tableData[data.row.index][0];
+              const lines = cellData.split('\n');
 
-                let yPos = data.cell.y + 4;
+              if (lines.length > 1) {
+                let yPos = data.cell.y + 5;
                 const lineHeight = 4;
 
                 // Draw each line with appropriate styling
-                text.forEach((line, index) => {
+                lines.forEach((line, index) => {
                   if (index === 0) {
                     // Item name - normal size, black
                     doc.setFontSize(9);
+                    doc.setFont('helvetica', 'normal');
                     doc.setTextColor(0, 0, 0);
                     doc.text(line, data.cell.x + 2, yPos);
                   } else if (line.startsWith('Last count:') || line.startsWith('Last price:')) {
                     // Metadata - smaller, gray
                     doc.setFontSize(8);
+                    doc.setFont('helvetica', 'normal');
                     doc.setTextColor(120, 120, 120);
                     doc.text(line, data.cell.x + 2, yPos);
                   } else if (line.startsWith('AI:')) {
@@ -11120,7 +11141,8 @@
                   yPos += lineHeight;
                 });
 
-                // Reset text color
+                // Reset to defaults
+                doc.setFont('helvetica', 'normal');
                 doc.setTextColor(0, 0, 0);
               }
             }
