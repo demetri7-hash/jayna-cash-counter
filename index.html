@@ -12999,13 +12999,36 @@
 
       matchRow.appendChild(matchInfo);
 
+      // Button container for MATCH and ADD NEW
+      const btnContainer = document.createElement('div');
+      btnContainer.style.cssText = 'display: flex; gap: 6px;';
+
       // Manual match button for low confidence or no match
       if (!item.matchedInventoryId || item.matchConfidence < 0.7) {
         const manualMatchBtn = document.createElement('button');
         manualMatchBtn.textContent = item.matchedInventoryId ? 'CHANGE' : 'MATCH';
         manualMatchBtn.style.cssText = 'background: var(--gray-100); color: var(--gray-900); border: 2px solid var(--gray-300); padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;';
         manualMatchBtn.onclick = function() { showManualMatchModal(index); };
-        matchRow.appendChild(manualMatchBtn);
+        btnContainer.appendChild(manualMatchBtn);
+
+        // Add New button
+        const addNewBtn = document.createElement('button');
+        addNewBtn.textContent = item.flaggedAsNew ? '✓ NEW' : 'ADD NEW';
+        addNewBtn.style.cssText = item.flaggedAsNew
+          ? 'background: #212121; color: white; border: 2px solid #212121; padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;'
+          : 'background: white; color: #212121; border: 2px solid #212121; padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;';
+        addNewBtn.onclick = function() {
+          item.flaggedAsNew = !item.flaggedAsNew;
+          if (item.flaggedAsNew) {
+            item.matchedInventoryId = null; // Clear any existing match
+          }
+          renderExtractedItems();
+        };
+        btnContainer.appendChild(addNewBtn);
+      }
+
+      if (btnContainer.children.length > 0) {
+        matchRow.appendChild(btnContainer);
       }
 
       card.appendChild(matchRow);
@@ -13282,6 +13305,7 @@
    * Handles both invoice reconciliation and order receiving flows
    */
   async function checkInInvoiceItems() {
+    console.log('checkInInvoiceItems called');
     const items = orderingSystemState.extractedInvoiceItems;
 
     if (items.length === 0) {
@@ -13289,19 +13313,21 @@
       return;
     }
 
-    // Validate that all items have matches
-    const unmatchedItems = items.filter(item => !item.matchedInventoryId);
-    if (unmatchedItems.length > 0) {
-      const confirmContinue = confirm(
-        unmatchedItems.length + ' item(s) are not matched. These will be skipped during check-in. Continue?'
-      );
-      if (!confirmContinue) return;
+    // Split items: matched (auto + manual) vs flagged as new
+    const matchedItems = items.filter(item => item.matchedInventoryId && !item.flaggedAsNew);
+    const newItems = items.filter(item => item.flaggedAsNew);
+
+    console.log('Matched items (to check in):', matchedItems.length);
+    console.log('Flagged as new (to add):', newItems.length);
+
+    if (matchedItems.length === 0 && newItems.length === 0) {
+      showMessage('Please match items or flag as new first', 'warning');
+      return;
     }
 
-    // Get matched items only
-    const matchedItems = items.filter(item => item.matchedInventoryId);
     if (matchedItems.length === 0) {
-      showMessage('No matched items to check in', 'warning');
+      // No matched items, just show add new items modal
+      showAddNewItemsModal(newItems);
       return;
     }
 
@@ -13382,23 +13408,9 @@
 
       hideLoading();
 
-      // Clear the extracted items
-      orderingSystemState.extractedInvoiceItems = [];
-      orderingSystemState.currentInvoiceImage = null;
-
-      // Reset UI
-      document.getElementById('extractedItemsSection').style.display = 'none';
-      document.getElementById('invoicePreviewImage').src = '';
-      document.getElementById('invoiceFileInput').value = '';
-      document.getElementById('invoiceCameraInput').value = '';
-      renderExtractedItems();
-
-      // Reload inventory to show updated counts
-      await loadOrderingData();
-
       // Show success message
       if (errorCount === 0) {
-        showMessage('Successfully checked in ' + successCount + ' items!', 'success');
+        showMessage('✅ Checked in ' + successCount + ' matched items!', 'success');
       } else {
         showMessage(
           'Checked in ' + successCount + ' items with ' + errorCount + ' errors. Check console for details.',
@@ -13406,11 +13418,189 @@
         );
       }
 
+      // Reload inventory to show updated counts
+      await loadOrderingData();
+
+      // Clear the checked-in items
+      orderingSystemState.extractedInvoiceItems = [];
+      orderingSystemState.currentInvoiceImage = null;
+
+      // Reset UI
+      document.getElementById('extractedItemsSection').style.display = 'none';
+      document.getElementById('invoicePreviewSection').style.display = 'none';
+      document.getElementById('invoicePreviewImage').src = '';
+      document.getElementById('invoiceFileInput').value = '';
+      document.getElementById('invoiceCameraInput').value = '';
+
+      // If there are flagged new items, show modal to add them
+      if (newItems.length > 0) {
+        setTimeout(() => {
+          showAddNewItemsModal(newItems);
+        }, 500);
+      }
+
     } catch (error) {
       hideLoading();
       console.error('Check-in error:', error);
       showMessage('Failed to check in items: ' + error.message, 'error');
     }
+  }
+
+  /**
+   * Show modal to add new items (unmatched items from invoice)
+   */
+  function showAddNewItemsModal(newItems) {
+    if (!newItems || newItems.length === 0) return;
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'addNewItemsModal';
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 10000; overflow-y: auto; padding: 20px;';
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background: white; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 0; border: 2px solid #212121;';
+
+    // Header
+    const header = document.createElement('h3');
+    header.textContent = 'ADD NEW ITEMS TO INVENTORY';
+    header.style.cssText = 'margin: 0 0 16px 0; color: #212121; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+    modal.appendChild(header);
+
+    const desc = document.createElement('p');
+    desc.textContent = 'Fill in details for ' + newItems.length + ' new item(s):';
+    desc.style.cssText = 'margin: 0 0 20px 0; color: #666; font-size: 13px;';
+    modal.appendChild(desc);
+
+    // Form for each item
+    newItems.forEach((item, index) => {
+      const itemCard = document.createElement('div');
+      itemCard.style.cssText = 'background: #f5f5f5; padding: 16px; margin-bottom: 16px; border: 2px solid #e0e0e0;';
+
+      const itemTitle = document.createElement('div');
+      itemTitle.textContent = 'FROM INVOICE: ' + item.detectedName;
+      itemTitle.style.cssText = 'font-weight: 700; margin-bottom: 12px; color: #212121; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;';
+      itemCard.appendChild(itemTitle);
+
+      // Item Name
+      const nameLabel = document.createElement('label');
+      nameLabel.textContent = 'ITEM NAME:';
+      nameLabel.style.cssText = 'display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; color: #666; letter-spacing: 0.5px;';
+      itemCard.appendChild(nameLabel);
+
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.value = item.detectedName;
+      nameInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid #e0e0e0; margin-bottom: 12px; font-size: 13px;';
+      nameInput.dataset.index = index;
+      nameInput.dataset.field = 'name';
+      itemCard.appendChild(nameInput);
+
+      // Vendor
+      const vendorLabel = document.createElement('label');
+      vendorLabel.textContent = 'VENDOR:';
+      vendorLabel.style.cssText = 'display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; color: #666; letter-spacing: 0.5px;';
+      itemCard.appendChild(vendorLabel);
+
+      const vendorInput = document.createElement('input');
+      vendorInput.type = 'text';
+      vendorInput.placeholder = 'e.g., Greenleaf';
+      vendorInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid #e0e0e0; margin-bottom: 12px; font-size: 13px;';
+      vendorInput.dataset.index = index;
+      vendorInput.dataset.field = 'vendor';
+      itemCard.appendChild(vendorInput);
+
+      // Unit
+      const unitLabel = document.createElement('label');
+      unitLabel.textContent = 'UNIT:';
+      unitLabel.style.cssText = 'display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; color: #666; letter-spacing: 0.5px;';
+      itemCard.appendChild(unitLabel);
+
+      const unitInput = document.createElement('input');
+      unitInput.type = 'text';
+      unitInput.placeholder = 'e.g., CS, EA, LB';
+      unitInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid #e0e0e0; margin-bottom: 12px; font-size: 13px; text-transform: uppercase;';
+      unitInput.dataset.index = index;
+      unitInput.dataset.field = 'unit';
+      itemCard.appendChild(unitInput);
+
+      // Par Level
+      const parLabel = document.createElement('label');
+      parLabel.textContent = 'PAR LEVEL:';
+      parLabel.style.cssText = 'display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; color: #666; letter-spacing: 0.5px;';
+      itemCard.appendChild(parLabel);
+
+      const parInput = document.createElement('input');
+      parInput.type = 'number';
+      parInput.step = '0.25';
+      parInput.value = item.detectedQuantity || 1;
+      parInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid #e0e0e0; font-size: 13px;';
+      parInput.dataset.index = index;
+      parInput.dataset.field = 'par';
+      itemCard.appendChild(parInput);
+
+      modal.appendChild(itemCard);
+    });
+
+    // Buttons
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display: flex; gap: 10px; margin-top: 20px;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'SKIP';
+    cancelBtn.style.cssText = 'flex: 1; padding: 12px; background: #e0e0e0; color: #212121; border: none; cursor: pointer; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+    cancelBtn.onclick = () => overlay.remove();
+    btnRow.appendChild(cancelBtn);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'ADD TO INVENTORY';
+    saveBtn.style.cssText = 'flex: 2; padding: 12px; background: #212121; color: white; border: none; cursor: pointer; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+    saveBtn.onclick = async () => {
+      const inputs = modal.querySelectorAll('input');
+      const itemsToAdd = [];
+
+      newItems.forEach((item, index) => {
+        const name = modal.querySelector(`input[data-index="${index}"][data-field="name"]`).value.trim();
+        const vendor = modal.querySelector(`input[data-index="${index}"][data-field="vendor"]`).value.trim();
+        const unit = modal.querySelector(`input[data-index="${index}"][data-field="unit"]`).value.trim().toUpperCase();
+        const par = parseFloat(modal.querySelector(`input[data-index="${index}"][data-field="par"]`).value) || 0;
+
+        if (!name) {
+          showMessage('Item name required for all items', 'error');
+          return;
+        }
+
+        itemsToAdd.push({
+          item_name: name,
+          vendor: vendor || 'Unknown',
+          unit: unit || 'EA',
+          par_level: par,
+          current_stock: item.detectedQuantity || 0
+        });
+      });
+
+      if (itemsToAdd.length === 0) return;
+
+      overlay.remove();
+      showLoading('Adding Items', 'Creating inventory items...');
+
+      try {
+        const { error } = await supabase.from('inventory_items').insert(itemsToAdd);
+        if (error) throw error;
+
+        hideLoading();
+        showMessage(`✅ Added ${itemsToAdd.length} new item(s) to inventory!`, 'success');
+        await loadOrderingData();
+      } catch (error) {
+        hideLoading();
+        showMessage('Error adding items: ' + error.message, 'error');
+      }
+    };
+    btnRow.appendChild(saveBtn);
+
+    modal.appendChild(btnRow);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
   }
 
   /**
