@@ -12739,20 +12739,30 @@
     document.getElementById('processOCRButton').disabled = true;
 
     try {
+      // Check if Tesseract is loaded
+      if (typeof Tesseract === 'undefined') {
+        throw new Error('Tesseract OCR library not loaded. Please refresh the page.');
+      }
+
+      console.log('Starting OCR process...');
+
       // Initialize Tesseract
       const worker = await Tesseract.createWorker('eng');
+      console.log('Tesseract worker created');
 
       // Update progress
       document.getElementById('ocrProgressText').textContent = 'Extracting text from image...';
 
       // Perform OCR
       const { data } = await worker.recognize(orderingSystemState.currentInvoiceImage);
+      console.log('OCR completed, extracted text length:', data?.text?.length || 0);
 
       // Update progress
       document.getElementById('ocrProgressText').textContent = 'Parsing extracted text...';
 
       // Parse the extracted text to find items
       const extractedItems = parseInvoiceText(data.text);
+      console.log('Parsed items:', extractedItems.length);
 
       if (extractedItems.length === 0) {
         showMessage('No items found in invoice. Please try a clearer image.', 'warning');
@@ -12765,9 +12775,14 @@
       // Update progress
       document.getElementById('ocrProgressText').textContent = 'Matching items with inventory...';
 
+      // Ensure inventory items are loaded
+      if (!orderingSystemState.items || orderingSystemState.items.length === 0) {
+        console.warn('No inventory items loaded for matching');
+      }
+
       // Match items with inventory using fuzzy matching
       for (const item of extractedItems) {
-        const match = fuzzyMatchInventoryItem(item.name);
+        const match = fuzzyMatchInventoryItem(item.detectedName);
         if (match) {
           item.matchedInventoryId = match.id;
           item.matchConfidence = match.confidence;
@@ -12793,7 +12808,8 @@
 
     } catch (error) {
       console.error('OCR processing error:', error);
-      showMessage('Failed to process invoice: ' + error.message, 'error');
+      const errorMsg = error?.message || error?.toString() || 'Unknown error occurred';
+      showMessage('Failed to process invoice: ' + errorMsg, 'error');
       document.getElementById('ocrProcessingStatus').style.display = 'none';
       document.getElementById('processOCRButton').disabled = false;
     }
@@ -12804,6 +12820,11 @@
    * Simple pattern matching for common invoice formats
    */
   function parseInvoiceText(text) {
+    if (!text) {
+      console.warn('No text provided to parseInvoiceText');
+      return [];
+    }
+
     const items = [];
     const lines = text.split('\n');
 
