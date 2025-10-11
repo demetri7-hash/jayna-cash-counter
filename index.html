@@ -10112,7 +10112,15 @@
                     <div style="font-size: 9px; color: #bbb; margin-top: 2px; font-style: italic;">${reasoningText}</div>
                   </td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd; font-weight: bold; color: #d32f2f;">${item.quantity}</td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.unit}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
+                    <input
+                      type="text"
+                      value="${item.unit}"
+                      onchange="updateItemUnit(${item.id}, this.value)"
+                      style="width: 80px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
+                      placeholder="e.g., CS, EA"
+                    />
+                  </td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.parLevel}</td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.currentStock}</td>
                 </tr>
@@ -10201,7 +10209,15 @@
                       ${getAllVendors().map(v => `<option value="${v}" ${v === item.vendor ? 'selected' : ''}>${v}</option>`).join('')}
                     </select>
                   </td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.unit}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
+                    <input
+                      type="text"
+                      value="${item.unit}"
+                      onchange="updateItemUnit(${item.id}, this.value)"
+                      style="width: 80px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
+                      placeholder="e.g., CS, EA"
+                    />
+                  </td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
                     <input
                       type="number"
@@ -10530,7 +10546,15 @@
                       ${getAllVendors().map(v => `<option value="${v}" ${v === item.vendor ? 'selected' : ''}>${v}</option>`).join('')}
                     </select>
                   </td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.unit}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
+                    <input
+                      type="text"
+                      value="${item.unit}"
+                      onchange="updateItemUnit(${item.id}, this.value)"
+                      style="width: 80px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
+                      placeholder="e.g., CS, EA"
+                    />
+                  </td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
                     <input
                       type="number"
@@ -11093,6 +11117,42 @@
     } catch (error) {
       hideLoading();
       showMessage(`Error updating par level: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Update unit type for an inventory item
+   */
+  async function updateItemUnit(itemId, newUnit) {
+    if (!newUnit || newUnit.trim() === '') {
+      showMessage('Unit cannot be empty', 'error');
+      return;
+    }
+
+    showLoading('Updating Unit', 'Saving changes...');
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ unit: newUnit.trim().toUpperCase() })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.unit = newUnit.trim().toUpperCase();
+      }
+
+      hideLoading();
+      showMessage('Unit updated', 'success');
+
+      // Re-render to show updated value
+      renderInventoryList();
+    } catch (error) {
+      hideLoading();
+      showMessage('Error updating unit: ' + error.message, 'error');
     }
   }
 
