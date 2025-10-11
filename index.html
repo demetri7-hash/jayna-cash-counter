@@ -12745,30 +12745,41 @@
       }
 
       console.log('Starting OCR process...');
+      console.log('Image data:', orderingSystemState.currentInvoiceImage?.substring(0, 50));
 
-      // Initialize Tesseract
-      const worker = await Tesseract.createWorker('eng');
-      console.log('Tesseract worker created');
+      // Use simpler Tesseract.recognize API for single image
+      document.getElementById('ocrProgressText').textContent = 'Loading OCR engine...';
 
-      // Update progress
-      document.getElementById('ocrProgressText').textContent = 'Extracting text from image...';
+      const result = await Tesseract.recognize(
+        orderingSystemState.currentInvoiceImage,
+        'eng',
+        {
+          logger: (m) => {
+            console.log('Tesseract progress:', m);
+            if (m.status === 'recognizing text') {
+              document.getElementById('ocrProgressText').textContent = `Extracting text: ${Math.round(m.progress * 100)}%`;
+            }
+          }
+        }
+      );
 
-      // Perform OCR
-      const { data } = await worker.recognize(orderingSystemState.currentInvoiceImage);
-      console.log('OCR completed, extracted text length:', data?.text?.length || 0);
+      console.log('OCR completed, result:', result);
+
+      const extractedText = result?.data?.text || '';
+      console.log('Extracted text length:', extractedText.length);
+      console.log('First 200 chars:', extractedText.substring(0, 200));
 
       // Update progress
       document.getElementById('ocrProgressText').textContent = 'Parsing extracted text...';
 
       // Parse the extracted text to find items
-      const extractedItems = parseInvoiceText(data.text);
+      const extractedItems = parseInvoiceText(extractedText);
       console.log('Parsed items:', extractedItems.length);
 
       if (extractedItems.length === 0) {
         showMessage('No items found in invoice. Please try a clearer image.', 'warning');
         document.getElementById('ocrProcessingStatus').style.display = 'none';
         document.getElementById('processOCRButton').disabled = false;
-        await worker.terminate();
         return;
       }
 
@@ -12800,8 +12811,7 @@
       // Render extracted items
       renderExtractedItems();
 
-      // Cleanup
-      await worker.terminate();
+      // Re-enable button
       document.getElementById('processOCRButton').disabled = false;
 
       showMessage(`Successfully extracted ${extractedItems.length} items from invoice!`, 'success');
