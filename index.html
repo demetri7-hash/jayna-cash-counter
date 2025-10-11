@@ -1582,6 +1582,30 @@
             <p style="color: var(--gray-500); font-size: 13px; margin-bottom: 20px;">
               Upload an invoice photo to scan and reconcile items with inventory.
             </p>
+
+            <!-- Type Selector -->
+            <div style="background: white; border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 20px;">
+              <label style="display: block; color: var(--gray-700); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">DOCUMENT TYPE:</label>
+              <div style="display: flex; gap: 10px;">
+                <button
+                  id="invoiceTypeInvoice"
+                  onclick="selectInvoiceType('invoice')"
+                  style="flex: 1; padding: 12px; background: #212121; color: white; border: 2px solid #212121; border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer;"
+                >
+                  INVOICE
+                </button>
+                <button
+                  id="invoiceTypeOrder"
+                  onclick="selectInvoiceType('order')"
+                  style="flex: 1; padding: 12px; background: white; color: var(--gray-700); border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer;"
+                >
+                  ORDER
+                </button>
+              </div>
+              <p id="invoiceTypeDescription" style="margin-top: 10px; font-size: 11px; color: var(--gray-500);">
+                Reconcile received items against invoice
+              </p>
+            </div>
           </div>
 
           <!-- Upload Section -->
@@ -12704,6 +12728,43 @@
   // ===================================================================
 
   /**
+   * Select invoice type (invoice vs order)
+   */
+  function selectInvoiceType(type) {
+    console.log('Selected invoice type:', type);
+    orderingSystemState.invoiceType = type;
+
+    // Update button styles
+    const invoiceBtn = document.getElementById('invoiceTypeInvoice');
+    const orderBtn = document.getElementById('invoiceTypeOrder');
+    const description = document.getElementById('invoiceTypeDescription');
+
+    if (type === 'invoice') {
+      // Invoice selected (default)
+      invoiceBtn.style.background = '#212121';
+      invoiceBtn.style.color = 'white';
+      invoiceBtn.style.borderColor = '#212121';
+
+      orderBtn.style.background = 'white';
+      orderBtn.style.color = 'var(--gray-700)';
+      orderBtn.style.borderColor = 'var(--gray-300)';
+
+      description.textContent = 'Reconcile received items against invoice';
+    } else {
+      // Order selected
+      orderBtn.style.background = '#212121';
+      orderBtn.style.color = 'white';
+      orderBtn.style.borderColor = '#212121';
+
+      invoiceBtn.style.background = 'white';
+      invoiceBtn.style.color = 'var(--gray-700)';
+      invoiceBtn.style.borderColor = 'var(--gray-300)';
+
+      description.textContent = 'Track order placement and expected delivery';
+    }
+  }
+
+  /**
    * Handle invoice/order image upload
    */
   function handleInvoiceUpload(event) {
@@ -13059,10 +13120,27 @@
           item.flaggedAsNew = !item.flaggedAsNew;
           if (item.flaggedAsNew) {
             item.matchedInventoryId = null; // Clear any existing match
+            item.skipped = false; // Clear skipped if flagging as new
           }
           renderExtractedItems();
         };
         btnContainer.appendChild(addNewBtn);
+
+        // Skip button
+        const skipBtn = document.createElement('button');
+        skipBtn.textContent = item.skipped ? '✓ SKIP' : 'SKIP';
+        skipBtn.style.cssText = item.skipped
+          ? 'background: var(--gray-700); color: white; border: 2px solid var(--gray-700); padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;'
+          : 'background: var(--gray-300); color: var(--gray-700); border: 2px solid var(--gray-400); padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;';
+        skipBtn.onclick = function() {
+          item.skipped = !item.skipped;
+          if (item.skipped) {
+            item.matchedInventoryId = null; // Clear any existing match
+            item.flaggedAsNew = false; // Clear flagged as new
+          }
+          renderExtractedItems();
+        };
+        btnContainer.appendChild(skipBtn);
       }
 
       if (btnContainer.children.length > 0) {
@@ -13351,15 +13429,17 @@
       return;
     }
 
-    // Split items: matched (auto + manual) vs flagged as new
-    const matchedItems = items.filter(item => item.matchedInventoryId && !item.flaggedAsNew);
-    const newItems = items.filter(item => item.flaggedAsNew);
+    // Split items: matched (auto + manual) vs flagged as new (EXCLUDING skipped items)
+    const matchedItems = items.filter(item => item.matchedInventoryId && !item.flaggedAsNew && !item.skipped);
+    const newItems = items.filter(item => item.flaggedAsNew && !item.skipped);
+    const skippedItems = items.filter(item => item.skipped);
 
     console.log('Matched items (to check in):', matchedItems.length);
     console.log('Flagged as new (to add):', newItems.length);
+    console.log('Skipped items (ignored):', skippedItems.length);
 
     if (matchedItems.length === 0 && newItems.length === 0) {
-      showMessage('Please match items or flag as new first', 'warning');
+      showMessage('Please match items, flag as new, or skip unwanted items', 'warning');
       return;
     }
 
