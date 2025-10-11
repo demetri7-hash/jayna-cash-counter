@@ -1517,33 +1517,20 @@
             </p>
           </div>
 
-          <!-- Count Session Selector (for prep tracking) -->
-          <div style="margin-bottom: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #ff6b35;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333; font-size: 14px;">
-              📋 Count Session (for prep item tracking):
-            </label>
-            <select
-              id="countSessionSelector"
-              onchange="updateCountSession()"
-              style="
-                width: 100%;
-                max-width: 400px;
-                padding: 10px 14px;
-                border: 2px solid #ff6b35;
-                border-radius: 6px;
-                font-size: 14px;
-                background: white;
-                cursor: pointer;
-                font-weight: 500;
-              "
-            >
-              <option value="morning_prep">🌅 Morning Prep (7:00 AM)</option>
-              <option value="afternoon_prep">☀️ Afternoon Prep (3:00-4:00 PM)</option>
-              <option value="closing_line">🌙 Closing Line (End of Day)</option>
-            </select>
-            <p style="margin-top: 8px; font-size: 12px; color: #666; font-style: italic;">
-              Select which count session this is. System will track consumption patterns between sessions.
-            </p>
+          <!-- Count Session Info (Auto-detected) -->
+          <div id="countSessionInfo" style="margin-bottom: 20px; padding: 16px; background: var(--gray-100); border-radius: 0; border: 2px solid var(--gray-300);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <div style="font-weight: 700; color: var(--gray-900); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
+                <span id="currentSessionIcon"></span>
+                <span id="currentSessionName"></span>
+              </div>
+              <div style="font-size: 11px; color: var(--gray-500); font-weight: 600;">
+                <span id="currentSessionTime"></span>
+              </div>
+            </div>
+            <div id="sessionCompletionStats" style="font-size: 12px; color: var(--gray-700); line-height: 1.6;">
+              <!-- Populated by JavaScript -->
+            </div>
           </div>
 
           <!-- PREP Item Counting Section -->
@@ -9766,6 +9753,7 @@
       renderInventoryList();
       renderStockCountList();
       renderPrepCountList(); // Render PREP items in PREP tab
+      await updateCountSessionDisplay(); // Auto-detect and display current count session
     } catch (error) {
       console.error('Error loading ordering system data:', error);
       showMessage(`Error: ${error.message}`, 'error');
@@ -9798,9 +9786,10 @@
 
     orderingSystemState.currentTab = tabName;
 
-    // Auto-refresh prep sheet when tab is opened
+    // Auto-refresh prep sheet and count session when tab is opened
     if (tabName === 'prepSheet') {
       refreshPrepSheet();
+      updateCountSessionDisplay(); // Update session info each time PREP tab is opened
     }
   }
 
@@ -11135,32 +11124,159 @@
   /**
    * Update current count session and create/update session record
    */
-  async function updateCountSession() {
-    const selector = document.getElementById('countSessionSelector');
-    const newSession = selector.value;
-    orderingSystemState.currentCountSession = newSession;
+  /**
+   * Automatically detect current count session based on time of day
+   * Before 3pm = Morning Prep
+   * 3pm-8pm = Afternoon Prep
+   * After 8pm = Closing Line
+   */
+  function getAutomaticCountSession() {
+    const now = new Date();
+    const hour = now.getHours();
 
-    // Create or update prep_count_sessions record for today
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    if (hour < 15) { // Before 3pm
+      return {
+        value: 'morning_prep',
+        name: 'Morning Prep',
+        icon: '🌅',
+        time: '7:00 AM - 3:00 PM'
+      };
+    } else if (hour < 20) { // 3pm-8pm
+      return {
+        value: 'afternoon_prep',
+        name: 'Afternoon Prep',
+        icon: '☀️',
+        time: '3:00 PM - 8:00 PM'
+      };
+    } else { // After 8pm
+      return {
+        value: 'closing_line',
+        name: 'Closing Line',
+        icon: '🌙',
+        time: 'After 8:00 PM'
+      };
+    }
+  }
 
+  /**
+   * Update count session display and fetch completion stats
+   */
+  async function updateCountSessionDisplay() {
+    const session = getAutomaticCountSession();
+
+    // Update current session display
+    document.getElementById('currentSessionIcon').textContent = session.icon;
+    document.getElementById('currentSessionName').textContent = session.name;
+    document.getElementById('currentSessionTime').textContent = session.time;
+
+    // Update orderingSystemState
+    orderingSystemState.currentCountSession = session.value;
+
+    // Fetch and display completion stats
+    await fetchAndDisplaySessionStats(session.value);
+
+    // Update session record in database
+    const today = new Date().toISOString().split('T')[0];
     try {
-      const { error } = await supabase
+      await supabase
         .from('prep_count_sessions')
         .upsert({
           count_date: today,
-          session_type: newSession,
+          session_type: session.value,
           session_timestamp: new Date().toISOString(),
-          notes: 'Session started'
+          notes: 'Auto-detected session'
         }, {
           onConflict: 'count_date,session_type'
         });
-
-      if (error) throw error;
-
-      console.log(`Count session updated to: ${newSession} for ${today}`);
     } catch (error) {
       console.error('Failed to update session record:', error);
     }
+  }
+
+  /**
+   * Fetch and display completion stats for previous count sessions
+   */
+  async function fetchAndDisplaySessionStats(currentSession) {
+    const today = new Date().toISOString().split('T')[0];
+    const statsContainer = document.getElementById('sessionCompletionStats');
+
+    try {
+      // Count PREP items that were updated today, grouped by hour ranges
+      const { data: prepItems, error } = await supabase
+        .from('inventory_items')
+        .select('last_counted_date, category, vendor')
+        .or('category.eq.PREP,vendor.eq.PREP');
+
+      if (error) throw error;
+
+      // Count items updated in each session today
+      const morningCount = prepItems.filter(item => {
+        if (!item.last_counted_date) return false;
+        const lastCounted = new Date(item.last_counted_date);
+        const isToday = lastCounted.toISOString().split('T')[0] === today;
+        const hour = lastCounted.getHours();
+        return isToday && hour < 15; // Before 3pm
+      }).length;
+
+      const afternoonCount = prepItems.filter(item => {
+        if (!item.last_counted_date) return false;
+        const lastCounted = new Date(item.last_counted_date);
+        const isToday = lastCounted.toISOString().split('T')[0] === today;
+        const hour = lastCounted.getHours();
+        return isToday && hour >= 15 && hour < 20; // 3pm-8pm
+      }).length;
+
+      const closingCount = prepItems.filter(item => {
+        if (!item.last_counted_date) return false;
+        const lastCounted = new Date(item.last_counted_date);
+        const isToday = lastCounted.toISOString().split('T')[0] === today;
+        const hour = lastCounted.getHours();
+        return isToday && hour >= 20; // After 8pm
+      }).length;
+
+      // Build status message based on current session
+      let statusHTML = '';
+
+      if (currentSession === 'morning_prep') {
+        // Morning: No previous sessions today
+        statusHTML = '<div style="color: var(--gray-600); font-style: italic;">First count session of the day</div>';
+      } else if (currentSession === 'afternoon_prep') {
+        // Afternoon: Show morning count
+        if (morningCount > 0) {
+          statusHTML = `<div><strong>${morningCount}</strong> prep items counted during Morning Prep</div>`;
+        } else {
+          statusHTML = '<div style="color: var(--gray-500); font-style: italic;">No items counted during Morning Prep</div>';
+        }
+      } else { // closing_line
+        // Closing: Show both morning and afternoon
+        const lines = [];
+        if (morningCount > 0) {
+          lines.push(`<div><strong>${morningCount}</strong> prep items counted during Morning Prep</div>`);
+        }
+        if (afternoonCount > 0) {
+          lines.push(`<div><strong>${afternoonCount}</strong> prep items counted during Afternoon Prep</div>`);
+        }
+        if (lines.length === 0) {
+          statusHTML = '<div style="color: var(--gray-500); font-style: italic;">No prep counts completed today</div>';
+        } else {
+          statusHTML = lines.join('');
+        }
+      }
+
+      statsContainer.innerHTML = statusHTML;
+
+    } catch (error) {
+      console.error('Error fetching session stats:', error);
+      statsContainer.innerHTML = '<div style="color: var(--gray-500); font-style: italic;">Unable to load count statistics</div>';
+    }
+  }
+
+  /**
+   * Legacy function - kept for compatibility
+   */
+  async function updateCountSession() {
+    // This function is now handled automatically by updateCountSessionDisplay()
+    await updateCountSessionDisplay();
   }
 
   /**
