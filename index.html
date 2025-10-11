@@ -10599,7 +10599,18 @@
                     ${lastPriceStr ? `<div style="font-size: 11px; color: #999; margin-top: 2px;">${lastPriceStr}</div>` : ''}
                     <div style="font-size: 9px; color: #bbb; margin-top: 2px; font-style: italic;">${reasoningText}</div>
                   </td>
-                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd; font-weight: bold; color: #d32f2f;">${item.quantity}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
+                    <input
+                      type="number"
+                      value="${item.quantity}"
+                      data-order-index="${index}"
+                      data-item-id="${item.id}"
+                      onchange="updateOrderItemQuantity(${index}, ${item.id}, this.value)"
+                      style="width: 70px; padding: 6px; text-align: center; border: 2px solid #d32f2f; border-radius: 0; font-size: 13px; font-weight: 700; color: #d32f2f;"
+                      min="0"
+                      step="0.25"
+                    />
+                  </td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
                     <input
                       type="text"
@@ -10617,6 +10628,12 @@
             </tbody>
           </table>
 
+          <div style="margin-top: 12px; margin-bottom: 20px;">
+            <button class="submit-btn" onclick="addItemToAISuggestion(${index})" style="width: 100%; background: var(--gray-600); color: white; font-weight: 700; padding: 10px;">
+              + ADD ITEM
+            </button>
+          </div>
+
           <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
             <button class="submit-btn" onclick="printOrder(${index})" style="flex: 1; min-width: 140px; background: #2e7d32;">
               🖨️ Print Order
@@ -10633,6 +10650,245 @@
     });
 
     container.innerHTML = html;
+  }
+
+  /**
+   * Update item quantity in AI suggestion
+   */
+  function updateOrderItemQuantity(orderIndex, itemId, newQuantity) {
+    const order = orderingSystemState.calculatedOrders[orderIndex];
+    if (!order) return;
+
+    const item = order.items.find(i => i.id === itemId);
+    if (item) {
+      item.quantity = parseFloat(newQuantity) || 0;
+      console.log(`Updated ${item.itemName} quantity to ${newQuantity}`);
+    }
+  }
+
+  /**
+   * Add item to AI suggestion
+   */
+  async function addItemToAISuggestion(orderIndex) {
+    const order = orderingSystemState.calculatedOrders[orderIndex];
+    if (!order) {
+      showMessage('Order not found', 'error');
+      return;
+    }
+
+    // Get current item IDs already in the order
+    const currentItemIds = order.items.map(item => item.id);
+
+    // Get available items from this vendor that aren't already in the order
+    const availableItems = orderingSystemState.items
+      .filter(item => item.vendor === order.vendor && !currentItemIds.includes(item.id))
+      .sort((a, b) => a.itemName.localeCompare(b.itemName));
+
+    if (availableItems.length === 0) {
+      showMessage('No more items available for this vendor', 'warning');
+      return;
+    }
+
+    // Create modal
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background: white; max-width: 600px; width: 100%; border: 2px solid var(--gray-400); max-height: 90vh; display: flex; flex-direction: column;';
+
+    // Header
+    const header = document.createElement('div');
+    header.style.cssText = 'background: var(--gray-600); color: white; padding: 16px 20px;';
+
+    const title = document.createElement('h3');
+    title.textContent = `ADD ITEM - ${order.vendor}`;
+    title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+    header.appendChild(title);
+
+    modal.appendChild(header);
+
+    // Content
+    const content = document.createElement('div');
+    content.style.cssText = 'padding: 20px; overflow-y: auto; flex: 1;';
+
+    const instructions = document.createElement('p');
+    instructions.textContent = 'Select an item to add to this order:';
+    instructions.style.cssText = 'color: var(--gray-600); font-size: 13px; margin-bottom: 16px;';
+    content.appendChild(instructions);
+
+    // Search input
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search items...';
+    searchInput.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; margin-bottom: 16px;';
+    content.appendChild(searchInput);
+
+    // Items list container
+    const itemsList = document.createElement('div');
+    itemsList.style.cssText = 'display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto;';
+
+    function renderItemsList(items) {
+      itemsList.innerHTML = '';
+
+      items.forEach(item => {
+        const itemBtn = document.createElement('button');
+        itemBtn.style.cssText = 'padding: 12px; border: 2px solid var(--gray-300); background: white; text-align: left; cursor: pointer; transition: all 0.2s;';
+
+        const itemName = document.createElement('div');
+        itemName.textContent = item.itemName;
+        itemName.style.cssText = 'font-weight: 700; font-size: 13px; color: var(--gray-900); margin-bottom: 4px;';
+        itemBtn.appendChild(itemName);
+
+        const itemDetails = document.createElement('div');
+        itemDetails.textContent = `Par: ${item.parLevel} | Current: ${item.currentStock} | Unit: ${item.unit}`;
+        itemDetails.style.cssText = 'font-size: 11px; color: var(--gray-600);';
+        itemBtn.appendChild(itemDetails);
+
+        itemBtn.onmouseover = () => {
+          itemBtn.style.background = 'var(--gray-100)';
+          itemBtn.style.borderColor = 'var(--gray-900)';
+        };
+        itemBtn.onmouseout = () => {
+          itemBtn.style.background = 'white';
+          itemBtn.style.borderColor = 'var(--gray-300)';
+        };
+
+        itemBtn.onclick = () => {
+          // Show quantity input modal
+          showQuantityInputModal(order, orderIndex, item, overlay);
+        };
+
+        itemsList.appendChild(itemBtn);
+      });
+    }
+
+    renderItemsList(availableItems);
+
+    // Search filter
+    searchInput.oninput = (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      const filtered = availableItems.filter(item =>
+        item.itemName.toLowerCase().includes(searchTerm)
+      );
+      renderItemsList(filtered);
+    };
+
+    content.appendChild(itemsList);
+    modal.appendChild(content);
+
+    // Footer
+    const footer = document.createElement('div');
+    footer.style.cssText = 'padding: 16px 20px; background: white; border-top: 2px solid var(--gray-300);';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = 'width: 100%; padding: 14px; background: white; color: var(--gray-700); border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
+    cancelBtn.onclick = () => document.body.removeChild(overlay);
+    footer.appendChild(cancelBtn);
+
+    modal.appendChild(footer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+
+  /**
+   * Show quantity input modal for adding item
+   */
+  function showQuantityInputModal(order, orderIndex, item, previousOverlay) {
+    // Remove previous modal
+    document.body.removeChild(previousOverlay);
+
+    // Create new modal for quantity input
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background: white; max-width: 500px; width: 100%; border: 2px solid var(--gray-400);';
+
+    // Header
+    const header = document.createElement('div');
+    header.style.cssText = 'background: var(--gray-600); color: white; padding: 16px 20px;';
+
+    const title = document.createElement('h3');
+    title.textContent = 'ENTER QUANTITY';
+    title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+    header.appendChild(title);
+
+    modal.appendChild(header);
+
+    // Content
+    const content = document.createElement('div');
+    content.style.cssText = 'padding: 20px;';
+
+    const itemLabel = document.createElement('div');
+    itemLabel.textContent = item.itemName;
+    itemLabel.style.cssText = 'font-weight: 700; font-size: 14px; color: var(--gray-900); margin-bottom: 16px;';
+    content.appendChild(itemLabel);
+
+    const qtyLabel = document.createElement('label');
+    qtyLabel.textContent = 'QUANTITY:';
+    qtyLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;';
+    content.appendChild(qtyLabel);
+
+    const qtyInput = document.createElement('input');
+    qtyInput.type = 'number';
+    qtyInput.min = '0';
+    qtyInput.step = '0.25';
+    qtyInput.value = Math.max(0, item.parLevel - item.currentStock);
+    qtyInput.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;';
+    content.appendChild(qtyInput);
+
+    modal.appendChild(content);
+
+    // Footer
+    const footer = document.createElement('div');
+    footer.style.cssText = 'padding: 16px 20px; background: white; border-top: 2px solid var(--gray-300); display: flex; gap: 12px;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = 'flex: 1; padding: 14px; background: white; color: var(--gray-700); border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
+    cancelBtn.onclick = () => document.body.removeChild(overlay);
+    footer.appendChild(cancelBtn);
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = 'ADD ITEM';
+    confirmBtn.style.cssText = 'flex: 2; padding: 14px; background: var(--gray-600); color: white; border: 2px solid var(--gray-600); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
+    confirmBtn.onclick = () => {
+      const quantity = parseFloat(qtyInput.value) || 0;
+      if (quantity <= 0) {
+        showMessage('Please enter a quantity greater than 0', 'warning');
+        return;
+      }
+
+      // Add item to the order
+      order.items.push({
+        id: item.id,
+        itemName: item.itemName,
+        quantity: quantity,
+        unit: item.unit,
+        parLevel: item.parLevel,
+        currentStock: item.currentStock,
+        lastCountedDate: item.lastCountedDate,
+        currentUnitCost: item.currentUnitCost,
+        lastCostUpdate: item.lastCostUpdate
+      });
+
+      // Close modal
+      document.body.removeChild(overlay);
+
+      // Re-render the order card to show the new item
+      renderUpcomingOrders();
+
+      showMessage(`Added ${item.itemName} (${quantity} ${item.unit})`, 'success');
+    };
+    footer.appendChild(confirmBtn);
+
+    modal.appendChild(footer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Focus quantity input
+    setTimeout(() => qtyInput.focus(), 100);
   }
 
   /**
