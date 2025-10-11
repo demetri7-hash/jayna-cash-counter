@@ -1279,7 +1279,19 @@
           </div>
 
           <!-- Inventory List -->
-          <h3 style="margin-bottom: 15px; color: #1e3c72;">Inventory Items</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0; color: #1e3c72;">Inventory Items</h3>
+            <button onclick="showVendorManagement()" style="
+              background: #1e3c72;
+              color: white;
+              border: none;
+              padding: 8px 16px;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 13px;
+              font-weight: 600;
+            ">Manage Vendors</button>
+          </div>
 
           <!-- Search and Filter Controls -->
           <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
@@ -9832,6 +9844,7 @@
             <thead>
               <tr style="background: #f8f9fa;">
                 <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Item Name</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 150px;">Vendor</th>
                 <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 100px;">Unit</th>
                 <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Par Level</th>
                 <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Current Stock</th>
@@ -9842,6 +9855,15 @@
               ${items.map((item, i) => `
                 <tr style="background: ${i % 2 === 0 ? 'white' : '#f8f9fa'};">
                   <td style="padding: 10px; border: 1px solid #ddd;">${item.itemName}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
+                    <select
+                      value="${item.vendor}"
+                      onchange="updateItemVendor(${item.id}, this.value)"
+                      style="width: 140px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
+                    >
+                      ${getAllVendors().map(v => `<option value="${v}" ${v === item.vendor ? 'selected' : ''}>${v}</option>`).join('')}
+                    </select>
+                  </td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.unit}</td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
                     <input
@@ -9995,7 +10017,7 @@
                       id="stock-${item.id}"
                       value="${item.currentStock}"
                       min="0"
-                      onchange="trackStockUpdate(${item.id}, this.value)"
+                      onblur="autoSaveStockCount(${item.id}, this.value, this)"
                       style="
                         width: 100%;
                         padding: 14px;
@@ -10011,7 +10033,6 @@
                         -moz-appearance: textfield;
                       "
                       onfocus="this.style.borderColor='#1b5e20'; this.style.background='#ffffff';"
-                      onblur="this.style.borderColor='#2e7d32'; this.style.background='#f9fdf9';"
                     />
                   </div>
                 </div>
@@ -10075,6 +10096,7 @@
             <thead>
               <tr style="background: #f8f9fa;">
                 <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Item Name</th>
+                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 150px;">Vendor</th>
                 <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 100px;">Unit</th>
                 <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Par Level</th>
                 <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Current Stock</th>
@@ -10085,6 +10107,15 @@
               ${items.map((item, i) => `
                 <tr style="background: ${i % 2 === 0 ? 'white' : '#f8f9fa'};">
                   <td style="padding: 10px; border: 1px solid #ddd;">${item.itemName}</td>
+                  <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
+                    <select
+                      value="${item.vendor}"
+                      onchange="updateItemVendor(${item.id}, this.value)"
+                      style="width: 140px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;"
+                    >
+                      ${getAllVendors().map(v => `<option value="${v}" ${v === item.vendor ? 'selected' : ''}>${v}</option>`).join('')}
+                    </select>
+                  </td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.unit}</td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
                     <input
@@ -10255,7 +10286,7 @@
                       id="stock-${item.id}"
                       value="${item.currentStock}"
                       min="0"
-                      onchange="trackStockUpdate(${item.id}, this.value)"
+                      onblur="autoSaveStockCount(${item.id}, this.value, this)"
                       style="
                         width: 100%;
                         padding: 14px;
@@ -10271,7 +10302,6 @@
                         -moz-appearance: textfield;
                       "
                       onfocus="this.style.borderColor='#1b5e20'; this.style.background='#ffffff';"
-                      onblur="this.style.borderColor='#2e7d32'; this.style.background='#f9fdf9';"
                     />
                   </div>
                 </div>
@@ -10286,11 +10316,72 @@
   }
 
   /**
-   * Track stock updates before saving
+   * Track stock updates before saving (legacy - kept for compatibility)
    */
   function trackStockUpdate(itemId, newValue) {
     orderingSystemState.pendingStockUpdates.set(itemId, parseInt(newValue));
     console.log('Tracked stock update:', itemId, newValue);
+  }
+
+  /**
+   * Auto-save stock count when input loses focus
+   */
+  async function autoSaveStockCount(itemId, newValue, inputElement) {
+    const stockValue = parseInt(newValue);
+    if (isNaN(stockValue)) return;
+
+    // Visual feedback - saving state
+    const originalBorder = inputElement.style.borderColor;
+    const originalBg = inputElement.style.background;
+    inputElement.style.borderColor = '#ff9800';
+    inputElement.style.background = '#fff3e0';
+    inputElement.disabled = true;
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({
+          current_stock: stockValue,
+          last_counted_date: new Date().toISOString()
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.currentStock = stockValue;
+        item.lastCountedDate = new Date().toISOString();
+      }
+
+      // Success feedback - green flash
+      inputElement.style.borderColor = '#388e3c';
+      inputElement.style.background = '#e8f5e9';
+
+      setTimeout(() => {
+        inputElement.style.borderColor = '#2e7d32';
+        inputElement.style.background = '#f9fdf9';
+        inputElement.disabled = false;
+      }, 800);
+
+      // Recalculate orders in background
+      calculateUpcomingOrders();
+
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+      // Error feedback - red flash
+      inputElement.style.borderColor = '#d32f2f';
+      inputElement.style.background = '#ffebee';
+
+      setTimeout(() => {
+        inputElement.style.borderColor = originalBorder;
+        inputElement.style.background = originalBg;
+        inputElement.disabled = false;
+      }, 1000);
+
+      showMessage(`Failed to save: ${error.message}`, 'error');
+    }
   }
 
   /**
@@ -10464,6 +10555,197 @@
     } catch (error) {
       hideLoading();
       showMessage(`Error deleting item: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Get all unique vendors from inventory
+   */
+  function getAllVendors() {
+    const vendors = new Set();
+    orderingSystemState.items.forEach(item => {
+      if (item.vendor) vendors.add(item.vendor);
+    });
+    return Array.from(vendors).sort();
+  }
+
+  /**
+   * Update item vendor
+   */
+  async function updateItemVendor(itemId, newVendor) {
+    showLoading('Updating Vendor', 'Saving changes...');
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ vendor: newVendor })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.vendor = newVendor;
+      }
+
+      // Refresh displays
+      renderInventoryList();
+      renderStockCountList();
+      calculateUpcomingOrders();
+
+      hideLoading();
+      showMessage('✅ Vendor updated!', 'success');
+    } catch (error) {
+      hideLoading();
+      showMessage(`Error updating vendor: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Rename vendor (updates all items with that vendor)
+   */
+  async function renameVendor(oldVendorName, newVendorName) {
+    if (!newVendorName || newVendorName.trim() === '') {
+      showMessage('Vendor name cannot be empty!', 'error');
+      return;
+    }
+
+    const itemsWithVendor = orderingSystemState.items.filter(i => i.vendor === oldVendorName);
+
+    if (itemsWithVendor.length === 0) {
+      showMessage('No items found for this vendor!', 'error');
+      return;
+    }
+
+    if (!confirm(`Rename "${oldVendorName}" to "${newVendorName}"? This will update ${itemsWithVendor.length} items.`)) {
+      return;
+    }
+
+    showLoading('Renaming Vendor', `Updating ${itemsWithVendor.length} items...`);
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ vendor: newVendorName })
+        .eq('vendor', oldVendorName);
+
+      if (error) throw error;
+
+      // Update local state
+      itemsWithVendor.forEach(item => {
+        item.vendor = newVendorName;
+      });
+
+      // Refresh displays
+      renderInventoryList();
+      renderStockCountList();
+      calculateUpcomingOrders();
+
+      hideLoading();
+      showMessage(`✅ Renamed "${oldVendorName}" to "${newVendorName}" (${itemsWithVendor.length} items updated)`, 'success');
+    } catch (error) {
+      hideLoading();
+      showMessage(`Error renaming vendor: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Delete vendor (requires moving all items to another vendor first)
+   */
+  async function deleteVendor(vendorName) {
+    const itemsWithVendor = orderingSystemState.items.filter(i => i.vendor === vendorName);
+
+    if (itemsWithVendor.length > 0) {
+      showMessage(`Cannot delete vendor "${vendorName}" - ${itemsWithVendor.length} items are still assigned to it. Move them to another vendor first.`, 'error');
+      return;
+    }
+
+    showMessage(`Vendor "${vendorName}" has no items and can be removed. Simply rename it or ignore it.`, 'info');
+  }
+
+  /**
+   * Show vendor management modal
+   */
+  function showVendorManagement() {
+    const vendors = getAllVendors();
+    const vendorList = vendors.map(vendor => {
+      const itemCount = orderingSystemState.items.filter(i => i.vendor === vendor).length;
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #e0e0e0;">
+          <div>
+            <strong style="font-size: 15px;">${vendor}</strong>
+            <span style="color: #666; font-size: 13px; margin-left: 8px;">(${itemCount} items)</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button onclick="promptRenameVendor('${vendor.replace(/'/g, "\\'")}')" style="
+              background: #1e3c72;
+              color: white;
+              border: none;
+              padding: 6px 12px;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 12px;
+            ">Rename</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const modalHTML = `
+      <div style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+      " onclick="closeVendorManagement(event)">
+        <div style="
+          background: white;
+          border-radius: 8px;
+          padding: 24px;
+          max-width: 600px;
+          width: 90%;
+          max-height: 80vh;
+          overflow-y: auto;
+        " onclick="event.stopPropagation()">
+          <h2 style="margin: 0 0 20px 0; color: #1e3c72;">Vendor Management</h2>
+          <div style="margin-bottom: 20px;">
+            ${vendorList}
+          </div>
+          <button onclick="closeVendorManagement()" class="submit-btn" style="background: #666;">Close</button>
+        </div>
+      </div>
+    `;
+
+    const modalDiv = document.createElement('div');
+    modalDiv.id = 'vendorManagementModal';
+    modalDiv.innerHTML = modalHTML;
+    document.body.appendChild(modalDiv);
+  }
+
+  /**
+   * Close vendor management modal
+   */
+  function closeVendorManagement(event) {
+    if (event && event.target !== event.currentTarget) return;
+    const modal = document.getElementById('vendorManagementModal');
+    if (modal) modal.remove();
+  }
+
+  /**
+   * Prompt to rename vendor
+   */
+  function promptRenameVendor(vendorName) {
+    const newName = prompt(`Rename vendor "${vendorName}" to:`, vendorName);
+    if (newName && newName !== vendorName) {
+      renameVendor(vendorName, newName);
+      closeVendorManagement();
     }
   }
 
