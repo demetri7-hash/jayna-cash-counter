@@ -528,12 +528,30 @@ function generateOrderEmailHTML(order, orderDate) {
       }
     }
 
+    // Format AI reasoning (very small text)
+    let reasoningStr = '';
+    if (item.reasoning) {
+      if (item.reasoning.method === 'Simple (no historical data)') {
+        reasoningStr = `<div style="font-size: 9px; color: #bbb; margin-top: 2px; font-style: italic;">AI: Par ${item.reasoning.parLevel} - Stock ${item.reasoning.currentStock} = ${item.qty} to order</div>`;
+      } else {
+        const avg = item.reasoning.avgDailyConsumption;
+        const days = item.reasoning.daysUntilNextDelivery;
+        const base = item.reasoning.baseQty;
+        const buffer = item.reasoning.safetyBuffer;
+        const trend = item.reasoning.trendAdjustment;
+        const predicted = item.reasoning.predictedNeed;
+
+        reasoningStr = `<div style="font-size: 9px; color: #bbb; margin-top: 2px; font-style: italic;">AI: ${avg}/day × ${days}d = ${base} + buffer ${buffer}${trend > 0 ? ` + trend ${trend}` : ''} = ${predicted} needed - ${item.stock} on hand</div>`;
+      }
+    }
+
     return `
     <tr style="border-bottom: 1px solid #e8e8e8;">
       <td style="padding: 10px 12px; font-size: 13px; color: #2c2c2c;">
         ${item.name}
         <div style="font-size: 11px; color: #999; margin-top: 2px;">Last count: ${lastCountedStr}</div>
         ${lastCostStr}
+        ${reasoningStr}
       </td>
       <td style="padding: 10px 12px; text-align: center; font-size: 14px; font-weight: 600; color: #000;">${item.qty}</td>
       <td style="padding: 10px 12px; text-align: center; font-size: 13px; color: #666;">${item.unit}</td>
