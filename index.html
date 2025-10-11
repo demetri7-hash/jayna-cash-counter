@@ -9787,6 +9787,7 @@
 
   /**
    * Render stock count list for updating inventory
+   * Mobile-first card-based design with large touch targets
    */
   function renderStockCountList() {
     const container = document.getElementById('stockCountList');
@@ -9805,50 +9806,128 @@
       itemsByVendor[item.vendor].push(item);
     });
 
+    // Helper function to get stock status
+    function getStockStatus(currentStock, parLevel) {
+      if (parLevel === 0) return { label: 'N/A', color: '#999', bg: '#f5f5f5' };
+      const percentage = (currentStock / parLevel) * 100;
+      if (percentage < 30) return { label: 'LOW', color: '#d32f2f', bg: '#ffebee' };
+      if (percentage < 70) return { label: 'MEDIUM', color: '#f57c00', bg: '#fff3e0' };
+      return { label: 'GOOD', color: '#388e3c', bg: '#e8f5e9' };
+    }
+
+    // Helper function to format last counted date
+    function formatLastCounted(dateStr) {
+      if (!dateStr) return 'Never';
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+    }
+
     let html = '';
     Object.keys(itemsByVendor).sort().forEach(vendor => {
       const items = itemsByVendor[vendor];
       html += `
         <div style="margin-bottom: 30px;">
-          <h4 style="background: #2e7d32; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
-            ${vendor} (${items.length} items)
+          <h4 style="background: #2e7d32; color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; font-size: 16px; font-weight: 600;">
+            ${vendor} <span style="opacity: 0.85; font-weight: 400; font-size: 14px;">(${items.length})</span>
           </h4>
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="background: #f8f9fa;">
-                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Item Name</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 100px;">Unit</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Par Level</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 150px;">Current Stock</th>
-                <th style="padding: 10px; text-align: center; border: 1px solid #ddd; width: 120px;">Last Counted</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${items.map((item, i) => {
-                const lastCounted = item.lastCountedDate
-                  ? new Date(item.lastCountedDate).toLocaleDateString()
-                  : 'Never';
-                return `
-                  <tr style="background: ${i % 2 === 0 ? 'white' : '#f8f9fa'};">
-                    <td style="padding: 10px; border: 1px solid #ddd;">${item.itemName}</td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.unit}</td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd; color: #666;">${item.parLevel}</td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">
-                      <input
-                        type="number"
-                        id="stock-${item.id}"
-                        value="${item.currentStock}"
-                        min="0"
-                        onchange="trackStockUpdate(${item.id}, this.value)"
-                        style="width: 100px; padding: 8px; text-align: center; border: 2px solid #2e7d32; border-radius: 4px; font-weight: bold;"
-                      />
-                    </td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd; font-size: 12px; color: #999;">${lastCounted}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
+
+          <!-- Mobile-first card grid -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px;">
+            ${items.map((item) => {
+              const status = getStockStatus(item.currentStock, item.parLevel);
+              const lastCounted = formatLastCounted(item.lastCountedDate);
+
+              return `
+                <div style="
+                  background: white;
+                  border: 1px solid #e0e0e0;
+                  border-radius: 8px;
+                  padding: 16px;
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                  transition: box-shadow 0.2s;
+                "
+                onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.12)'"
+                onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'">
+
+                  <!-- Header: Item Name + Status Badge -->
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 8px;">
+                    <div style="flex: 1; font-weight: 600; font-size: 15px; line-height: 1.3; color: #333;">
+                      ${item.itemName}
+                    </div>
+                    <div style="
+                      background: ${status.bg};
+                      color: ${status.color};
+                      padding: 4px 10px;
+                      border-radius: 12px;
+                      font-size: 11px;
+                      font-weight: 700;
+                      white-space: nowrap;
+                      letter-spacing: 0.3px;
+                    ">
+                      ${status.label}
+                    </div>
+                  </div>
+
+                  <!-- Metadata Row -->
+                  <div style="
+                    display: flex;
+                    gap: 16px;
+                    margin-bottom: 12px;
+                    font-size: 13px;
+                    color: #666;
+                  ">
+                    <div>
+                      <span style="color: #999;">Unit:</span> <strong>${item.unit}</strong>
+                    </div>
+                    <div>
+                      <span style="color: #999;">Par:</span> <strong>${item.parLevel}</strong>
+                    </div>
+                    <div style="margin-left: auto; color: #999; font-size: 12px;">
+                      ${lastCounted}
+                    </div>
+                  </div>
+
+                  <!-- Stock Input (Large Touch Target) -->
+                  <div>
+                    <label style="display: block; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 500;">
+                      Current Stock
+                    </label>
+                    <input
+                      type="number"
+                      inputmode="numeric"
+                      id="stock-${item.id}"
+                      value="${item.currentStock}"
+                      min="0"
+                      onchange="trackStockUpdate(${item.id}, this.value)"
+                      style="
+                        width: 100%;
+                        padding: 14px;
+                        font-size: 20px;
+                        font-weight: 600;
+                        text-align: center;
+                        border: 2px solid #2e7d32;
+                        border-radius: 6px;
+                        background: #f9fdf9;
+                        color: #2e7d32;
+                        box-sizing: border-box;
+                        -webkit-appearance: none;
+                        -moz-appearance: textfield;
+                      "
+                      onfocus="this.style.borderColor='#1b5e20'; this.style.background='#ffffff';"
+                      onblur="this.style.borderColor='#2e7d32'; this.style.background='#f9fdf9';"
+                    />
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
         </div>
       `;
     });
