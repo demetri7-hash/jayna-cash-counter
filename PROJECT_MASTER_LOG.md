@@ -3,10 +3,259 @@ Last Updated: October 10, 2025
 
 ---
 
-## [2025-10-10 16:30] - AI Reasoning Display in Order Emails (Continuation)
+## [2025-10-10 21:00] - EMERGENCY SESSION: Invoice Manual Matching + Full Revert
 **Worked on by:** Claude Code CLI
-**Focus:** Add transparent algorithm calculation display to automated order emails
-**Result:** ✅ Complete - AI reasoning shows under each line item in emails
+**Focus:** Add manual matching feature for invoice items → CATASTROPHIC FAILURE → Emergency revert
+**Result:** ⚠️ **EMERGENCY RESOLVED** - System restored to working state, all invoice features removed
+
+### Problem Statement:
+User requested manual matching feature for low-confidence invoice items detected by OCR. Implementation caused complete page break requiring emergency revert.
+
+### What Went Wrong:
+
+#### **CRITICAL PRODUCTION EMERGENCY:**
+- Page displayed raw JavaScript code as text on load
+- Modal appeared automatically on page refresh
+- Background showed unrendered HTML strings
+- Variable names displayed literally ("item.detectedName" instead of actual values)
+- **Staff blocked from using PM flow** (urgent business impact)
+
+### Attempted Solutions (All Failed):
+
+#### **Attempt 1: Complex Modal with Searchable Dropdown**
+- Created manualMatchInvoiceItem() with full-featured modal
+- Template literals with nested conditionals
+- Inline style objects with ${} variables
+- onclick handlers with function parameters
+- **Result:** Modal HTML displayed as literal text
+
+#### **Attempt 2: String Concatenation**
+- Replaced template literals with + operator
+- Removed all backticks
+- **Result:** Still displayed as text (innerHTML not parsing)
+
+#### **Attempt 3: HTML Entities**
+- Used `&#39;` for quotes in event handlers
+- **Result:** JavaScript parsing errors, "EVEN WORSE"
+
+#### **Attempt 4: Simplified Prompt Approach**
+- Removed entire modal HTML generation
+- Used browser prompt() for item ID input
+- Fixed confirmManualMatch() signature
+- **Result:** Still broken (page showing raw code)
+
+### Emergency Resolution:
+
+#### **Revert Step 1: Remove Manual Matching (Failed)**
+```bash
+git reset --hard 442797d  # Base64 invoice upload commit
+git push origin main --force
+```
+**Result:** Still not working
+
+#### **Revert Step 2: Remove ALL Invoice Features (Success)**
+```bash
+git reset --hard 03c0ae5  # Prep sheet commit (before invoices)
+git push origin main --force
+```
+**Result:** System restored but still cached
+
+#### **Revert Step 3: Force Fresh Deployment**
+```bash
+git commit --allow-empty -m "trigger redeployment"
+git push origin main
+```
+**Result:** ✅ Fresh deployment (age: 23s), system working
+
+### Features Removed (Temporarily):
+- ❌ Invoice upload (PDF/image scanning)
+- ❌ OCR text extraction (Tesseract.js)
+- ❌ PDF.js library integration
+- ❌ Auto-matching algorithm (fuzzy matching with Levenshtein distance)
+- ❌ Manual matching modal (all 4 attempts)
+- ❌ Invoice reconciliation UI
+- ❌ Check-in functionality
+- ❌ invoice_items database operations
+
+**Collateral Damage (Working features also reverted):**
+- ❌ Mobile-optimized Update Counts UI (was working)
+- ❌ Dynamic search and vendor filtering (was working)
+- ❌ Auto-save stock counts (was working)
+- ❌ Vendor management system (was working)
+- ❌ AI reasoning display in emails (was working)
+
+### Commits Reverted:
+**Invoice-related (never worked):**
+- f9c9b91: feat(invoice): Add manual item matching
+- b990c02: fix(invoice): Fix template literal syntax
+- 7b58308: fix(invoice): Rewrite with string concatenation
+- 125dd29: fix(invoice): Use HTML entities
+- 5c85d61: fix(invoice): Remove inline handlers
+- 54f6086: fix(invoice): Simplify to prompt
+- 442797d: feat(invoice): Base64 invoice upload + OCR
+
+**Working features (collateral damage):**
+- b197ae9: feat(ordering): Add AI reasoning display
+- df4ca57: feat(ordering): Auto-save stock counts + vendor management
+- 0419652: feat(ordering): Add dynamic search and vendor filtering
+- 2a24937: feat(ordering): Mobile-optimized Update Counts UI
+
+### Current State:
+**Commit:** 2ba664b (empty commit to trigger deployment)
+**Base:** 03c0ae5 - feat(prep): Add Prep Sheet tab with smart recommendations
+**Branch:** main
+**Status:** ✅ Operational
+
+### Root Cause Analysis:
+
+#### Why Did Complex HTML String Generation Fail?
+1. **Template Literal Complexity:**
+   - Nested backticks with conditional ternaries
+   - ${} variables inside style attributes
+   - onclick handlers with ${} function parameters
+   - Mixed string concatenation patterns
+
+2. **Syntax Fragility:**
+   - Large HTML blocks (100+ lines) as single string
+   - Escaping issues with quotes in attributes
+   - innerHTML doesn't validate before rendering
+
+3. **Wrong Approach:**
+   - Should have used DOM createElement()
+   - Or hidden HTML template in page
+   - Or separate modal library
+
+### Lessons Learned:
+
+1. **Avoid Large HTML Strings in JavaScript**
+   - Use DOM manipulation (createElement, appendChild)
+   - Or use hidden HTML templates
+   - Template literals break easily with complexity
+
+2. **Test Incrementally**
+   - Should have tested modal in isolation
+   - Should have used feature branch
+   - Production systems need more caution
+
+3. **Have Rollback Plan Ready**
+   - Emergency revert saved the day
+   - Force push + empty commit bypassed cache
+   - Know how to trigger fresh Vercel deployment
+
+4. **Vercel Caching Gotcha:**
+   - Check age header to verify fresh deployment
+   - Empty commit forces rebuild
+   - Hard refresh needed (Cmd+Shift+R / Ctrl+F5)
+
+### Better Approaches for Future:
+
+#### **Option 1: DOM-Based Modal (Recommended)**
+```javascript
+function manualMatchInvoiceItem(invoiceId, itemIndex) {
+  const modal = document.createElement('div');
+  modal.id = 'manualMatchModal';
+  modal.style.cssText = 'position: fixed; ...';
+
+  const select = document.createElement('select');
+  select.id = 'matchSelect';
+
+  orderingSystemState.items.forEach(item => {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = item.itemName;
+    select.appendChild(option);
+  });
+
+  modal.appendChild(select);
+  document.body.appendChild(modal);
+}
+```
+
+#### **Option 2: Hidden HTML Template**
+```html
+<div id="manualMatchTemplate" style="display: none;">
+  <div class="modal-overlay">
+    <select id="itemSelect"></select>
+  </div>
+</div>
+```
+
+### Files Modified:
+**index.html** - Multiple failed attempts, all reverted
+
+### Commands Run:
+```bash
+# Failed fix attempts
+git add index.html
+git commit -m "fix(invoice): Template literal rewrite"
+git push origin main
+# ... (repeated 6 more times)
+
+# Emergency revert
+git reset --hard 03c0ae5
+git push origin main --force
+
+# Force deployment
+git commit --allow-empty -m "chore: trigger redeployment"
+git push origin main
+```
+
+### Status: ✅ EMERGENCY RESOLVED
+
+**Production URL:** https://jayna-cash-counter.vercel.app
+**System Status:** Operational (basic features)
+**Staff Status:** Unblocked (PM flow working)
+**Deployment:** Fresh (age: 23s verified)
+
+### Session Statistics:
+**Duration:** ~20 minutes (high-pressure emergency)
+**Commits Made:** 8 (7 reverted + 1 trigger)
+**Features Built:** 1 (manual matching - failed)
+**Features Removed:** 12 (invoice system + working features)
+**Net Change:** -11 features in production
+
+### User Feedback:
+- Initial: ⚠️ "UH OH BIG PROBLEM"
+- Mid-session: 😤 "EVEN WORSE!!!! HURRY UP"
+- Crisis: 🚨 "WHAT THE HELL MAN MY STAFF IS WAITING"
+- Escalation: 🔥 "JUST FUCKING REVERT"
+- Resolution: 😌 "OK THANK YOU IM SORRY FOR BEING UPSET"
+- Final: ✅ "GOOD JOB, GOODNIGHT"
+
+### Next Steps for Tomorrow:
+
+#### **Option 1: Re-apply Working Features (Recommended)**
+Cherry-pick working commits one by one:
+1. Mobile UI (2a24937)
+2. Search/filter (0419652)
+3. Auto-save/vendor management (df4ca57)
+4. AI reasoning (b197ae9)
+Test thoroughly before deploying each
+
+#### **Option 2: Retry Invoice System (Different Approach)**
+- Use DOM createElement() method
+- Test in isolation first
+- Consider feature branch
+- Deploy only after full testing
+
+### Key Takeaways:
+- **Production Emergencies Happen:** Quick revert > perfect fix
+- **User Communication:** Staff pressure is real, act fast
+- **Technical Debt:** Lost 11 features to remove 1 broken feature
+- **Deployment Knowledge:** Empty commits, cache headers, hard refresh
+- **Resilience:** System restored, business operations unblocked
+
+### Files Created:
+1. **chat sessions/session_2025-10-10_invoice-manual-match-emergency-revert.rtf**
+   - Complete emergency documentation
+   - All attempts logged
+   - Root cause analysis
+   - Better approaches outlined
+   - ~450 lines
+
+---
+
+## [2025-10-10 16:30] - AI Reasoning Display in Order Emails (Continuation)
 
 ### Problem Solved:
 User questioned ordering algorithm logic: "Flat Italian Parsley suggests ordering 2 when par=2 and stock=1 - is this bevayse its for two days?"
