@@ -1355,9 +1355,18 @@
 
         <!-- Tab Content: Update Counts -->
         <div id="updateCounts" class="tab-content" style="display: none;">
-          <div style="margin-bottom: 20px;">
-            <button class="submit-btn" onclick="saveAllStockCounts()" style="background: #2e7d32;">
-              Save All Changes
+          <!-- Mobile-optimized header controls -->
+          <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+            <button class="submit-btn" onclick="saveAllStockCounts()" style="background: #2e7d32; flex: 1; min-width: 150px;">
+              💾 Save All Changes
+            </button>
+            <button
+              class="submit-btn"
+              onclick="toggleCompactMode()"
+              style="background: #1e3c72; flex: 0 0 auto; padding: 12px 20px;"
+              title="Toggle compact view"
+            >
+              <span id="compactModeIcon">📋</span>
             </button>
           </div>
 
@@ -10136,8 +10145,8 @@
             ${isPrepCategory ? '🍳 ' : ''}${vendor} <span style="opacity: 0.85; font-weight: 400; font-size: 14px;">(${items.length})</span>
           </h4>
 
-          <!-- Mobile-first card grid -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px;">
+          <!-- Mobile-first card grid (responsive based on compact mode) -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(${isCompactMode ? '280px' : '320px'}, 1fr)); gap: ${isCompactMode ? '8px' : '12px'};">
             ${items.map((item) => {
               const status = getStockStatus(item.currentStock, item.parLevel);
               const lastCounted = formatLastCounted(item.lastCountedDate);
@@ -10146,8 +10155,8 @@
                 <div style="
                   background: white;
                   border: 1px solid #e0e0e0;
-                  border-radius: 8px;
-                  padding: 16px;
+                  border-radius: ${isCompactMode ? '6px' : '8px'};
+                  padding: ${isCompactMode ? '12px' : '16px'};
                   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
                   transition: box-shadow 0.2s;
                 "
@@ -10155,16 +10164,16 @@
                 onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'">
 
                   <!-- Header: Item Name + Status Badge -->
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 8px;">
-                    <div style="flex: 1; font-weight: 600; font-size: 15px; line-height: 1.3; color: #333;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: ${isCompactMode ? '8px' : '12px'}; gap: 8px;">
+                    <div style="flex: 1; font-weight: 600; font-size: ${isCompactMode ? '14px' : '15px'}; line-height: 1.3; color: #333;">
                       ${item.itemName}
                     </div>
                     <div style="
                       background: ${status.bg};
                       color: ${status.color};
-                      padding: 4px 10px;
+                      padding: ${isCompactMode ? '3px 8px' : '4px 10px'};
                       border-radius: 12px;
-                      font-size: 11px;
+                      font-size: ${isCompactMode ? '10px' : '11px'};
                       font-weight: 700;
                       white-space: nowrap;
                       letter-spacing: 0.3px;
@@ -10176,9 +10185,9 @@
                   <!-- Metadata Row -->
                   <div style="
                     display: flex;
-                    gap: 16px;
-                    margin-bottom: 12px;
-                    font-size: 13px;
+                    gap: ${isCompactMode ? '12px' : '16px'};
+                    margin-bottom: ${isCompactMode ? '8px' : '12px'};
+                    font-size: ${isCompactMode ? '12px' : '13px'};
                     color: #666;
                   ">
                     <div>
@@ -10187,40 +10196,112 @@
                     <div>
                       <span style="color: #999;">Par:</span> <strong>${item.parLevel}</strong>
                     </div>
-                    <div style="margin-left: auto; color: #999; font-size: 12px;">
+                    <div style="margin-left: auto; color: #999; font-size: ${isCompactMode ? '11px' : '12px'};">
                       ${lastCounted}
                     </div>
                   </div>
 
-                  <!-- Stock Input (Large Touch Target) -->
+                  <!-- Stock Input with Quick Adjustments (Mobile-Optimized) -->
                   <div>
-                    <label style="display: block; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 500;">
+                    <label style="display: block; font-size: 12px; color: #666; margin-bottom: 6px; font-weight: 500;">
                       Current Stock
                     </label>
-                    <input
-                      type="number"
-                      inputmode="decimal"
-                      id="stock-${item.id}"
-                      value="${item.currentStock}"
-                      min="0"
-                      step="0.25"
-                      onblur="autoSaveStockCount(${item.id}, this.value, this)"
+                    <!-- Input with Stepper Buttons -->
+                    <div style="display: flex; gap: 8px; align-items: stretch;">
+                      <!-- Decrement Button -->
+                      <button
+                        type="button"
+                        onclick="quickAdjustStock(${item.id}, -1)"
+                        style="
+                          flex: 0 0 50px;
+                          padding: 0;
+                          font-size: 28px;
+                          font-weight: 700;
+                          background: #f5f5f5;
+                          border: 2px solid #e0e0e0;
+                          border-radius: 8px;
+                          color: #666;
+                          cursor: pointer;
+                          transition: all 0.2s;
+                          min-height: 54px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                        onmousedown="this.style.background='#e0e0e0'; this.style.transform='scale(0.95)';"
+                        onmouseup="this.style.background='#f5f5f5'; this.style.transform='scale(1)';"
+                        onmouseleave="this.style.background='#f5f5f5'; this.style.transform='scale(1)';"
+                      >−</button>
+
+                      <!-- Stock Input Field -->
+                      <input
+                        type="number"
+                        inputmode="decimal"
+                        id="stock-${item.id}"
+                        value="${item.currentStock}"
+                        min="0"
+                        step="0.25"
+                        onblur="autoSaveStockCount(${item.id}, this.value, this)"
+                        onchange="autoSaveStockCount(${item.id}, this.value, this)"
+                        style="
+                          flex: 1;
+                          padding: 16px 12px;
+                          font-size: 24px;
+                          font-weight: 700;
+                          text-align: center;
+                          border: 3px solid #2e7d32;
+                          border-radius: 8px;
+                          background: #f9fdf9;
+                          color: #2e7d32;
+                          box-sizing: border-box;
+                          -webkit-appearance: none;
+                          -moz-appearance: textfield;
+                          min-height: 54px;
+                          transition: all 0.2s;
+                        "
+                        onfocus="this.style.borderColor='#1b5e20'; this.style.background='#ffffff'; this.select();"
+                        onblur="this.style.borderColor='#2e7d32'; this.style.background='#f9fdf9';"
+                      />
+
+                      <!-- Increment Button -->
+                      <button
+                        type="button"
+                        onclick="quickAdjustStock(${item.id}, 1)"
+                        style="
+                          flex: 0 0 50px;
+                          padding: 0;
+                          font-size: 28px;
+                          font-weight: 700;
+                          background: #2e7d32;
+                          border: 2px solid #2e7d32;
+                          border-radius: 8px;
+                          color: white;
+                          cursor: pointer;
+                          transition: all 0.2s;
+                          min-height: 54px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                        onmousedown="this.style.background='#1b5e20'; this.style.transform='scale(0.95)';"
+                        onmouseup="this.style.background='#2e7d32'; this.style.transform='scale(1)';"
+                        onmouseleave="this.style.background='#2e7d32'; this.style.transform='scale(1)';"
+                      >+</button>
+                    </div>
+
+                    <!-- Save Status Indicator -->
+                    <div
+                      id="save-status-${item.id}"
                       style="
-                        width: 100%;
-                        padding: 14px;
-                        font-size: 20px;
-                        font-weight: 600;
+                        margin-top: 6px;
+                        font-size: 11px;
                         text-align: center;
-                        border: 2px solid #2e7d32;
-                        border-radius: 6px;
-                        background: #f9fdf9;
-                        color: #2e7d32;
-                        box-sizing: border-box;
-                        -webkit-appearance: none;
-                        -moz-appearance: textfield;
+                        min-height: 16px;
+                        font-weight: 600;
+                        opacity: 0;
+                        transition: opacity 0.2s;
                       "
-                      onfocus="this.style.borderColor='#1b5e20'; this.style.background='#ffffff';"
-                    />
+                    ></div>
                   </div>
                 </div>
               `;
@@ -10410,8 +10491,8 @@
             ${isPrepCategory ? '🍳 ' : ''}${vendor} <span style="opacity: 0.85; font-weight: 400; font-size: 14px;">(${items.length})</span>
           </h4>
 
-          <!-- Mobile-first card grid -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px;">
+          <!-- Mobile-first card grid (responsive based on compact mode) -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(${isCompactMode ? '280px' : '320px'}, 1fr)); gap: ${isCompactMode ? '8px' : '12px'};">
             ${items.map((item) => {
               const status = getStockStatus(item.currentStock, item.parLevel);
               const lastCounted = formatLastCounted(item.lastCountedDate);
@@ -10420,8 +10501,8 @@
                 <div style="
                   background: white;
                   border: 1px solid #e0e0e0;
-                  border-radius: 8px;
-                  padding: 16px;
+                  border-radius: ${isCompactMode ? '6px' : '8px'};
+                  padding: ${isCompactMode ? '12px' : '16px'};
                   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
                   transition: box-shadow 0.2s;
                 "
@@ -10429,16 +10510,16 @@
                 onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'">
 
                   <!-- Header: Item Name + Status Badge -->
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 8px;">
-                    <div style="flex: 1; font-weight: 600; font-size: 15px; line-height: 1.3; color: #333;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: ${isCompactMode ? '8px' : '12px'}; gap: 8px;">
+                    <div style="flex: 1; font-weight: 600; font-size: ${isCompactMode ? '14px' : '15px'}; line-height: 1.3; color: #333;">
                       ${item.itemName}
                     </div>
                     <div style="
                       background: ${status.bg};
                       color: ${status.color};
-                      padding: 4px 10px;
+                      padding: ${isCompactMode ? '3px 8px' : '4px 10px'};
                       border-radius: 12px;
-                      font-size: 11px;
+                      font-size: ${isCompactMode ? '10px' : '11px'};
                       font-weight: 700;
                       white-space: nowrap;
                       letter-spacing: 0.3px;
@@ -10450,9 +10531,9 @@
                   <!-- Metadata Row -->
                   <div style="
                     display: flex;
-                    gap: 16px;
-                    margin-bottom: 12px;
-                    font-size: 13px;
+                    gap: ${isCompactMode ? '12px' : '16px'};
+                    margin-bottom: ${isCompactMode ? '8px' : '12px'};
+                    font-size: ${isCompactMode ? '12px' : '13px'};
                     color: #666;
                   ">
                     <div>
@@ -10461,40 +10542,112 @@
                     <div>
                       <span style="color: #999;">Par:</span> <strong>${item.parLevel}</strong>
                     </div>
-                    <div style="margin-left: auto; color: #999; font-size: 12px;">
+                    <div style="margin-left: auto; color: #999; font-size: ${isCompactMode ? '11px' : '12px'};">
                       ${lastCounted}
                     </div>
                   </div>
 
-                  <!-- Stock Input (Large Touch Target) -->
+                  <!-- Stock Input with Quick Adjustments (Mobile-Optimized) -->
                   <div>
-                    <label style="display: block; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 500;">
+                    <label style="display: block; font-size: 12px; color: #666; margin-bottom: 6px; font-weight: 500;">
                       Current Stock
                     </label>
-                    <input
-                      type="number"
-                      inputmode="decimal"
-                      id="stock-${item.id}"
-                      value="${item.currentStock}"
-                      min="0"
-                      step="0.25"
-                      onblur="autoSaveStockCount(${item.id}, this.value, this)"
+                    <!-- Input with Stepper Buttons -->
+                    <div style="display: flex; gap: 8px; align-items: stretch;">
+                      <!-- Decrement Button -->
+                      <button
+                        type="button"
+                        onclick="quickAdjustStock(${item.id}, -1)"
+                        style="
+                          flex: 0 0 50px;
+                          padding: 0;
+                          font-size: 28px;
+                          font-weight: 700;
+                          background: #f5f5f5;
+                          border: 2px solid #e0e0e0;
+                          border-radius: 8px;
+                          color: #666;
+                          cursor: pointer;
+                          transition: all 0.2s;
+                          min-height: 54px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                        onmousedown="this.style.background='#e0e0e0'; this.style.transform='scale(0.95)';"
+                        onmouseup="this.style.background='#f5f5f5'; this.style.transform='scale(1)';"
+                        onmouseleave="this.style.background='#f5f5f5'; this.style.transform='scale(1)';"
+                      >−</button>
+
+                      <!-- Stock Input Field -->
+                      <input
+                        type="number"
+                        inputmode="decimal"
+                        id="stock-${item.id}"
+                        value="${item.currentStock}"
+                        min="0"
+                        step="0.25"
+                        onblur="autoSaveStockCount(${item.id}, this.value, this)"
+                        onchange="autoSaveStockCount(${item.id}, this.value, this)"
+                        style="
+                          flex: 1;
+                          padding: 16px 12px;
+                          font-size: 24px;
+                          font-weight: 700;
+                          text-align: center;
+                          border: 3px solid #2e7d32;
+                          border-radius: 8px;
+                          background: #f9fdf9;
+                          color: #2e7d32;
+                          box-sizing: border-box;
+                          -webkit-appearance: none;
+                          -moz-appearance: textfield;
+                          min-height: 54px;
+                          transition: all 0.2s;
+                        "
+                        onfocus="this.style.borderColor='#1b5e20'; this.style.background='#ffffff'; this.select();"
+                        onblur="this.style.borderColor='#2e7d32'; this.style.background='#f9fdf9';"
+                      />
+
+                      <!-- Increment Button -->
+                      <button
+                        type="button"
+                        onclick="quickAdjustStock(${item.id}, 1)"
+                        style="
+                          flex: 0 0 50px;
+                          padding: 0;
+                          font-size: 28px;
+                          font-weight: 700;
+                          background: #2e7d32;
+                          border: 2px solid #2e7d32;
+                          border-radius: 8px;
+                          color: white;
+                          cursor: pointer;
+                          transition: all 0.2s;
+                          min-height: 54px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                        onmousedown="this.style.background='#1b5e20'; this.style.transform='scale(0.95)';"
+                        onmouseup="this.style.background='#2e7d32'; this.style.transform='scale(1)';"
+                        onmouseleave="this.style.background='#2e7d32'; this.style.transform='scale(1)';"
+                      >+</button>
+                    </div>
+
+                    <!-- Save Status Indicator -->
+                    <div
+                      id="save-status-${item.id}"
                       style="
-                        width: 100%;
-                        padding: 14px;
-                        font-size: 20px;
-                        font-weight: 600;
+                        margin-top: 6px;
+                        font-size: 11px;
                         text-align: center;
-                        border: 2px solid #2e7d32;
-                        border-radius: 6px;
-                        background: #f9fdf9;
-                        color: #2e7d32;
-                        box-sizing: border-box;
-                        -webkit-appearance: none;
-                        -moz-appearance: textfield;
+                        min-height: 16px;
+                        font-weight: 600;
+                        opacity: 0;
+                        transition: opacity 0.2s;
                       "
-                      onfocus="this.style.borderColor='#1b5e20'; this.style.background='#ffffff';"
-                    />
+                    ></div>
                   </div>
                 </div>
               `;
@@ -10556,9 +10709,18 @@
     // Visual feedback - saving state
     const originalBorder = inputElement.style.borderColor;
     const originalBg = inputElement.style.background;
+    const statusDiv = document.getElementById(`save-status-${itemId}`);
+
     inputElement.style.borderColor = '#ff9800';
     inputElement.style.background = '#fff3e0';
     inputElement.disabled = true;
+
+    // Show "Saving..." status
+    if (statusDiv) {
+      statusDiv.textContent = '💾 Saving...';
+      statusDiv.style.color = '#ff9800';
+      statusDiv.style.opacity = '1';
+    }
 
     try {
       const { error } = await supabase
@@ -10623,10 +10785,21 @@
       inputElement.style.borderColor = '#388e3c';
       inputElement.style.background = '#e8f5e9';
 
+      // Show "Saved!" status
+      if (statusDiv) {
+        statusDiv.textContent = '✓ Saved!';
+        statusDiv.style.color = '#388e3c';
+      }
+
       setTimeout(() => {
         inputElement.style.borderColor = '#2e7d32';
         inputElement.style.background = '#f9fdf9';
         inputElement.disabled = false;
+
+        // Fade out status message
+        if (statusDiv) {
+          statusDiv.style.opacity = '0';
+        }
       }, 800);
 
       // Recalculate orders in background
@@ -10638,13 +10811,61 @@
       inputElement.style.borderColor = '#d32f2f';
       inputElement.style.background = '#ffebee';
 
+      // Show error status
+      if (statusDiv) {
+        statusDiv.textContent = '✗ Failed';
+        statusDiv.style.color = '#d32f2f';
+      }
+
       setTimeout(() => {
         inputElement.style.borderColor = originalBorder;
         inputElement.style.background = originalBg;
         inputElement.disabled = false;
+
+        // Fade out error message
+        if (statusDiv) {
+          statusDiv.style.opacity = '0';
+        }
       }, 1000);
 
       showMessage(`Failed to save: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Quick adjust stock count with +/- buttons (Mobile-Optimized)
+   */
+  function quickAdjustStock(itemId, adjustment) {
+    const inputElement = document.getElementById(`stock-${itemId}`);
+    if (!inputElement) return;
+
+    const currentValue = parseFloat(inputElement.value) || 0;
+    const newValue = Math.max(0, currentValue + adjustment); // Don't go below 0
+
+    inputElement.value = newValue;
+
+    // Trigger auto-save
+    autoSaveStockCount(itemId, newValue, inputElement);
+  }
+
+  /**
+   * Toggle compact mode for Update Counts view
+   */
+  let isCompactMode = false;
+  function toggleCompactMode() {
+    isCompactMode = !isCompactMode;
+    const icon = document.getElementById('compactModeIcon');
+
+    if (isCompactMode) {
+      // Compact mode: smaller cards, tighter spacing
+      icon.textContent = '📱';
+      // Apply compact styles by re-rendering
+      renderStockCountList();
+    } else {
+      // Normal mode: larger cards, comfortable spacing
+      icon.textContent = '📋';
+      // Apply normal styles by re-rendering
+      renderStockCountList();
     }
   }
 
