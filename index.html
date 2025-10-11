@@ -1608,6 +1608,9 @@
             </div>
           </div>
 
+          <!-- Orders Due Today Alert (dynamically populated) -->
+          <div id="ordersDueTodayAlert"></div>
+
           <!-- Upload Section -->
           <div style="background: var(--gray-100); padding: 24px; border-radius: 0; margin-bottom: 24px; border: 2px solid var(--gray-300);">
             <div style="text-align: center;">
@@ -9759,7 +9762,8 @@
     // Invoice system state
     currentInvoiceImage: null,
     extractedInvoiceItems: [],
-    invoiceType: 'invoice' // 'invoice' or 'order'
+    invoiceType: 'invoice', // 'invoice' or 'order'
+    selectedPendingOrderId: null // For reconciliation against pending order
   };
 
   /**
@@ -9819,6 +9823,11 @@
     // Load pending orders when ORDERS tab is opened
     if (tabName === 'upcomingOrders') {
       renderPendingOrders();
+    }
+
+    // Load orders due today alert when CHECK-IN tab is opened
+    if (tabName === 'checkInInvoice') {
+      loadOrdersDueTodayAlert();
     }
   }
 
@@ -10011,6 +10020,102 @@
     } catch (error) {
       console.error('Error loading pending orders:', error);
       container.innerHTML = `<div style="text-align: center; padding: 40px;"><p style="color: #ef4444;">Error loading orders: ${error.message}</p></div>`;
+    }
+  }
+
+  /**
+   * Load and display orders due today alert on CHECK-IN tab
+   */
+  async function loadOrdersDueTodayAlert() {
+    const container = document.getElementById('ordersDueTodayAlert');
+    if (!container) return;
+
+    // Clear previous alert
+    container.innerHTML = '';
+
+    try {
+      // Fetch orders due today
+      const today = new Date().toISOString().split('T')[0];
+      const { data: orders, error } = await supabase
+        .from('pending_orders')
+        .select(`
+          *,
+          pending_order_items (
+            id,
+            inventory_item_id,
+            quantity_ordered,
+            unit,
+            item_name
+          )
+        `)
+        .eq('expected_delivery_date', today)
+        .eq('status', 'pending');
+
+      if (error) throw error;
+
+      if (!orders || orders.length === 0) {
+        // No orders due today - don't show anything
+        return;
+      }
+
+      console.log(`Found ${orders.length} order(s) due today`);
+
+      // Create alert box
+      const alert = document.createElement('div');
+      alert.style.cssText = 'background: #fef3c7; border: 2px solid #f59e0b; padding: 16px; margin-bottom: 24px;';
+
+      const header = document.createElement('div');
+      header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;';
+
+      const title = document.createElement('h4');
+      title.textContent = `⚠️ ${orders.length} ORDER(S) DUE TODAY`;
+      title.style.cssText = 'color: #92400e; margin: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+      header.appendChild(title);
+
+      alert.appendChild(header);
+
+      const description = document.createElement('p');
+      description.textContent = 'Select the order below when checking in delivery:';
+      description.style.cssText = 'color: #78350f; margin: 0 0 12px 0; font-size: 12px;';
+      alert.appendChild(description);
+
+      // List each order
+      orders.forEach(order => {
+        const orderCard = document.createElement('div');
+        orderCard.style.cssText = 'background: white; border: 2px solid #f59e0b; padding: 12px; margin-top: 8px; cursor: pointer; transition: background 0.2s;';
+        orderCard.onmouseover = () => orderCard.style.background = '#fffbeb';
+        orderCard.onmouseout = () => orderCard.style.background = 'white';
+
+        const vendorName = document.createElement('div');
+        vendorName.textContent = order.vendor;
+        vendorName.style.cssText = 'color: #92400e; font-size: 14px; font-weight: 700; margin-bottom: 4px;';
+        orderCard.appendChild(vendorName);
+
+        const itemCount = document.createElement('div');
+        itemCount.textContent = `${order.total_items} item(s) ordered`;
+        itemCount.style.cssText = 'color: #78350f; font-size: 11px;';
+        orderCard.appendChild(itemCount);
+
+        // Store order ID for future reconciliation
+        orderCard.onclick = () => {
+          orderingSystemState.selectedPendingOrderId = order.id;
+          showMessage(`✓ Selected ${order.vendor} order for reconciliation`, 'success');
+          // Highlight selected
+          document.querySelectorAll('#ordersDueTodayAlert > div > div').forEach(card => {
+            card.style.borderColor = '#f59e0b';
+            card.style.background = 'white';
+          });
+          orderCard.style.borderColor = '#92400e';
+          orderCard.style.background = '#fffbeb';
+        };
+
+        alert.appendChild(orderCard);
+      });
+
+      container.appendChild(alert);
+
+    } catch (error) {
+      console.error('Error loading orders due today:', error);
     }
   }
 
