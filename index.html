@@ -9513,7 +9513,9 @@
         parLevel: item.par_level || 0,
         currentStock: item.current_stock || 0,
         unit: item.unit,
-        lastCountedDate: item.last_counted_date
+        lastCountedDate: item.last_counted_date,
+        currentUnitCost: item.current_unit_cost,
+        lastCostUpdate: item.last_cost_update
       }));
 
       console.log('orderingSystemState.items:', orderingSystemState.items);
@@ -9586,7 +9588,10 @@
         quantity: Math.max(0, Math.ceil((item.parLevel - item.currentStock) * multiplier)),
         unit: item.unit,
         parLevel: item.parLevel,
-        currentStock: item.currentStock
+        currentStock: item.currentStock,
+        lastCountedDate: item.lastCountedDate,
+        currentUnitCost: item.currentUnitCost,
+        lastCostUpdate: item.lastCostUpdate
       }))
       .filter(item => item.quantity > 0);
 
@@ -9616,7 +9621,10 @@
         quantity: Math.max(0, item.parLevel - item.currentStock),
         unit: item.unit,
         parLevel: item.parLevel,
-        currentStock: item.currentStock
+        currentStock: item.currentStock,
+        lastCountedDate: item.lastCountedDate,
+        currentUnitCost: item.currentUnitCost,
+        lastCostUpdate: item.lastCostUpdate
       }))
       .filter(item => item.quantity > 0);
 
@@ -9649,7 +9657,10 @@
         quantity: Math.max(0, Math.ceil((item.parLevel - item.currentStock) * (multiplier / 7))),
         unit: item.unit,
         parLevel: item.parLevel,
-        currentStock: item.currentStock
+        currentStock: item.currentStock,
+        lastCountedDate: item.lastCountedDate,
+        currentUnitCost: item.currentUnitCost,
+        lastCostUpdate: item.lastCostUpdate
       }))
       .filter(item => item.quantity > 0);
 
@@ -9679,7 +9690,10 @@
         quantity: Math.max(0, item.parLevel - item.currentStock),
         unit: item.unit,
         parLevel: item.parLevel,
-        currentStock: item.currentStock
+        currentStock: item.currentStock,
+        lastCountedDate: item.lastCountedDate,
+        currentUnitCost: item.currentUnitCost,
+        lastCostUpdate: item.lastCostUpdate
       }))
       .filter(item => item.quantity > 0);
 
@@ -9696,6 +9710,45 @@
       items: items,
       notes: 'Delivery always on Thursday'
     };
+  }
+
+  /**
+   * Format timestamp as relative time (e.g., "2h ago", "5d ago")
+   * Matches email format
+   */
+  function formatRelativeTime(dateStr) {
+    if (!dateStr) return 'Never';
+
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays}d ago`;
+    } else {
+      return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+    }
+  }
+
+  /**
+   * Format price with date (e.g., "$24.38 (9/22/25)")
+   * Matches email format
+   */
+  function formatPriceWithDate(price, dateStr) {
+    if (!price) return '';
+
+    const formattedPrice = '$' + parseFloat(price).toFixed(2);
+
+    if (!dateStr) return formattedPrice;
+
+    const date = new Date(dateStr);
+    const formattedDate = date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+
+    return `${formattedPrice} (${formattedDate})`;
   }
 
   /**
@@ -9785,15 +9838,47 @@
               </tr>
             </thead>
             <tbody>
-              ${order.items.map((item, i) => `
+              ${order.items.map((item, i) => {
+                // Calculate reasoning text (matches email format)
+                const isFriday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Friday';
+                const isThursday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Thursday';
+                let reasoningText = '';
+
+                if (order.vendor === 'Greenleaf' && isFriday) {
+                  // Friday Greenleaf = 2-day coverage
+                  reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 2 days = ${item.quantity} to order`;
+                } else if (order.vendor === 'Mani Imports' && isThursday) {
+                  // Thursday Mani = 5-day coverage
+                  const calc = Math.ceil((item.parLevel - item.currentStock) * (5 / 7));
+                  reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 5/7 days = ${calc} to order`;
+                } else if (order.vendor === 'Mani Imports') {
+                  // Tuesday Mani = 3-day coverage
+                  const calc = Math.ceil((item.parLevel - item.currentStock) * (3 / 7));
+                  reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 3/7 days = ${calc} to order`;
+                } else {
+                  // Simple par-based calculation
+                  reasoningText = `AI: Par ${item.parLevel} - Stock ${item.currentStock} = ${item.quantity} to order`;
+                }
+
+                // Format last count and last price (matches email format)
+                const lastCountStr = item.lastCountedDate ? `Last count: ${formatRelativeTime(item.lastCountedDate)}` : '';
+                const lastPriceStr = item.currentUnitCost ? `Last price: ${formatPriceWithDate(item.currentUnitCost, item.lastCostUpdate)}` : '';
+
+                return `
                 <tr style="background: ${i % 2 === 0 ? '#f8f9fa' : 'white'};">
-                  <td style="padding: 10px; border: 1px solid #ddd;">${item.itemName}</td>
+                  <td style="padding: 10px; border: 1px solid #ddd;">
+                    ${item.itemName}
+                    ${lastCountStr ? `<div style="font-size: 11px; color: #999; margin-top: 2px;">${lastCountStr}</div>` : ''}
+                    ${lastPriceStr ? `<div style="font-size: 11px; color: #999; margin-top: 2px;">${lastPriceStr}</div>` : ''}
+                    <div style="font-size: 9px; color: #bbb; margin-top: 2px; font-style: italic;">${reasoningText}</div>
+                  </td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd; font-weight: bold; color: #d32f2f;">${item.quantity}</td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.unit}</td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.parLevel}</td>
                   <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">${item.currentStock}</td>
                 </tr>
-              `).join('')}
+                `;
+              }).join('')}
             </tbody>
           </table>
 
@@ -10802,14 +10887,43 @@
         doc.text(`Notes: ${order.notes}`, 20, 66);
       }
 
-      // Table
-      const tableData = order.items.map(item => [
-        item.itemName,
-        item.quantity.toString(),
-        item.unit,
-        item.parLevel.toString(),
-        item.currentStock.toString()
-      ]);
+      // Table with AI reasoning
+      const isFriday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Friday';
+      const isThursday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Thursday';
+
+      const tableData = order.items.map(item => {
+        // Calculate reasoning text (matches email format)
+        let reasoningText = '';
+        if (order.vendor === 'Greenleaf' && isFriday) {
+          reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 2 days = ${item.quantity} to order`;
+        } else if (order.vendor === 'Mani Imports' && isThursday) {
+          const calc = Math.ceil((item.parLevel - item.currentStock) * (5 / 7));
+          reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 5/7 days = ${calc} to order`;
+        } else if (order.vendor === 'Mani Imports') {
+          const calc = Math.ceil((item.parLevel - item.currentStock) * (3 / 7));
+          reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 3/7 days = ${calc} to order`;
+        } else {
+          reasoningText = `AI: Par ${item.parLevel} - Stock ${item.currentStock} = ${item.quantity} to order`;
+        }
+
+        // Format last count and last price (matches email format)
+        const lastCountStr = item.lastCountedDate ? `Last count: ${formatRelativeTime(item.lastCountedDate)}` : '';
+        const lastPriceStr = item.currentUnitCost ? `Last price: ${formatPriceWithDate(item.currentUnitCost, item.lastCostUpdate)}` : '';
+
+        // Combine all metadata
+        let itemNameWithMetadata = item.itemName;
+        if (lastCountStr) itemNameWithMetadata += '\n' + lastCountStr;
+        if (lastPriceStr) itemNameWithMetadata += '\n' + lastPriceStr;
+        itemNameWithMetadata += '\n' + reasoningText;
+
+        return [
+          itemNameWithMetadata,
+          item.quantity.toString(),
+          item.unit,
+          item.parLevel.toString(),
+          item.currentStock.toString()
+        ];
+      });
 
       doc.autoTable({
         head: [['Item', 'Qty to Order', 'Unit', 'Par Level', 'Current Stock']],
@@ -10817,7 +10931,46 @@
         startY: order.notes ? 75 : 68,
         theme: 'grid',
         headStyles: { fillColor: [30, 60, 114] },
-        styles: { fontSize: 9 }
+        styles: { fontSize: 9 },
+        didDrawCell: function(data) {
+          // Custom rendering for Item column with metadata
+          if (data.column.index === 0 && data.cell.section === 'body') {
+            const text = data.cell.text;
+            if (text.length > 1) {
+              // Clear the cell
+              data.cell.text = [];
+
+              let yPos = data.cell.y + 4;
+              const lineHeight = 4;
+
+              // Draw each line with appropriate styling
+              text.forEach((line, index) => {
+                if (index === 0) {
+                  // Item name - normal size, black
+                  doc.setFontSize(9);
+                  doc.setTextColor(0, 0, 0);
+                  doc.text(line, data.cell.x + 2, yPos);
+                } else if (line.startsWith('Last count:') || line.startsWith('Last price:')) {
+                  // Metadata - smaller, gray
+                  doc.setFontSize(8);
+                  doc.setTextColor(120, 120, 120);
+                  doc.text(line, data.cell.x + 2, yPos);
+                } else if (line.startsWith('AI:')) {
+                  // Reasoning - smallest, light gray, italic
+                  doc.setFontSize(7);
+                  doc.setFont('helvetica', 'italic');
+                  doc.setTextColor(170, 170, 170);
+                  doc.text(line, data.cell.x + 2, yPos);
+                  doc.setFont('helvetica', 'normal');
+                }
+                yPos += lineHeight;
+              });
+
+              // Reset text color
+              doc.setTextColor(0, 0, 0);
+            }
+          }
+        }
       });
 
       // Footer
@@ -10888,14 +11041,43 @@
           doc.text(`Notes: ${order.notes}`, 20, 56);
         }
 
-        // Table
-        const tableData = order.items.map(item => [
-          item.itemName,
-          item.quantity.toString(),
-          item.unit,
-          item.parLevel.toString(),
-          item.currentStock.toString()
-        ]);
+        // Table with AI reasoning
+        const isFriday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Friday';
+        const isThursday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Thursday';
+
+        const tableData = order.items.map(item => {
+          // Calculate reasoning text (matches email format)
+          let reasoningText = '';
+          if (order.vendor === 'Greenleaf' && isFriday) {
+            reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 2 days = ${item.quantity} to order`;
+          } else if (order.vendor === 'Mani Imports' && isThursday) {
+            const calc = Math.ceil((item.parLevel - item.currentStock) * (5 / 7));
+            reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 5/7 days = ${calc} to order`;
+          } else if (order.vendor === 'Mani Imports') {
+            const calc = Math.ceil((item.parLevel - item.currentStock) * (3 / 7));
+            reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 3/7 days = ${calc} to order`;
+          } else {
+            reasoningText = `AI: Par ${item.parLevel} - Stock ${item.currentStock} = ${item.quantity} to order`;
+          }
+
+          // Format last count and last price (matches email format)
+          const lastCountStr = item.lastCountedDate ? `Last count: ${formatRelativeTime(item.lastCountedDate)}` : '';
+          const lastPriceStr = item.currentUnitCost ? `Last price: ${formatPriceWithDate(item.currentUnitCost, item.lastCostUpdate)}` : '';
+
+          // Combine all metadata
+          let itemNameWithMetadata = item.itemName;
+          if (lastCountStr) itemNameWithMetadata += '\n' + lastCountStr;
+          if (lastPriceStr) itemNameWithMetadata += '\n' + lastPriceStr;
+          itemNameWithMetadata += '\n' + reasoningText;
+
+          return [
+            itemNameWithMetadata,
+            item.quantity.toString(),
+            item.unit,
+            item.parLevel.toString(),
+            item.currentStock.toString()
+          ];
+        });
 
         doc.autoTable({
           head: [['Item', 'Qty', 'Unit', 'Par', 'Stock']],
@@ -10903,7 +11085,46 @@
           startY: order.notes ? 65 : 58,
           theme: 'grid',
           headStyles: { fillColor: [30, 60, 114] },
-          styles: { fontSize: 9 }
+          styles: { fontSize: 9 },
+          didDrawCell: function(data) {
+            // Custom rendering for Item column with metadata
+            if (data.column.index === 0 && data.cell.section === 'body') {
+              const text = data.cell.text;
+              if (text.length > 1) {
+                // Clear the cell
+                data.cell.text = [];
+
+                let yPos = data.cell.y + 4;
+                const lineHeight = 4;
+
+                // Draw each line with appropriate styling
+                text.forEach((line, index) => {
+                  if (index === 0) {
+                    // Item name - normal size, black
+                    doc.setFontSize(9);
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(line, data.cell.x + 2, yPos);
+                  } else if (line.startsWith('Last count:') || line.startsWith('Last price:')) {
+                    // Metadata - smaller, gray
+                    doc.setFontSize(8);
+                    doc.setTextColor(120, 120, 120);
+                    doc.text(line, data.cell.x + 2, yPos);
+                  } else if (line.startsWith('AI:')) {
+                    // Reasoning - smallest, light gray, italic
+                    doc.setFontSize(7);
+                    doc.setFont('helvetica', 'italic');
+                    doc.setTextColor(170, 170, 170);
+                    doc.text(line, data.cell.x + 2, yPos);
+                    doc.setFont('helvetica', 'normal');
+                  }
+                  yPos += lineHeight;
+                });
+
+                // Reset text color
+                doc.setTextColor(0, 0, 0);
+              }
+            }
+          }
         });
       });
 
