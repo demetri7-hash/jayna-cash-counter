@@ -9820,9 +9820,9 @@
       updateCountSessionDisplay(); // Update session info each time PREP tab is opened
     }
 
-    // Load pending orders when ORDERS tab is opened
+    // Load both pending orders AND AI suggestions when ORDERS tab is opened
     if (tabName === 'upcomingOrders') {
-      renderPendingOrders();
+      renderOrdersTab();
     }
 
     // Load orders due today alert when CHECK-IN tab is opened
@@ -9832,13 +9832,44 @@
   }
 
   /**
-   * Render pending orders on ORDERS tab
+   * Render complete ORDERS tab (pending orders + AI suggestions)
    */
-  async function renderPendingOrders() {
-    console.log('Rendering pending orders...');
+  async function renderOrdersTab() {
     const container = document.getElementById('upcomingOrders');
+    container.innerHTML = '<div style="text-align: center; padding: 40px;"><p style="color: var(--gray-500);">Loading...</p></div>';
 
-    // Show loading state
+    // Create wrapper for both sections
+    const wrapper = document.createElement('div');
+
+    // Section 1: Pending Orders
+    const pendingSection = document.createElement('div');
+    pendingSection.id = 'pendingOrdersSection';
+    wrapper.appendChild(pendingSection);
+
+    // Section 2: AI Suggestions
+    const aiSection = document.createElement('div');
+    aiSection.id = 'aiSuggestionsSection';
+    aiSection.style.cssText = 'margin-top: 40px;';
+    wrapper.appendChild(aiSection);
+
+    // Replace container content
+    container.innerHTML = '';
+    container.appendChild(wrapper);
+
+    // Load both sections
+    await renderPendingOrders(pendingSection);
+    calculateUpcomingOrders();
+    renderUpcomingOrders(aiSection); // Render AI suggestions into AI section
+  }
+
+  /**
+   * Render pending orders section
+   */
+  async function renderPendingOrders(targetContainer) {
+    const container = targetContainer || document.getElementById('pendingOrdersSection');
+    console.log('Rendering pending orders...');
+
+    // Show loading state (only if no target container provided)
     container.innerHTML = '<div style="text-align: center; padding: 40px;"><p style="color: var(--gray-500);">Loading pending orders...</p></div>';
 
     try {
@@ -9866,6 +9897,22 @@
 
       // Clear container
       container.innerHTML = '';
+
+      // Add section header
+      const header = document.createElement('div');
+      header.style.cssText = 'margin-bottom: 20px; padding-bottom: 12px; border-bottom: 3px solid var(--gray-300);';
+
+      const title = document.createElement('h3');
+      title.textContent = 'PENDING ORDERS';
+      title.style.cssText = 'color: var(--gray-900); margin: 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+      header.appendChild(title);
+
+      const subtitle = document.createElement('p');
+      subtitle.textContent = 'Orders you\'ve created that are awaiting delivery';
+      subtitle.style.cssText = 'color: var(--gray-600); font-size: 12px; margin: 8px 0 0 0;';
+      header.appendChild(subtitle);
+
+      container.appendChild(header);
 
       // Group orders by delivery status
       const today = new Date().toISOString().split('T')[0];
@@ -10414,22 +10461,31 @@
   }
 
   /**
-   * Render upcoming orders
+   * Render upcoming orders (AI suggestions)
    */
-  function renderUpcomingOrders() {
-    const container = document.getElementById('upcomingOrders');
+  function renderUpcomingOrders(targetContainer) {
+    const container = targetContainer || document.getElementById('upcomingOrders');
+
+    // Add section header
+    let html = `
+      <div style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 3px solid var(--gray-300);">
+        <h3 style="color: var(--gray-900); margin: 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">AI-SUGGESTED ORDERS</h3>
+        <p style="color: var(--gray-600); font-size: 12px; margin: 8px 0 0 0;">Based on current stock levels and par requirements</p>
+      </div>
+    `;
 
     if (orderingSystemState.calculatedOrders.length === 0) {
-      container.innerHTML = `
+      html += `
         <div style="text-align: center; padding: 40px; background: #f0f4f8; border-radius: 4px;">
           <p style="font-size: 16px; color: #666;">✅ No orders needed in the next 7 days!</p>
           <p style="font-size: 14px; color: #999; margin-top: 10px;">All inventory levels are sufficient.</p>
         </div>
       `;
+      container.innerHTML = html;
       return;
     }
 
-    let html = `
+    html += `
       <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
         <button class="submit-btn" onclick="generateAllPDFs()" style="background: #d32f2f;">
           📄 Generate All PDFs
