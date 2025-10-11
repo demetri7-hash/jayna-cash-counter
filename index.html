@@ -13864,6 +13864,319 @@
   }
 
   /**
+   * Show reconciliation view comparing ordered vs received items
+   */
+  async function showReconciliationView(pendingOrderId, receivedItems) {
+    console.log('Loading pending order for reconciliation...', pendingOrderId);
+    showLoading('Loading Order', 'Fetching order details...');
+
+    try {
+      // Fetch pending order with items
+      const { data: orderData, error: orderError } = await supabase
+        .from('pending_orders')
+        .select(`
+          *,
+          pending_order_items (
+            id,
+            inventory_item_id,
+            quantity_ordered,
+            unit,
+            item_name,
+            vendor
+          )
+        `)
+        .eq('id', pendingOrderId)
+        .single();
+
+      if (orderError) throw orderError;
+      if (!orderData) throw new Error('Order not found');
+
+      hideLoading();
+
+      console.log('Loaded pending order:', orderData);
+
+      // Match received items to ordered items
+      const reconciliationData = orderData.pending_order_items.map(orderedItem => {
+        // Find matching received item
+        const receivedItem = receivedItems.find(r => r.matchedInventoryId === orderedItem.inventory_item_id);
+
+        return {
+          orderItemId: orderedItem.id,
+          inventoryItemId: orderedItem.inventory_item_id,
+          itemName: orderedItem.item_name,
+          unit: orderedItem.unit,
+          quantityOrdered: orderedItem.quantity_ordered,
+          quantityReceived: receivedItem ? receivedItem.detectedQuantity : 0,
+          variance: receivedItem ? (receivedItem.detectedQuantity - orderedItem.quantity_ordered) : -orderedItem.quantity_ordered,
+          hasReceived: !!receivedItem
+        };
+      });
+
+      // Create modal
+      const overlay = document.createElement('div');
+      overlay.id = 'reconciliationModal';
+      overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 10000; padding: 0; overflow-y: auto;';
+
+      const modal = document.createElement('div');
+      modal.style.cssText = 'background: white; max-width: 800px; width: 100%; margin: 20px auto; border: 2px solid var(--gray-400);';
+
+      // Responsive: full screen on mobile
+      if (window.innerWidth <= 600) {
+        modal.style.maxWidth = '100%';
+        modal.style.margin = '0';
+        modal.style.minHeight = '100vh';
+      }
+
+      // Header (sticky)
+      const header = document.createElement('div');
+      header.style.cssText = 'background: #212121; color: white; padding: 16px 20px; position: sticky; top: 0; z-index: 10;';
+
+      const title = document.createElement('h3');
+      title.textContent = `RECONCILE ORDER - ${orderData.vendor}`;
+      title.style.cssText = 'margin: 0 0 4px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+      header.appendChild(title);
+
+      const subtitle = document.createElement('p');
+      subtitle.textContent = `Expected: ${new Date(orderData.expected_delivery_date).toLocaleDateString()} | ${reconciliationData.length} item(s)`;
+      subtitle.style.cssText = 'margin: 0; font-size: 11px; color: #b0b0b0;';
+      header.appendChild(subtitle);
+
+      modal.appendChild(header);
+
+      // Content (scrollable)
+      const content = document.createElement('div');
+      content.style.cssText = 'padding: 20px; max-height: calc(100vh - 200px); overflow-y: auto;';
+
+      // Instructions
+      const instructions = document.createElement('p');
+      instructions.textContent = 'Review the quantities below. Update received amounts if needed, then confirm to complete check-in.';
+      instructions.style.cssText = 'color: var(--gray-600); font-size: 12px; margin-bottom: 20px; padding: 12px; background: #f3f4f6; border-left: 3px solid var(--gray-400);';
+      content.appendChild(instructions);
+
+      // Table
+      const table = document.createElement('div');
+      table.style.cssText = 'border: 2px solid var(--gray-300);';
+
+      // Table header
+      const headerRow = document.createElement('div');
+      headerRow.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 10px; background: var(--gray-100); border-bottom: 2px solid var(--gray-300); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-700);';
+
+      ['ITEM', 'ORDERED', 'RECEIVED', 'VARIANCE'].forEach(label => {
+        const cell = document.createElement('div');
+        cell.textContent = label;
+        cell.style.textAlign = label === 'ITEM' ? 'left' : 'center';
+        headerRow.appendChild(cell);
+      });
+      table.appendChild(headerRow);
+
+      // Table rows
+      reconciliationData.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.style.cssText = `display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 12px 10px; background: ${index % 2 === 0 ? 'white' : '#f9fafb'}; border-bottom: 1px solid var(--gray-200); align-items: center;`;
+
+        // Item name
+        const nameCell = document.createElement('div');
+        nameCell.textContent = item.itemName;
+        nameCell.style.cssText = 'font-size: 13px; font-weight: 600; color: var(--gray-900);';
+        row.appendChild(nameCell);
+
+        // Ordered quantity
+        const orderedCell = document.createElement('div');
+        orderedCell.textContent = `${item.quantityOrdered} ${item.unit}`;
+        orderedCell.style.cssText = 'text-align: center; font-size: 13px; color: var(--gray-700);';
+        row.appendChild(orderedCell);
+
+        // Received quantity (editable)
+        const receivedCell = document.createElement('div');
+        receivedCell.style.cssText = 'text-align: center;';
+
+        const receivedInput = document.createElement('input');
+        receivedInput.type = 'number';
+        receivedInput.value = item.quantityReceived;
+        receivedInput.step = '0.25';
+        receivedInput.min = '0';
+        receivedInput.id = `received-${item.orderItemId}`;
+        receivedInput.style.cssText = 'width: 70px; padding: 6px; border: 2px solid var(--gray-300); border-radius: 0; text-align: center; font-size: 13px; font-weight: 600;';
+        receivedInput.onchange = () => {
+          // Recalculate variance
+          const newReceived = parseFloat(receivedInput.value) || 0;
+          const newVariance = newReceived - item.quantityOrdered;
+          varianceCell.textContent = newVariance >= 0 ? `+${newVariance.toFixed(2)}` : newVariance.toFixed(2);
+
+          // Update color
+          if (newVariance < 0) {
+            varianceCell.style.color = '#ef4444'; // Red
+          } else if (newVariance > 0) {
+            varianceCell.style.color = '#10b981'; // Green
+          } else {
+            varianceCell.style.color = 'var(--gray-600)'; // Gray
+          }
+
+          // Update item data
+          item.quantityReceived = newReceived;
+          item.variance = newVariance;
+        };
+        receivedCell.appendChild(receivedInput);
+        row.appendChild(receivedCell);
+
+        // Variance
+        const varianceCell = document.createElement('div');
+        varianceCell.textContent = item.variance >= 0 ? `+${item.variance.toFixed(2)}` : item.variance.toFixed(2);
+        varianceCell.style.cssText = 'text-align: center; font-size: 13px; font-weight: 700;';
+        if (item.variance < 0) {
+          varianceCell.style.color = '#ef4444'; // Red - short
+        } else if (item.variance > 0) {
+          varianceCell.style.color = '#10b981'; // Green - over
+        } else {
+          varianceCell.style.color = 'var(--gray-600)'; // Gray - exact
+        }
+        row.appendChild(varianceCell);
+
+        table.appendChild(row);
+      });
+
+      content.appendChild(table);
+      modal.appendChild(content);
+
+      // Footer buttons (sticky)
+      const footer = document.createElement('div');
+      footer.style.cssText = 'padding: 16px 20px; background: white; border-top: 2px solid var(--gray-300); display: flex; gap: 12px; position: sticky; bottom: 0;';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'CANCEL';
+      cancelBtn.style.cssText = 'flex: 1; padding: 14px; background: white; color: var(--gray-700); border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
+      cancelBtn.onclick = () => document.body.removeChild(overlay);
+      footer.appendChild(cancelBtn);
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.textContent = 'CONFIRM RECONCILIATION';
+      confirmBtn.style.cssText = 'flex: 2; padding: 14px; background: #212121; color: white; border: 2px solid #212121; border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
+      confirmBtn.onclick = async () => {
+        await completeReconciliation(pendingOrderId, orderData, reconciliationData, overlay);
+      };
+      footer.appendChild(confirmBtn);
+
+      modal.appendChild(footer);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error loading order for reconciliation:', error);
+      showMessage('Failed to load order: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Complete reconciliation and update database
+   */
+  async function completeReconciliation(pendingOrderId, orderData, reconciliationData, modalOverlay) {
+    showLoading('Reconciling Order', 'Updating inventory and order status...');
+
+    try {
+      // Update each order item with received quantities
+      for (const item of reconciliationData) {
+        const { error: updateError } = await supabase
+          .from('pending_order_items')
+          .update({
+            quantity_received: item.quantityReceived,
+            variance: item.variance
+          })
+          .eq('id', item.orderItemId);
+
+        if (updateError) throw updateError;
+
+        // Update inventory stock with received amount
+        if (item.quantityReceived > 0) {
+          const { data: currentItem, error: fetchError } = await supabase
+            .from('inventory_items')
+            .select('current_stock')
+            .eq('id', item.inventoryItemId)
+            .single();
+
+          if (fetchError) throw fetchError;
+
+          const newStock = (parseFloat(currentItem.current_stock) || 0) + item.quantityReceived;
+
+          const { error: stockError } = await supabase
+            .from('inventory_items')
+            .update({
+              current_stock: newStock,
+              last_counted_date: new Date().toISOString().split('T')[0]
+            })
+            .eq('id', item.inventoryItemId);
+
+          if (stockError) throw stockError;
+        }
+      }
+
+      // Determine order status (delivered or partial)
+      const allReceived = reconciliationData.every(item => item.variance === 0);
+      const noneReceived = reconciliationData.every(item => item.quantityReceived === 0);
+      const newStatus = noneReceived ? 'pending' : (allReceived ? 'delivered' : 'partial');
+
+      // Update pending order status
+      const { error: orderError } = await supabase
+        .from('pending_orders')
+        .update({
+          status: newStatus,
+          reconciled: true,
+          reconciled_at: new Date().toISOString(),
+          reconciled_by: 'System'
+        })
+        .eq('id', pendingOrderId);
+
+      if (orderError) throw orderError;
+
+      // Create invoice record linked to this order
+      const { data: invoiceData, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          vendor: orderData.vendor,
+          invoice_date: new Date().toISOString().split('T')[0],
+          invoice_type: 'invoice',
+          pending_order_id: pendingOrderId,
+          total_items: reconciliationData.filter(i => i.quantityReceived > 0).length,
+          processed_by: 'System',
+          notes: 'Reconciled against pending order'
+        })
+        .select()
+        .single();
+
+      if (invoiceError) throw invoiceError;
+
+      hideLoading();
+
+      // Close modal
+      document.body.removeChild(modalOverlay);
+
+      // Clear state
+      orderingSystemState.extractedInvoiceItems = [];
+      orderingSystemState.currentInvoiceImage = null;
+      orderingSystemState.selectedPendingOrderId = null;
+
+      // Clear displays
+      const container = document.getElementById('extractedInvoiceItems');
+      if (container) container.innerHTML = '';
+
+      const preview = document.getElementById('invoiceImagePreview');
+      if (preview) preview.innerHTML = '';
+
+      // Reload inventory
+      await loadInventoryData();
+
+      showMessage(`✅ Order reconciled! Status: ${newStatus.toUpperCase()}`, 'success');
+
+      console.log('✅ Reconciliation completed successfully');
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error completing reconciliation:', error);
+      showMessage('Failed to complete reconciliation: ' + error.message, 'error');
+    }
+  }
+
+  /**
    * Check in invoice items and update inventory
    * Handles both invoice reconciliation and order receiving flows
    */
@@ -13893,6 +14206,13 @@
     if (matchedItems.length === 0) {
       // No matched items, just show add new items modal
       showAddNewItemsModal(newItems);
+      return;
+    }
+
+    // Check if reconciliation against pending order is needed
+    if (orderingSystemState.selectedPendingOrderId) {
+      console.log('Reconciliation mode: pending order ID', orderingSystemState.selectedPendingOrderId);
+      showReconciliationView(orderingSystemState.selectedPendingOrderId, matchedItems);
       return;
     }
 
