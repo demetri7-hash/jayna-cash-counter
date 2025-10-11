@@ -10279,7 +10279,16 @@
       }
     }
 
-    orderingSystemState.calculatedOrders = orders;
+    // Filter to only show NEXT order per vendor (not all 7 days)
+    const nextOrdersByVendor = {};
+    orders.forEach(order => {
+      if (!nextOrdersByVendor[order.vendor] || order.orderDate < nextOrdersByVendor[order.vendor].orderDate) {
+        nextOrdersByVendor[order.vendor] = order;
+      }
+    });
+
+    orderingSystemState.calculatedOrders = Object.values(nextOrdersByVendor);
+    console.log('Filtered to next order per vendor:', orderingSystemState.calculatedOrders.length, 'orders');
     renderUpcomingOrders();
   }
 
@@ -10608,12 +10617,15 @@
             </tbody>
           </table>
 
-          <div style="margin-top: 20px; display: flex; gap: 10px;">
-            <button class="submit-btn" onclick="printOrder(${index})" style="flex: 1; background: #2e7d32;">
+          <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="submit-btn" onclick="printOrder(${index})" style="flex: 1; min-width: 140px; background: #2e7d32;">
               🖨️ Print Order
             </button>
-            <button class="submit-btn" onclick="generateOrderPDF(${index})" style="flex: 1; background: #d32f2f;">
+            <button class="submit-btn" onclick="generateOrderPDF(${index})" style="flex: 1; min-width: 140px; background: #d32f2f;">
               📄 Generate PDF
+            </button>
+            <button class="submit-btn" onclick="createOrderForReceiving(${index})" style="flex: 1; min-width: 200px; background: #212121; color: white; font-weight: 700;">
+              📦 CREATE ORDER FOR RECEIVING
             </button>
           </div>
         </div>
@@ -10621,6 +10633,190 @@
     });
 
     container.innerHTML = html;
+  }
+
+  /**
+   * Create pending order from AI suggestion
+   */
+  async function createOrderForReceiving(orderIndex) {
+    const order = orderingSystemState.calculatedOrders[orderIndex];
+    if (!order) {
+      showMessage('Order not found', 'error');
+      return;
+    }
+
+    console.log('Creating order for receiving:', order);
+
+    // Create confirmation modal
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background: white; max-width: 600px; width: 100%; border: 2px solid var(--gray-400); max-height: 90vh; overflow-y: auto;';
+
+    // Header
+    const header = document.createElement('div');
+    header.style.cssText = 'background: #212121; color: white; padding: 16px 20px;';
+
+    const title = document.createElement('h3');
+    title.textContent = `CREATE ORDER - ${order.vendor}`;
+    title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+    header.appendChild(title);
+
+    modal.appendChild(header);
+
+    // Content
+    const content = document.createElement('div');
+    content.style.cssText = 'padding: 20px;';
+
+    const instructions = document.createElement('p');
+    instructions.textContent = 'This will create an order that can be checked in when it arrives. Confirm the delivery date below:';
+    instructions.style.cssText = 'color: var(--gray-600); font-size: 13px; margin-bottom: 20px;';
+    content.appendChild(instructions);
+
+    // Order details
+    const detailsBox = document.createElement('div');
+    detailsBox.style.cssText = 'background: #f9fafb; padding: 16px; border: 2px solid var(--gray-300); margin-bottom: 20px;';
+
+    const orderDateLabel = document.createElement('div');
+    orderDateLabel.textContent = 'Order Date:';
+    orderDateLabel.style.cssText = 'font-size: 11px; font-weight: 700; color: var(--gray-700); margin-bottom: 4px; text-transform: uppercase;';
+    detailsBox.appendChild(orderDateLabel);
+
+    const orderDateValue = document.createElement('div');
+    orderDateValue.textContent = order.orderDate.toLocaleDateString();
+    orderDateValue.style.cssText = 'font-size: 14px; color: var(--gray-900); margin-bottom: 12px;';
+    detailsBox.appendChild(orderDateValue);
+
+    const itemsLabel = document.createElement('div');
+    itemsLabel.textContent = 'Items:';
+    itemsLabel.style.cssText = 'font-size: 11px; font-weight: 700; color: var(--gray-700); margin-bottom: 4px; text-transform: uppercase;';
+    detailsBox.appendChild(itemsLabel);
+
+    const itemsValue = document.createElement('div');
+    itemsValue.textContent = `${order.items.length} item(s) to order`;
+    itemsValue.style.cssText = 'font-size: 14px; color: var(--gray-900);';
+    detailsBox.appendChild(itemsValue);
+
+    content.appendChild(detailsBox);
+
+    // Delivery date input
+    const dateLabel = document.createElement('label');
+    dateLabel.textContent = 'EXPECTED DELIVERY DATE:';
+    dateLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;';
+    content.appendChild(dateLabel);
+
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.id = 'createOrderDeliveryDate';
+    dateInput.value = order.deliveryDate.toISOString().split('T')[0];
+    dateInput.min = new Date().toISOString().split('T')[0];
+    dateInput.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; margin-bottom: 20px;';
+    content.appendChild(dateInput);
+
+    // Notes
+    const notesLabel = document.createElement('label');
+    notesLabel.textContent = 'NOTES (OPTIONAL):';
+    notesLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;';
+    content.appendChild(notesLabel);
+
+    const notesInput = document.createElement('textarea');
+    notesInput.id = 'createOrderNotes';
+    notesInput.placeholder = 'Add any special instructions...';
+    notesInput.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; min-height: 80px; font-family: inherit;';
+    if (order.notes) notesInput.value = order.notes;
+    content.appendChild(notesInput);
+
+    modal.appendChild(content);
+
+    // Footer
+    const footer = document.createElement('div');
+    footer.style.cssText = 'padding: 16px 20px; background: white; border-top: 2px solid var(--gray-300); display: flex; gap: 12px;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = 'flex: 1; padding: 14px; background: white; color: var(--gray-700); border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
+    cancelBtn.onclick = () => document.body.removeChild(overlay);
+    footer.appendChild(cancelBtn);
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = 'CREATE ORDER';
+    confirmBtn.style.cssText = 'flex: 2; padding: 14px; background: #212121; color: white; border: 2px solid #212121; border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
+    confirmBtn.onclick = async () => {
+      await saveAIPendingOrder(order, dateInput.value, notesInput.value, overlay);
+    };
+    footer.appendChild(confirmBtn);
+
+    modal.appendChild(footer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+
+  /**
+   * Save AI-suggested order as pending order
+   */
+  async function saveAIPendingOrder(order, deliveryDate, notes, modalOverlay) {
+    if (!deliveryDate) {
+      showMessage('Please select a delivery date', 'warning');
+      return;
+    }
+
+    showLoading('Creating Order', 'Saving order for receiving...');
+
+    try {
+      // Create pending order record
+      const { data: orderData, error: orderError } = await supabase
+        .from('pending_orders')
+        .insert({
+          vendor: order.vendor,
+          order_date: order.orderDate.toISOString().split('T')[0],
+          expected_delivery_date: deliveryDate,
+          status: 'pending',
+          created_by: 'System (AI Suggestion)',
+          notes: notes || `Cutoff: ${order.cutoffTime}`,
+          total_items: order.items.length
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const orderId = orderData.id;
+      console.log('Created pending order from AI suggestion:', orderId);
+
+      // Create order items
+      const orderItems = order.items.map(item => ({
+        order_id: orderId,
+        inventory_item_id: item.id,
+        quantity_ordered: item.quantity,
+        unit: item.unit,
+        item_name: item.itemName,
+        vendor: order.vendor
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('pending_order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      hideLoading();
+
+      // Close modal
+      document.body.removeChild(modalOverlay);
+
+      showMessage(`✅ Order created! ${order.items.length} items from ${order.vendor}`, 'success');
+
+      // Refresh the ORDERS tab to show the new pending order
+      renderOrdersTab();
+
+      console.log('✅ AI order converted to pending order successfully');
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error creating pending order:', error);
+      showMessage('Failed to create order: ' + error.message, 'error');
+    }
   }
 
   /**
