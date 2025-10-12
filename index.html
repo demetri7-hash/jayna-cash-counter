@@ -13900,10 +13900,10 @@
       const recommendValue = item.recommendedAmount > 0 ? String(item.recommendedAmount) : '—';
 
       return [
-        `${item.itemName}\nLast count: ${lastCountStr}`,
-        `${stockDisplay}\nCurrent`,
-        `${parDisplay}\nPar`,
-        `${recommendValue}\nTo Make`,
+        `${item.itemName} (${lastCountStr})`,
+        stockDisplay,
+        parDisplay,
+        recommendValue,
         item.reasoning
       ];
     });
@@ -13917,9 +13917,10 @@
       margin: { left: 0.5, right: 0.5 },
       styles: {
         fontSize: 7,
-        cellPadding: 0.06,
+        cellPadding: 0.08,
         lineColor: [224, 224, 224],
-        lineWidth: 0.01
+        lineWidth: 0.01,
+        valign: 'middle'
       },
       headStyles: {
         fillColor: lightGray,
@@ -13930,11 +13931,11 @@
         halign: 'left'
       },
       columnStyles: {
-        0: { cellWidth: 2.0, fontStyle: 'bold', fontSize: 7, textColor: [33, 33, 33] },
+        0: { cellWidth: 2.5, fontStyle: 'bold', fontSize: 7, textColor: [33, 33, 33] },
         1: { cellWidth: 1.2, halign: 'center', fontSize: 7 },
         2: { cellWidth: 1.2, halign: 'center', fontSize: 7 },
-        3: { cellWidth: 0.9, halign: 'center', fontStyle: 'bold', fontSize: 8, textColor: jaynaBlue },
-        4: { cellWidth: 2.2, fontSize: 5.5, textColor: [102, 102, 102], fontStyle: 'italic' }
+        3: { cellWidth: 0.8, halign: 'center', fontStyle: 'bold', fontSize: 9, textColor: jaynaBlue },
+        4: { cellWidth: 2.3, fontSize: 6, textColor: [102, 102, 102], fontStyle: 'italic' }
       },
       didParseCell: function(data) {
         // Add border only to body cells
@@ -13948,33 +13949,6 @@
           if (cellText && cellText.includes('OUT')) {
             data.cell.styles.textColor = [211, 47, 47];
             data.cell.styles.fontStyle = 'bold';
-          }
-        }
-      },
-      didDrawCell: function(data) {
-        // Handle multi-line rendering for item names
-        if (data.column.index === 0 && data.section === 'body' && data.row.index >= 0) {
-          const lines = data.cell.text;
-          if (lines.length > 1) {
-            // First line is item name (already drawn)
-            // Second line is "Last count:" in smaller gray text
-            const y = data.cell.y + data.cell.height - 0.12;
-            doc.setFontSize(5.5);
-            doc.setTextColor(153, 153, 153);
-            doc.setFont('helvetica', 'normal');
-            doc.text(lines[1], data.cell.x + 0.06, y);
-          }
-        }
-        // Handle multi-line labels for stock values
-        if ((data.column.index >= 1 && data.column.index <= 3) && data.section === 'body') {
-          const lines = data.cell.text;
-          if (lines.length > 1) {
-            // Second line is the label (Current, Par, To Make)
-            const y = data.cell.y + data.cell.height - 0.12;
-            doc.setFontSize(5);
-            doc.setTextColor(102, 102, 102);
-            doc.setFont('helvetica', 'normal');
-            doc.text(lines[1], data.cell.x + data.cell.width / 2, y, { align: 'center' });
           }
         }
       }
