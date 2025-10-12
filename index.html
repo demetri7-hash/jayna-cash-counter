@@ -15055,9 +15055,12 @@
     }
 
     const items = [];
-    const lines = text.split('\n');
 
-    console.log('🔍 Parsing OCR text - Total lines:', lines.length);
+    // CRITICAL: Filter out blank lines (OCR creates double newlines)
+    const allLines = text.split('\n');
+    const lines = allLines.map(l => l.trim()).filter(l => l.length > 0);
+
+    console.log('🔍 Parsing OCR text - Total lines (after removing blanks):', lines.length);
     console.log('📄 Invoice type:', orderingSystemState.invoiceType || 'invoice');
 
     // ==== PERFORMANCE ORDER FORMAT ====
