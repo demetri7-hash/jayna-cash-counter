@@ -15290,14 +15290,184 @@
     const order = orderingSystemState.calculatedOrders[orderIndex];
     if (!order) return;
 
-    const orderCard = document.getElementById(`order-${orderIndex}`);
-    if (!orderCard) return;
-
     const printWindow = window.open('', '', 'height=800,width=800');
     printWindow.document.write('<html><head><title>Order - ' + order.vendor + '</title>');
-    printWindow.document.write('<style>body{font-family: Arial, sans-serif; padding: 20px;} table{width:100%; border-collapse: collapse;} th, td{border: 1px solid #ddd; padding: 8px; text-align: left;} th{background: #1e3c72; color: white;}</style>');
+    printWindow.document.write(`<style>
+      @page { margin: 0.5in; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        padding: 0;
+        margin: 0;
+        color: #1a1a1a;
+        font-size: 9pt;
+        line-height: 1.3;
+      }
+      .header {
+        border-bottom: 2px solid #2196F3;
+        padding-bottom: 8px;
+        margin-bottom: 12px;
+      }
+      .company {
+        font-size: 16pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #1a1a1a;
+        margin: 0 0 4px 0;
+      }
+      .order-title {
+        font-size: 12pt;
+        font-weight: 600;
+        color: #424242;
+        margin: 0;
+      }
+      .order-details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin: 12px 0;
+        padding: 8px;
+        background: #f5f5f5;
+        font-size: 8pt;
+      }
+      .detail-label {
+        font-weight: 600;
+        color: #616161;
+        text-transform: uppercase;
+        font-size: 7pt;
+        letter-spacing: 0.5px;
+      }
+      .detail-value {
+        color: #1a1a1a;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        font-size: 8pt;
+      }
+      th {
+        background: #424242;
+        color: white;
+        padding: 6px 8px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 7pt;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      td {
+        border-bottom: 1px solid #e0e0e0;
+        padding: 6px 8px;
+        vertical-align: top;
+      }
+      tr:hover { background: #fafafa; }
+      .item-name {
+        font-weight: 600;
+        color: #1a1a1a;
+        font-size: 8pt;
+      }
+      .item-meta {
+        font-size: 7pt;
+        color: #757575;
+        margin-top: 2px;
+      }
+      .item-reasoning {
+        font-size: 6pt;
+        color: #9e9e9e;
+        font-style: italic;
+        margin-top: 2px;
+      }
+      .qty-cell {
+        font-weight: 700;
+        color: #2196F3;
+        text-align: center;
+      }
+      .notes-box {
+        background: #e3f2fd;
+        border-left: 3px solid #2196F3;
+        padding: 8px;
+        margin: 12px 0;
+        font-size: 8pt;
+      }
+      .footer {
+        margin-top: 16px;
+        padding-top: 8px;
+        border-top: 1px solid #e0e0e0;
+        font-size: 7pt;
+        color: #757575;
+        text-align: center;
+      }
+    </style>`);
     printWindow.document.write('</head><body>');
-    printWindow.document.write(orderCard.innerHTML);
+
+    // Header
+    printWindow.document.write(`
+      <div class="header">
+        <div class="company">JAYNA GYRO</div>
+        <div class="order-title">${order.vendor} - Order #${orderIndex + 1}</div>
+      </div>
+    `);
+
+    // Order details
+    const orderDateStr = order.orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const deliveryDateStr = order.deliveryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    printWindow.document.write(`
+      <div class="order-details">
+        <div><span class="detail-label">Order Date:</span> <span class="detail-value">${orderDateStr}</span></div>
+        <div><span class="detail-label">Cutoff:</span> <span class="detail-value">${order.cutoffTime}</span></div>
+        <div><span class="detail-label">Delivery:</span> <span class="detail-value">${deliveryDateStr}</span></div>
+        <div><span class="detail-label">Items:</span> <span class="detail-value">${order.items.length}</span></div>
+      </div>
+    `);
+
+    // Notes
+    if (order.notes) {
+      printWindow.document.write(`<div class="notes-box"><strong>Note:</strong> ${order.notes}</div>`);
+    }
+
+    // Table
+    printWindow.document.write('<table><thead><tr><th>Item</th><th style="text-align:center;">Qty</th><th style="text-align:center;">Unit</th><th style="text-align:center;">Par</th><th style="text-align:center;">Current</th></tr></thead><tbody>');
+
+    const isFriday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Friday';
+    const isThursday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Thursday';
+
+    order.items.forEach(item => {
+      let reasoningText = '';
+      if (order.vendor === 'Greenleaf' && isFriday) {
+        reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 2 days = ${item.quantity}`;
+      } else if (order.vendor === 'Mani Imports' && isThursday) {
+        const calc = Math.ceil((item.parLevel - item.currentStock) * (5 / 7));
+        reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 5/7 = ${calc}`;
+      } else if (order.vendor === 'Mani Imports') {
+        const calc = Math.ceil((item.parLevel - item.currentStock) * (3 / 7));
+        reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 3/7 = ${calc}`;
+      } else {
+        reasoningText = `AI: Par ${item.parLevel} - Stock ${item.currentStock} = ${item.quantity}`;
+      }
+
+      const lastCountStr = item.lastCountedDate ? `Last count: ${formatRelativeTime(item.lastCountedDate)}` : '';
+      const lastPriceStr = item.currentUnitCost ? `Last price: ${formatPriceWithDate(item.currentUnitCost, item.lastCostUpdate)}` : '';
+
+      printWindow.document.write(`
+        <tr>
+          <td>
+            <div class="item-name">${item.itemName}</div>
+            ${lastCountStr ? `<div class="item-meta">${lastCountStr}</div>` : ''}
+            ${lastPriceStr ? `<div class="item-meta">${lastPriceStr}</div>` : ''}
+            <div class="item-reasoning">${reasoningText}</div>
+          </td>
+          <td class="qty-cell">${item.quantity}</td>
+          <td style="text-align:center;">${item.unit}</td>
+          <td style="text-align:center;">${item.parLevel}</td>
+          <td style="text-align:center;">${item.currentStock}</td>
+        </tr>
+      `);
+    });
+
+    printWindow.document.write('</tbody></table>');
+    printWindow.document.write(`<div class="footer">Generated: ${new Date().toLocaleString()}</div>`);
     printWindow.document.write('</body></html>');
     printWindow.document.close();
     printWindow.print();
@@ -15316,50 +15486,88 @@
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
 
-      // Header
-      doc.setFontSize(20);
+      // Blue accent color (Jayna blue)
+      const jaynaBlue = [33, 150, 243]; // #2196F3
+      const darkGray = [66, 66, 66]; // #424242
+      const mediumGray = [117, 117, 117]; // #757575
+      const lightGray = [158, 158, 158]; // #9e9e9e
+
+      // Header with blue underline
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('JAYNA GYRO', 105, 20, { align: 'center' });
+      doc.setTextColor(26, 26, 26);
+      doc.text('JAYNA GYRO', 105, 15, { align: 'center' });
 
-      doc.setFontSize(16);
-      doc.text(`${order.vendor} Order`, 105, 30, { align: 'center' });
-
-      // Order details
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Order Date: ${order.orderDate.toLocaleDateString()}`, 20, 45);
-      doc.text(`Cutoff Time: ${order.cutoffTime}`, 20, 52);
-      doc.text(`Delivery Date: ${order.deliveryDate.toLocaleDateString()}`, 20, 59);
+      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+      doc.text(`${order.vendor} - Order #${orderIndex + 1}`, 105, 22, { align: 'center' });
 
+      // Blue line
+      doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+      doc.setLineWidth(0.5);
+      doc.line(20, 25, 190, 25);
+
+      // Order details in compact grid
+      const orderDateStr = order.orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const deliveryDateStr = order.deliveryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      doc.setFillColor(245, 245, 245);
+      doc.rect(20, 28, 170, 16, 'F');
+
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+      doc.text('ORDER DATE', 25, 33);
+      doc.text('CUTOFF', 75, 33);
+      doc.text('DELIVERY', 125, 33);
+      doc.text('ITEMS', 165, 33);
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(26, 26, 26);
+      doc.text(orderDateStr, 25, 40);
+      doc.text(order.cutoffTime, 75, 40);
+      doc.text(deliveryDateStr, 125, 40);
+      doc.text(order.items.length.toString(), 165, 40);
+
+      let startY = 47;
+
+      // Notes box if present
       if (order.notes) {
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Notes: ${order.notes}`, 20, 66);
+        doc.setFillColor(227, 242, 253); // Light blue
+        doc.rect(20, startY, 170, 10, 'F');
+        doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+        doc.setLineWidth(1);
+        doc.line(20, startY, 20, startY + 10);
+
+        doc.setFontSize(7);
+        doc.setTextColor(26, 26, 26);
+        doc.text(`Note: ${order.notes}`, 25, startY + 6);
+        startY += 13;
       }
 
-      // Table with AI reasoning
+      // Table with compact styling
       const isFriday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Friday';
       const isThursday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Thursday';
 
       const tableData = order.items.map(item => {
-        // Calculate reasoning text (matches email format)
         let reasoningText = '';
         if (order.vendor === 'Greenleaf' && isFriday) {
-          reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 2 days = ${item.quantity} to order`;
+          reasoningText = `AI: (${item.parLevel} - ${item.currentStock}) × 2 = ${item.quantity}`;
         } else if (order.vendor === 'Mani Imports' && isThursday) {
           const calc = Math.ceil((item.parLevel - item.currentStock) * (5 / 7));
-          reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 5/7 days = ${calc} to order`;
+          reasoningText = `AI: (${item.parLevel} - ${item.currentStock}) × 5/7 = ${calc}`;
         } else if (order.vendor === 'Mani Imports') {
           const calc = Math.ceil((item.parLevel - item.currentStock) * (3 / 7));
-          reasoningText = `AI: (Par ${item.parLevel} - Stock ${item.currentStock}) × 3/7 days = ${calc} to order`;
+          reasoningText = `AI: (${item.parLevel} - ${item.currentStock}) × 3/7 = ${calc}`;
         } else {
-          reasoningText = `AI: Par ${item.parLevel} - Stock ${item.currentStock} = ${item.quantity} to order`;
+          reasoningText = `AI: ${item.parLevel} - ${item.currentStock} = ${item.quantity}`;
         }
 
-        // Format last count and last price (matches email format)
-        const lastCountStr = item.lastCountedDate ? `Last count: ${formatRelativeTime(item.lastCountedDate)}` : '';
-        const lastPriceStr = item.currentUnitCost ? `Last price: ${formatPriceWithDate(item.currentUnitCost, item.lastCostUpdate)}` : '';
+        const lastCountStr = item.lastCountedDate ? `Count: ${formatRelativeTime(item.lastCountedDate)}` : '';
+        const lastPriceStr = item.currentUnitCost ? `Price: ${formatPriceWithDate(item.currentUnitCost, item.lastCostUpdate)}` : '';
 
-        // Combine all metadata
         let itemNameWithMetadata = item.itemName;
         if (lastCountStr) itemNameWithMetadata += '\n' + lastCountStr;
         if (lastPriceStr) itemNameWithMetadata += '\n' + lastPriceStr;
@@ -15375,59 +15583,71 @@
       });
 
       doc.autoTable({
-        head: [['Item', 'Qty to Order', 'Unit', 'Par Level', 'Current Stock']],
+        head: [['Item', 'Qty', 'Unit', 'Par', 'Stock']],
         body: tableData,
-        startY: order.notes ? 75 : 68,
-        theme: 'grid',
-        headStyles: { fillColor: [30, 60, 114] },
-        styles: { fontSize: 9, cellPadding: 3 },
+        startY: startY,
+        theme: 'plain',
+        headStyles: {
+          fillColor: darkGray,
+          textColor: [255, 255, 255],
+          fontSize: 7,
+          fontStyle: 'bold',
+          halign: 'left',
+          cellPadding: { top: 3, right: 4, bottom: 3, left: 4 }
+        },
+        styles: {
+          fontSize: 7,
+          cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+          lineColor: [224, 224, 224],
+          lineWidth: 0.1
+        },
         columnStyles: {
-          0: { cellWidth: 80 } // Wider first column for multi-line content
+          0: { cellWidth: 90 },
+          1: { halign: 'center', textColor: jaynaBlue, fontStyle: 'bold' },
+          2: { halign: 'center', cellWidth: 20 },
+          3: { halign: 'center', cellWidth: 20 },
+          4: { halign: 'center', cellWidth: 25 }
+        },
+        alternateRowStyles: {
+          fillColor: [250, 250, 250]
         },
         willDrawCell: function(data) {
-          // Prevent default text rendering for Item column - clear BEFORE drawing
           if (data.column.index === 0 && data.cell.section === 'body' && data.cell.text.length > 1) {
-            data.cell.text = []; // This prevents the default rendering
+            data.cell.text = [];
           }
         },
         didDrawCell: function(data) {
-          // Custom rendering for Item column with metadata
           if (data.column.index === 0 && data.cell.section === 'body') {
             const cellData = tableData[data.row.index][0];
             const lines = cellData.split('\n');
 
             if (lines.length > 1) {
-              let yPos = data.cell.y + 5;
-              const lineHeight = 4;
+              let yPos = data.cell.y + 4;
+              const lineHeight = 3.5;
 
-              // Draw each line with appropriate styling
               lines.forEach((line, index) => {
                 if (index === 0) {
-                  // Item name - normal size, black
-                  doc.setFontSize(9);
-                  doc.setFont('helvetica', 'normal');
-                  doc.setTextColor(0, 0, 0);
-                  doc.text(line, data.cell.x + 2, yPos);
-                } else if (line.startsWith('Last count:') || line.startsWith('Last price:')) {
-                  // Metadata - smaller, gray
-                  doc.setFontSize(8);
-                  doc.setFont('helvetica', 'normal');
-                  doc.setTextColor(120, 120, 120);
-                  doc.text(line, data.cell.x + 2, yPos);
-                } else if (line.startsWith('AI:')) {
-                  // Reasoning - smallest, light gray, italic
                   doc.setFontSize(7);
+                  doc.setFont('helvetica', 'bold');
+                  doc.setTextColor(26, 26, 26);
+                  doc.text(line, data.cell.x + 4, yPos);
+                } else if (line.startsWith('Count:') || line.startsWith('Price:')) {
+                  doc.setFontSize(6);
+                  doc.setFont('helvetica', 'normal');
+                  doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+                  doc.text(line, data.cell.x + 4, yPos);
+                } else if (line.startsWith('AI:')) {
+                  doc.setFontSize(5.5);
                   doc.setFont('helvetica', 'italic');
-                  doc.setTextColor(170, 170, 170);
-                  doc.text(line, data.cell.x + 2, yPos);
+                  doc.setTextColor(lightGray[0], lightGray[1], lightGray[2]);
+                  doc.text(line, data.cell.x + 4, yPos);
                   doc.setFont('helvetica', 'normal');
                 }
                 yPos += lineHeight;
               });
 
-              // Reset to defaults
               doc.setFont('helvetica', 'normal');
-              doc.setTextColor(0, 0, 0);
+              doc.setTextColor(26, 26, 26);
             }
           }
         }
@@ -15437,9 +15657,14 @@
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        doc.setFontSize(8);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 285);
-        doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: 'right' });
+        doc.setDrawColor(224, 224, 224);
+        doc.setLineWidth(0.1);
+        doc.line(20, 282, 190, 282);
+
+        doc.setFontSize(6);
+        doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 287);
+        doc.text(`Page ${i} of ${pageCount}`, 190, 287, { align: 'right' });
       }
 
       doc.save(`${order.vendor}_Order_${order.orderDate.toISOString().split('T')[0]}.pdf`);
@@ -15448,6 +15673,7 @@
       showMessage('✅ PDF generated successfully!', 'success');
     } catch (error) {
       hideLoading();
+      console.error('PDF generation error:', error);
       showMessage(`Error generating PDF: ${error.message}`, 'error');
     }
   }
