@@ -1611,12 +1611,34 @@
                 id="invoicePreviewImage"
                 style="max-width: 100%; height: auto; border-radius: 0; display: block; margin: 0 auto;"
               />
+
+              <!-- Vendor Format Selector -->
+              <div style="margin-top: 16px; padding: 12px; background: var(--gray-100); border: 2px solid var(--gray-300);">
+                <label style="display: block; margin-bottom: 8px; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                  VENDOR FORMAT (helps OCR accuracy)
+                </label>
+                <select
+                  id="ocrVendorFormat"
+                  style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; background: white; font-weight: 600;"
+                >
+                  <option value="auto">Auto-Detect Format</option>
+                  <option value="performance-order">Performance - Order Email</option>
+                  <option value="performance-invoice">Performance - Invoice</option>
+                  <option value="greenleaf-invoice">Greenleaf - Invoice</option>
+                  <option value="mani-invoice">Mani Imports - Invoice</option>
+                  <option value="generic">Generic Format</option>
+                </select>
+                <p style="margin-top: 6px; font-size: 10px; color: var(--gray-600);">
+                  System learns and improves with each check-in!
+                </p>
+              </div>
+
               <div style="margin-top: 16px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
                 <button
                   class="submit-btn"
                   onclick="processInvoiceOCR()"
                   id="processOCRButton"
-                  style="background: var(--gray-100); color: var(--gray-900); border: 2px solid var(--gray-300); flex: 1; max-width: 200px; padding: 14px;"
+                  style="background: var(--gray-700); color: white; border: 2px solid var(--gray-700); flex: 1; max-width: 200px; padding: 14px; font-weight: 700;"
                 >
                   SCAN & EXTRACT
                 </button>
@@ -15039,80 +15061,102 @@
     console.log('📄 Invoice type:', orderingSystemState.invoiceType || 'invoice');
 
     // ==== PERFORMANCE ORDER FORMAT ====
-    // Multi-line format:
-    // ITEM NAME
-    // SKU/Brand
-    // Size/Unit                Confirmed: X        Qty: X
-    // CS                      $price              $total
+    // Format from image:
+    // WATER DRINKING
+    // 543845 HILTON (6-digit SKU + Brand)
+    // 24/16.9 OZ    Confirmed: 2    Qty: 2
+    // CS            $5.12           $10.24
 
-    if (orderingSystemState.invoiceType === 'order') {
-      console.log('🔍 Trying Performance order format...');
-      console.log('📄 First 10 lines of OCR:');
-      for (let i = 0; i < Math.min(10, lines.length); i++) {
+    const vendorFormat = document.getElementById('ocrVendorFormat')?.value || 'auto';
+
+    if (orderingSystemState.invoiceType === 'order' || vendorFormat === 'performance-order') {
+      console.log('🔍 Trying Performance Order format...');
+      console.log('📄 Vendor format selected:', vendorFormat);
+      console.log('📄 First 15 OCR lines:');
+      for (let i = 0; i < Math.min(15, lines.length); i++) {
         console.log(`  Line ${i}: "${lines[i]}"`);
       }
 
-      for (let i = 0; i < lines.length - 2; i++) {
-        const line1 = lines[i].trim(); // Item name
-        const line2 = lines[i + 1].trim(); // SKU/Brand
-        const line3 = lines[i + 2].trim(); // Size + Confirmed/Qty OR CS/Price
+      for (let i = 0; i < lines.length - 3; i++) {
+        const currentLine = lines[i].trim();
+        const nextLine = lines[i + 1].trim();
+        const line3 = lines[i + 2].trim();
+        const line4 = lines[i + 3].trim();
 
-        // DEBUG: Log what we're checking
-        if (i < 20) { // Only log first 20 to avoid spam
-          console.log(`Checking lines ${i}-${i+2}:`, { line1, line2, line3 });
-        }
+        // Look for SKU pattern: Line starts with 6 digits followed by brand name
+        // Example: "543845 HILTON" or "276375 COKE ZERO"
+        const skuMatch = nextLine.match(/^(\d{6})\s+(.+)$/);
 
-        // Look for "Confirmed:" OR "Qty:" patterns (OCR might split these)
-        // Pattern 1: Line has both "Confirmed:" and "Qty:"
-        // Pattern 2: Line has "QTY:" or "Qty:" alone
-        const hasConfirmed = line2.toLowerCase().includes('confirmed') || line3.toLowerCase().includes('confirmed');
-        const hasQty = line2.toLowerCase().includes('qty') || line3.toLowerCase().includes('qty');
+        if (skuMatch) {
+          const itemName = currentLine; // Line BEFORE SKU is the item name
+          const sku = skuMatch[1];
+          const brand = skuMatch[2];
 
-        if (hasConfirmed || hasQty) {
-          console.log('  ✓ Found Confirmed/Qty pattern at line', i);
+          console.log(`  ✓ Found SKU pattern: "${sku} ${brand}" at line ${i+1}`);
+          console.log(`  → Item name (line ${i}): "${itemName}"`);
 
-          // Try to extract quantity from any of the lines
-          let quantity = 1; // Default
-          let price = null;
-
-          // Look for "Qty: X" or "QTY: X" pattern in line2 or line3
-          const qtyMatch = (line2 + ' ' + line3).match(/qty:?\s*(\d+)/i);
-          if (qtyMatch) {
-            quantity = parseInt(qtyMatch[1]);
-            console.log('  ✓ Extracted quantity:', quantity);
+          // Skip if item name is junk (too short, just numbers, etc.)
+          if (itemName.length < 3 || itemName.match(/^[\d\s\-\/]+$/)) {
+            console.log(`  ✗ Skipping - item name is junk`);
+            continue;
           }
 
-          // Look for price in next few lines (format: $X.XX)
-          for (let j = i; j < Math.min(i + 5, lines.length); j++) {
-            const priceMatch = lines[j].match(/\$(\d+\.\d{2})/);
-            if (priceMatch) {
-              price = parseFloat(priceMatch[1]);
-              console.log('  ✓ Extracted price:', price);
+          // Extract quantity from "Confirmed: X" in line3
+          let quantity = 1;
+          const confirmedMatch = line3.match(/confirmed:?\s*(\d+)/i);
+          if (confirmedMatch) {
+            quantity = parseInt(confirmedMatch[1]);
+            console.log(`  ✓ Extracted quantity: ${quantity} from line ${i+2}`);
+          }
+
+          // Extract price from line4 or nearby lines
+          // OCR might read "$5.12" as "512" so look for both patterns
+          let price = null;
+
+          // Try to find $X.XX pattern in next 3 lines
+          for (let j = i + 2; j < Math.min(i + 6, lines.length); j++) {
+            const priceLine = lines[j];
+
+            // Pattern 1: $5.12 (with dollar sign)
+            const dollarMatch = priceLine.match(/\$(\d+\.\d{2})/);
+            if (dollarMatch) {
+              price = parseFloat(dollarMatch[1]);
+              console.log(`  ✓ Found price with $: $${price} at line ${j}`);
               break;
+            }
+
+            // Pattern 2: "cs 512" or "CS $5.12" (OCR might drop $)
+            // Look for "cs" or "CS" followed by numbers
+            const csMatch = priceLine.match(/cs\s+\$?(\d+\.?\d*)/i);
+            if (csMatch) {
+              const priceNum = parseFloat(csMatch[1]);
+              // If it's a reasonable price (< 500), use it
+              if (priceNum < 500 && priceNum > 0) {
+                price = priceNum;
+                console.log(`  ✓ Found price after CS: $${price} at line ${j}`);
+                break;
+              }
             }
           }
 
-          // Only add if we have a reasonable item name
-          if (line1.length > 2 && !line1.match(/^[0-9\/\-]+$/)) {
-            items.push({
-              id: Date.now() + Math.random() + i,
-              detectedName: line1, // Use item name from line 1
-              detectedQuantity: quantity,
-              detectedPrice: price,
-              matchedInventoryId: null,
-              matchConfidence: 0,
-              matchedItemName: null
-            });
+          items.push({
+            id: Date.now() + Math.random() + i,
+            detectedName: itemName,
+            detectedQuantity: quantity,
+            detectedPrice: price,
+            matchedInventoryId: null,
+            matchConfidence: 0,
+            matchedItemName: null
+          });
 
-            console.log('✅ Found Performance item:', line1, 'Qty:', quantity, 'Price:', price);
+          console.log(`✅ Added item: "${itemName}" | Qty: ${quantity} | Price: ${price ? '$' + price : 'N/A'}`);
 
-            // Skip the lines we just processed (at least 2-3 lines per item)
-            i += 2;
-          }
+          // Skip the lines we just processed (SKU + 2 more lines minimum)
+          i += 3;
         }
       }
 
-      console.log('📊 Performance format matched items:', items.length);
+      console.log('📊 Performance Order format matched items:', items.length);
 
       if (items.length > 0) {
         return items; // Success!
