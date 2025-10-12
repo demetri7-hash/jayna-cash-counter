@@ -10221,6 +10221,12 @@
 
     orderingSystemState.calculatedOrders = Object.values(nextOrdersByVendor);
     console.log('Filtered to next order per vendor:', orderingSystemState.calculatedOrders.length, 'orders');
+
+    // Load any saved edits from previous sessions
+    orderingSystemState.calculatedOrders.forEach(order => {
+      loadOrderEditsFromStorage(order);
+    });
+
     renderUpcomingOrders();
   }
 
@@ -10234,6 +10240,7 @@
     const items = orderingSystemState.items
       .filter(item => item.vendor === 'Greenleaf')
       .map(item => ({
+        id: item.id,
         itemName: item.itemName,
         quantity: Math.max(0, Math.ceil((item.parLevel - item.currentStock) * multiplier)),
         unit: item.unit,
@@ -10267,6 +10274,7 @@
     const items = orderingSystemState.items
       .filter(item => item.vendor === 'Performance')
       .map(item => ({
+        id: item.id,
         itemName: item.itemName,
         quantity: Math.max(0, item.parLevel - item.currentStock),
         unit: item.unit,
@@ -10303,6 +10311,7 @@
     const items = orderingSystemState.items
       .filter(item => item.vendor === 'Mani Imports')
       .map(item => ({
+        id: item.id,
         itemName: item.itemName,
         quantity: Math.max(0, Math.ceil((item.parLevel - item.currentStock) * (multiplier / 7))),
         unit: item.unit,
@@ -10336,6 +10345,7 @@
     const items = orderingSystemState.items
       .filter(item => item.vendor === 'Eatopia Foods')
       .map(item => ({
+        id: item.id,
         itemName: item.itemName,
         quantity: Math.max(0, item.parLevel - item.currentStock),
         unit: item.unit,
@@ -10595,6 +10605,8 @@
     const item = order.items.find(i => i.id === itemId);
     if (item) {
       item.quantity = parseFloat(newQuantity) || 0;
+      // Save immediately to persist edits
+      saveOrderEditsToStorage(orderIndex);
     }
   }
 
@@ -10608,7 +10620,8 @@
     const item = order.items.find(i => i.id === itemId);
     if (item) {
       item.unit = newUnit.trim().toUpperCase();
-      console.log(`Updated ${item.itemName} unit to ${newUnit}`);
+      // Save immediately to persist edits
+      saveOrderEditsToStorage(orderIndex);
     }
   }
 
@@ -16158,14 +16171,60 @@
   }
 
   /**
+   * Save order edits to localStorage (persist across sessions)
+   */
+  function saveOrderEditsToStorage(orderIndex) {
+    const order = orderingSystemState.calculatedOrders[orderIndex];
+    if (!order) return;
+
+    const storageKey = `orderEdits_${order.vendor}_${order.orderDate.toISOString().split('T')[0]}`;
+    const edits = {};
+
+    order.items.forEach(item => {
+      edits[item.id] = {
+        quantity: item.quantity,
+        unit: item.unit
+      };
+    });
+
+    localStorage.setItem(storageKey, JSON.stringify(edits));
+  }
+
+  /**
+   * Load order edits from localStorage
+   */
+  function loadOrderEditsFromStorage(order) {
+    const storageKey = `orderEdits_${order.vendor}_${order.orderDate.toISOString().split('T')[0]}`;
+    const saved = localStorage.getItem(storageKey);
+
+    if (saved) {
+      try {
+        const edits = JSON.parse(saved);
+        order.items.forEach(item => {
+          if (edits[item.id]) {
+            item.quantity = edits[item.id].quantity;
+            item.unit = edits[item.id].unit;
+          }
+        });
+      } catch (e) {
+        console.error('Failed to load saved edits:', e);
+      }
+    }
+  }
+
+  /**
    * Capture all current input field values before PDF generation
    */
   function captureAllOrderEdits(orderIndex) {
     const order = orderingSystemState.calculatedOrders[orderIndex];
     if (!order) return;
 
-    // Find all quantity inputs for this order
-    const qtyInputs = document.querySelectorAll(`input[type="number"][data-order-index="${orderIndex}"]`);
+    // Get the specific order card
+    const orderCard = document.getElementById(`order-${orderIndex}`);
+    if (!orderCard) return;
+
+    // Find all quantity inputs WITHIN this specific order card
+    const qtyInputs = orderCard.querySelectorAll('input[type="number"]');
     qtyInputs.forEach(input => {
       const itemId = parseInt(input.getAttribute('data-item-id'));
       const newQty = parseFloat(input.value) || 0;
@@ -16175,8 +16234,8 @@
       }
     });
 
-    // Find all unit inputs for this order
-    const unitInputs = document.querySelectorAll(`input[type="text"][data-order-index="${orderIndex}"]`);
+    // Find all unit inputs WITHIN this specific order card
+    const unitInputs = orderCard.querySelectorAll('input[type="text"]');
     unitInputs.forEach(input => {
       const itemId = parseInt(input.getAttribute('data-item-id'));
       const newUnit = input.value.trim().toUpperCase();
@@ -16185,6 +16244,9 @@
         item.unit = newUnit;
       }
     });
+
+    // Save to localStorage so edits persist
+    saveOrderEditsToStorage(orderIndex);
   }
 
   /**
