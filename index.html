@@ -66,7 +66,10 @@
       max-height: none;
       overflow: visible;
     }
-    .main-menu { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    .main-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .secondary-links { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 20px; font-size: 11px; }
+    .secondary-links a { color: var(--gray-700); text-decoration: underline; cursor: pointer; transition: color 0.15s ease; }
+    .secondary-links a:hover { color: var(--gray-900); }
     .menu-btn {
       padding: 16px 12px;
       border: 2px solid var(--gray-300);
@@ -465,9 +468,10 @@
     
     @media (max-width: 480px) {
       .header h1 { font-size: 20px; }
-      .main-menu { grid-template-columns: 1fr; }
+      .main-menu { grid-template-columns: 1fr; gap: 10px; }
       .main-menu.show-report { grid-template-columns: 1fr; }
       .menu-btn { padding: 20px 15px; min-height: 60px; }
+      .secondary-links { font-size: 10px; gap: 10px; }
       .denom-label { font-size: 16px; }
       .qty-input { width: 100px; height: 50px; font-size: 18px; }
       .grand-total .amount { font-size: 28px; }
@@ -724,12 +728,20 @@
       <div id="mainMenu" class="main-menu">
         <button class="menu-btn primary" onclick="startAMCount()">AM Count</button>
         <button class="menu-btn primary" onclick="startPMCount()">PM Close</button>
-        <button class="menu-btn" onclick="requirePasswordFor('Generate Reports', showReports)">Generate Report</button>
-        <button class="menu-btn" onclick="requirePasswordFor('Tip Pool Calculator', showTipPool)">Tip Pool</button>
-        <button class="menu-btn" onclick="requirePasswordFor('Weekly Cashbox Count', showCashbox)">Weekly Cashbox</button>
-        <button class="menu-btn" onclick="requirePasswordFor('Manager Dashboard', () => window.location.href='manager.html')">Manager</button>
-        <button class="menu-btn" onclick="requirePasswordFor('COGs Management', accessCOGs)" style="background: #616161; color: white; border-color: #616161;">COGs</button>
-        <button class="menu-btn" onclick="startOrderingSystem()" style="background: #2e7d32; color: white; border-color: #2e7d32;">Ordering System</button>
+        <button class="menu-btn" onclick="startOrderingSystem()" style="background: var(--gray-600); color: white; border-color: var(--gray-600);">Orders & Prep</button>
+      </div>
+
+      <!-- Secondary Links -->
+      <div class="secondary-links">
+        <a onclick="requirePasswordFor('Generate Reports', showReports)">Generate Report</a>
+        <span style="color: var(--gray-400);">|</span>
+        <a onclick="requirePasswordFor('Tip Pool Calculator', showTipPool)">Tip Pool</a>
+        <span style="color: var(--gray-400);">|</span>
+        <a onclick="requirePasswordFor('Weekly Cashbox Count', showCashbox)">Weekly Cashbox</a>
+        <span style="color: var(--gray-400);">|</span>
+        <a onclick="requirePasswordFor('Manager Dashboard', () => window.location.href='manager.html')">Manager</a>
+        <span style="color: var(--gray-400);">|</span>
+        <a onclick="requirePasswordFor('COGs Management', accessCOGs)">COGs</a>
       </div>
       
       <!-- AM Count Form -->
@@ -1197,81 +1209,53 @@
 
       <!-- Ordering System Section -->
       <div id="orderingSystemForm" class="form-section">
-        <h2 style="margin-bottom: 20px; color: #1e3c72;">Restaurant Ordering System</h2>
+        <h2 style="margin-bottom: 20px; color: var(--gray-900);">Orders & Prep System</h2>
 
         <!-- Tab Navigation -->
-        <div style="position: sticky; top: 0; z-index: 100; background: var(--white); margin-bottom: 20px;">
-          <div class="tabs" style="display: flex; border-bottom: 2px solid var(--gray-300); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; gap: 2px;">
+        <div style="position: sticky; top: 0; z-index: 100; background: var(--white); margin-bottom: 20px; padding-bottom: 10px;">
+          <div class="tabs" style="display: flex; border-bottom: 2px solid var(--gray-300); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; gap: 4px;">
             <button class="tab-link active" onclick="openOrderTab(event, 'upcomingOrders')" style="
             flex: 0 0 auto;
-            padding: 8px 6px;
-            min-width: 70px;
-            background: var(--gray-300);
-            color: var(--gray-900);
+            padding: 12px 10px;
+            min-width: 80px;
+            background: var(--gray-700);
+            color: var(--white);
             border: none;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
             transition: all 0.15s ease;
-          ">ORDERS</button>
-          <button class="tab-link" onclick="openOrderTab(event, 'manageInventory')" style="
-            flex: 0 0 auto;
-            padding: 8px 6px;
-            min-width: 70px;
-            background: var(--gray-100);
-            color: var(--gray-700);
-            border: none;
-            cursor: pointer;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            transition: all 0.15s ease;
-          ">MANAGE</button>
-          <button class="tab-link" onclick="openOrderTab(event, 'updateCounts')" style="
-            flex: 0 0 auto;
-            padding: 8px 6px;
-            min-width: 70px;
-            background: var(--gray-100);
-            color: var(--gray-700);
-            border: none;
-            cursor: pointer;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            transition: all 0.15s ease;
-          ">COUNT</button>
-          <button class="tab-link" onclick="openOrderTab(event, 'prepSheet')" style="
-            flex: 0 0 auto;
-            padding: 8px 6px;
-            min-width: 70px;
-            background: var(--gray-100);
-            color: var(--gray-700);
-            border: none;
-            cursor: pointer;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            transition: all 0.15s ease;
-          ">PREP</button>
+          ">STOCK</button>
           <button class="tab-link" onclick="openOrderTab(event, 'checkInInvoice')" style="
             flex: 0 0 auto;
-            padding: 8px 6px;
-            min-width: 70px;
+            padding: 12px 10px;
+            min-width: 80px;
             background: var(--gray-100);
             color: var(--gray-700);
             border: none;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
             transition: all 0.15s ease;
-          ">CHECK-IN</button>
+          ">ORDERS</button>
+          <button class="tab-link" onclick="openOrderTab(event, 'prepSheet')" style="
+            flex: 0 0 auto;
+            padding: 12px 10px;
+            min-width: 80px;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            transition: all 0.15s ease;
+          ">PREP</button>
           </div>
         </div>
 
@@ -1285,8 +1269,8 @@
         <!-- Tab Content: Manage Inventory -->
         <div id="manageInventory" class="tab-content" style="display: none;">
           <!-- Add New Item Form -->
-          <div style="background: #f0f4f8; padding: 20px; border-radius: 4px; margin-bottom: 30px;">
-            <h3 style="margin-bottom: 15px; color: #1e3c72;">Add New Inventory Item</h3>
+          <div style="background: var(--gray-100); padding: 20px; border-radius: 0; margin-bottom: 30px;">
+            <h3 style="margin-bottom: 15px; color: var(--gray-900);">Add New Inventory Item</h3>
             <form id="addItemForm" onsubmit="handleAddItem(event)" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
               <div class="form-group">
                 <label for="newItemName">Item Name:</label>
@@ -1325,13 +1309,13 @@
 
           <!-- Inventory List -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h3 style="margin: 0; color: #1e3c72;">Inventory Items</h3>
+            <h3 style="margin: 0; color: var(--gray-900);">Inventory Items</h3>
             <button onclick="showVendorManagement()" style="
-              background: #1e3c72;
+              background: var(--gray-600);
               color: white;
               border: none;
               padding: 8px 16px;
-              border-radius: 4px;
+              border-radius: 0;
               cursor: pointer;
               font-size: 13px;
               font-weight: 600;
@@ -1354,7 +1338,7 @@
                 font-size: 14px;
                 transition: border-color 0.2s;
               "
-              onfocus="this.style.borderColor='#1e3c72'"
+              onfocus="this.style.borderColor='var(--gray-700)'"
               onblur="this.style.borderColor='#e0e0e0'"
             />
             <select
@@ -1391,13 +1375,13 @@
         <div id="updateCounts" class="tab-content" style="display: none;">
           <!-- Mobile-optimized header controls -->
           <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
-            <button class="submit-btn" onclick="saveAllStockCounts()" style="background: #2e7d32; flex: 1; min-width: 150px;">
+            <button class="submit-btn" onclick="saveAllStockCounts()" style="background: var(--gray-700); flex: 1; min-width: 150px;">
               💾 Save All Changes
             </button>
             <button
               class="submit-btn"
               onclick="toggleCompactMode()"
-              style="background: #1e3c72; flex: 0 0 auto; padding: 12px 20px;"
+              style="background: var(--gray-600); flex: 0 0 auto; padding: 12px 20px;"
               title="Toggle compact view"
             >
               <span id="compactModeIcon">📋</span>
@@ -1420,7 +1404,7 @@
                 font-size: 14px;
                 transition: border-color 0.2s;
               "
-              onfocus="this.style.borderColor='#2e7d32'"
+              onfocus="this.style.borderColor='var(--gray-700)'"
               onblur="this.style.borderColor='#e0e0e0'"
             />
             <select
@@ -1548,14 +1532,14 @@
 
           <!-- Action Buttons -->
           <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
-            <button class="submit-btn" onclick="refreshPrepSheet()" style="background: #ff6b35;">
-              🔄 Refresh Recommendations
+            <button class="submit-btn" onclick="refreshPrepSheet()" style="background: var(--gray-700); flex: 1;">
+              🔄 Refresh
             </button>
-            <button class="submit-btn" onclick="generatePrepSheetPDF()" style="background: #1e3c72;">
-              📄 Generate PDF
+            <button class="submit-btn" onclick="generatePrepSheetPDF()" style="background: var(--gray-600); flex: 1;">
+              📄 PDF
             </button>
-            <button class="submit-btn" onclick="printPrepSheet()" style="background: #2e7d32;">
-              🖨️ Print Sheet
+            <button class="submit-btn" onclick="printPrepSheet()" style="background: var(--gray-600); flex: 1;">
+              🖨️ Print
             </button>
           </div>
 
@@ -9802,14 +9786,14 @@
     // Remove active class from all tab links
     const tabLinks = document.querySelectorAll('.tab-link');
     tabLinks.forEach(link => {
-      link.style.background = '#f5f5f5';
-      link.style.color = '#1e3c72';
+      link.style.background = 'var(--gray-100)';
+      link.style.color = 'var(--gray-700)';
     });
 
     // Show selected tab and mark button as active
     document.getElementById(tabName).style.display = 'block';
     if (event && event.target) {
-      event.target.style.background = '#1e3c72';
+      event.target.style.background = 'var(--gray-700)';
       event.target.style.color = 'white';
     }
 
