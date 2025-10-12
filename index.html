@@ -15839,10 +15839,73 @@
     // Filter matched items (exclude skipped and flagged as new)
     const matchedItems = items.filter(item => item.matchedInventoryId && !item.flaggedAsNew && !item.skipped);
 
+    // Get items flagged as NEW to create inventory items
+    const newItems = items.filter(item => item.flaggedAsNew && !item.skipped);
+
     console.log('Matched items to save:', matchedItems.length);
+    console.log('New items to create:', newItems.length);
+
+    if (matchedItems.length === 0 && newItems.length === 0) {
+      showMessage('Please match items or flag as new', 'warning');
+      return;
+    }
+
+    // ✅ CREATE NEW INVENTORY ITEMS IMMEDIATELY
+    if (newItems.length > 0) {
+      showLoading('Creating New Items', `Adding ${newItems.length} new inventory items...`);
+
+      try {
+        for (const item of newItems) {
+          const { data: newInvItem, error: createError } = await supabase
+            .from('inventory_items')
+            .insert({
+              item_name: item.detectedName,
+              vendor: vendor,
+              unit: 'EA', // Default unit
+              par_level: 0,
+              current_stock: 0,
+              item_type: 'ingredient',
+              created_date: new Date().toISOString()
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Failed to create item:', item.detectedName, createError);
+            continue;
+          }
+
+          console.log('✅ Created new inventory item:', newInvItem.item_name, 'ID:', newInvItem.id);
+
+          // Add to local state
+          orderingSystemState.items.push({
+            id: newInvItem.id,
+            itemName: newInvItem.item_name,
+            vendor: newInvItem.vendor,
+            parLevel: newInvItem.par_level,
+            currentStock: newInvItem.current_stock,
+            unit: newInvItem.unit,
+            itemType: newInvItem.item_type,
+            lastCountedDate: null
+          });
+
+          // Convert to matched item for order
+          item.matchedInventoryId = newInvItem.id;
+          item.matchedItemName = newInvItem.item_name;
+          item.matchConfidence = 1.0;
+          matchedItems.push(item);
+        }
+
+        console.log('✅ Created', newItems.length, 'new inventory items!');
+      } catch (error) {
+        console.error('Error creating new items:', error);
+        showMessage('Some items failed to create: ' + error.message, 'warning');
+      }
+    }
 
     if (matchedItems.length === 0) {
-      showMessage('Please match items to inventory first', 'warning');
+      hideLoading();
+      showMessage('No items were successfully matched or created', 'warning');
       return;
     }
 
@@ -15885,8 +15948,50 @@
 
       if (itemsError) throw itemsError;
 
+      // ✅ LEARNING: Save matches to invoice_items immediately for future auto-matching
+      console.log('💾 Saving matches to invoice_items for learning...');
+
+      // Create a temporary invoice record for learning purposes
+      const { data: invoiceData, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          invoice_date: new Date().toISOString().split('T')[0],
+          vendor: vendor,
+          invoice_type: 'order',
+          total_items: matchedItems.length,
+          processed_by: 'System',
+          notes: `Pending order #${orderId} - saved for learning`
+        })
+        .select()
+        .single();
+
+      if (!invoiceError && invoiceData) {
+        // Save each match for learning
+        const learningItems = matchedItems.map(item => ({
+          invoice_id: invoiceData.id,
+          inventory_item_id: item.matchedInventoryId,
+          detected_item_name: item.detectedName,
+          detected_quantity: item.detectedQuantity,
+          detected_price: item.detectedPrice || 0,
+          match_confidence: item.matchConfidence,
+          matched_at: new Date().toISOString(),
+          checked_in: true, // Mark as learned immediately
+          checked_in_at: new Date().toISOString()
+        }));
+
+        const { error: learningError } = await supabase
+          .from('invoice_items')
+          .insert(learningItems);
+
+        if (learningError) {
+          console.warn('Failed to save learning data:', learningError);
+        } else {
+          console.log('✅ Saved', learningItems.length, 'matches for learning!');
+        }
+      }
+
       hideLoading();
-      showMessage(`✅ Order saved! ${matchedItems.length} items ordered from ${vendor}`, 'success');
+      showMessage(`✅ Order saved! ${matchedItems.length} items ordered from ${vendor}. Matches saved for future auto-detection!`, 'success');
 
       // Clear state
       orderingSystemState.extractedInvoiceItems = [];
