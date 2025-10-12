@@ -10552,7 +10552,7 @@
                     <input
                       type="text"
                       value="${item.unit}"
-                      onchange="updateItemUnit(${item.id}, this.value)"
+                      onchange="updateOrderItemUnit(${index}, ${item.id}, this.value)"
                       style="width: 65px; padding: 5px 4px; text-align: center; border: 2px solid var(--gray-300); border-radius: 0; font-size: 11px;"
                       placeholder="CS"
                     />
@@ -10594,6 +10594,20 @@
     if (item) {
       item.quantity = parseFloat(newQuantity) || 0;
       console.log(`Updated ${item.itemName} quantity to ${newQuantity}`);
+    }
+  }
+
+  /**
+   * Update item unit in AI suggestion (does NOT save to database, only updates order)
+   */
+  function updateOrderItemUnit(orderIndex, itemId, newUnit) {
+    const order = orderingSystemState.calculatedOrders[orderIndex];
+    if (!order) return;
+
+    const item = order.items.find(i => i.id === itemId);
+    if (item) {
+      item.unit = newUnit.trim().toUpperCase();
+      console.log(`Updated ${item.itemName} unit to ${newUnit}`);
     }
   }
 
@@ -10935,9 +10949,15 @@
       confirmBtn.textContent = 'SAVE & CONTINUE';
       confirmBtn.style.cssText = 'flex: 2; padding: 14px; background: #212121; color: white; border: 2px solid #212121; border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
       confirmBtn.onclick = async () => {
+        // Update order object with modal inputs BEFORE saving and generating PDF
+        order.deliveryDate = new Date(dateInput.value);
+        order.notes = notesInput.value;
+
         const success = await saveAIPendingOrder(order, dateInput.value, notesInput.value, overlay);
         if (success) {
-          resolve(); // Resolve the promise when order is successfully saved
+          // Order object is now updated with latest notes and delivery date
+          // PDF will use these updated values
+          resolve();
         } else {
           reject('Failed to save order');
         }
