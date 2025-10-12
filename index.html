@@ -10148,6 +10148,8 @@
         lastCostUpdate: item.last_cost_update,
         itemType: item.item_type || 'ingredient', // Track if item is 'prep' or 'ingredient'
         urgent: item.urgent || false, // Track urgent flag for MAKE FIRST category
+        lineCooksPrep: item.line_cooks_prep || false, // Track line cooks prep items
+        notMadeDaily: item.not_made_daily || false, // Track items not made daily
         batchLifespan: item.batch_lifespan_hours,
         storageLocation: item.storage_location
       }));
@@ -11919,6 +11921,34 @@
                     MAKE FIRST (urgent)
                   </label>
                 </div>
+
+                <!-- Line Cooks Prep Checkbox -->
+                <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                  <input
+                    type="checkbox"
+                    id="line-cooks-prep-${item.id}"
+                    ${item.lineCooksPrep ? 'checked' : ''}
+                    onchange="toggleLineCooksPrep(${item.id}, this.checked)"
+                    style="width: 18px; height: 18px; cursor: pointer;"
+                  />
+                  <label for="line-cooks-prep-${item.id}" style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;">
+                    LINE COOKS PREP
+                  </label>
+                </div>
+
+                <!-- Not Made Daily Checkbox -->
+                <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                  <input
+                    type="checkbox"
+                    id="not-made-daily-${item.id}"
+                    ${item.notMadeDaily ? 'checked' : ''}
+                    onchange="toggleNotMadeDaily(${item.id}, this.checked)"
+                    style="width: 18px; height: 18px; cursor: pointer;"
+                  />
+                  <label for="not-made-daily-${item.id}" style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;">
+                    NOT MADE DAILY
+                  </label>
+                </div>
               </div>
             `;
           }).join('')}
@@ -12637,6 +12667,146 @@
       }, 1000);
 
       showMessage(`Failed to update urgent status: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Toggle line cooks prep flag for prep item
+   */
+  async function toggleLineCooksPrep(itemId, isLineCooksPrep) {
+    const checkbox = document.getElementById(`line-cooks-prep-${itemId}`);
+    const label = checkbox?.nextElementSibling;
+    const statusDiv = document.getElementById(`save-status-${itemId}`);
+
+    // Visual feedback - saving state
+    if (checkbox) checkbox.disabled = true;
+    if (label) label.style.opacity = '0.5';
+
+    // Show saving status
+    if (statusDiv) {
+      statusDiv.textContent = '💾 Saving...';
+      statusDiv.style.color = '#ff9800';
+      statusDiv.style.opacity = '1';
+    }
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ line_cooks_prep: isLineCooksPrep })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.lineCooksPrep = isLineCooksPrep;
+      }
+
+      // Success feedback
+      if (statusDiv) {
+        statusDiv.textContent = '✓ Saved';
+        statusDiv.style.color = '#4caf50';
+      }
+
+      setTimeout(() => {
+        if (checkbox) checkbox.disabled = false;
+        if (label) label.style.opacity = '1';
+        if (statusDiv) statusDiv.style.opacity = '0';
+      }, 800);
+
+      // Refresh prep sheet to update categories
+      refreshPrepSheet();
+
+    } catch (error) {
+      console.error('Failed to toggle line cooks prep:', error);
+
+      // Error feedback
+      if (statusDiv) {
+        statusDiv.textContent = '✗ Failed';
+        statusDiv.style.color = '#d32f2f';
+      }
+
+      // Revert checkbox state
+      if (checkbox) checkbox.checked = !isLineCooksPrep;
+
+      setTimeout(() => {
+        if (checkbox) checkbox.disabled = false;
+        if (label) label.style.opacity = '1';
+        if (statusDiv) statusDiv.style.opacity = '0';
+      }, 1000);
+
+      showMessage(`Failed to update line cooks prep status: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Toggle not made daily flag for prep item
+   */
+  async function toggleNotMadeDaily(itemId, isNotMadeDaily) {
+    const checkbox = document.getElementById(`not-made-daily-${itemId}`);
+    const label = checkbox?.nextElementSibling;
+    const statusDiv = document.getElementById(`save-status-${itemId}`);
+
+    // Visual feedback - saving state
+    if (checkbox) checkbox.disabled = true;
+    if (label) label.style.opacity = '0.5';
+
+    // Show saving status
+    if (statusDiv) {
+      statusDiv.textContent = '💾 Saving...';
+      statusDiv.style.color = '#ff9800';
+      statusDiv.style.opacity = '1';
+    }
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ not_made_daily: isNotMadeDaily })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.notMadeDaily = isNotMadeDaily;
+      }
+
+      // Success feedback
+      if (statusDiv) {
+        statusDiv.textContent = '✓ Saved';
+        statusDiv.style.color = '#4caf50';
+      }
+
+      setTimeout(() => {
+        if (checkbox) checkbox.disabled = false;
+        if (label) label.style.opacity = '1';
+        if (statusDiv) statusDiv.style.opacity = '0';
+      }, 800);
+
+      // Refresh prep sheet to update recommendations
+      refreshPrepSheet();
+
+    } catch (error) {
+      console.error('Failed to toggle not made daily:', error);
+
+      // Error feedback
+      if (statusDiv) {
+        statusDiv.textContent = '✗ Failed';
+        statusDiv.style.color = '#d32f2f';
+      }
+
+      // Revert checkbox state
+      if (checkbox) checkbox.checked = !isNotMadeDaily;
+
+      setTimeout(() => {
+        if (checkbox) checkbox.disabled = false;
+        if (label) label.style.opacity = '1';
+        if (statusDiv) statusDiv.style.opacity = '0';
+      }, 1000);
+
+      showMessage(`Failed to update not made daily status: ${error.message}`, 'error');
     }
   }
 
@@ -13616,9 +13786,9 @@
       if (error) throw error;
 
       // Calculate recommendations for each prep item
-      const recommendations = prepItems.map(item => {
-        return calculatePrepRecommendation(item, consumptionData);
-      });
+      const recommendations = prepItems
+        .map(item => calculatePrepRecommendation(item, consumptionData))
+        .filter(rec => rec !== null); // Filter out null returns (e.g., line cooks prep with good stock)
 
       // Sort by priority (lowest stock % first, then by consumption rate)
       recommendations.sort((a, b) => {
@@ -13658,17 +13828,17 @@
     // Calculate stock percentage (current / par)
     const stockPercentage = item.parLevel > 0 ? (item.currentStock / item.parLevel) * 100 : 0;
 
-    // Check if this is a special non-daily prep item (Octopus or Vegan Lamb Burgers)
-    const itemNameUpper = item.itemName.toUpperCase();
-    const isNonDailyItem = itemNameUpper.includes('OCTOPUS') || itemNameUpper.includes('VEGAN LAMB');
+    // Check flags from database
+    const isLineCooksPrep = item.lineCooksPrep || false;
+    const isNotMadeDaily = item.notMadeDaily || false;
 
     // Determine recommendation amount
     let recommendedAmount = 0;
     let priority = 'low';
     let reasoning = '';
 
-    if (isNonDailyItem) {
-      // Special logic for Octopus and Vegan Lamb Burgers
+    if (isNotMadeDaily) {
+      // Special logic for items not made daily (Octopus, Vegan Lamb Burgers, etc.)
       if (item.currentStock < 5) {
         // Only urgent when below 5
         recommendedAmount = Math.max(5, item.parLevel - item.currentStock);
@@ -13681,6 +13851,25 @@
       } else {
         priority = 'low';
         reasoning = `Not made daily - Stock good (${item.currentStock} units)`;
+      }
+    } else if (isLineCooksPrep) {
+      // Special logic for line cooks prep items (Chili Oil, Iskender Sauce)
+      // Only show in prep sheet when stock is low
+      if (item.currentStock === 0) {
+        recommendedAmount = Math.max(item.parLevel, Math.ceil(avgConsumptionRate * 2));
+        priority = 'urgent';
+        reasoning = 'Out of stock - line cooks need to prep';
+      } else if (stockPercentage < 50) {
+        recommendedAmount = Math.ceil(item.parLevel - item.currentStock);
+        priority = 'high';
+        reasoning = `Stock below 50% (${stockPercentage.toFixed(0)}%) - line cooks prep`;
+      } else if (stockPercentage < 75) {
+        recommendedAmount = Math.ceil(item.parLevel - item.currentStock);
+        priority = 'medium';
+        reasoning = `Stock at ${stockPercentage.toFixed(0)}% - line cooks prep`;
+      } else {
+        // Don't show in prep sheet if stock is good
+        return null;
       }
     } else {
       // Standard logic for regular prep items
@@ -13718,6 +13907,8 @@
       priority,
       reasoning,
       urgent: item.urgent || false,
+      lineCooksPrep: item.lineCooksPrep || false,
+      notMadeDaily: item.notMadeDaily || false,
       lastCountedDate: item.lastCountedDate
     };
   }
@@ -13776,14 +13967,18 @@
     const makeFirst = recommendations.filter(r => r.urgent === true)
       .sort((a, b) => a.stockPercentage - b.stockPercentage);
 
-    // THEN: Regular priority groups (exclude urgent flagged items)
-    const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true)
+    // SECOND: Filter LINE COOKS PREP items (lineCooksPrep flag set, exclude urgent items)
+    const lineCooksPrep = recommendations.filter(r => r.lineCooksPrep === true && r.urgent !== true)
       .sort((a, b) => a.stockPercentage - b.stockPercentage);
-    const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true)
+
+    // THEN: Regular priority groups (exclude urgent and lineCooksPrep flagged items)
+    const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true && r.lineCooksPrep !== true)
       .sort((a, b) => a.stockPercentage - b.stockPercentage);
-    const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true)
+    const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true && r.lineCooksPrep !== true)
       .sort((a, b) => a.stockPercentage - b.stockPercentage);
-    const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true)
+    const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true && r.lineCooksPrep !== true)
+      .sort((a, b) => a.stockPercentage - b.stockPercentage);
+    const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true && r.lineCooksPrep !== true)
       .sort((a, b) => a.stockPercentage - b.stockPercentage);
 
     let html = '';
@@ -13791,6 +13986,11 @@
     // Render MAKE FIRST category at the very top
     if (makeFirst.length > 0) {
       html += renderPriorityGroup('MAKE FIRST', makeFirst, 'makeFirst');
+    }
+
+    // Render LINE COOKS PREP category second
+    if (lineCooksPrep.length > 0) {
+      html += renderPriorityGroup('LINE COOKS PREP', lineCooksPrep, 'lineCooksPrep');
     }
 
     // Render each priority group with grayscale styling (matching PDF)
@@ -14007,15 +14207,24 @@
       const makeFirst = recommendations.filter(r => r.urgent === true)
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
 
-      // THEN: Regular priority groups (exclude urgent flagged items)
-      const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true);
-      const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true);
-      const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true);
-      const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true);
+      // SECOND: Filter LINE COOKS PREP items (lineCooksPrep flag set, exclude urgent items)
+      const lineCooksPrep = recommendations.filter(r => r.lineCooksPrep === true && r.urgent !== true)
+        .sort((a, b) => a.stockPercentage - b.stockPercentage);
+
+      // THEN: Regular priority groups (exclude urgent and lineCooksPrep flagged items)
+      const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true && r.lineCooksPrep !== true);
+      const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true && r.lineCooksPrep !== true);
+      const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true && r.lineCooksPrep !== true);
+      const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true && r.lineCooksPrep !== true);
 
       // Render MAKE FIRST category at the very top
       if (makeFirst.length > 0) {
         yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0]); // Red color for emphasis
+      }
+
+      // Render LINE COOKS PREP category second
+      if (lineCooksPrep.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130]); // Purple color for line cooks
       }
 
       // Render each priority group
@@ -14139,13 +14348,18 @@
       // Group by priority
       const makeFirst = recommendations.filter(r => r.urgent === true)
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true);
-      const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true);
-      const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true);
-      const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true);
+      const lineCooksPrep = recommendations.filter(r => r.lineCooksPrep === true && r.urgent !== true)
+        .sort((a, b) => a.stockPercentage - b.stockPercentage);
+      const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true && r.lineCooksPrep !== true);
+      const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true && r.lineCooksPrep !== true);
+      const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true && r.lineCooksPrep !== true);
+      const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true && r.lineCooksPrep !== true);
 
       if (makeFirst.length > 0) {
         yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0]);
+      }
+      if (lineCooksPrep.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130]);
       }
       if (urgent.length > 0) {
         yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black);
@@ -14175,16 +14389,25 @@
       const pdfBase64 = doc.output('datauristring').split(',')[1];
       const filename = `Prep_Sheet_${dateStr.replace(/\//g, '-')}.pdf`;
 
-      // Send via EmailJS
-      const templateParams = {
-        to_email: 'GSS4168CTJJA73@print.epsonconnect.com',
-        subject: `Prep Sheet - ${dateStr}`,
-        message: `Prep sheet for ${dateStr} attached.`,
-        attachment: pdfBase64,
-        filename: filename
-      };
+      // Send via backend Gmail API
+      const response = await fetch('/api/send-prep-sheet-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          pdfBase64: pdfBase64,
+          filename: filename,
+          subject: `Prep Sheet - ${dateStr}`,
+          toEmail: 'GSS4168CTJJA73@print.epsonconnect.com'
+        })
+      });
 
-      await emailjs.send('service_rvdkdxq', 'template_prep_sheet', templateParams, 'oEbbB6g5H0TsFG2Q4');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send email');
+      }
 
       showMessage('✅ Prep sheet sent to printer successfully!', 'success');
 
