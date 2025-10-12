@@ -14973,13 +14973,6 @@
       const extractedItems = parseInvoiceText(extractedText);
       console.log('Parsed items:', extractedItems.length);
 
-      if (extractedItems.length === 0) {
-        showMessage('No items found in invoice. Please try a clearer image.', 'warning');
-        document.getElementById('ocrProcessingStatus').style.display = 'none';
-        document.getElementById('processOCRButton').disabled = false;
-        return;
-      }
-
       // Update progress
       document.getElementById('ocrProgressText').textContent = 'Matching items with inventory...';
 
@@ -14988,30 +14981,37 @@
         console.warn('No inventory items loaded for matching');
       }
 
-      // Match items with inventory using fuzzy matching
-      for (const item of extractedItems) {
-        const match = fuzzyMatchInventoryItem(item.detectedName);
-        if (match) {
-          item.matchedInventoryId = match.id;
-          item.matchConfidence = match.confidence;
-          item.matchedItemName = match.itemName;
+      // Match items with inventory using fuzzy matching (only if items were found)
+      if (extractedItems.length > 0) {
+        for (const item of extractedItems) {
+          const match = fuzzyMatchInventoryItem(item.detectedName);
+          if (match) {
+            item.matchedInventoryId = match.id;
+            item.matchConfidence = match.confidence;
+            item.matchedItemName = match.itemName;
+          }
         }
       }
 
-      // Store extracted items
+      // Store extracted items (even if empty array - user can add manually)
       orderingSystemState.extractedInvoiceItems = extractedItems;
 
       // Hide processing, show results
       document.getElementById('ocrProcessingStatus').style.display = 'none';
       document.getElementById('extractedItemsSection').style.display = 'block';
 
-      // Render extracted items
+      // Render extracted items (will show "add manually" button if empty)
       renderExtractedItems();
 
       // Re-enable button
       document.getElementById('processOCRButton').disabled = false;
 
-      showMessage(`Successfully extracted ${extractedItems.length} items from invoice!`, 'success');
+      // Show appropriate message
+      if (extractedItems.length === 0) {
+        showMessage('No items auto-detected. You can add items manually below.', 'info');
+      } else {
+        showMessage(`Successfully extracted ${extractedItems.length} items from invoice!`, 'success');
+      }
 
     } catch (error) {
       console.error('OCR processing error:', error);
@@ -15035,10 +15035,14 @@
     const items = [];
     const lines = text.split('\n');
 
+    console.log('🔍 Parsing OCR text - Total lines:', lines.length);
+
     // Pattern to match: quantity, item name, price
     // Example: "2 Arugula 4# CS 12.50" or "1.5 Fresh Basil Bunch 8.99"
     const itemPattern = /^[\s]*([0-9]+\.?[0-9]*)\s+(.+?)\s+([0-9]+\.[0-9]{2})[\s]*$/;
 
+    // Try pattern matching first
+    let patternMatchCount = 0;
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.length < 5) continue; // Skip short lines
@@ -15060,8 +15064,55 @@
             matchConfidence: 0,
             matchedItemName: null
           });
+          patternMatchCount++;
         }
       }
+    }
+
+    console.log('📊 Pattern matched items:', patternMatchCount);
+
+    // If no pattern matches found, show ALL lines for manual matching
+    if (items.length === 0) {
+      console.log('⚠️ No pattern matches - showing ALL lines for manual review');
+
+      // Skip common header/footer lines
+      const skipPatterns = [
+        /^(order|invoice|po#|est\.|qty|total|subtotal|tax|page)/i,
+        /^[0-9]{10,}$/, // Long numbers (order IDs)
+        /^[0-9\/\-]+$/, // Just dates
+        /^\s*$/  // Empty
+      ];
+
+      for (let i = 0; i < lines.length; i++) {
+        const trimmed = lines[i].trim();
+
+        // Skip very short or very long lines
+        if (trimmed.length < 3 || trimmed.length > 100) continue;
+
+        // Skip header/footer patterns
+        let shouldSkip = false;
+        for (const pattern of skipPatterns) {
+          if (pattern.test(trimmed)) {
+            shouldSkip = true;
+            break;
+          }
+        }
+
+        if (shouldSkip) continue;
+
+        // Add as potential item (user can skip/match manually)
+        items.push({
+          id: Date.now() + Math.random() + i, // Temporary ID
+          detectedName: trimmed,
+          detectedQuantity: 1, // Default quantity
+          detectedPrice: null, // No price detected
+          matchedInventoryId: null,
+          matchConfidence: 0,
+          matchedItemName: null
+        });
+      }
+
+      console.log('📋 Created', items.length, 'potential items from OCR lines for manual review');
     }
 
     return items;
@@ -15140,13 +15191,27 @@
     container.innerHTML = '';
 
     if (orderingSystemState.extractedInvoiceItems.length === 0) {
-      const emptyMessage = document.createElement('p');
-      emptyMessage.textContent = 'No items extracted yet.';
-      emptyMessage.style.textAlign = 'center';
-      emptyMessage.style.color = '#666';
-      emptyMessage.style.padding = '20px';
+      // Show message that no items were extracted
+      const emptyMessage = document.createElement('div');
+      emptyMessage.style.cssText = 'background: var(--gray-100); border: 2px dashed var(--gray-400); padding: 40px 20px; text-align: center; border-radius: 0; margin-bottom: 20px;';
+
+      const icon = document.createElement('div');
+      icon.textContent = '📋';
+      icon.style.cssText = 'font-size: 48px; margin-bottom: 16px;';
+      emptyMessage.appendChild(icon);
+
+      const title = document.createElement('div');
+      title.textContent = 'NO TEXT DETECTED';
+      title.style.cssText = 'font-size: 14px; font-weight: 700; color: var(--gray-900); margin-bottom: 8px; letter-spacing: 1px;';
+      emptyMessage.appendChild(title);
+
+      const desc = document.createElement('div');
+      desc.textContent = 'OCR could not extract any text from the image. Please try a clearer photo.';
+      desc.style.cssText = 'font-size: 12px; color: var(--gray-600);';
+      emptyMessage.appendChild(desc);
+
       container.appendChild(emptyMessage);
-      return;
+      return; // No items to display
     }
 
     // Create a card for each extracted item
