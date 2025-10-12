@@ -9759,6 +9759,7 @@
     pendingStockUpdates: new Map(), // Track unsaved stock updates
     currentCountSession: 'morning_prep', // Track current prep count session
     previousCounts: new Map(), // Track previous counts for consumption calculation (itemId -> {count, session})
+    prepRecommendations: [], // Store current prep recommendations for print/PDF
     // Invoice system state
     currentInvoiceImage: null,
     extractedInvoiceItems: [],
@@ -13658,6 +13659,9 @@
   function renderPrepRecommendations(recommendations) {
     const container = document.getElementById('prepRecommendationsList');
 
+    // Store recommendations for print/PDF
+    orderingSystemState.prepRecommendations = recommendations;
+
     if (recommendations.length === 0) {
       container.innerHTML = `
         <div style="text-align: center; padding: 40px;">
@@ -13772,30 +13776,458 @@
   }
 
   /**
-   * Generate prep sheet PDF
+   * Generate prep sheet PDF with compact grayscale design
    */
   async function generatePrepSheetPDF() {
+    const recommendations = orderingSystemState.prepRecommendations;
+    if (!recommendations || recommendations.length === 0) {
+      showMessage('No prep recommendations to export', 'warning');
+      return;
+    }
+
     showMessage('Generating prep sheet PDF...', 'info');
-    // TODO: Implement PDF generation using jsPDF
-    showMessage('PDF generation coming soon!', 'info');
+
+    try {
+      // Check if jsPDF is loaded
+      if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
+        throw new Error('jsPDF library not loaded. Please refresh the page.');
+      }
+
+      const { jsPDF } = jspdf;
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'in',
+        format: 'letter'
+      });
+
+      const jaynaBlue = [33, 150, 243]; // #2196F3
+      const darkGray = [66, 66, 66]; // #424242
+      const black = [33, 33, 33]; // #212121
+      const lightGray = [245, 245, 245]; // #f5f5f5
+
+      const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+      // Header
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(black[0], black[1], black[2]);
+      doc.text('PREP SHEET - ' + dateStr, 4.25, 0.7, { align: 'center' });
+
+      // Blue underline
+      doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+      doc.setLineWidth(0.02);
+      doc.line(0.5, 0.78, 8, 0.78);
+
+      // Subtitle
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(102, 102, 102);
+      doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
+
+      let yPos = 1.1;
+
+      // Group by priority
+      const urgent = recommendations.filter(r => r.priority === 'urgent');
+      const high = recommendations.filter(r => r.priority === 'high');
+      const medium = recommendations.filter(r => r.priority === 'medium');
+      const low = recommendations.filter(r => r.priority === 'low');
+
+      // Render each priority group
+      if (urgent.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black);
+      }
+      if (high.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'HIGH PRIORITY - Low Stock', high, yPos, darkGray);
+      }
+      if (medium.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'MEDIUM PRIORITY', medium, yPos, darkGray);
+      }
+      if (low.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray);
+      }
+
+      // Footer
+      if (yPos < 10) {
+        doc.setDrawColor(224, 224, 224);
+        doc.line(0.5, 10.2, 8, 10.2);
+        doc.setFontSize(6);
+        doc.setTextColor(153, 153, 153);
+        doc.text('Jayna Organic Eatery | Prep Recommendations', 4.25, 10.35, { align: 'center' });
+      }
+
+      // Save PDF
+      const filename = `Prep_Sheet_${dateStr.replace(/\//g, '-')}.pdf`;
+      doc.save(filename);
+
+      showMessage('Prep sheet PDF generated successfully!', 'success');
+
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      showMessage('Failed to generate PDF: ' + error.message, 'error');
+    }
   }
 
   /**
-   * Print prep sheet
+   * Render a priority section in the PDF
+   */
+  function renderPrepPDFSection(doc, title, items, startY, headerColor) {
+    const jaynaBlue = [33, 150, 243];
+    const lightGray = [245, 245, 245];
+
+    // Check if we need a new page
+    if (startY > 9.5) {
+      doc.addPage();
+      startY = 0.7;
+    }
+
+    // Section header
+    doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
+    doc.rect(0.5, startY, 7.5, 0.25, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(`${title} (${items.length} items)`, 0.6, startY + 0.17);
+
+    startY += 0.25;
+
+    // Table setup
+    const tableData = items.map(item => {
+      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+      const isOut = item.currentStock === 0;
+      const stockDisplay = isOut ? 'OUT' : `${item.currentStock} ${item.unit}`;
+      const parDisplay = `${item.parLevel} ${item.unit}`;
+      const recommendValue = item.recommendedAmount > 0 ? String(item.recommendedAmount) : '—';
+
+      return [
+        `${item.itemName}\nLast count: ${lastCountStr}`,
+        `${stockDisplay}\nCurrent`,
+        `${parDisplay}\nPar`,
+        `${recommendValue}\nTo Make`,
+        item.reasoning
+      ];
+    });
+
+    // Custom rendering for better control
+    doc.autoTable({
+      startY: startY,
+      head: [['ITEM NAME', 'CURRENT', 'PAR', 'RECOMMEND', 'REASONING']],
+      body: tableData,
+      theme: 'plain',
+      margin: { left: 0.5, right: 0.5 },
+      styles: {
+        fontSize: 7,
+        cellPadding: 0.06,
+        lineColor: [224, 224, 224],
+        lineWidth: 0.01
+      },
+      headStyles: {
+        fillColor: lightGray,
+        textColor: [102, 102, 102],
+        fontStyle: 'bold',
+        fontSize: 6,
+        cellPadding: 0.05,
+        halign: 'left'
+      },
+      columnStyles: {
+        0: { cellWidth: 2.0, fontStyle: 'bold', fontSize: 7, textColor: [33, 33, 33] },
+        1: { cellWidth: 1.2, halign: 'center', fontSize: 7 },
+        2: { cellWidth: 1.2, halign: 'center', fontSize: 7 },
+        3: { cellWidth: 0.9, halign: 'center', fontStyle: 'bold', fontSize: 8, textColor: jaynaBlue },
+        4: { cellWidth: 2.2, fontSize: 5.5, textColor: [102, 102, 102], fontStyle: 'italic' }
+      },
+      didParseCell: function(data) {
+        // Add border only to body cells
+        if (data.section === 'body') {
+          data.cell.styles.lineColor = [224, 224, 224];
+          data.cell.styles.lineWidth = 0.005;
+        }
+        // Highlight OUT items in red
+        if (data.column.index === 1 && data.section === 'body') {
+          const cellText = data.cell.text[0];
+          if (cellText && cellText.includes('OUT')) {
+            data.cell.styles.textColor = [211, 47, 47];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      },
+      didDrawCell: function(data) {
+        // Handle multi-line rendering for item names
+        if (data.column.index === 0 && data.section === 'body' && data.row.index >= 0) {
+          const lines = data.cell.text;
+          if (lines.length > 1) {
+            // First line is item name (already drawn)
+            // Second line is "Last count:" in smaller gray text
+            const y = data.cell.y + data.cell.height - 0.12;
+            doc.setFontSize(5.5);
+            doc.setTextColor(153, 153, 153);
+            doc.setFont('helvetica', 'normal');
+            doc.text(lines[1], data.cell.x + 0.06, y);
+          }
+        }
+        // Handle multi-line labels for stock values
+        if ((data.column.index >= 1 && data.column.index <= 3) && data.section === 'body') {
+          const lines = data.cell.text;
+          if (lines.length > 1) {
+            // Second line is the label (Current, Par, To Make)
+            const y = data.cell.y + data.cell.height - 0.12;
+            doc.setFontSize(5);
+            doc.setTextColor(102, 102, 102);
+            doc.setFont('helvetica', 'normal');
+            doc.text(lines[1], data.cell.x + data.cell.width / 2, y, { align: 'center' });
+          }
+        }
+      }
+    });
+
+    return doc.lastAutoTable.finalY + 0.2;
+  }
+
+  /**
+   * Print prep sheet with compact grayscale design
    */
   function printPrepSheet() {
-    const prepSheet = document.getElementById('prepRecommendationsList');
-    if (!prepSheet) return;
+    const recommendations = orderingSystemState.prepRecommendations;
+    if (!recommendations || recommendations.length === 0) {
+      showMessage('No prep recommendations to print', 'warning');
+      return;
+    }
+
+    const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+
+    // Group by priority
+    const urgent = recommendations.filter(r => r.priority === 'urgent');
+    const high = recommendations.filter(r => r.priority === 'high');
+    const medium = recommendations.filter(r => r.priority === 'medium');
+    const low = recommendations.filter(r => r.priority === 'low');
 
     const printWindow = window.open('', '', 'height=800,width=1000');
-    printWindow.document.write('<html><head><title>Prep Sheet - ' + new Date().toLocaleDateString() + '</title>');
-    printWindow.document.write('<style>body{font-family: Arial, sans-serif; padding: 20px;} table{width:100%; border-collapse: collapse;} th, td{border: 1px solid #ddd; padding: 8px; text-align: left;} th{background: #ff6b35; color: white;}</style>');
-    printWindow.document.write('</head><body>');
-    printWindow.document.write('<h1 style="color: #ff6b35;">🍳 Prep Sheet - ' + new Date().toLocaleDateString() + '</h1>');
-    printWindow.document.write(prepSheet.innerHTML);
-    printWindow.document.write('</body></html>');
+
+    let html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Prep Sheet - ${dateStr}</title>
+  <style>
+    @page {
+      margin: 0.5in;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      color: #212121;
+      font-size: 9pt;
+      line-height: 1.3;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 16pt;
+      border-bottom: 2px solid #2196F3;
+      padding-bottom: 8pt;
+    }
+    .header h1 {
+      font-size: 16pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #212121;
+      margin-bottom: 4pt;
+    }
+    .header .subtitle {
+      font-size: 9pt;
+      color: #666;
+      font-weight: 400;
+    }
+    .section {
+      margin-bottom: 14pt;
+      page-break-inside: avoid;
+    }
+    .section-header {
+      background: #424242;
+      color: white;
+      padding: 6pt 8pt;
+      font-size: 10pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      border: 2px solid #424242;
+    }
+    .section-header.urgent {
+      background: #212121;
+      border-color: #212121;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 2px solid #424242;
+      border-top: none;
+    }
+    th {
+      background: #f5f5f5;
+      padding: 5pt 6pt;
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #666;
+      border-bottom: 2px solid #e0e0e0;
+      text-align: left;
+    }
+    td {
+      padding: 5pt 6pt;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 8pt;
+      vertical-align: top;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    .item-name {
+      font-weight: 700;
+      color: #212121;
+      text-transform: uppercase;
+      font-size: 9pt;
+      letter-spacing: 0.3px;
+    }
+    .last-count {
+      font-size: 7pt;
+      color: #999;
+      margin-top: 1pt;
+    }
+    .stock-value {
+      font-weight: 700;
+      font-size: 10pt;
+      color: #212121;
+    }
+    .stock-value.out {
+      color: #d32f2f;
+      text-transform: uppercase;
+      font-size: 9pt;
+      letter-spacing: 0.5px;
+    }
+    .stock-label {
+      font-size: 7pt;
+      color: #666;
+      text-transform: uppercase;
+      margin-top: 1pt;
+    }
+    .recommend-value {
+      font-weight: 700;
+      font-size: 11pt;
+      color: #2196F3;
+    }
+    .reasoning {
+      font-size: 7pt;
+      color: #666;
+      font-style: italic;
+      line-height: 1.2;
+    }
+    .col-name { width: 28%; }
+    .col-current { width: 15%; text-align: center; }
+    .col-par { width: 15%; text-align: center; }
+    .col-recommend { width: 12%; text-align: center; }
+    .col-reasoning { width: 30%; }
+    .footer {
+      margin-top: 16pt;
+      padding-top: 8pt;
+      border-top: 1px solid #e0e0e0;
+      font-size: 7pt;
+      color: #999;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Prep Sheet - ${dateStr}</h1>
+    <div class="subtitle">Generated ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+  </div>
+`;
+
+    // Render each priority group
+    if (urgent.length > 0) {
+      html += renderPrintPriorityGroup('URGENT - Out of Stock', urgent, 'urgent');
+    }
+    if (high.length > 0) {
+      html += renderPrintPriorityGroup('HIGH PRIORITY - Low Stock', high, 'high');
+    }
+    if (medium.length > 0) {
+      html += renderPrintPriorityGroup('MEDIUM PRIORITY', medium, 'medium');
+    }
+    if (low.length > 0) {
+      html += renderPrintPriorityGroup('LOW PRIORITY - Stock Good', low, 'low');
+    }
+
+    html += `
+  <div class="footer">
+    Jayna Organic Eatery | Prep Recommendations
+  </div>
+</body>
+</html>`;
+
+    printWindow.document.write(html);
     printWindow.document.close();
     printWindow.print();
+  }
+
+  /**
+   * Render a priority group for printing
+   */
+  function renderPrintPriorityGroup(title, items, priority) {
+    const itemRows = items.map(item => {
+      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+      const isOut = item.currentStock === 0;
+      const stockDisplay = isOut ? 'OUT' : `${item.currentStock} ${item.unit}`;
+      const recommendValue = item.recommendedAmount > 0 ? item.recommendedAmount : '—';
+
+      return `
+        <tr>
+          <td class="col-name">
+            <div class="item-name">${item.itemName}</div>
+            <div class="last-count">Last count: ${lastCountStr}</div>
+          </td>
+          <td class="col-current">
+            <div class="stock-value ${isOut ? 'out' : ''}">${stockDisplay}</div>
+            <div class="stock-label">Current</div>
+          </td>
+          <td class="col-par">
+            <div class="stock-value">${item.parLevel} ${item.unit}</div>
+            <div class="stock-label">Par</div>
+          </td>
+          <td class="col-recommend">
+            <div class="recommend-value">${recommendValue}</div>
+            <div class="stock-label">To Make</div>
+          </td>
+          <td class="col-reasoning">
+            <div class="reasoning">${item.reasoning}</div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="section">
+        <div class="section-header ${priority}">${title} (${items.length} items)</div>
+        <table>
+          <thead>
+            <tr>
+              <th class="col-name">ITEM NAME</th>
+              <th class="col-current">CURRENT</th>
+              <th class="col-par">PAR</th>
+              <th class="col-recommend">RECOMMEND</th>
+              <th class="col-reasoning">REASONING</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
   // ===================================================================
