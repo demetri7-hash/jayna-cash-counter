@@ -13957,24 +13957,21 @@
       return renderCompactPrepList(doc, items, startY);
     }
 
-    // Table setup
+    // Table setup - match on-screen format with value + label structure
     const tableData = items.map(item => {
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
       const isOut = item.currentStock === 0;
-      const stockDisplay = isOut ? 'OUT' : `${item.currentStock} ${item.unit}`;
-      const parDisplay = `${item.parLevel} ${item.unit}`;
-      const recommendValue = item.recommendedAmount > 0 ? String(item.recommendedAmount) : '—';
 
       return [
-        `${item.itemName} (${lastCountStr})`,
-        stockDisplay,
-        parDisplay,
-        recommendValue,
+        { itemName: item.itemName, lastCount: lastCountStr },
+        { value: isOut ? 'OUT' : `${item.currentStock} ${item.unit}`, label: 'Current', isOut: isOut },
+        { value: `${item.parLevel} ${item.unit}`, label: 'Par' },
+        { value: item.recommendedAmount > 0 ? String(item.recommendedAmount) : '—', label: 'To Make' },
         item.reasoning
       ];
     });
 
-    // Custom rendering for better control
+    // Custom rendering with two-line format matching on-screen display
     doc.autoTable({
       startY: startY,
       head: [['ITEM NAME', 'CURRENT', 'PAR', 'RECOMMEND', 'REASONING']],
@@ -13983,10 +13980,10 @@
       margin: { left: 0.5, right: 0.5 },
       styles: {
         fontSize: 7,
-        cellPadding: 0.08,
+        cellPadding: 0.1,
         lineColor: [224, 224, 224],
         lineWidth: 0.01,
-        valign: 'middle'
+        valign: 'top'
       },
       headStyles: {
         fillColor: lightGray,
@@ -13997,25 +13994,75 @@
         halign: 'left'
       },
       columnStyles: {
-        0: { cellWidth: 2.5, fontStyle: 'bold', fontSize: 7, textColor: [33, 33, 33] },
-        1: { cellWidth: 1.2, halign: 'center', fontSize: 7 },
-        2: { cellWidth: 1.2, halign: 'center', fontSize: 7 },
-        3: { cellWidth: 0.8, halign: 'center', fontStyle: 'bold', fontSize: 9, textColor: jaynaBlue },
-        4: { cellWidth: 2.3, fontSize: 6, textColor: [102, 102, 102], fontStyle: 'italic' }
+        0: { cellWidth: 2.3, fontStyle: 'bold', fontSize: 7, textColor: [33, 33, 33] },
+        1: { cellWidth: 1.3, halign: 'center', fontSize: 8 },
+        2: { cellWidth: 1.3, halign: 'center', fontSize: 8 },
+        3: { cellWidth: 0.9, halign: 'center', fontStyle: 'bold', fontSize: 9, textColor: jaynaBlue },
+        4: { cellWidth: 2.2, fontSize: 6, textColor: [102, 102, 102], fontStyle: 'italic' }
       },
-      didParseCell: function(data) {
-        // Add border only to body cells
-        if (data.section === 'body') {
-          data.cell.styles.lineColor = [224, 224, 224];
-          data.cell.styles.lineWidth = 0.005;
+      didDrawCell: function(data) {
+        if (data.section !== 'body') return;
+
+        const cellData = data.row.raw[data.column.index];
+        const x = data.cell.x;
+        const y = data.cell.y;
+        const width = data.cell.width;
+        const height = data.cell.height;
+
+        // Column 0: Item Name + "Last count: X" below
+        if (data.column.index === 0 && typeof cellData === 'object' && cellData.itemName) {
+          // Item name (bold, larger)
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(33, 33, 33);
+          doc.text(cellData.itemName, x + 0.06, y + 0.12);
+
+          // Last count (small, gray)
+          doc.setFontSize(5.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(153, 153, 153);
+          doc.text(`Last count: ${cellData.lastCount}`, x + 0.06, y + 0.22);
         }
-        // Highlight OUT items in red
-        if (data.column.index === 1 && data.section === 'body') {
-          const cellText = data.cell.text[0];
-          if (cellText && cellText.includes('OUT')) {
-            data.cell.styles.textColor = [211, 47, 47];
-            data.cell.styles.fontStyle = 'bold';
+
+        // Columns 1-3: Value + Label below
+        if ((data.column.index >= 1 && data.column.index <= 3) && typeof cellData === 'object' && cellData.value) {
+          const centerX = x + width / 2;
+
+          // Value (large, bold)
+          doc.setFontSize(data.column.index === 3 ? 9 : 8);
+          doc.setFont('helvetica', 'bold');
+
+          // Color for OUT items and recommend values
+          if (data.column.index === 1 && cellData.isOut) {
+            doc.setTextColor(211, 47, 47); // Red for OUT
+          } else if (data.column.index === 3) {
+            doc.setTextColor(33, 150, 243); // Blue for recommend
+          } else {
+            doc.setTextColor(33, 33, 33);
           }
+
+          doc.text(cellData.value, centerX, y + 0.13, { align: 'center' });
+
+          // Label (small, gray)
+          doc.setFontSize(5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(102, 102, 102);
+          doc.text(cellData.label, centerX, y + 0.23, { align: 'center' });
+        }
+
+        // Column 4: Reasoning (italic)
+        if (data.column.index === 4 && typeof cellData === 'string') {
+          doc.setFontSize(6);
+          doc.setFont('helvetica', 'italic');
+          doc.setTextColor(102, 102, 102);
+          const lines = doc.splitTextToSize(cellData, width - 0.12);
+          doc.text(lines, x + 0.06, y + 0.12);
+        }
+      },
+      willDrawCell: function(data) {
+        // Prevent autoTable from drawing text (we'll do it in didDrawCell)
+        if (data.section === 'body') {
+          data.cell.text = [];
         }
       }
     });
