@@ -14421,44 +14421,42 @@
    * Render low priority items in extra compact list format
    */
   function renderCompactPrepList(doc, items, startY) {
-    const colWidth = 2.5;
-    const lineHeight = 0.12;  // Reduced from 0.15
-    const itemsPerColumn = 25;  // Increased from 20
-    const leftMargin = 0.6;
+    // 2-COLUMN LAYOUT for LOW PRIORITY items
+    const leftColX = 0.6;        // Left column start
+    const rightColX = 4.3;       // Right column start (middle of page)
+    const colWidth = 3.5;        // Each column width
+    const lineHeight = 0.12;
+    const topMargin = startY + 0.08;
 
-    let x = leftMargin;
-    let y = startY + 0.08;  // Reduced from 0.1
-    let itemsInColumn = 0;
+    // Split items into 2 columns (left half and right half)
+    const itemsPerColumn = Math.ceil(items.length / 2);
+    const leftColItems = items.slice(0, itemsPerColumn);
+    const rightColItems = items.slice(itemsPerColumn);
 
-    doc.setFontSize(5.5);  // Reduced from 6
+    doc.setFontSize(5.5);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(66, 66, 66);
 
-    items.forEach((item, index) => {
-      // Move to next column if needed
-      if (itemsInColumn >= itemsPerColumn) {
-        x += colWidth;
-        y = startY + 0.08;
-        itemsInColumn = 0;
-      }
-
-      // Check if we need a new page
-      if (x > 7) {
-        doc.addPage();
-        x = leftMargin;
-        y = 0.7;
-        itemsInColumn = 0;
-      }
-
-      // Render item: "Item Name (50%)"
+    // Render LEFT COLUMN
+    let y = topMargin;
+    leftColItems.forEach((item) => {
       const stockText = `${item.itemName} (${item.stockPercentage.toFixed(0)}%)`;
-      doc.text(stockText, x, y);
-
+      doc.text(stockText, leftColX, y, { maxWidth: colWidth });
       y += lineHeight;
-      itemsInColumn++;
     });
 
-    return y + 0.15;  // Reduced from 0.2
+    // Render RIGHT COLUMN
+    y = topMargin;
+    rightColItems.forEach((item) => {
+      const stockText = `${item.itemName} (${item.stockPercentage.toFixed(0)}%)`;
+      doc.text(stockText, rightColX, y, { maxWidth: colWidth });
+      y += lineHeight;
+    });
+
+    // Return the max Y position (whichever column ended lower)
+    const leftColEndY = topMargin + (leftColItems.length * lineHeight);
+    const rightColEndY = topMargin + (rightColItems.length * lineHeight);
+    return Math.max(leftColEndY, rightColEndY) + 0.15;
   }
 
   /**
