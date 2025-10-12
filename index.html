@@ -15221,7 +15221,10 @@
         const manualMatchBtn = document.createElement('button');
         manualMatchBtn.textContent = item.matchedInventoryId ? 'CHANGE' : 'MATCH';
         manualMatchBtn.style.cssText = 'background: var(--gray-100); color: var(--gray-900); border: 2px solid var(--gray-300); padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;';
-        manualMatchBtn.onclick = function() { showManualMatchModal(index); };
+        manualMatchBtn.onclick = function() {
+          console.log('🖱️ MATCH/CHANGE button clicked! Index:', index);
+          showManualMatchModal(index);
+        };
         btnContainer.appendChild(manualMatchBtn);
 
         // Add New button
@@ -15348,8 +15351,13 @@
    * Avoids template literals that caused previous crash
    */
   function showManualMatchModal(itemIndex) {
+    console.log('🔍 showManualMatchModal called with itemIndex:', itemIndex);
     const item = orderingSystemState.extractedInvoiceItems[itemIndex];
-    if (!item) return;
+    console.log('📦 Extracted item:', item);
+    if (!item) {
+      console.error('❌ No item found at index:', itemIndex);
+      return;
+    }
 
     // Create modal overlay
     const overlay = document.createElement('div');
@@ -15585,7 +15593,20 @@
 
     // Assemble modal
     overlay.appendChild(modal);
+    console.log('✅ Modal created, appending to body...');
+    console.log('📍 Overlay element:', overlay);
+    console.log('📍 Modal element:', modal);
     document.body.appendChild(overlay);
+    console.log('✅ Modal appended to body successfully!');
+    console.log('📊 document.body children count:', document.body.children.length);
+
+    // Check if modal is actually in DOM
+    const modalCheck = document.getElementById('manualMatchModal');
+    console.log('🔍 Modal found in DOM:', modalCheck ? 'YES' : 'NO');
+    if (modalCheck) {
+      console.log('📐 Modal computed style:', window.getComputedStyle(modalCheck).display);
+      console.log('📐 Modal z-index:', window.getComputedStyle(modalCheck).zIndex);
+    }
 
     // Focus search input
     searchInput.focus();
