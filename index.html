@@ -15036,7 +15036,62 @@
     const lines = text.split('\n');
 
     console.log('🔍 Parsing OCR text - Total lines:', lines.length);
+    console.log('📄 Invoice type:', orderingSystemState.invoiceType || 'invoice');
 
+    // ==== PERFORMANCE ORDER FORMAT ====
+    // Multi-line format:
+    // ITEM NAME
+    // SKU/Brand
+    // Size/Unit                Confirmed: X        Qty: X
+    // CS                      $price              $total
+
+    if (orderingSystemState.invoiceType === 'order') {
+      console.log('🔍 Trying Performance order format...');
+
+      for (let i = 0; i < lines.length - 3; i++) {
+        const line1 = lines[i].trim(); // Item name
+        const line2 = lines[i + 1].trim(); // SKU/Brand
+        const line3 = lines[i + 2].trim(); // Size + Confirmed/Qty
+        const line4 = lines[i + 3].trim(); // CS + Price
+
+        // Check if line3 contains "Confirmed:" and "Qty:"
+        if (line3.includes('Confirmed:') && line3.includes('Qty:')) {
+          // Extract quantity from "Qty: X"
+          const qtyMatch = line3.match(/Qty:\s*(\d+)/);
+
+          // Extract price from line4 (format: "CS $5.12 $10.24")
+          const priceMatch = line4.match(/\$(\d+\.\d{2})/);
+
+          if (qtyMatch && priceMatch && line1.length > 2) {
+            const quantity = parseInt(qtyMatch[1]);
+            const price = parseFloat(priceMatch[1]);
+
+            items.push({
+              id: Date.now() + Math.random() + i,
+              detectedName: line1, // Use item name from line 1
+              detectedQuantity: quantity,
+              detectedPrice: price,
+              matchedInventoryId: null,
+              matchConfidence: 0,
+              matchedItemName: null
+            });
+
+            console.log('✅ Found Performance item:', line1, 'Qty:', quantity, 'Price:', price);
+
+            // Skip the lines we just processed
+            i += 3;
+          }
+        }
+      }
+
+      console.log('📊 Performance format matched items:', items.length);
+
+      if (items.length > 0) {
+        return items; // Success!
+      }
+    }
+
+    // ==== STANDARD INVOICE FORMAT ====
     // Pattern to match: quantity, item name, price
     // Example: "2 Arugula 4# CS 12.50" or "1.5 Fresh Basil Bunch 8.99"
     const itemPattern = /^[\s]*([0-9]+\.?[0-9]*)\s+(.+?)\s+([0-9]+\.[0-9]{2})[\s]*$/;
@@ -15069,7 +15124,7 @@
       }
     }
 
-    console.log('📊 Pattern matched items:', patternMatchCount);
+    console.log('📊 Standard format matched items:', patternMatchCount);
 
     // If no pattern matches found, show ALL lines for manual matching
     if (items.length === 0) {
