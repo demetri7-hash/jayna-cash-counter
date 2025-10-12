@@ -13658,30 +13658,52 @@
     // Calculate stock percentage (current / par)
     const stockPercentage = item.parLevel > 0 ? (item.currentStock / item.parLevel) * 100 : 0;
 
+    // Check if this is a special non-daily prep item (Octopus or Vegan Lamb Burgers)
+    const itemNameUpper = item.itemName.toUpperCase();
+    const isNonDailyItem = itemNameUpper.includes('OCTOPUS') || itemNameUpper.includes('VEGAN LAMB');
+
     // Determine recommendation amount
     let recommendedAmount = 0;
     let priority = 'low';
     let reasoning = '';
 
-    if (item.currentStock === 0) {
-      // Out of stock - urgent
-      recommendedAmount = Math.max(item.parLevel, Math.ceil(avgConsumptionRate * 2)); // At least par or 2x consumption
-      priority = 'urgent';
-      reasoning = 'Out of stock - make immediately';
-    } else if (stockPercentage < 50) {
-      // Low stock - high priority
-      recommendedAmount = Math.ceil(item.parLevel - item.currentStock);
-      priority = 'high';
-      reasoning = `Stock below 50% (${stockPercentage.toFixed(0)}%)`;
-    } else if (stockPercentage < 75 && avgConsumptionRate > 0) {
-      // Medium stock but consuming - medium priority
-      recommendedAmount = Math.ceil(avgConsumptionRate * 1.5);
-      priority = 'medium';
-      reasoning = `Stock at ${stockPercentage.toFixed(0)}%, consuming ${avgConsumptionRate.toFixed(1)}/session`;
+    if (isNonDailyItem) {
+      // Special logic for Octopus and Vegan Lamb Burgers
+      if (item.currentStock < 5) {
+        // Only urgent when below 5
+        recommendedAmount = Math.max(5, item.parLevel - item.currentStock);
+        priority = 'urgent';
+        reasoning = `Below 5 units - May not need daily prep, check with manager`;
+      } else if (item.currentStock < item.parLevel * 0.7) {
+        recommendedAmount = Math.ceil(item.parLevel - item.currentStock);
+        priority = 'medium';
+        reasoning = `Not made daily - Check with manager before prepping`;
+      } else {
+        priority = 'low';
+        reasoning = `Not made daily - Stock good (${item.currentStock} units)`;
+      }
     } else {
-      // Stock is good
-      priority = 'low';
-      reasoning = `Stock good (${stockPercentage.toFixed(0)}%)`;
+      // Standard logic for regular prep items
+      if (item.currentStock === 0) {
+        // Out of stock - urgent
+        recommendedAmount = Math.max(item.parLevel, Math.ceil(avgConsumptionRate * 2)); // At least par or 2x consumption
+        priority = 'urgent';
+        reasoning = 'Out of stock - make immediately';
+      } else if (stockPercentage < 50) {
+        // Low stock - high priority
+        recommendedAmount = Math.ceil(item.parLevel - item.currentStock);
+        priority = 'high';
+        reasoning = `Stock below 50% (${stockPercentage.toFixed(0)}%)`;
+      } else if (stockPercentage < 75 && avgConsumptionRate > 0) {
+        // Medium stock but consuming - medium priority
+        recommendedAmount = Math.ceil(avgConsumptionRate * 1.5);
+        priority = 'medium';
+        reasoning = `Stock at ${stockPercentage.toFixed(0)}%, consuming ${avgConsumptionRate.toFixed(1)}/session`;
+      } else {
+        // Stock is good
+        priority = 'low';
+        reasoning = `Stock good (${stockPercentage.toFixed(0)}%)`;
+      }
     }
 
     return {
