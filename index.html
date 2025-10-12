@@ -10552,6 +10552,8 @@
                     <input
                       type="text"
                       value="${item.unit}"
+                      data-order-index="${index}"
+                      data-item-id="${item.id}"
                       onchange="updateOrderItemUnit(${index}, ${item.id}, this.value)"
                       style="width: 65px; padding: 5px 4px; text-align: center; border: 2px solid var(--gray-300); border-radius: 0; font-size: 11px;"
                       placeholder="CS"
@@ -10593,7 +10595,6 @@
     const item = order.items.find(i => i.id === itemId);
     if (item) {
       item.quantity = parseFloat(newQuantity) || 0;
-      console.log(`Updated ${item.itemName} quantity to ${newQuantity}`);
     }
   }
 
@@ -16157,14 +16158,47 @@
   }
 
   /**
+   * Capture all current input field values before PDF generation
+   */
+  function captureAllOrderEdits(orderIndex) {
+    const order = orderingSystemState.calculatedOrders[orderIndex];
+    if (!order) return;
+
+    // Find all quantity inputs for this order
+    const qtyInputs = document.querySelectorAll(`input[type="number"][data-order-index="${orderIndex}"]`);
+    qtyInputs.forEach(input => {
+      const itemId = parseInt(input.getAttribute('data-item-id'));
+      const newQty = parseFloat(input.value) || 0;
+      const item = order.items.find(i => i.id === itemId);
+      if (item) {
+        item.quantity = newQty;
+      }
+    });
+
+    // Find all unit inputs for this order
+    const unitInputs = document.querySelectorAll(`input[type="text"][data-order-index="${orderIndex}"]`);
+    unitInputs.forEach(input => {
+      const itemId = parseInt(input.getAttribute('data-item-id'));
+      const newUnit = input.value.trim().toUpperCase();
+      const item = order.items.find(i => i.id === itemId);
+      if (item) {
+        item.unit = newUnit;
+      }
+    });
+  }
+
+  /**
    * Generate PDF and create order for receiving (combined action)
    */
   async function generatePDFAndCreateOrder(orderIndex) {
     try {
-      // First show the create order modal to save any edits
+      // FIRST: Capture any unsaved edits from input fields
+      captureAllOrderEdits(orderIndex);
+
+      // SECOND: Show the create order modal to save
       await createOrderForReceiving(orderIndex);
 
-      // Then generate the PDF with the final edited quantities
+      // THIRD: Generate the PDF with the final edited quantities
       await generateOrderPDF(orderIndex);
     } catch (error) {
       // User cancelled or error occurred - do nothing
