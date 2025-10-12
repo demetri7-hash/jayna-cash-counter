@@ -13671,11 +13671,15 @@
       return;
     }
 
-    // Group by priority
-    const urgent = recommendations.filter(r => r.priority === 'urgent');
-    const high = recommendations.filter(r => r.priority === 'high');
-    const medium = recommendations.filter(r => r.priority === 'medium');
-    const low = recommendations.filter(r => r.priority === 'low');
+    // Group by priority and sort by stock percentage (lowest to highest)
+    const urgent = recommendations.filter(r => r.priority === 'urgent')
+      .sort((a, b) => a.stockPercentage - b.stockPercentage);
+    const high = recommendations.filter(r => r.priority === 'high')
+      .sort((a, b) => a.stockPercentage - b.stockPercentage);
+    const medium = recommendations.filter(r => r.priority === 'medium')
+      .sort((a, b) => a.stockPercentage - b.stockPercentage);
+    const low = recommendations.filter(r => r.priority === 'low')
+      .sort((a, b) => a.stockPercentage - b.stockPercentage);
 
     let html = '';
 
@@ -13869,6 +13873,50 @@
   }
 
   /**
+   * Render low priority items in compact list format
+   */
+  function renderCompactPrepList(doc, items, startY) {
+    const colWidth = 2.4;
+    const lineHeight = 0.15;
+    const itemsPerColumn = 20;
+    const leftMargin = 0.6;
+
+    let x = leftMargin;
+    let y = startY + 0.1;
+    let itemsInColumn = 0;
+
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(66, 66, 66);
+
+    items.forEach((item, index) => {
+      // Move to next column if needed
+      if (itemsInColumn >= itemsPerColumn) {
+        x += colWidth;
+        y = startY + 0.1;
+        itemsInColumn = 0;
+      }
+
+      // Check if we need a new page
+      if (x > 7) {
+        doc.addPage();
+        x = leftMargin;
+        y = 0.7;
+        itemsInColumn = 0;
+      }
+
+      // Render item: "Item Name (50%)"
+      const stockText = `${item.itemName} (${item.stockPercentage.toFixed(0)}%)`;
+      doc.text(stockText, x, y);
+
+      y += lineHeight;
+      itemsInColumn++;
+    });
+
+    return y + 0.2;
+  }
+
+  /**
    * Render a priority section in the PDF
    */
   function renderPrepPDFSection(doc, title, items, startY, headerColor) {
@@ -13890,6 +13938,11 @@
     doc.text(`${title} (${items.length} items)`, 0.6, startY + 0.17);
 
     startY += 0.25;
+
+    // LOW PRIORITY items: use compact list format
+    if (title.includes('LOW PRIORITY')) {
+      return renderCompactPrepList(doc, items, startY);
+    }
 
     // Table setup
     const tableData = items.map(item => {
@@ -13969,11 +14022,15 @@
 
     const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
 
-    // Group by priority
-    const urgent = recommendations.filter(r => r.priority === 'urgent');
-    const high = recommendations.filter(r => r.priority === 'high');
-    const medium = recommendations.filter(r => r.priority === 'medium');
-    const low = recommendations.filter(r => r.priority === 'low');
+    // Group by priority and sort by stock percentage (lowest to highest)
+    const urgent = recommendations.filter(r => r.priority === 'urgent')
+      .sort((a, b) => a.stockPercentage - b.stockPercentage);
+    const high = recommendations.filter(r => r.priority === 'high')
+      .sort((a, b) => a.stockPercentage - b.stockPercentage);
+    const medium = recommendations.filter(r => r.priority === 'medium')
+      .sort((a, b) => a.stockPercentage - b.stockPercentage);
+    const low = recommendations.filter(r => r.priority === 'low')
+      .sort((a, b) => a.stockPercentage - b.stockPercentage);
 
     const printWindow = window.open('', '', 'height=800,width=1000');
 
@@ -14152,6 +14209,23 @@
    * Render a priority group for printing
    */
   function renderPrintPriorityGroup(title, items, priority) {
+    // LOW PRIORITY items: use compact list format
+    if (priority === 'low') {
+      const itemList = items.map(item =>
+        `<span style="display: inline-block; width: 32%; padding: 2pt 4pt; font-size: 6pt; color: #666;">${item.itemName} (${item.stockPercentage.toFixed(0)}%)</span>`
+      ).join('');
+
+      return `
+        <div class="section">
+          <div class="section-header ${priority}">${title} (${items.length} items)</div>
+          <div style="background: white; border: 2px solid #424242; border-top: none; padding: 6pt 8pt; display: flex; flex-wrap: wrap;">
+            ${itemList}
+          </div>
+        </div>
+      `;
+    }
+
+    // URGENT, HIGH, MEDIUM: use full table format
     const itemRows = items.map(item => {
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
       const isOut = item.currentStock === 0;
