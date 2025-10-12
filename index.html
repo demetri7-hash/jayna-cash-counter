@@ -13919,19 +13919,19 @@
   }
 
   /**
-   * Render low priority items in compact list format
+   * Render low priority items in extra compact list format
    */
   function renderCompactPrepList(doc, items, startY) {
-    const colWidth = 2.4;
-    const lineHeight = 0.15;
-    const itemsPerColumn = 20;
+    const colWidth = 2.5;
+    const lineHeight = 0.12;  // Reduced from 0.15
+    const itemsPerColumn = 25;  // Increased from 20
     const leftMargin = 0.6;
 
     let x = leftMargin;
-    let y = startY + 0.1;
+    let y = startY + 0.08;  // Reduced from 0.1
     let itemsInColumn = 0;
 
-    doc.setFontSize(6);
+    doc.setFontSize(5.5);  // Reduced from 6
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(66, 66, 66);
 
@@ -13939,7 +13939,7 @@
       // Move to next column if needed
       if (itemsInColumn >= itemsPerColumn) {
         x += colWidth;
-        y = startY + 0.1;
+        y = startY + 0.08;
         itemsInColumn = 0;
       }
 
@@ -13959,11 +13959,11 @@
       itemsInColumn++;
     });
 
-    return y + 0.2;
+    return y + 0.15;  // Reduced from 0.2
   }
 
   /**
-   * Render a priority section in the PDF
+   * Render a priority section in the PDF (compact original format)
    */
   function renderPrepPDFSection(doc, title, items, startY, headerColor) {
     const jaynaBlue = [33, 150, 243];
@@ -13985,26 +13985,29 @@
 
     startY += 0.25;
 
-    // LOW PRIORITY items: use compact list format
+    // LOW PRIORITY items: use even more compact list format
     if (title.includes('LOW PRIORITY')) {
       return renderCompactPrepList(doc, items, startY);
     }
 
-    // Table setup - match on-screen format with value + label structure
+    // Table setup - simple one-line format
     const tableData = items.map(item => {
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
       const isOut = item.currentStock === 0;
+      const stockDisplay = isOut ? 'OUT' : `${item.currentStock} ${item.unit}`;
+      const parDisplay = `${item.parLevel} ${item.unit}`;
+      const recommendValue = item.recommendedAmount > 0 ? String(item.recommendedAmount) : '—';
 
       return [
-        { itemName: item.itemName, lastCount: lastCountStr },
-        { value: isOut ? 'OUT' : `${item.currentStock} ${item.unit}`, label: 'Current', isOut: isOut },
-        { value: `${item.parLevel} ${item.unit}`, label: 'Par' },
-        { value: item.recommendedAmount > 0 ? String(item.recommendedAmount) : '—', label: 'To Make' },
+        `${item.itemName} (${lastCountStr})`,
+        stockDisplay,
+        parDisplay,
+        recommendValue,
         item.reasoning
       ];
     });
 
-    // Custom rendering with two-line format matching on-screen display
+    // Compact rendering with reduced padding and smaller units
     doc.autoTable({
       startY: startY,
       head: [['ITEM NAME', 'CURRENT', 'PAR', 'RECOMMEND', 'REASONING']],
@@ -14012,95 +14015,46 @@
       theme: 'plain',
       margin: { left: 0.5, right: 0.5 },
       styles: {
-        fontSize: 7,
-        cellPadding: 0.1,
+        fontSize: 6.5,
+        cellPadding: 0.04,  // Reduced from 0.08
         lineColor: [224, 224, 224],
         lineWidth: 0.01,
-        valign: 'top'
+        valign: 'middle'
       },
       headStyles: {
         fillColor: lightGray,
         textColor: [102, 102, 102],
         fontStyle: 'bold',
         fontSize: 6,
-        cellPadding: 0.05,
+        cellPadding: 0.03,  // Reduced
         halign: 'left'
       },
       columnStyles: {
-        0: { cellWidth: 2.3, fontStyle: 'bold', fontSize: 7, textColor: [33, 33, 33] },
-        1: { cellWidth: 1.3, halign: 'center', fontSize: 8 },
-        2: { cellWidth: 1.3, halign: 'center', fontSize: 8 },
-        3: { cellWidth: 0.9, halign: 'center', fontStyle: 'bold', fontSize: 9, textColor: jaynaBlue },
-        4: { cellWidth: 2.2, fontSize: 6, textColor: [102, 102, 102], fontStyle: 'italic' }
+        0: { cellWidth: 2.5, fontStyle: 'bold', fontSize: 6.5, textColor: [33, 33, 33] },
+        1: { cellWidth: 1.2, halign: 'center', fontSize: 6, fontStyle: 'normal' },  // Units not bold, smaller
+        2: { cellWidth: 1.2, halign: 'center', fontSize: 6, fontStyle: 'normal' },  // Units not bold, smaller
+        3: { cellWidth: 0.8, halign: 'center', fontStyle: 'bold', fontSize: 8, textColor: jaynaBlue },
+        4: { cellWidth: 2.3, fontSize: 5.5, textColor: [102, 102, 102], fontStyle: 'italic' }
       },
-      didDrawCell: function(data) {
-        if (data.section !== 'body') return;
-
-        const cellData = data.row.raw[data.column.index];
-        const x = data.cell.x;
-        const y = data.cell.y;
-        const width = data.cell.width;
-        const height = data.cell.height;
-
-        // Column 0: Item Name + "Last count: X" below
-        if (data.column.index === 0 && typeof cellData === 'object' && cellData.itemName) {
-          // Item name (bold, larger)
-          doc.setFontSize(7);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(33, 33, 33);
-          doc.text(cellData.itemName, x + 0.06, y + 0.12);
-
-          // Last count (small, gray)
-          doc.setFontSize(5.5);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(153, 153, 153);
-          doc.text(`Last count: ${cellData.lastCount}`, x + 0.06, y + 0.22);
-        }
-
-        // Columns 1-3: Value + Label below
-        if ((data.column.index >= 1 && data.column.index <= 3) && typeof cellData === 'object' && cellData.value) {
-          const centerX = x + width / 2;
-
-          // Value (large, bold)
-          doc.setFontSize(data.column.index === 3 ? 9 : 8);
-          doc.setFont('helvetica', 'bold');
-
-          // Color for OUT items and recommend values
-          if (data.column.index === 1 && cellData.isOut) {
-            doc.setTextColor(211, 47, 47); // Red for OUT
-          } else if (data.column.index === 3) {
-            doc.setTextColor(33, 150, 243); // Blue for recommend
-          } else {
-            doc.setTextColor(33, 33, 33);
-          }
-
-          doc.text(cellData.value, centerX, y + 0.13, { align: 'center' });
-
-          // Label (small, gray)
-          doc.setFontSize(5);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(102, 102, 102);
-          doc.text(cellData.label, centerX, y + 0.23, { align: 'center' });
-        }
-
-        // Column 4: Reasoning (italic)
-        if (data.column.index === 4 && typeof cellData === 'string') {
-          doc.setFontSize(6);
-          doc.setFont('helvetica', 'italic');
-          doc.setTextColor(102, 102, 102);
-          const lines = doc.splitTextToSize(cellData, width - 0.12);
-          doc.text(lines, x + 0.06, y + 0.12);
-        }
-      },
-      willDrawCell: function(data) {
-        // Prevent autoTable from drawing text (we'll do it in didDrawCell)
+      didParseCell: function(data) {
+        // Add border only to body cells
         if (data.section === 'body') {
-          data.cell.text = [];
+          data.cell.styles.lineColor = [224, 224, 224];
+          data.cell.styles.lineWidth = 0.005;
+        }
+        // Highlight OUT items in red
+        if (data.column.index === 1 && data.section === 'body') {
+          const cellText = data.cell.text[0];
+          if (cellText && cellText.includes('OUT')) {
+            data.cell.styles.textColor = [211, 47, 47];
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fontSize = 7;
+          }
         }
       }
     });
 
-    return doc.lastAutoTable.finalY + 0.2;
+    return doc.lastAutoTable.finalY + 0.15;  // Reduced spacing between sections
   }
 
   /**
