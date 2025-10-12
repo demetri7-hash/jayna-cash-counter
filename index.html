@@ -12562,6 +12562,21 @@
    * Toggle urgent flag for prep item
    */
   async function toggleUrgent(itemId, isUrgent) {
+    const checkbox = document.getElementById(`urgent-${itemId}`);
+    const label = checkbox?.nextElementSibling;
+    const statusDiv = document.getElementById(`save-status-${itemId}`);
+
+    // Visual feedback - saving state
+    if (checkbox) checkbox.disabled = true;
+    if (label) label.style.opacity = '0.5';
+
+    // Show saving status
+    if (statusDiv) {
+      statusDiv.textContent = '💾 Saving...';
+      statusDiv.style.color = '#ff9800';
+      statusDiv.style.opacity = '1';
+    }
+
     try {
       const { error } = await supabase
         .from('inventory_items')
@@ -12576,11 +12591,39 @@
         item.urgent = isUrgent;
       }
 
+      // Success feedback
+      if (statusDiv) {
+        statusDiv.textContent = '✓ Saved';
+        statusDiv.style.color = '#4caf50';
+      }
+
+      setTimeout(() => {
+        if (checkbox) checkbox.disabled = false;
+        if (label) label.style.opacity = '1';
+        if (statusDiv) statusDiv.style.opacity = '0';
+      }, 800);
+
       // Refresh prep sheet to reorder
       refreshPrepSheet();
 
     } catch (error) {
       console.error('Failed to toggle urgent:', error);
+
+      // Error feedback
+      if (statusDiv) {
+        statusDiv.textContent = '✗ Failed';
+        statusDiv.style.color = '#d32f2f';
+      }
+
+      // Revert checkbox state
+      if (checkbox) checkbox.checked = !isUrgent;
+
+      setTimeout(() => {
+        if (checkbox) checkbox.disabled = false;
+        if (label) label.style.opacity = '1';
+        if (statusDiv) statusDiv.style.opacity = '0';
+      }, 1000);
+
       showMessage(`Failed to update urgent status: ${error.message}`, 'error');
     }
   }
