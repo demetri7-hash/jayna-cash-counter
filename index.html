@@ -1477,16 +1477,28 @@
             </div>
           </div>
 
+          <!-- Custom Notes Section -->
+          <div style="margin-bottom: 20px;">
+            <label for="prepSheetNotes" style="display: block; font-size: 12px; font-weight: 700; color: var(--gray-700); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+              Custom Notes (optional - will appear on PDF):
+            </label>
+            <textarea
+              id="prepSheetNotes"
+              placeholder="Add any special instructions or notes for the prep team..."
+              style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; min-height: 80px; font-family: inherit; resize: vertical;"
+            ></textarea>
+          </div>
+
           <!-- Action Buttons -->
           <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
             <button class="submit-btn" onclick="refreshPrepSheet()" style="background: var(--gray-700); flex: 1;">
-              🔄 Refresh
+              REFRESH
             </button>
             <button class="submit-btn" onclick="generatePrepSheetPDF()" style="background: var(--gray-600); flex: 1;">
-              📄 PDF
+              DOWNLOAD PDF
             </button>
-            <button class="submit-btn" onclick="printPrepSheet()" style="background: var(--gray-600); flex: 1;">
-              🖨️ Print
+            <button class="submit-btn" onclick="emailPrepSheetToPrinter()" style="background: var(--gray-600); flex: 1;">
+              EMAIL TO PRINTER
             </button>
           </div>
 
@@ -13918,8 +13930,15 @@
       const black = [33, 33, 33]; // #212121
       const lightGray = [245, 245, 245]; // #f5f5f5
 
-      const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      // Date logic: If after 8pm, use next day's date
+      const now = new Date();
+      const currentHour = now.getHours();
+      const prepDate = new Date(now);
+      if (currentHour >= 20) { // 8pm or later
+        prepDate.setDate(prepDate.getDate() + 1);
+      }
+      const dateStr = prepDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
       // Header
       doc.setFontSize(14);
@@ -13939,6 +13958,27 @@
       doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
 
       let yPos = 1.1;
+
+      // Custom Notes Section (if provided)
+      const customNotes = document.getElementById('prepSheetNotes')?.value.trim();
+      if (customNotes) {
+        doc.setFillColor(255, 249, 196); // Light yellow background
+        doc.rect(0.5, yPos, 7.5, 0.5, 'F');
+        doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+        doc.setLineWidth(0.02);
+        doc.rect(0.5, yPos, 7.5, 0.5);
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(black[0], black[1], black[2]);
+        doc.text('CUSTOM NOTES:', 0.6, yPos + 0.15);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        const notesLines = doc.splitTextToSize(customNotes, 7);
+        doc.text(notesLines, 0.6, yPos + 0.3);
+        yPos += 0.6;
+      }
 
       // Group by priority
       // FIRST: Filter MAKE FIRST items (urgent flag set), sorted by stock %
@@ -13970,13 +14010,15 @@
         yPos = renderPrepPDFSection(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray);
       }
 
-      // Footer
+      // Footer with disclaimer
       if (yPos < 10) {
         doc.setDrawColor(224, 224, 224);
         doc.line(0.5, 10.2, 8, 10.2);
         doc.setFontSize(6);
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(153, 153, 153);
-        doc.text('Jayna Organic Eatery | Prep Recommendations', 4.25, 10.35, { align: 'center' });
+        doc.text('MISTAKES HAPPEN, PLEASE USE YOUR BRAIN WHEN READING THIS LIST AND', 4.25, 10.32, { align: 'center' });
+        doc.text('DOUBLE CHECK BY CLARIFYING WITH YOUR MANAGER IF YOU DOUBT ANYTHING.', 4.25, 10.40, { align: 'center' });
       }
 
       // Save PDF
@@ -13985,9 +14027,148 @@
 
       showMessage('Prep sheet PDF generated successfully!', 'success');
 
+      return doc; // Return for email function
+
     } catch (error) {
       console.error('PDF generation error:', error);
       showMessage('Failed to generate PDF: ' + error.message, 'error');
+      throw error;
+    }
+  }
+
+  /**
+   * Email prep sheet PDF to Epson printer
+   */
+  async function emailPrepSheetToPrinter() {
+    const recommendations = orderingSystemState.prepRecommendations;
+    if (!recommendations || recommendations.length === 0) {
+      showMessage('No prep recommendations to send', 'warning');
+      return;
+    }
+
+    showMessage('Generating and sending prep sheet to printer...', 'info');
+
+    try {
+      // Check if jsPDF is loaded
+      if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
+        throw new Error('jsPDF library not loaded. Please refresh the page.');
+      }
+
+      const { jsPDF } = jspdf;
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'in',
+        format: 'letter'
+      });
+
+      const jaynaBlue = [33, 150, 243];
+      const darkGray = [66, 66, 66];
+      const black = [33, 33, 33];
+      const lightGray = [245, 245, 245];
+
+      // Date logic: If after 8pm, use next day's date
+      const now = new Date();
+      const currentHour = now.getHours();
+      const prepDate = new Date(now);
+      if (currentHour >= 20) {
+        prepDate.setDate(prepDate.getDate() + 1);
+      }
+      const dateStr = prepDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+      // Header
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(black[0], black[1], black[2]);
+      doc.text('PREP SHEET - ' + dateStr, 4.25, 0.7, { align: 'center' });
+
+      doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+      doc.setLineWidth(0.02);
+      doc.line(0.5, 0.78, 8, 0.78);
+
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(102, 102, 102);
+      doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
+
+      let yPos = 1.1;
+
+      // Custom Notes
+      const customNotes = document.getElementById('prepSheetNotes')?.value.trim();
+      if (customNotes) {
+        doc.setFillColor(255, 249, 196);
+        doc.rect(0.5, yPos, 7.5, 0.5, 'F');
+        doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+        doc.setLineWidth(0.02);
+        doc.rect(0.5, yPos, 7.5, 0.5);
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(black[0], black[1], black[2]);
+        doc.text('CUSTOM NOTES:', 0.6, yPos + 0.15);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        const notesLines = doc.splitTextToSize(customNotes, 7);
+        doc.text(notesLines, 0.6, yPos + 0.3);
+        yPos += 0.6;
+      }
+
+      // Group by priority
+      const makeFirst = recommendations.filter(r => r.urgent === true)
+        .sort((a, b) => a.stockPercentage - b.stockPercentage);
+      const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true);
+      const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true);
+      const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true);
+      const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true);
+
+      if (makeFirst.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0]);
+      }
+      if (urgent.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black);
+      }
+      if (high.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'HIGH PRIORITY - Low Stock', high, yPos, darkGray);
+      }
+      if (medium.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'MEDIUM PRIORITY', medium, yPos, darkGray);
+      }
+      if (low.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray);
+      }
+
+      // Footer
+      if (yPos < 10) {
+        doc.setDrawColor(224, 224, 224);
+        doc.line(0.5, 10.2, 8, 10.2);
+        doc.setFontSize(6);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(153, 153, 153);
+        doc.text('MISTAKES HAPPEN, PLEASE USE YOUR BRAIN WHEN READING THIS LIST AND', 4.25, 10.32, { align: 'center' });
+        doc.text('DOUBLE CHECK BY CLARIFYING WITH YOUR MANAGER IF YOU DOUBT ANYTHING.', 4.25, 10.40, { align: 'center' });
+      }
+
+      // Get PDF as base64
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      const filename = `Prep_Sheet_${dateStr.replace(/\//g, '-')}.pdf`;
+
+      // Send via EmailJS
+      const templateParams = {
+        to_email: 'GSS4168CTJJA73@print.epsonconnect.com',
+        subject: `Prep Sheet - ${dateStr}`,
+        message: `Prep sheet for ${dateStr} attached.`,
+        attachment: pdfBase64,
+        filename: filename
+      };
+
+      await emailjs.send('service_rvdkdxq', 'template_prep_sheet', templateParams, 'oEbbB6g5H0TsFG2Q4');
+
+      showMessage('✅ Prep sheet sent to printer successfully!', 'success');
+
+    } catch (error) {
+      console.error('Email send error:', error);
+      showMessage('Failed to send to printer: ' + error.message, 'error');
     }
   }
 
