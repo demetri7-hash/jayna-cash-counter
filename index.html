@@ -13838,19 +13838,30 @@
     let reasoning = '';
 
     if (isNotMadeDaily) {
-      // Special logic for items not made daily (Octopus, Vegan Lamb Burgers, etc.)
-      if (item.currentStock < 5) {
-        // Only urgent when below 5
-        recommendedAmount = Math.max(5, item.parLevel - item.currentStock);
+      // Special logic for items not made daily - use percentage-based thresholds
+      if (item.currentStock === 0) {
+        recommendedAmount = Math.ceil(item.parLevel);
         priority = 'urgent';
-        reasoning = `Below 5 units - May not need daily prep, check with manager`;
-      } else if (item.currentStock < item.parLevel * 0.7) {
+        reasoning = `Out of stock - Not made daily, check with manager first`;
+      } else if (stockPercentage < 30) {
+        // Very low stock - urgent
+        recommendedAmount = Math.ceil(item.parLevel - item.currentStock);
+        priority = 'urgent';
+        reasoning = `Critical low (${stockPercentage.toFixed(0)}%) - Not made daily, check with manager`;
+      } else if (stockPercentage < 50) {
+        // Low stock - high priority
+        recommendedAmount = Math.ceil(item.parLevel - item.currentStock);
+        priority = 'high';
+        reasoning = `Low stock (${stockPercentage.toFixed(0)}%) - Not made daily, check with manager`;
+      } else if (stockPercentage < 70) {
+        // Medium stock
         recommendedAmount = Math.ceil(item.parLevel - item.currentStock);
         priority = 'medium';
-        reasoning = `Not made daily - Check with manager before prepping`;
+        reasoning = `Stock at ${stockPercentage.toFixed(0)}% - Not made daily, check with manager`;
       } else {
+        // Stock is good
         priority = 'low';
-        reasoning = `Not made daily - Stock good (${item.currentStock} units)`;
+        reasoning = `Stock good (${stockPercentage.toFixed(0)}%) - Not made daily`;
       }
     } else if (isLineCooksPrep) {
       // Special logic for line cooks prep items (Chili Oil, Iskender Sauce)
