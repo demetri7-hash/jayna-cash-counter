@@ -10134,7 +10134,10 @@
         lastCountedDate: item.last_counted_date,
         currentUnitCost: item.current_unit_cost,
         lastCostUpdate: item.last_cost_update,
-        itemType: item.item_type || 'ingredient' // Track if item is 'prep' or 'ingredient'
+        itemType: item.item_type || 'ingredient', // Track if item is 'prep' or 'ingredient'
+        urgent: item.urgent || false, // Track urgent flag for MAKE FIRST category
+        batchLifespan: item.batch_lifespan_hours,
+        storageLocation: item.storage_location
       }));
 
       console.log('orderingSystemState.items:', orderingSystemState.items);
@@ -11890,6 +11893,20 @@
                     "
                   ></div>
                 </div>
+
+                <!-- Urgent Checkbox -->
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 2px solid var(--gray-200); display: flex; align-items: center; gap: 8px;">
+                  <input
+                    type="checkbox"
+                    id="urgent-${item.id}"
+                    ${item.urgent ? 'checked' : ''}
+                    onchange="toggleUrgent(${item.id}, this.checked)"
+                    style="width: 18px; height: 18px; cursor: pointer;"
+                  />
+                  <label for="urgent-${item.id}" style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;">
+                    MAKE FIRST (urgent)
+                  </label>
+                </div>
               </div>
             `;
           }).join('')}
@@ -12538,6 +12555,33 @@
       }, 1000);
 
       showMessage(`Failed to save: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Toggle urgent flag for prep item
+   */
+  async function toggleUrgent(itemId, isUrgent) {
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ urgent: isUrgent })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.urgent = isUrgent;
+      }
+
+      // Refresh prep sheet to reorder
+      refreshPrepSheet();
+
+    } catch (error) {
+      console.error('Failed to toggle urgent:', error);
+      showMessage(`Failed to update urgent status: ${error.message}`, 'error');
     }
   }
 
@@ -13596,6 +13640,7 @@
       recommendedAmount,
       priority,
       reasoning,
+      urgent: item.urgent || false,
       lastCountedDate: item.lastCountedDate
     };
   }
@@ -13650,16 +13695,26 @@
     }
 
     // Group by priority and sort by stock percentage (lowest to highest)
-    const urgent = recommendations.filter(r => r.priority === 'urgent')
+    // FIRST: Filter MAKE FIRST items (urgent flag set)
+    const makeFirst = recommendations.filter(r => r.urgent === true)
       .sort((a, b) => a.stockPercentage - b.stockPercentage);
-    const high = recommendations.filter(r => r.priority === 'high')
+
+    // THEN: Regular priority groups (exclude urgent flagged items)
+    const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true)
       .sort((a, b) => a.stockPercentage - b.stockPercentage);
-    const medium = recommendations.filter(r => r.priority === 'medium')
+    const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true)
       .sort((a, b) => a.stockPercentage - b.stockPercentage);
-    const low = recommendations.filter(r => r.priority === 'low')
+    const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true)
+      .sort((a, b) => a.stockPercentage - b.stockPercentage);
+    const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true)
       .sort((a, b) => a.stockPercentage - b.stockPercentage);
 
     let html = '';
+
+    // Render MAKE FIRST category at the very top
+    if (makeFirst.length > 0) {
+      html += renderPriorityGroup('🔥 MAKE FIRST', makeFirst, 'makeFirst');
+    }
 
     // Render each priority group with grayscale styling (matching PDF)
     if (urgent.length > 0) {
@@ -13843,10 +13898,20 @@
       let yPos = 1.1;
 
       // Group by priority
-      const urgent = recommendations.filter(r => r.priority === 'urgent');
-      const high = recommendations.filter(r => r.priority === 'high');
-      const medium = recommendations.filter(r => r.priority === 'medium');
-      const low = recommendations.filter(r => r.priority === 'low');
+      // FIRST: Filter MAKE FIRST items (urgent flag set), sorted by stock %
+      const makeFirst = recommendations.filter(r => r.urgent === true)
+        .sort((a, b) => a.stockPercentage - b.stockPercentage);
+
+      // THEN: Regular priority groups (exclude urgent flagged items)
+      const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true);
+      const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true);
+      const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true);
+      const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true);
+
+      // Render MAKE FIRST category at the very top
+      if (makeFirst.length > 0) {
+        yPos = renderPrepPDFSection(doc, '🔥 MAKE FIRST', makeFirst, yPos, [220, 0, 0]); // Red color for emphasis
+      }
 
       // Render each priority group
       if (urgent.length > 0) {
