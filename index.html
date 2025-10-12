@@ -10432,8 +10432,8 @@
   }
 
   /**
-   * Format timestamp as relative time (e.g., "2h ago", "5d ago")
-   * Matches email format
+   * Format timestamp as relative time with precise hours and minutes
+   * Examples: "32m ago", "1hr and 32m ago", "5d ago"
    */
   function formatRelativeTime(dateStr) {
     if (!dateStr) return 'Never';
@@ -10441,14 +10441,27 @@
     const date = new Date(dateStr);
     const now = new Date();
     const diffMs = now - date;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffHours < 24) {
-      return `${diffHours}h ago`;
+    if (diffMinutes < 60) {
+      // Less than 1 hour: show minutes only
+      return `${diffMinutes}m ago`;
+    } else if (diffHours < 24) {
+      // Less than 24 hours: show hours and minutes
+      const hours = diffHours;
+      const minutes = diffMinutes % 60;
+      if (minutes === 0) {
+        return `${hours}hr ago`;
+      } else {
+        return `${hours}hr and ${minutes}m ago`;
+      }
     } else if (diffDays < 7) {
+      // Less than 7 days: show days only
       return `${diffDays}d ago`;
     } else {
+      // Older than 7 days: show date
       return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
     }
   }
