@@ -1567,6 +1567,9 @@
           <!-- Orders Due Today Alert (dynamically populated) -->
           <div id="ordersDueTodayAlert"></div>
 
+          <!-- Pending Order Check-In View (dynamically populated) -->
+          <div id="pendingOrderCheckInView" style="display: none;"></div>
+
           <!-- Upload Section -->
           <div style="background: var(--gray-100); padding: 24px; border-radius: 0; margin-bottom: 24px; border: 2px solid var(--gray-300);">
             <div style="text-align: center;">
@@ -1629,6 +1632,7 @@
                 <select
                   id="ocrVendorFormat"
                   style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; background: white; font-weight: 600;"
+                  onchange="handleVendorFormatChange(this.value)"
                 >
                   <option value="auto">Auto-Detect Format</option>
                   <option value="performance-order">Performance - Order Email</option>
@@ -1636,6 +1640,7 @@
                   <option value="greenleaf-invoice">Greenleaf - Invoice</option>
                   <option value="mani-invoice">Mani Imports - Invoice</option>
                   <option value="generic">Generic Format</option>
+                  <option value="__ADD_NEW__" style="border-top: 2px solid #ccc; margin-top: 4px; font-weight: 700;">➕ CREATE NEW FORMAT...</option>
                 </select>
                 <p style="margin-top: 6px; font-size: 10px; color: var(--gray-600);">
                   System learns and improves with each check-in!
@@ -1909,6 +1914,9 @@
     initializeSupabase();
     initializeEmailJS();
     setTodayDate();
+
+    // Load custom vendor formats from database
+    loadCustomVendorFormats();
 
     // Load saved data (removed loadTipPoolData to reset tip pool fields every time)
     loadCombinedReportData();
@@ -10122,13 +10130,8 @@
         itemCount.style.cssText = 'color: #78350f; font-size: 11px;';
         orderCard.appendChild(itemCount);
 
-        // Store order ID for future reconciliation
+        // Store order ID and show check-in interface
         orderCard.onclick = () => {
-          orderingSystemState.selectedPendingOrderId = order.id;
-          orderingSystemState.invoiceType = 'invoice'; // Set to invoice mode for reconciliation
-
-          showMessage(`✓ Selected ${order.vendor} order. Switching to CHECK-IN tab...`, 'success');
-
           // Highlight selected
           document.querySelectorAll('#ordersDueTodayAlert > div > div').forEach(card => {
             card.style.borderColor = '#f59e0b';
@@ -10137,28 +10140,8 @@
           orderCard.style.borderColor = '#92400e';
           orderCard.style.background = '#fffbeb';
 
-          // Auto-navigate to CHECK-IN tab after brief delay
-          setTimeout(() => {
-            // Manually call openOrderTab with a synthetic event
-            const checkInTabButton = document.querySelector('[onclick*="checkInInvoice"]');
-            if (checkInTabButton) {
-              // Create synthetic event with target
-              const syntheticEvent = {
-                target: checkInTabButton,
-                preventDefault: () => {}
-              };
-
-              // Call the tab opener directly
-              openOrderTab(syntheticEvent, 'checkInInvoice');
-
-              // Scroll to top and show instructions
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-
-              setTimeout(() => {
-                showMessage(`📦 Upload invoice for ${order.vendor} order to reconcile items`, 'info');
-              }, 500);
-            }
-          }, 800);
+          // Show check-in interface for this order
+          showPendingOrderForCheckIn(order.id);
         };
 
         alert.appendChild(orderCard);
@@ -10168,6 +10151,441 @@
 
     } catch (error) {
       console.error('Error loading orders due today:', error);
+    }
+  }
+
+  /**
+   * Display pending order items for manual check-in
+   */
+  async function showPendingOrderForCheckIn(orderId) {
+    console.log('showPendingOrderForCheckIn called with order ID:', orderId);
+
+    const container = document.getElementById('pendingOrderCheckInView');
+    if (!container) return;
+
+    showLoading('Loading Order', 'Fetching order details...');
+
+    try {
+      // Fetch pending order with all items
+      const { data: orderData, error: orderError } = await supabase
+        .from('pending_orders')
+        .select(`
+          *,
+          pending_order_items (
+            id,
+            inventory_item_id,
+            quantity_ordered,
+            unit,
+            item_name,
+            vendor
+          )
+        `)
+        .eq('id', orderId)
+        .single();
+
+      if (orderError) throw orderError;
+      if (!orderData) throw new Error('Order not found');
+
+      hideLoading();
+
+      // Store order ID for later
+      orderingSystemState.selectedPendingOrderId = orderId;
+      orderingSystemState.currentCheckInOrder = orderData;
+
+      // Clear and show container
+      container.innerHTML = '';
+      container.style.display = 'block';
+
+      // Scroll to this section
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Header
+      const header = document.createElement('div');
+      header.style.cssText = 'background: #fef3c7; border: 2px solid #f59e0b; padding: 16px; margin-bottom: 20px;';
+
+      const title = document.createElement('h3');
+      title.textContent = `CHECK IN: ${orderData.vendor}`;
+      title.style.cssText = 'color: #92400e; margin: 0 0 8px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+      header.appendChild(title);
+
+      const orderInfo = document.createElement('div');
+      orderInfo.style.cssText = 'display: flex; gap: 20px; flex-wrap: wrap;';
+
+      const date = document.createElement('div');
+      date.innerHTML = `<strong>Expected:</strong> ${orderData.expected_delivery_date}`;
+      date.style.cssText = 'font-size: 12px; color: #78350f;';
+      orderInfo.appendChild(date);
+
+      const itemCount = document.createElement('div');
+      itemCount.innerHTML = `<strong>Total Items:</strong> ${orderData.total_items}`;
+      itemCount.style.cssText = 'font-size: 12px; color: #78350f;';
+      orderInfo.appendChild(itemCount);
+
+      header.appendChild(orderInfo);
+      container.appendChild(header);
+
+      // Instructions
+      const instructions = document.createElement('p');
+      instructions.textContent = 'Enter received quantities and add notes, then check in each item:';
+      instructions.style.cssText = 'color: var(--gray-600); font-size: 13px; margin-bottom: 16px;';
+      container.appendChild(instructions);
+
+      // Items table
+      const table = document.createElement('div');
+      table.style.cssText = 'border: 2px solid var(--gray-300); margin-bottom: 20px;';
+
+      // Table header
+      const thead = document.createElement('div');
+      thead.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 2fr 120px; gap: 8px; padding: 10px; background: var(--gray-900); color: white; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;';
+
+      ['Item', 'Ordered', 'Received', 'Unit', 'Notes', 'Action'].forEach(label => {
+        const th = document.createElement('div');
+        th.textContent = label;
+        thead.appendChild(th);
+      });
+
+      table.appendChild(thead);
+
+      // Items (stored for later updates)
+      if (!orderingSystemState.checkInItems) {
+        orderingSystemState.checkInItems = {};
+      }
+
+      // Table body
+      orderData.pending_order_items.forEach((item, index) => {
+        // Initialize item state
+        orderingSystemState.checkInItems[item.id] = {
+          id: item.id,
+          inventoryItemId: item.inventory_item_id,
+          itemName: item.item_name,
+          ordered: item.quantity_ordered,
+          received: item.quantity_ordered, // Default to ordered quantity
+          unit: item.unit,
+          notes: '',
+          checkedIn: false
+        };
+
+        const row = document.createElement('div');
+        row.id = `checkInRow${item.id}`;
+        row.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 2fr 120px; gap: 8px; padding: 12px; border-top: 1px solid var(--gray-300); background: white;';
+
+        // Item name
+        const nameCell = document.createElement('div');
+        nameCell.textContent = item.item_name;
+        nameCell.style.cssText = 'font-size: 12px; font-weight: 600; color: var(--gray-900);';
+        row.appendChild(nameCell);
+
+        // Ordered quantity (read-only)
+        const orderedCell = document.createElement('div');
+        orderedCell.textContent = item.quantity_ordered;
+        orderedCell.style.cssText = 'font-size: 12px; font-weight: 700; color: var(--gray-700);';
+        row.appendChild(orderedCell);
+
+        // Received quantity (editable input)
+        const receivedCell = document.createElement('div');
+        const receivedInput = document.createElement('input');
+        receivedInput.type = 'number';
+        receivedInput.min = '0';
+        receivedInput.step = '0.25';
+        receivedInput.value = item.quantity_ordered;
+        receivedInput.id = `receivedQty${item.id}`;
+        receivedInput.style.cssText = 'width: 100%; padding: 6px; border: 2px solid var(--gray-300); font-size: 12px; font-weight: 600; text-align: center;';
+        receivedInput.onchange = function() {
+          orderingSystemState.checkInItems[item.id].received = parseFloat(this.value) || 0;
+          // Highlight if different from ordered
+          if (parseFloat(this.value) !== item.quantity_ordered) {
+            this.style.borderColor = '#f59e0b';
+            this.style.background = '#fffbeb';
+          } else {
+            this.style.borderColor = 'var(--gray-300)';
+            this.style.background = 'white';
+          }
+        };
+        receivedCell.appendChild(receivedInput);
+        row.appendChild(receivedCell);
+
+        // Unit
+        const unitCell = document.createElement('div');
+        unitCell.textContent = item.unit;
+        unitCell.style.cssText = 'font-size: 11px; color: var(--gray-600);';
+        row.appendChild(unitCell);
+
+        // Notes (editable input)
+        const notesCell = document.createElement('div');
+        const notesInput = document.createElement('input');
+        notesInput.type = 'text';
+        notesInput.placeholder = 'Add notes...';
+        notesInput.id = `notes${item.id}`;
+        notesInput.style.cssText = 'width: 100%; padding: 6px; border: 2px solid var(--gray-300); font-size: 11px;';
+        notesInput.onchange = function() {
+          orderingSystemState.checkInItems[item.id].notes = this.value;
+        };
+        notesCell.appendChild(notesInput);
+        row.appendChild(notesCell);
+
+        // Check in button
+        const actionCell = document.createElement('div');
+        const checkInBtn = document.createElement('button');
+        checkInBtn.textContent = 'CHECK IN';
+        checkInBtn.id = `checkInBtn${item.id}`;
+        checkInBtn.style.cssText = 'width: 100%; padding: 8px 6px; background: var(--gray-700); color: white; border: none; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; cursor: pointer; text-transform: uppercase;';
+        checkInBtn.onclick = () => checkInSingleItem(item.id);
+        actionCell.appendChild(checkInBtn);
+        row.appendChild(actionCell);
+
+        table.appendChild(row);
+      });
+
+      container.appendChild(table);
+
+      // Bulk actions
+      const bulkActions = document.createElement('div');
+      bulkActions.style.cssText = 'display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;';
+
+      // Auto-fill all button
+      const autoFillBtn = document.createElement('button');
+      autoFillBtn.textContent = 'AUTO-FILL: ALL RECEIVED AS ORDERED';
+      autoFillBtn.style.cssText = 'flex: 1; padding: 14px; background: var(--gray-100); color: var(--gray-900); border: 2px solid var(--gray-300); font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer; text-transform: uppercase;';
+      autoFillBtn.onclick = () => {
+        orderData.pending_order_items.forEach(item => {
+          const input = document.getElementById(`receivedQty${item.id}`);
+          if (input) {
+            input.value = item.quantity_ordered;
+            input.style.borderColor = 'var(--gray-300)';
+            input.style.background = 'white';
+            orderingSystemState.checkInItems[item.id].received = item.quantity_ordered;
+          }
+        });
+        showMessage('✓ All quantities set to ordered amounts', 'success');
+      };
+      bulkActions.appendChild(autoFillBtn);
+
+      // Check in all button
+      const checkInAllBtn = document.createElement('button');
+      checkInAllBtn.textContent = 'CHECK IN ALL ITEMS';
+      checkInAllBtn.style.cssText = 'flex: 1; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer; text-transform: uppercase;';
+      checkInAllBtn.onclick = () => checkInAllItems(orderId);
+      bulkActions.appendChild(checkInAllBtn);
+
+      container.appendChild(bulkActions);
+
+      // Close button
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = 'CANCEL';
+      closeBtn.style.cssText = 'width: 100%; padding: 12px; background: var(--gray-300); color: var(--gray-700); border: 2px solid var(--gray-400); font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer; text-transform: uppercase;';
+      closeBtn.onclick = () => {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        orderingSystemState.selectedPendingOrderId = null;
+        orderingSystemState.currentCheckInOrder = null;
+        orderingSystemState.checkInItems = {};
+      };
+      container.appendChild(closeBtn);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error loading pending order:', error);
+      showMessage('Failed to load order: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Check in a single item
+   */
+  async function checkInSingleItem(itemId) {
+    const itemData = orderingSystemState.checkInItems[itemId];
+    if (!itemData || itemData.checkedIn) {
+      showMessage('Item already checked in', 'info');
+      return;
+    }
+
+    const btn = document.getElementById(`checkInBtn${itemId}`);
+    const row = document.getElementById(`checkInRow${itemId}`);
+
+    try {
+      btn.disabled = true;
+      btn.textContent = 'CHECKING IN...';
+
+      // Update inventory stock
+      const { data: currentItem, error: fetchError } = await supabase
+        .from('inventory_items')
+        .select('current_stock')
+        .eq('id', itemData.inventoryItemId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const newStock = (parseFloat(currentItem.current_stock) || 0) + itemData.received;
+
+      const { error: updateError } = await supabase
+        .from('inventory_items')
+        .update({
+          current_stock: newStock,
+          last_counted_date: getPacificDate()
+        })
+        .eq('id', itemData.inventoryItemId);
+
+      if (updateError) throw updateError;
+
+      // Mark as checked in
+      itemData.checkedIn = true;
+
+      // Visual feedback
+      row.style.background = '#d1fae5';
+      btn.textContent = '✓ CHECKED IN';
+      btn.style.background = '#059669';
+      btn.disabled = true;
+
+      // Disable inputs
+      document.getElementById(`receivedQty${itemId}`).disabled = true;
+      document.getElementById(`notes${itemId}`).disabled = true;
+
+      showMessage(`✓ ${itemData.itemName} checked in! Stock updated to ${newStock} ${itemData.unit}`, 'success');
+
+      // Check if all items are checked in
+      const allCheckedIn = Object.values(orderingSystemState.checkInItems).every(i => i.checkedIn);
+      if (allCheckedIn) {
+        setTimeout(() => {
+          finalizeOrderCheckIn();
+        }, 1000);
+      }
+
+    } catch (error) {
+      console.error('Error checking in item:', error);
+      showMessage('Failed to check in item: ' + error.message, 'error');
+      btn.disabled = false;
+      btn.textContent = 'CHECK IN';
+    }
+  }
+
+  /**
+   * Check in all items at once
+   */
+  async function checkInAllItems(orderId) {
+    const items = Object.values(orderingSystemState.checkInItems).filter(i => !i.checkedIn);
+
+    if (items.length === 0) {
+      showMessage('All items already checked in', 'info');
+      return;
+    }
+
+    if (!confirm(`Check in all ${items.length} items and update inventory?`)) {
+      return;
+    }
+
+    showLoading('Checking In', `Processing ${items.length} items...`);
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const item of items) {
+        try {
+          // Update inventory stock
+          const { data: currentItem, error: fetchError} = await supabase
+            .from('inventory_items')
+            .select('current_stock')
+            .eq('id', item.inventoryItemId)
+            .single();
+
+          if (fetchError) throw fetchError;
+
+          const newStock = (parseFloat(currentItem.current_stock) || 0) + item.received;
+
+          const { error: updateError } = await supabase
+            .from('inventory_items')
+            .update({
+              current_stock: newStock,
+              last_counted_date: getPacificDate()
+            })
+            .eq('id', item.inventoryItemId);
+
+          if (updateError) throw updateError;
+
+          // Mark as checked in
+          item.checkedIn = true;
+
+          // Visual feedback
+          const row = document.getElementById(`checkInRow${item.id}`);
+          const btn = document.getElementById(`checkInBtn${item.id}`);
+
+          if (row) row.style.background = '#d1fae5';
+          if (btn) {
+            btn.textContent = '✓ CHECKED IN';
+            btn.style.background = '#059669';
+            btn.disabled = true;
+          }
+
+          // Disable inputs
+          const qtyInput = document.getElementById(`receivedQty${item.id}`);
+          const notesInput = document.getElementById(`notes${item.id}`);
+          if (qtyInput) qtyInput.disabled = true;
+          if (notesInput) notesInput.disabled = true;
+
+          successCount++;
+        } catch (error) {
+          console.error(`Error checking in ${item.itemName}:`, error);
+          errorCount++;
+        }
+      }
+
+      hideLoading();
+
+      if (errorCount === 0) {
+        showMessage(`✅ All ${successCount} items checked in successfully!`, 'success');
+        setTimeout(() => {
+          finalizeOrderCheckIn();
+        }, 1500);
+      } else {
+        showMessage(`⚠️ ${successCount} items checked in, ${errorCount} failed`, 'warning');
+      }
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error checking in all items:', error);
+      showMessage('Failed to check in items: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Finalize order after all items checked in
+   */
+  async function finalizeOrderCheckIn() {
+    if (!orderingSystemState.selectedPendingOrderId) return;
+
+    try {
+      // Update pending order status
+      const { error } = await supabase
+        .from('pending_orders')
+        .update({
+          status: 'completed',
+          received_date: getPacificDate()
+        })
+        .eq('id', orderingSystemState.selectedPendingOrderId);
+
+      if (error) throw error;
+
+      showMessage('🎉 Order check-in complete! Inventory updated.', 'success');
+
+      // Clear and hide check-in view
+      const container = document.getElementById('pendingOrderCheckInView');
+      if (container) {
+        setTimeout(() => {
+          container.style.display = 'none';
+          container.innerHTML = '';
+        }, 2000);
+      }
+
+      // Reload orders due today
+      loadOrdersDueTodayAlert();
+
+      // Refresh inventory and calculations
+      await loadInventoryData();
+      calculateUpcomingOrders();
+
+    } catch (error) {
+      console.error('Error finalizing order:', error);
+      showMessage('Order checked in but failed to update status', 'warning');
     }
   }
 
@@ -15080,6 +15498,341 @@
   }
 
   /**
+   * ============================================
+   * VENDOR FORMAT LEARNING SYSTEM
+   * ============================================
+   */
+
+  /**
+   * Load custom vendor formats from database and populate dropdown
+   */
+  async function loadCustomVendorFormats() {
+    try {
+      const { data: formats, error } = await supabase
+        .from('vendor_formats')
+        .select('*')
+        .eq('active', true)
+        .order('format_name');
+
+      if (error) throw error;
+
+      if (formats && formats.length > 0) {
+        const dropdown = document.getElementById('ocrVendorFormat');
+        const addNewOption = dropdown.querySelector('option[value="__ADD_NEW__"]');
+
+        // Add custom formats before "ADD NEW" option
+        formats.forEach(format => {
+          const option = document.createElement('option');
+          option.value = format.format_id;
+          option.textContent = format.format_name;
+          option.dataset.customFormat = 'true';
+          dropdown.insertBefore(option, addNewOption);
+        });
+
+        console.log('✅ Loaded', formats.length, 'custom vendor formats');
+      }
+    } catch (error) {
+      console.warn('Failed to load custom formats:', error);
+    }
+  }
+
+  /**
+   * Handle vendor format dropdown change
+   */
+  async function handleVendorFormatChange(value) {
+    if (value === '__ADD_NEW__') {
+      showCreateFormatModal();
+    } else {
+      // Store selected format for later use
+      orderingSystemState.selectedVendorFormat = value;
+      console.log('Selected vendor format:', value);
+
+      // If this is a custom format (not hardcoded), fetch its database ID
+      const dropdown = document.getElementById('ocrVendorFormat');
+      const selectedOption = dropdown.querySelector(`option[value="${value}"]`);
+
+      if (selectedOption && selectedOption.dataset.customFormat === 'true') {
+        // Fetch format ID from database
+        const { data, error } = await supabase
+          .from('vendor_formats')
+          .select('id')
+          .eq('format_id', value)
+          .single();
+
+        if (!error && data) {
+          orderingSystemState.currentVendorFormatId = data.id;
+          console.log('✅ Format ID loaded:', data.id);
+        }
+      } else {
+        // Hardcoded formats don't have DB IDs yet
+        orderingSystemState.currentVendorFormatId = null;
+      }
+    }
+  }
+
+  /**
+   * Show modal to create new vendor format
+   */
+  function showCreateFormatModal() {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+    const content = document.createElement('div');
+    content.style.cssText = 'background: white; padding: 24px; max-width: 500px; width: 90%; border: 3px solid var(--gray-700);';
+
+    content.innerHTML = `
+      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+        🧠 CREATE NEW VENDOR FORMAT
+      </h3>
+      <p style="margin: 0 0 20px 0; font-size: 13px; color: var(--gray-600); line-height: 1.5;">
+        Give this format a name (e.g., "Greenleaf Order", "Sysco Invoice").
+        The system will learn from your manual corrections and improve accuracy next time!
+      </p>
+
+      <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--gray-700); letter-spacing: 0.5px;">
+        FORMAT NAME
+      </label>
+      <input
+        type="text"
+        id="newFormatName"
+        placeholder="e.g., Greenleaf Order"
+        style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; margin-bottom: 20px; box-sizing: border-box;"
+        autofocus
+      />
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button
+          onclick="closeCreateFormatModal()"
+          style="padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;"
+        >
+          CANCEL
+        </button>
+        <button
+          onclick="saveNewVendorFormat()"
+          style="padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;"
+        >
+          CREATE
+        </button>
+      </div>
+    `;
+
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+    modal.id = 'createFormatModal';
+
+    // Focus input
+    setTimeout(() => document.getElementById('newFormatName').focus(), 100);
+
+    // Allow Enter key to submit
+    document.getElementById('newFormatName').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') saveNewVendorFormat();
+    });
+  }
+
+  /**
+   * Close create format modal
+   */
+  function closeCreateFormatModal() {
+    const modal = document.getElementById('createFormatModal');
+    if (modal) modal.remove();
+
+    // Reset dropdown to previously selected format
+    const dropdown = document.getElementById('ocrVendorFormat');
+    dropdown.value = orderingSystemState.selectedVendorFormat || 'auto';
+  }
+
+  /**
+   * Save new vendor format
+   */
+  async function saveNewVendorFormat() {
+    const nameInput = document.getElementById('newFormatName');
+    const formatName = nameInput.value.trim();
+
+    if (!formatName) {
+      nameInput.style.borderColor = 'red';
+      return;
+    }
+
+    // Generate format_id from name (e.g., "Greenleaf Order" → "greenleaf-order")
+    const formatId = formatName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    showLoading('Creating Format', `Saving "${formatName}"...`);
+
+    try {
+      const { data, error } = await supabase
+        .from('vendor_formats')
+        .insert({
+          format_name: formatName,
+          format_id: formatId,
+          parsing_rules: {}, // Empty initially, will be populated from corrections
+          sample_corrections: [],
+          confidence_score: 0,
+          created_by: 'User',
+          notes: 'Created via OCR interface'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      hideLoading();
+      closeCreateFormatModal();
+
+      // Add to dropdown
+      const dropdown = document.getElementById('ocrVendorFormat');
+      const addNewOption = dropdown.querySelector('option[value="__ADD_NEW__"]');
+      const option = document.createElement('option');
+      option.value = formatId;
+      option.textContent = formatName;
+      option.dataset.customFormat = 'true';
+      dropdown.insertBefore(option, addNewOption);
+
+      // Select the new format
+      dropdown.value = formatId;
+      orderingSystemState.selectedVendorFormat = formatId;
+      orderingSystemState.currentVendorFormatId = data.id; // Store DB ID for corrections
+
+      showMessage(`✅ Created format "${formatName}"! System will learn from your corrections.`, 'success');
+    } catch (error) {
+      hideLoading();
+      console.error('Error creating format:', error);
+      showMessage('Failed to create format: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Track OCR correction for learning
+   * Call this when user manually edits item name, quantity, or price
+   */
+  async function trackOCRCorrection(originalItem, correctedData) {
+    if (!orderingSystemState.currentVendorFormatId) return; // No format selected
+
+    try {
+      const correction = {
+        format_id: orderingSystemState.currentVendorFormatId,
+        invoice_id: orderingSystemState.currentInvoiceId || null,
+        original_text: originalItem.detectedName,
+        corrected_item_name: correctedData.itemName,
+        corrected_quantity: correctedData.quantity,
+        corrected_price: correctedData.price,
+        full_line_text: originalItem.fullLineText || originalItem.detectedName,
+        correction_type: determineCorrectionType(originalItem, correctedData)
+      };
+
+      const { error } = await supabase
+        .from('ocr_corrections')
+        .insert(correction);
+
+      if (error) throw error;
+
+      console.log('📝 Logged correction for learning:', correction);
+
+      // Update format's sample_corrections for pattern learning
+      await updateFormatPatterns(orderingSystemState.currentVendorFormatId, correction);
+
+    } catch (error) {
+      console.warn('Failed to track correction:', error);
+    }
+  }
+
+  /**
+   * Determine what type of correction was made
+   */
+  function determineCorrectionType(original, corrected) {
+    const itemChanged = original.detectedName !== corrected.itemName;
+    const qtyChanged = original.detectedQuantity !== corrected.quantity;
+    const priceChanged = original.detectedPrice !== corrected.price;
+
+    if (itemChanged && qtyChanged && priceChanged) return 'all';
+    if (itemChanged) return 'item_name';
+    if (qtyChanged) return 'quantity';
+    if (priceChanged) return 'price';
+    return 'none';
+  }
+
+  /**
+   * Update format patterns based on correction
+   */
+  async function updateFormatPatterns(formatId, correction) {
+    try {
+      // Fetch current format
+      const { data: format, error: fetchError } = await supabase
+        .from('vendor_formats')
+        .select('sample_corrections, parsing_rules')
+        .eq('id', formatId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Add this correction to samples (keep last 50)
+      const samples = format.sample_corrections || [];
+      samples.push({
+        original: correction.original_text,
+        corrected_name: correction.corrected_item_name,
+        corrected_qty: correction.corrected_quantity,
+        corrected_price: correction.corrected_price,
+        timestamp: new Date().toISOString()
+      });
+
+      // Keep only last 50 corrections
+      const recentSamples = samples.slice(-50);
+
+      // Analyze patterns (simple pattern detection for now)
+      const patterns = analyzeCorrections(recentSamples);
+
+      // Update format
+      const { error: updateError } = await supabase
+        .from('vendor_formats')
+        .update({
+          sample_corrections: recentSamples,
+          parsing_rules: patterns,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', formatId);
+
+      if (updateError) throw updateError;
+
+      console.log('🧠 Updated format patterns:', patterns);
+
+    } catch (error) {
+      console.warn('Failed to update patterns:', error);
+    }
+  }
+
+  /**
+   * Analyze corrections to detect patterns
+   * This is a simple version - can be enhanced with ML
+   */
+  function analyzeCorrections(samples) {
+    if (!samples || samples.length < 3) return {}; // Need at least 3 samples
+
+    const patterns = {
+      common_price_positions: [],
+      common_quantity_patterns: [],
+      item_name_length_avg: 0,
+      detected_at: new Date().toISOString()
+    };
+
+    // Analyze where prices typically appear
+    const priceMatches = samples.map(s => {
+      const match = s.original.match(/\$?\d+\.\d{2}/);
+      return match ? match.index : -1;
+    }).filter(i => i !== -1);
+
+    if (priceMatches.length > 0) {
+      patterns.common_price_positions = [Math.round(priceMatches.reduce((a,b) => a+b) / priceMatches.length)];
+    }
+
+    // Analyze average item name length
+    const nameLengths = samples.map(s => s.corrected_name?.length || 0).filter(l => l > 0);
+    if (nameLengths.length > 0) {
+      patterns.item_name_length_avg = Math.round(nameLengths.reduce((a,b) => a+b) / nameLengths.length);
+    }
+
+    return patterns;
+  }
+
+  /**
    * Process invoice with Tesseract OCR
    */
   async function processInvoiceOCR() {
@@ -16214,10 +16967,10 @@
         .from('invoices')
         .insert({
           invoice_date: new Date().toISOString().split('T')[0],
-          vendor: vendor,
-          invoice_type: 'order',
-          total_items: matchedItems.length,
-          processed_by: 'System',
+          vendor_name: vendor,
+          invoice_type: 'order', // Added by migration
+          entered_by: 'System',
+          processed: true,
           notes: `Pending order #${orderId} - saved for learning`
         })
         .select()
@@ -16225,17 +16978,34 @@
 
       if (!invoiceError && invoiceData) {
         // Save each match for learning
-        const learningItems = matchedItems.map(item => ({
-          invoice_id: invoiceData.id,
-          inventory_item_id: item.matchedInventoryId,
-          detected_item_name: item.detectedName,
-          detected_quantity: item.detectedQuantity,
-          detected_price: item.detectedPrice || 0,
-          match_confidence: item.matchConfidence,
-          matched_at: new Date().toISOString(),
-          checked_in: true, // Mark as learned immediately
-          checked_in_at: new Date().toISOString()
-        }));
+        const learningItems = matchedItems.map(item => {
+          const inventoryItem = orderingSystemState.items.find(i => i.id === item.matchedInventoryId);
+          const quantity = item.detectedQuantity || 0;
+          const unitPrice = item.detectedPrice || 0;
+          const totalPrice = quantity * unitPrice;
+
+          return {
+            invoice_id: invoiceData.id,
+            inventory_item_id: item.matchedInventoryId,
+
+            // Required fields from invoice_items schema
+            item_description: item.detectedName,
+            quantity: quantity,
+            unit: inventoryItem?.unit || 'EA',
+            unit_price: unitPrice,
+            total_price: totalPrice,
+            matched: true,
+
+            // Learning/tracking fields (added via migrations)
+            detected_item_name: item.detectedName,
+            detected_quantity: quantity,
+            detected_price: unitPrice,
+            match_confidence: item.matchConfidence,
+            matched_at: new Date().toISOString(),
+            checked_in: true,
+            checked_in_at: new Date().toISOString()
+          };
+        });
 
         const { error: learningError } = await supabase
           .from('invoice_items')
