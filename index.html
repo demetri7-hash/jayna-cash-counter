@@ -7063,8 +7063,8 @@
     try {
       // STEP 1: Try database first (instant if data exists)
       console.log('Checking database for sales data...');
-      document.getElementById('loadingText').textContent = 'Checking database...';
-      document.getElementById('loadingSubtext').textContent = 'Looking for automatically imported Toast data';
+      document.getElementById('loadingTitle').textContent = 'Checking database...';
+      document.getElementById('loadingMessage').textContent = 'Looking for automatically imported Toast data';
 
       const dbResponse = await fetch(`/api/get-daily-sales?startDate=${startDate}&endDate=${endDate}`);
       const dbResult = await dbResponse.json();
@@ -7075,8 +7075,8 @@
         statusDiv.innerHTML = `<span style="color: #28a745;">Data loaded from database (${dbResult.daysFound} days, automated import)</span>`;
 
         // Still need labor data from API
-        document.getElementById('loadingText').textContent = 'Fetching labor data from Toast...';
-        document.getElementById('loadingSubtext').textContent = 'Getting employee hours...';
+        document.getElementById('loadingTitle').textContent = 'Fetching labor data from Toast...';
+        document.getElementById('loadingMessage').textContent = 'Getting employee hours...';
 
         const authResponse = await fetch('/api/toast-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
         const authData = await authResponse.json();
@@ -7110,8 +7110,8 @@
       console.log('No database data found, fetching from Toast API...');
       statusDiv.innerHTML = '<span style="color: #ffc107;">No database data - fetching from Toast API (slower)...</span>';
 
-      document.getElementById('loadingText').textContent = 'Authenticating with Toast API...';
-      document.getElementById('loadingSubtext').textContent = 'No automated data available for this date range';
+      document.getElementById('loadingTitle').textContent = 'Authenticating with Toast API...';
+      document.getElementById('loadingMessage').textContent = 'No automated data available for this date range';
 
       const authResponse = await fetch('/api/toast-auth', {
         method: 'POST',
@@ -7124,8 +7124,8 @@
       const token = authData.data.accessToken;
 
       // Fetch labor and sales data from API
-      document.getElementById('loadingText').textContent = 'Fetching labor and payment data...';
-      document.getElementById('loadingSubtext').textContent = 'Processing hundreds of payments - this takes 1-2 minutes';
+      document.getElementById('loadingTitle').textContent = 'Fetching labor and payment data...';
+      document.getElementById('loadingMessage').textContent = 'Processing hundreds of payments - this takes 1-2 minutes';
 
       const [laborResponse, salesResponse] = await Promise.all([
         fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`),
