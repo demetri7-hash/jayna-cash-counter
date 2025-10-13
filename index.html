@@ -5682,15 +5682,21 @@
   }
   
   async function generateDateRangePDF() {
+    // IMPORTANT: Tip pool reports MUST use Monday-Sunday date ranges (7 days)
+    // startDate = Monday, endDate = Sunday (the week_end_date stored in database)
+    // Example: Monday 9/29/2025 through Sunday 10/5/2025
+    // All dates stored as YYYY-MM-DD format (e.g., "2025-10-05" for Sunday)
+
     const startDate = document.getElementById('reportStartDate').value;
     const endDate = document.getElementById('reportEndDate').value;
     const realEnvelopeAmount = parseFloat(document.getElementById('realEnvelopeAmount').value) || null;
-    
+
     if (!startDate || !endDate) {
       throw new Error('Please select both start and end dates');
     }
-    
-    // Handle dates properly with timezone-safe parsing (like AM/PM flows)
+
+    // Handle dates properly with timezone-safe parsing (append T12:00:00 to force local time)
+    // This prevents UTC midnight interpretation which shifts dates by timezone offset
     const start = new Date(startDate + 'T12:00:00');
     const end = new Date(endDate + 'T12:00:00');
     
@@ -7277,6 +7283,8 @@
     }
 
     // Fetch previous week's cash surplus from database (ONLY if positive = surplus)
+    // NOTE: Tip pool date ranges are ALWAYS Monday through Sunday (7 days)
+    // week_end_date is stored as Sunday's date (e.g., "2025-10-05" for week 9/29-10/5)
     let previousCashSurplus = 0;
     let cashSurplusFromDate = null;
 
@@ -7964,7 +7972,7 @@
     // Build variance carryover display
     let varianceCarryoverHtml = '';
     if (tipPoolSummary.previousVariance && tipPoolSummary.previousVariance > 0) {
-      const carriedDate = new Date(tipPoolSummary.carriedFromDate).toLocaleDateString();
+      const carriedDate = new Date(tipPoolSummary.carriedFromDate + 'T12:00:00').toLocaleDateString();
       varianceCarryoverHtml = `
           <div style="background: white; padding: 15px; border-radius: 0; border: 2px solid #ff9800; grid-column: 1 / -1;">
             <h4 style="margin: 0 0 8px 0; color: #ff9800; font-size: 12px;">⚠️ UNPAID TIPS FROM PREVIOUS WEEK</h4>
@@ -8270,7 +8278,7 @@
 
       // Add previous variance carryover if it exists (compliance tracking)
       if (tipPoolSummary.previousVariance && tipPoolSummary.previousVariance > 0) {
-        const carriedDate = new Date(tipPoolSummary.carriedFromDate).toLocaleDateString();
+        const carriedDate = new Date(tipPoolSummary.carriedFromDate + 'T12:00:00').toLocaleDateString();
         entries.push(
           ['⚠️ UNPAID TIPS FROM PREVIOUS WEEK', `$${tipPoolSummary.previousVariance.toFixed(2)}`],
           [`   Carried from week ending ${carriedDate}`, '(ADDED TO POOL)']
@@ -8497,7 +8505,7 @@
 
       // Add previous variance carryover if it exists (compliance tracking)
       if (tipPoolSummary.previousVariance && tipPoolSummary.previousVariance > 0) {
-        const carriedDate = new Date(tipPoolSummary.carriedFromDate).toLocaleDateString();
+        const carriedDate = new Date(tipPoolSummary.carriedFromDate + 'T12:00:00').toLocaleDateString();
         middleColumnEntries.push(
           ['UNPAID TIPS', `$${tipPoolSummary.previousVariance.toFixed(2)}`],
           [`Carried from ${carriedDate}`, '']
@@ -8593,7 +8601,9 @@
         doc.setFontSize(7);
         doc.setTextColor(100, 100, 100); // Gray
 
-        const surplusDate = new Date(tipPoolSummary.cashSurplusFromDate).toLocaleDateString();
+        // Parse date without timezone shift (dates stored as YYYY-MM-DD for Sunday of the week)
+        // Append 'T12:00:00' to force local time interpretation instead of UTC
+        const surplusDate = new Date(tipPoolSummary.cashSurplusFromDate + 'T12:00:00').toLocaleDateString();
         const surplusText = `Includes $${tipPoolSummary.previousCashSurplus.toFixed(2)} surplus from week ending ${surplusDate}`;
 
         const surplusWidth = doc.getTextWidth(surplusText);
