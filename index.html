@@ -8994,6 +8994,11 @@
           // V2.84 LOGIC: Tips absorb shortages
           const originalDiscrepancy = day.pm_discrepancy || 0;
 
+          // ORIGINAL DISC: Raw discrepancy (can be negative)
+          const originalDiscFormatted = originalDiscrepancy >= 0
+            ? `+$${originalDiscrepancy.toFixed(2)}`
+            : `-$${Math.abs(originalDiscrepancy).toFixed(2)}`;
+
           // TIPS TAKEN: Exact shortage amount USED (not whole dollar broken)
           // Example: Shortage $2.50 → we use $2.50 from tips to balance
           const tipsTaken = originalDiscrepancy < 0 ? Math.abs(originalDiscrepancy) : 0;
@@ -9012,17 +9017,18 @@
             day.pm_counter || 'N/A',
             `$${(day.pm_toast_sales || 0).toFixed(2)}`,
             `$${actualCashIn.toFixed(2)}`,
-            `$${tipsTaken.toFixed(2)}`,  // Always show as positive amount taken
+            originalDiscFormatted,        // RAW discrepancy (before tips)
+            `$${tipsTaken.toFixed(2)}`,   // Always show as positive amount taken
             netDiscrepancyFormatted,      // Always $0 or positive
             `$${actualExcess.toFixed(2)}`
           ];
         });
 
         // Calculate totals for numerical columns (skip DATE and NIGHT COUNTER columns)
-        const totalsRow = ['TOTALS', '', '', '', '', '', ''];
+        const totalsRow = ['TOTALS', '', '', '', '', '', '', ''];
 
-        // Calculate totals for columns 2-6 (TOAST SALES, ACTUAL CASH IN, TIPS TAKEN, NET DISC, EXCESS)
-        for (let col = 2; col < 7; col++) {
+        // Calculate totals for columns 2-7 (TOAST SALES, ACTUAL CASH IN, DISC, TIPS TAKEN, NET DISC, EXCESS)
+        for (let col = 2; col < 8; col++) {
           let total = 0;
           dailyTableData.forEach(row => {
             let value = row[col].replace('$', '').replace('+', '').replace('-', '').replace(',', '');
@@ -9031,7 +9037,10 @@
             total += isNegative ? -numValue : numValue;
           });
 
-          if (col === 5) { // NET DISC column - show sign and format
+          if (col === 4) { // DISC column (original) - show sign and format
+            const sign = total >= 0 ? '+' : '';
+            totalsRow[col] = `${sign}$${Math.abs(total).toFixed(2)}`;
+          } else if (col === 6) { // NET DISC column (after tips) - show sign and format
             const sign = total > 0 ? '+' : '';
             totalsRow[col] = total > 0 ? `${sign}$${total.toFixed(2)}` : '$0.00';
           } else {
@@ -9044,7 +9053,7 @@
 
         doc.autoTable({
           startY: currentY,
-          head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'TIPS TAKEN', 'NET DISC', 'EXCESS']],
+          head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISC', 'TIPS TAKEN', 'NET DISC', 'EXCESS']],
           body: tableDataWithTotals,
           margin: { left: margin, right: margin },
           theme: 'grid',
@@ -9070,24 +9079,36 @@
               data.cell.styles.fillColor = [240, 240, 240]; // Light gray background for totals
             }
 
-            // Color formatting for NET DISC column (column index 5)
-            if (data.column.index === 5 && data.row.index < tableDataWithTotals.length - 1) {
+            // Color formatting for DISC column (column index 4) - original discrepancy
+            if (data.column.index === 4 && data.row.index < tableDataWithTotals.length - 1) {
               const cellValue = data.cell.text[0];
-              if (cellValue && cellValue.includes('+')) {
-                // Positive net discrepancy (overage) - dark green
+              if (cellValue && cellValue.includes('-')) {
+                // Negative discrepancy (shortage) - dark red
+                data.cell.styles.textColor = [139, 0, 0]; // Dark red
+              } else if (cellValue && cellValue.includes('+')) {
+                // Positive discrepancy (overage) - dark green
                 data.cell.styles.textColor = [34, 139, 34]; // Dark green
               }
-              // No red coloring - net discrepancies are never negative (tips absorb shortages)
             }
 
-            // Color formatting for TIPS TAKEN column (column index 4) - show in muted orange if non-zero
-            if (data.column.index === 4 && data.row.index < tableDataWithTotals.length - 1) {
+            // Color formatting for TIPS TAKEN column (column index 5) - show in muted orange if non-zero
+            if (data.column.index === 5 && data.row.index < tableDataWithTotals.length - 1) {
               const cellValue = data.cell.text[0];
               const value = parseFloat(cellValue.replace('$', '').replace(',', '')) || 0;
               if (value > 0) {
                 // Tips were taken to cover shortage - show in muted orange
                 data.cell.styles.textColor = [184, 134, 11]; // Dark goldenrod
               }
+            }
+
+            // Color formatting for NET DISC column (column index 6) - after tips absorb shortage
+            if (data.column.index === 6 && data.row.index < tableDataWithTotals.length - 1) {
+              const cellValue = data.cell.text[0];
+              if (cellValue && cellValue.includes('+')) {
+                // Positive net discrepancy (overage) - dark green
+                data.cell.styles.textColor = [34, 139, 34]; // Dark green
+              }
+              // No red coloring - net discrepancies are never negative (tips absorb shortages)
             }
           },
           tableWidth: 'auto'
@@ -9700,6 +9721,7 @@
 
     // Get cashbox count from tip pool form (optional feature)
     const cashboxData = getTipPoolCashboxData();
+    const cashboxTotal = cashboxData ? cashboxData.total : null; // CRITICAL FIX: Extract total
 
     console.log('📦 Cashbox data from form:', cashboxData);
 
