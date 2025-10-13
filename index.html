@@ -10706,37 +10706,44 @@
   window.deleteOrderItem = deleteOrderItem;
 
   /**
-   * Delete entire pending order
+   * Delete entire pending order - SIMPLIFIED VERSION
    */
   async function deletePendingOrder(orderId, vendorName) {
-    console.log('🚀 deletePendingOrder FUNCTION CALLED with:', orderId, vendorName);
-    console.log('🔍 Supabase client exists?', !!supabase);
+    if (!orderId) {
+      alert('ERROR: No order ID');
+      return;
+    }
 
-    // No confirmation needed - red DELETE button is clear intent
-    showLoading('Deleting Order', `Removing order from ${vendorName}...`);
+    showLoading('Deleting...', 'Removing order');
 
     try {
-      // Delete order (cascade will delete items)
-      const { error } = await supabase
+      // Delete items first
+      const { error: itemsError } = await supabase
+        .from('pending_order_items')
+        .delete()
+        .eq('order_id', orderId);
+
+      if (itemsError) throw new Error('Items delete failed: ' + itemsError.message);
+
+      // Delete order
+      const { error: orderError } = await supabase
         .from('pending_orders')
         .delete()
         .eq('id', orderId);
 
-      if (error) throw error;
+      if (orderError) throw new Error('Order delete failed: ' + orderError.message);
 
       hideLoading();
-      showMessage(`✅ Order from ${vendorName} deleted successfully!`, 'success');
+      alert('✅ DELETED ' + vendorName);
 
-      // Reload orders list
+      // Reload
       await loadAllPendingOrders();
-
-      // Reload orders due today alert
       await loadOrdersDueTodayAlert();
 
     } catch (error) {
       hideLoading();
-      console.error('Error deleting order:', error);
-      showMessage('Failed to delete order: ' + error.message, 'error');
+      alert('DELETE FAILED: ' + error.message);
+      console.error(error);
     }
   }
   window.deletePendingOrder = deletePendingOrder;
