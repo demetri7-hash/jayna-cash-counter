@@ -64,11 +64,9 @@ export default async function handler(req, res) {
       other_sales: salesData.otherSales,
       other_tips: salesData.otherTips,
       total_tips: salesData.totalTips,
-      gift_card_payments: salesData.giftCardPayments || 0,
-      gift_card_amount: salesData.giftCardAmount || 0,
       imported_at: new Date().toISOString(),
       source: 'toast_api_auto',
-      raw_data: salesData // Store full response for debugging
+      raw_data: salesData // Store full response for debugging (includes gift card data)
     };
 
     const { data, error } = await supabase
