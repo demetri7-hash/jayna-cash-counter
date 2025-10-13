@@ -51,11 +51,25 @@
 **Commits:**
 - `e9fcbd3`: feat(receive): Add PDF upload + improve price extraction + always show action buttons
 - `a803c3b`: feat(database): Add supabase migration for learning columns
+- `1141e86`: fix(receive): Add PDF-to-image conversion for OCR processing ← **CRITICAL FIX**
+
+**Critical Fix Applied (1141e86):**
+- **Problem:** Tesseract.js cannot read PDFs directly (Error: "Error attempting to read image")
+- **Solution:** Added PDF.js library to convert PDF → Image → Tesseract
+- **How it works:**
+  1. Detects PDF files by checking `data:application/pdf` prefix
+  2. Converts PDF to Uint8Array using atob()
+  3. Loads PDF with pdfjsLib.getDocument()
+  4. Renders first page to canvas at 2x scale (high quality)
+  5. Converts canvas to PNG data URL
+  6. Passes PNG to Tesseract for OCR
+- **Libraries:** PDF.js v3.11.174 + worker
 
 **Philosophy Applied:** "Always go forward, never backwards"
 - Added PDF support instead of restricting to images only
 - Added database column instead of removing feature
 - Added button visibility instead of removing user control
+- Added PDF conversion instead of blocking PDF uploads
 
 ---
 
