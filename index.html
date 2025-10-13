@@ -8414,8 +8414,8 @@
       if (tipPoolSummary.previousVariance && tipPoolSummary.previousVariance > 0) {
         const carriedDate = new Date(tipPoolSummary.carriedFromDate).toLocaleDateString();
         rightColumnEntries.push(
-          ['⚠️ UNPAID TIPS FROM PREVIOUS WEEK', `$${tipPoolSummary.previousVariance.toFixed(2)}`],
-          [`   Carried from ${carriedDate}`, '(ADDED TO POOL)']
+          ['UNPAID TIPS FROM PREVIOUS WEEK', `$${tipPoolSummary.previousVariance.toFixed(2)}`],
+          [`Carried from ${carriedDate}`, '(ADDED TO POOL)']
         );
       }
 
@@ -8677,7 +8677,7 @@
       // Always show labor summary boxes (they will fit on page with compressed layout)
       if (true) {
         // Draw two bordered boxes side by side
-        const boxHeight = 120; // Reduced from 140 to fit better
+        const boxHeight = 90; // Reduced to fit page 1 without overflow
         const boxWidth = (pageWidth - (2 * margin) - 10) / 2; // 10pt gap between boxes
         const leftBoxX = margin;
         const rightBoxX = margin + boxWidth + 10;
@@ -8714,70 +8714,15 @@
         doc.line(leftBoxX, currentY + 20, leftBoxX + boxWidth, currentY + 20);
         doc.line(rightBoxX, currentY + 20, rightBoxX + boxWidth, currentY + 20);
 
-        // Left box content - Daily Notes
-        let notesY = currentY + 30;
+        // Left box content - Tip Pool Notes Only
+        let notesY = currentY + 35;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
         doc.setTextColor(0, 0, 0);
 
-        if (cashData && cashData.length > 0) {
-          let hasNotes = false;
-          cashData.forEach(day => {
-            const dayNotes = [];
-            if (day.am_notes && day.am_notes.trim()) dayNotes.push(`AM: ${day.am_notes.trim()}`);
-            if (day.pm_notes && day.pm_notes.trim()) dayNotes.push(`PM: ${day.pm_notes.trim()}`);
-
-            if (dayNotes.length > 0) {
-              hasNotes = true;
-              const dateStr = new Date(day.date + 'T12:00:00').toLocaleDateString();
-              doc.setFont('helvetica', 'bold');
-              doc.text(dateStr, leftBoxX + 5, notesY);
-              notesY += 9;
-              doc.setFont('helvetica', 'normal');
-
-              dayNotes.forEach(note => {
-                const lines = doc.splitTextToSize(note, boxWidth - 10);
-                lines.forEach(line => {
-                  if (notesY < currentY + boxHeight - 5) {
-                    doc.text(line, leftBoxX + 5, notesY);
-                    notesY += 8;
-                  }
-                });
-              });
-              notesY += 3; // Space between days
-            }
-          });
-
-          if (!hasNotes) {
-            doc.setTextColor(150, 150, 150);
-            doc.text('No notes for this period', leftBoxX + boxWidth / 2, currentY + 70, { align: 'center' });
-            notesY = currentY + 80; // Position for custom notes
-          }
-        } else {
-          doc.setTextColor(150, 150, 150);
-          doc.text('No notes available', leftBoxX + boxWidth / 2, currentY + 70, { align: 'center' });
-          notesY = currentY + 80; // Position for custom notes
-        }
-
-        // Add custom tip pool notes if available
+        // Display custom tip pool notes if available
         if (tipPoolSummary && tipPoolSummary.customNotes && tipPoolSummary.customNotes.trim()) {
-          // Add separator line if there were daily notes
-          if (notesY > currentY + 30) {
-            doc.setDrawColor(200, 200, 200);
-            doc.setLineWidth(0.5);
-            doc.line(leftBoxX + 10, notesY - 5, leftBoxX + boxWidth - 10, notesY - 5);
-          }
-
-          // Custom notes header
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(7);
-          doc.setTextColor(0, 0, 0);
-          doc.text('TIP POOL NOTES:', leftBoxX + 5, notesY + 5);
-          notesY += 12;
-
           // Custom notes content
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(7);
           const noteLines = doc.splitTextToSize(tipPoolSummary.customNotes.trim(), boxWidth - 10);
           noteLines.forEach(line => {
             if (notesY < currentY + boxHeight - 5) {
@@ -8785,6 +8730,10 @@
               notesY += 8;
             }
           });
+        } else {
+          // No notes message (centered)
+          doc.setTextColor(150, 150, 150);
+          doc.text('No additional notes added during tip pool calculation', leftBoxX + boxWidth / 2, currentY + 70, { align: 'center' });
         }
 
         // Right box content - Labor Summary (clean and simple)
@@ -8870,7 +8819,7 @@
         }
 
         // Move currentY past the boxes
-        currentY += boxHeight + 20;
+        currentY += boxHeight + 10; // Reduced spacing to prevent page overflow
       }
 
       // Add developer credit - centered, bold, black
