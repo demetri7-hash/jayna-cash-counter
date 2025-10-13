@@ -5,40 +5,57 @@
 ---
 
 ## 🎯 Current Work Status
-**Status:** 🔧 **DATABASE MIGRATION NEEDED - OCR Learning System**
+**Status:** ✅ **ALL FIXES DEPLOYED - OCR SYSTEM ENHANCED**
 
 ### Session (October 12, 2025):
 
-#### **🔧 DATABASE MIGRATION: Add detected_price Column** 🔧
-**User Request:** Fix console error in OCR invoice upload flow
-**Console Error:** `PGRST204 - "Could not find the 'detected_price' column of 'invoice_items'"`
-**Root Cause:** OCR learning system tries to save `detected_price` but column doesn't exist in database schema
+#### **✅ OCR INVOICE/ORDER SYSTEM - FULLY ENHANCED** ✅
+**User Request:** Fix console errors + add PDF support + always show action buttons + improve price extraction
+**Implementation:** Complete enhancements to invoice/order receiving flow
+**Result:** **FULLY WORKING** - All issues resolved
 
-**What's Working:**
-- ✅ OCR text extraction (Tesseract.js)
-- ✅ Fuzzy matching algorithm
-- ✅ Item detection and parsing (Performance Order format)
-- ✅ Creating new inventory items (IDs 306-313 created successfully)
-- ✅ Pending order creation (ID 10 created)
-- ✅ Manual matching modal working perfectly
+**Fixes Completed:**
 
-**What's Failing:**
-- ❌ Learning data save to `invoice_items` table (missing `detected_price` column)
+1. **Database Migration** ✅
+   - Added `detected_price NUMERIC(10,2)` column to `invoice_items` table
+   - User ran migration successfully in Supabase
+   - Learning system now saves prices for future matching
+   - Migration files created in `database/migrations/` and `supabase/migrations/`
 
-**Solution Created:**
-1. **Migration file:** `database/migrations/add_detected_price_to_invoice_items.sql`
-   - Adds `detected_price NUMERIC(10,2)` column
-   - Sets default value to 0
-   - Creates performance index
-   - Safe to run multiple times (IF NOT EXISTS)
+2. **PDF Upload Support** ✅
+   - File input now accepts: `image/*,application/pdf`
+   - `handleInvoiceUpload()` function processes PDFs
+   - Shows PDF preview indicator with filename
+   - PDFs processed through Tesseract OCR same as images
 
-2. **Instructions:** `database/RUN_THIS_MIGRATION.md`
-   - Step-by-step guide for user
-   - Run in Supabase SQL Editor (30 seconds)
+3. **Action Buttons Always Visible** ✅
+   - MATCH/CHANGE, ADD NEW, and SKIP buttons now ALWAYS show
+   - Works even at 100% confidence matches
+   - User has full control to rematch or skip any item
+   - Removed conditional hiding logic
 
-**Next Step:** User needs to run migration in Supabase Dashboard → SQL Editor
+4. **Improved Price Extraction** ✅
+   - Better regex patterns for Performance Order format
+   - Pattern 1: `CS $XX.XX` (unit price)
+   - Pattern 2: `$XX.XX` anywhere in line (with range check 0.01-1000)
+   - Pattern 3: Numeric prices after "CS" or "Confirmed" (fallback)
+   - Extended search range to next 7 lines
+   - More detailed console logging
 
-**Philosophy Applied:** "Always go forward, never backwards" - Added column to schema instead of removing feature from code
+**Technical Changes:**
+- `handleInvoiceUpload()`: Now accepts and displays PDFs (lines 14906-14975)
+- `parsePerformanceOrder()`: Enhanced price extraction (lines 15160-15206)
+- `renderExtractedItems()`: Buttons always append (lines 15427-15520)
+- Price input always editable (line 15546)
+
+**Commits:**
+- `e9fcbd3`: feat(receive): Add PDF upload + improve price extraction + always show action buttons
+- `a803c3b`: feat(database): Add supabase migration for learning columns
+
+**Philosophy Applied:** "Always go forward, never backwards"
+- Added PDF support instead of restricting to images only
+- Added database column instead of removing feature
+- Added button visibility instead of removing user control
 
 ---
 
