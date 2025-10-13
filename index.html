@@ -1206,11 +1206,11 @@
 
             <!-- Denomination Inputs -->
             <div id="tipPoolCashboxDenominationInputs" style="display: none; margin-top: 15px;">
-              <h5 style="color: #856404; margin-bottom: 15px;">Count by Denomination</h5>
+              <h5 style="color: #666; margin-bottom: 15px;">Count by Denomination</h5>
 
               <!-- Bills Section -->
-              <div style="background: #fffbf0; padding: 15px; border-radius: 0; margin-bottom: 15px; border: 1px solid #ffeaa7;">
-                <h6 style="color: #856404; margin-bottom: 10px; font-size: 13px;">Bills</h6>
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 0; margin-bottom: 15px; border: 1px solid #ddd;">
+                <h6 style="color: #666; margin-bottom: 10px; font-size: 13px;">Bills</h6>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
                   <div class="denomination-group">
                     <label style="font-size: 12px;">$100 bills:</label>
@@ -1240,8 +1240,8 @@
               </div>
 
               <!-- Coins Section -->
-              <div style="background: #fffbf0; padding: 15px; border-radius: 0; margin-bottom: 15px; border: 1px solid #ffeaa7;">
-                <h6 style="color: #856404; margin-bottom: 10px; font-size: 13px;">Coins</h6>
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 0; margin-bottom: 15px; border: 1px solid #ddd;">
+                <h6 style="color: #666; margin-bottom: 10px; font-size: 13px;">Coins</h6>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
                   <div class="denomination-group">
                     <label style="font-size: 12px;">Quarters:</label>
@@ -1263,10 +1263,10 @@
               </div>
 
               <!-- Total Display -->
-              <div style="background: #fff; padding: 20px; border-radius: 0; text-align: center; border: 3px solid #ffc107;">
-                <h5 style="margin: 0 0 10px 0; color: #856404; font-size: 14px; text-transform: uppercase;">Total Cashbox Amount</h5>
-                <div id="tipPoolCashboxTotal" style="font-size: 28px; font-weight: bold; color: #856404;">$0.00</div>
-                <div style="font-size: 12px; color: #856404; margin-top: 8px;">This will be used for weekly reconciliation on the combined report</div>
+              <div style="background: #fff; padding: 20px; border-radius: 0; text-align: center; border: 2px solid #ddd;">
+                <h5 style="margin: 0 0 10px 0; color: #666; font-size: 14px; text-transform: uppercase;">Total Cashbox Amount</h5>
+                <div id="tipPoolCashboxTotal" style="font-size: 28px; font-weight: bold; color: #333;">$0.00</div>
+                <div style="font-size: 12px; color: #666; margin-top: 8px;">This will be used for weekly reconciliation on the combined report</div>
               </div>
             </div>
           </div>
@@ -7316,16 +7316,19 @@
       return; // Silently skip if dates not set
     }
 
-    // CRITICAL: Skip auto-fetch if user has already uploaded files
+    // CRITICAL: Check if user uploaded files
     const laborFile = document.getElementById('laborFile').files[0];
     const salesFile = document.getElementById('salesFile').files[0];
     const hasFiles = laborFile && salesFile;
 
     if (hasFiles) {
-      console.log('Files already uploaded - skipping auto-fetch');
+      console.log('Files already uploaded - skipping sales/labor auto-fetch, but still fetching TDS driver tips');
       const statusDiv = document.getElementById('autoFetchStatus');
       statusDiv.innerHTML = '<span style="color: #28a745;">Using uploaded files (will bypass database and API)</span>';
-      return; // User wants to use uploaded files, don't fetch!
+
+      // CRITICAL FIX: Still need to fetch TDS Driver tips (not in manual files!)
+      await autoFetchTdsDriverTips(startDate, endDate);
+      return;
     }
 
     // Show loading overlay
