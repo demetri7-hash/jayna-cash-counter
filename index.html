@@ -14907,20 +14907,65 @@
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      showMessage('Please upload an image file (JPG, PNG, etc.)', 'error');
+    // Validate file type (accept images AND PDFs)
+    const isImage = file.type.startsWith('image/');
+    const isPDF = file.type === 'application/pdf';
+
+    if (!isImage && !isPDF) {
+      showMessage('Please upload an image file (JPG, PNG) or PDF', 'error');
       return;
     }
 
-    // Convert to base64 and display preview
+    // Handle PDF files
+    if (isPDF) {
+      showMessage('PDF uploaded! Processing with OCR...', 'success');
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        // Store the PDF data
+        orderingSystemState.currentInvoiceImage = e.target.result;
+
+        // Show preview section (show PDF icon placeholder)
+        document.getElementById('invoicePreviewSection').style.display = 'block';
+        const previewImg = document.getElementById('invoicePreviewImage');
+
+        // Create PDF preview indicator
+        previewImg.style.display = 'none';
+        let pdfPreview = document.getElementById('pdfPreviewIndicator');
+        if (!pdfPreview) {
+          pdfPreview = document.createElement('div');
+          pdfPreview.id = 'pdfPreviewIndicator';
+          pdfPreview.style.cssText = 'padding: 40px; text-align: center; background: var(--gray-100); border: 2px dashed var(--gray-400); border-radius: 0;';
+          previewImg.parentNode.insertBefore(pdfPreview, previewImg);
+        }
+        pdfPreview.innerHTML = `
+          <div style="font-size: 48px; margin-bottom: 12px;">📄</div>
+          <div style="font-size: 14px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 1px;">PDF UPLOADED</div>
+          <div style="font-size: 11px; color: var(--gray-600); margin-top: 6px;">${file.name}</div>
+        `;
+        pdfPreview.style.display = 'block';
+
+        // Hide other sections
+        document.getElementById('ocrProcessingStatus').style.display = 'none';
+        document.getElementById('extractedItemsSection').style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    // Handle image files
     const reader = new FileReader();
     reader.onload = function(e) {
       orderingSystemState.currentInvoiceImage = e.target.result;
 
       // Show preview section
       document.getElementById('invoicePreviewSection').style.display = 'block';
-      document.getElementById('invoicePreviewImage').src = e.target.result;
+      const previewImg = document.getElementById('invoicePreviewImage');
+      previewImg.src = e.target.result;
+      previewImg.style.display = 'block';
+
+      // Hide PDF preview if exists
+      const pdfPreview = document.getElementById('pdfPreviewIndicator');
+      if (pdfPreview) pdfPreview.style.display = 'none';
 
       // Hide other sections
       document.getElementById('ocrProcessingStatus').style.display = 'none';
@@ -15113,33 +15158,51 @@
           }
 
           // Extract price from line4 or nearby lines
-          // OCR might read "$5.12" as "512" so look for both patterns
+          // Performance orders show: "CS $35.55 $70.22" (unit price, then total)
+          // We want the FIRST price (unit price per case)
           let price = null;
 
-          // Try to find $X.XX pattern in next 3 lines
-          for (let j = i + 2; j < Math.min(i + 6, lines.length); j++) {
+          // Try to find price in next 5 lines after item
+          for (let j = i + 2; j < Math.min(i + 7, lines.length); j++) {
             const priceLine = lines[j];
 
-            // Pattern 1: $5.12 (with dollar sign)
-            const dollarMatch = priceLine.match(/\$(\d+\.\d{2})/);
-            if (dollarMatch) {
-              price = parseFloat(dollarMatch[1]);
-              console.log(`  ✓ Found price with $: $${price} at line ${j}`);
+            // Pattern 1: "CS $XX.XX" or "CS $XX.XX $YYY.YY" (unit price first)
+            const csWithPrice = priceLine.match(/cs\s+\$(\d+\.\d{2})/i);
+            if (csWithPrice) {
+              price = parseFloat(csWithPrice[1]);
+              console.log(`  ✓ Found CS unit price: $${price} at line ${j} [${priceLine.trim()}]`);
               break;
             }
 
-            // Pattern 2: "cs 512" or "CS $5.12" (OCR might drop $)
-            // Look for "cs" or "CS" followed by numbers
-            const csMatch = priceLine.match(/cs\s+\$?(\d+\.?\d*)/i);
-            if (csMatch) {
-              const priceNum = parseFloat(csMatch[1]);
-              // If it's a reasonable price (< 500), use it
-              if (priceNum < 500 && priceNum > 0) {
-                price = priceNum;
-                console.log(`  ✓ Found price after CS: $${price} at line ${j}`);
+            // Pattern 2: Just "$XX.XX" anywhere in line (first occurrence)
+            const dollarMatch = priceLine.match(/\$(\d+\.\d{2})/);
+            if (dollarMatch && !price) {  // Only if we haven't found CS price yet
+              const foundPrice = parseFloat(dollarMatch[1]);
+              // Reasonable price range check (avoid order numbers like $55229235)
+              if (foundPrice > 0.01 && foundPrice < 1000) {
+                price = foundPrice;
+                console.log(`  ✓ Found $ price: $${price} at line ${j} [${priceLine.trim()}]`);
                 break;
               }
             }
+
+            // Pattern 3: Numbers that look like prices (without $, OCR might miss it)
+            // Look for XX.XX pattern after "CS" or "Confirmed"
+            if (!price) {
+              const numericPrice = priceLine.match(/(?:cs|confirmed:?\s+\d+).*?(\d+\.\d{2})/i);
+              if (numericPrice) {
+                const foundPrice = parseFloat(numericPrice[1]);
+                if (foundPrice > 0.50 && foundPrice < 1000) {
+                  price = foundPrice;
+                  console.log(`  ✓ Found numeric price: $${price} at line ${j} [${priceLine.trim()}]`);
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!price) {
+            console.log(`  ⚠️ No price found for "${itemName}"`);
           }
 
           items.push({
@@ -15424,57 +15487,55 @@
 
       matchRow.appendChild(matchInfo);
 
-      // Button container for MATCH and ADD NEW
+      // Button container for MATCH, ADD NEW, and SKIP
+      // ALWAYS show these buttons - user needs control even on 100% matches!
       const btnContainer = document.createElement('div');
       btnContainer.style.cssText = 'display: flex; gap: 6px;';
 
-      // Manual match button for low confidence or no match
-      if (!item.matchedInventoryId || item.matchConfidence < 0.7) {
-        const manualMatchBtn = document.createElement('button');
-        manualMatchBtn.textContent = item.matchedInventoryId ? 'CHANGE' : 'MATCH';
-        manualMatchBtn.style.cssText = 'background: var(--gray-100); color: var(--gray-900); border: 2px solid var(--gray-300); padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;';
-        manualMatchBtn.onclick = function() {
-          console.log('🖱️ MATCH/CHANGE button clicked! Index:', index);
-          showManualMatchModal(index);
-        };
-        btnContainer.appendChild(manualMatchBtn);
+      // MATCH/CHANGE button (always visible)
+      const manualMatchBtn = document.createElement('button');
+      manualMatchBtn.textContent = item.matchedInventoryId ? 'CHANGE' : 'MATCH';
+      manualMatchBtn.style.cssText = 'background: var(--gray-100); color: var(--gray-900); border: 2px solid var(--gray-300); padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;';
+      manualMatchBtn.onclick = function() {
+        console.log('🖱️ MATCH/CHANGE button clicked! Index:', index);
+        showManualMatchModal(index);
+      };
+      btnContainer.appendChild(manualMatchBtn);
 
-        // Add New button
-        const addNewBtn = document.createElement('button');
-        addNewBtn.textContent = item.flaggedAsNew ? '✓ NEW' : 'ADD NEW';
-        addNewBtn.style.cssText = item.flaggedAsNew
-          ? 'background: #212121; color: white; border: 2px solid #212121; padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;'
-          : 'background: white; color: #212121; border: 2px solid #212121; padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;';
-        addNewBtn.onclick = function() {
-          item.flaggedAsNew = !item.flaggedAsNew;
-          if (item.flaggedAsNew) {
-            item.matchedInventoryId = null; // Clear any existing match
-            item.skipped = false; // Clear skipped if flagging as new
-          }
-          renderExtractedItems();
-        };
-        btnContainer.appendChild(addNewBtn);
+      // ADD NEW button (always visible)
+      const addNewBtn = document.createElement('button');
+      addNewBtn.textContent = item.flaggedAsNew ? '✓ NEW' : 'ADD NEW';
+      addNewBtn.style.cssText = item.flaggedAsNew
+        ? 'background: #212121; color: white; border: 2px solid #212121; padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;'
+        : 'background: white; color: #212121; border: 2px solid #212121; padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;';
+      addNewBtn.onclick = function() {
+        item.flaggedAsNew = !item.flaggedAsNew;
+        if (item.flaggedAsNew) {
+          item.matchedInventoryId = null; // Clear any existing match
+          item.skipped = false; // Clear skipped if flagging as new
+        }
+        renderExtractedItems();
+      };
+      btnContainer.appendChild(addNewBtn);
 
-        // Skip button
-        const skipBtn = document.createElement('button');
-        skipBtn.textContent = item.skipped ? '✓ SKIP' : 'SKIP';
-        skipBtn.style.cssText = item.skipped
-          ? 'background: var(--gray-700); color: white; border: 2px solid var(--gray-700); padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;'
-          : 'background: var(--gray-300); color: var(--gray-700); border: 2px solid var(--gray-400); padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;';
-        skipBtn.onclick = function() {
-          item.skipped = !item.skipped;
-          if (item.skipped) {
-            item.matchedInventoryId = null; // Clear any existing match
-            item.flaggedAsNew = false; // Clear flagged as new
-          }
-          renderExtractedItems();
-        };
-        btnContainer.appendChild(skipBtn);
-      }
+      // SKIP button (always visible)
+      const skipBtn = document.createElement('button');
+      skipBtn.textContent = item.skipped ? '✓ SKIP' : 'SKIP';
+      skipBtn.style.cssText = item.skipped
+        ? 'background: var(--gray-700); color: white; border: 2px solid var(--gray-700); padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;'
+        : 'background: var(--gray-300); color: var(--gray-700); border: 2px solid var(--gray-400); padding: 6px 12px; border-radius: 0; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;';
+      skipBtn.onclick = function() {
+        item.skipped = !item.skipped;
+        if (item.skipped) {
+          item.matchedInventoryId = null; // Clear any existing match
+          item.flaggedAsNew = false; // Clear flagged as new
+        }
+        renderExtractedItems();
+      };
+      btnContainer.appendChild(skipBtn);
 
-      if (btnContainer.children.length > 0) {
-        matchRow.appendChild(btnContainer);
-      }
+      // Always append buttons (no conditional check)
+      matchRow.appendChild(btnContainer);
 
       card.appendChild(matchRow);
 
