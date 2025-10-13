@@ -10125,7 +10125,10 @@
         // Store order ID for future reconciliation
         orderCard.onclick = () => {
           orderingSystemState.selectedPendingOrderId = order.id;
-          showMessage(`✓ Selected ${order.vendor} order for reconciliation`, 'success');
+          orderingSystemState.invoiceType = 'invoice'; // Set to invoice mode for reconciliation
+
+          showMessage(`✓ Selected ${order.vendor} order. Switching to CHECK-IN tab...`, 'success');
+
           // Highlight selected
           document.querySelectorAll('#ordersDueTodayAlert > div > div').forEach(card => {
             card.style.borderColor = '#f59e0b';
@@ -10133,6 +10136,21 @@
           });
           orderCard.style.borderColor = '#92400e';
           orderCard.style.background = '#fffbeb';
+
+          // Auto-navigate to CHECK-IN tab after brief delay
+          setTimeout(() => {
+            const checkInTab = document.querySelector('[onclick*="checkInInvoice"]');
+            if (checkInTab) {
+              checkInTab.click();
+
+              // Scroll to top and show instructions
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+
+              setTimeout(() => {
+                showMessage(`📦 Upload invoice for ${order.vendor} order to reconcile items`, 'info');
+              }, 500);
+            }
+          }, 800);
         };
 
         alert.appendChild(orderCard);
