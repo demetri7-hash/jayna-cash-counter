@@ -8370,25 +8370,25 @@
         totalBackToCashbox += (day.pm_amount_to_keep - day.am_total) || 0;
       });
 
-      // Summary section: arrange entries in two columns with tighter spacing
+      // Summary section: arrange entries in three columns with tighter spacing
       doc.setFontSize(9);   // Reduced from 10
       doc.setFont('helvetica', 'normal');
-      
-      // Create separate left and right column entries
+
+      // Column 1: Cash data
       const leftColumnEntries = [
         ['Toast Cash Sales Reported', `$${totalToastSalesReported.toFixed(2)}`],
         ['Actual Cash In', `$${totalActualCashIn.toFixed(2)}`],
         ['Total Discrepancy', `$${totalDiscrepancy.toFixed(2)}`]
       ];
-      
+
       // Add cashbox reconciliation if available
       if (cashboxReconciliation) {
         leftColumnEntries.push(['Current Cashbox Total', `$${cashboxReconciliation.currentTotal.toFixed(2)}`]);
-        
+
         if (!cashboxReconciliation.isFirstCount && cashboxReconciliation.expectedEnding !== undefined) {
           leftColumnEntries.push(['Expected Based on Discrepancies', `$${cashboxReconciliation.expectedEnding.toFixed(2)}`]);
           leftColumnEntries.push(['Total Period Discrepancies', `$${cashboxReconciliation.totalDiscrepancies.toFixed(2)}`]);
-          
+
           if (Math.abs(cashboxReconciliation.actualVariance) >= 0.01) {
             const varianceLabel = cashboxReconciliation.actualVariance >= 0 ? 'Unexplained Overage' : 'Unexplained Shortage';
             leftColumnEntries.push([varianceLabel, `$${Math.abs(cashboxReconciliation.actualVariance).toFixed(2)}`]);
@@ -8404,62 +8404,79 @@
         // Fallback when no cashbox data is available yet
         leftColumnEntries.push(['Cashbox Reconciliation', 'N/A - New Feature']);
       }
-      
+
       const leftColumnMapped = leftColumnEntries.map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
 
-      // Build right column entries (tip pool data)
-      const rightColumnEntries = [];
+      // Column 2: Tip sources
+      const middleColumnEntries = [];
 
       // Add previous variance carryover if it exists (compliance tracking)
       if (tipPoolSummary.previousVariance && tipPoolSummary.previousVariance > 0) {
         const carriedDate = new Date(tipPoolSummary.carriedFromDate).toLocaleDateString();
-        rightColumnEntries.push(
+        middleColumnEntries.push(
           ['UNPAID TIPS FROM PREVIOUS WEEK', `$${tipPoolSummary.previousVariance.toFixed(2)}`],
           [`Carried from ${carriedDate}`, '(ADDED TO POOL)']
         );
       }
 
-      // Standard tip pool entries
-      rightColumnEntries.push(
+      middleColumnEntries.push(
         ['Credit Tips', `$${tipPoolSummary.creditTips.toFixed(2)}`],
         ['Cash Tips', `$${tipPoolSummary.cashTips.toFixed(2)}`],
-        ['EZCater Tips', `$${tipPoolSummary.ezcaterTips.toFixed(2)}`],
+        ['EZCater Tips', `$${tipPoolSummary.ezcaterTips.toFixed(2)}`]
+      );
+
+      const middleColumnMapped = middleColumnEntries.map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
+
+      // Column 3: Tip distribution
+      const rightColumnEntries = [
         ['Total Tips', `$${tipPoolSummary.totalTips.toFixed(2)}`],
         ['TDS Driver', `$${tipPoolSummary.tdsDriverTips.toFixed(2)}`],
         ['Tip Pool Total (Minus TDS)', `$${tipPoolSummary.pool.toFixed(2)}`],
         ['Hourly Rate', `$${tipPoolSummary.hourlyRate.toFixed(2)}`]
-      );
+      ];
 
       const rightColumnMapped = rightColumnEntries.map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
-      
+
       // Define fixed x offsets for values within each column
-      const colValueOffset = 170;  // Reduced from 200
+      const colValueOffset = 120;  // Reduced for narrower columns
       let summaryY = currentY + 66; // Reduced from 86
       const lineHeight = 11;        // Reduced from 14
-      const col2X = pageWidth / 2;
-      
-      // Draw left column (cash data)
-      let leftColumnY = summaryY;
+      const colWidth = (pageWidth - (2 * margin)) / 3;
+      const col2X = margin + colWidth;
+      const col3X = margin + (colWidth * 2);
+
+      // Draw column 1 (cash data)
+      let col1Y = summaryY;
       for (const [label, value] of leftColumnMapped) {
         doc.setFont('helvetica', 'bold');
-        doc.text(`${label}:`, margin, leftColumnY);
+        doc.text(`${label}:`, margin, col1Y);
         doc.setFont('helvetica', 'normal');
-        doc.text(value, margin + colValueOffset, leftColumnY);
-        leftColumnY += lineHeight;
+        doc.text(value, margin + colValueOffset, col1Y);
+        col1Y += lineHeight;
       }
-      
-      // Draw right column (tip data)
-      let rightColumnY = summaryY;
+
+      // Draw column 2 (tip sources)
+      let col2Y = summaryY;
+      for (const [label, value] of middleColumnMapped) {
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${label}:`, col2X, col2Y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(value, col2X + colValueOffset, col2Y);
+        col2Y += lineHeight;
+      }
+
+      // Draw column 3 (tip distribution)
+      let col3Y = summaryY;
       for (const [label, value] of rightColumnMapped) {
         doc.setFont('helvetica', 'bold');
-        doc.text(`${label}:`, col2X + 6, rightColumnY);
+        doc.text(`${label}:`, col3X, col3Y);
         doc.setFont('helvetica', 'normal');
-        doc.text(value, col2X + 6 + colValueOffset, rightColumnY);
-        rightColumnY += lineHeight;
+        doc.text(value, col3X + colValueOffset, col3Y);
+        col3Y += lineHeight;
       }
       
-      // Add centered Cash Needed/Surplus line below both columns with larger italic font
-      const cashNeededY = Math.max(leftColumnY, rightColumnY) + 8;
+      // Add centered Cash Needed/Surplus line below all three columns with larger italic font
+      const cashNeededY = Math.max(col1Y, col2Y, col3Y) + 8;
       const cashNeededLabel = tipPoolSummary.cashNeeded > 0 ? 'CASH NEEDED' : 'CASH SURPLUS';
       const cashNeededValue = `$${Math.abs(tipPoolSummary.cashNeeded).toFixed(2)}`;
       const cashNeededText = `${cashNeededLabel}: ${cashNeededValue}`;
