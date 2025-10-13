@@ -15351,18 +15351,35 @@
 
       // Header row with detected name and quantity
       const headerRow = document.createElement('div');
-      headerRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;';
+      headerRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 12px;';
 
       const detectedName = document.createElement('strong');
       detectedName.textContent = item.detectedName;
-      detectedName.style.cssText = 'font-size: 14px; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;';
+      detectedName.style.cssText = 'font-size: 14px; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px; flex: 1;';
 
-      const detectedQty = document.createElement('span');
-      detectedQty.textContent = 'QTY: ' + item.detectedQuantity;
-      detectedQty.style.cssText = 'background: var(--gray-100); padding: 4px 8px; border-radius: 0; font-size: 11px; font-weight: 700; color: var(--gray-700); letter-spacing: 0.5px;';
+      // Editable quantity input
+      const qtyContainer = document.createElement('div');
+      qtyContainer.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+
+      const qtyLabel = document.createElement('span');
+      qtyLabel.textContent = 'QTY:';
+      qtyLabel.style.cssText = 'font-size: 11px; font-weight: 700; color: var(--gray-700); letter-spacing: 0.5px;';
+      qtyContainer.appendChild(qtyLabel);
+
+      const qtyInput = document.createElement('input');
+      qtyInput.type = 'number';
+      qtyInput.min = '0';
+      qtyInput.step = '1';
+      qtyInput.value = item.detectedQuantity;
+      qtyInput.style.cssText = 'width: 60px; padding: 6px 8px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; font-weight: 700; text-align: center; background: white;';
+      qtyInput.onchange = function() {
+        item.detectedQuantity = parseInt(this.value) || 1;
+        console.log('✏️ Updated quantity for', item.detectedName, '→', item.detectedQuantity);
+      };
+      qtyContainer.appendChild(qtyInput);
 
       headerRow.appendChild(detectedName);
-      headerRow.appendChild(detectedQty);
+      headerRow.appendChild(qtyContainer);
       card.appendChild(headerRow);
 
       // Match confidence indicator
@@ -15461,13 +15478,38 @@
 
       card.appendChild(matchRow);
 
-      // Price info
-      if (item.detectedPrice) {
-        const priceLabel = document.createElement('div');
-        priceLabel.textContent = 'PRICE: $' + item.detectedPrice.toFixed(2);
-        priceLabel.style.cssText = 'font-size: 11px; color: var(--gray-500); margin-top: 6px; font-weight: 700; letter-spacing: 0.5px;';
-        card.appendChild(priceLabel);
-      }
+      // Editable price input (optional for orders)
+      const priceRow = document.createElement('div');
+      priceRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--gray-200);';
+
+      const priceLabel = document.createElement('span');
+      priceLabel.textContent = orderingSystemState.invoiceType === 'order' ? 'PRICE (per case - optional):' : 'PRICE:';
+      priceLabel.style.cssText = 'font-size: 11px; font-weight: 700; color: var(--gray-600); letter-spacing: 0.5px;';
+      priceRow.appendChild(priceLabel);
+
+      const priceInputContainer = document.createElement('div');
+      priceInputContainer.style.cssText = 'display: flex; align-items: center;';
+
+      const dollarSign = document.createElement('span');
+      dollarSign.textContent = '$';
+      dollarSign.style.cssText = 'font-size: 13px; font-weight: 700; color: var(--gray-700); margin-right: 4px;';
+      priceInputContainer.appendChild(dollarSign);
+
+      const priceInput = document.createElement('input');
+      priceInput.type = 'number';
+      priceInput.min = '0';
+      priceInput.step = '0.01';
+      priceInput.placeholder = '0.00';
+      priceInput.value = item.detectedPrice ? item.detectedPrice.toFixed(2) : '';
+      priceInput.style.cssText = 'width: 80px; padding: 6px 8px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; font-weight: 600; text-align: right; background: white;';
+      priceInput.onchange = function() {
+        item.detectedPrice = parseFloat(this.value) || null;
+        console.log('✏️ Updated price for', item.detectedName, '→', item.detectedPrice);
+      };
+      priceInputContainer.appendChild(priceInput);
+
+      priceRow.appendChild(priceInputContainer);
+      card.appendChild(priceRow);
 
       container.appendChild(card);
     });

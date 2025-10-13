@@ -1,10 +1,46 @@
 # CURRENT STATUS - Jayna Cash Counter
-**Last Updated:** 2025-10-11 (Invoice System Rebuild + Complete Styling Overhaul)
+**Last Updated:** 2025-10-12 (Session Active)
+**Previous Session:** 2025-10-11 (Invoice System Rebuild + Complete Styling Overhaul)
 
 ---
 
 ## 🎯 Current Work Status
-**Status:** ✅ **ALL SYSTEMS OPERATIONAL - INVOICE SYSTEM WORKING**
+**Status:** 🔧 **DATABASE MIGRATION NEEDED - OCR Learning System**
+
+### Session (October 12, 2025):
+
+#### **🔧 DATABASE MIGRATION: Add detected_price Column** 🔧
+**User Request:** Fix console error in OCR invoice upload flow
+**Console Error:** `PGRST204 - "Could not find the 'detected_price' column of 'invoice_items'"`
+**Root Cause:** OCR learning system tries to save `detected_price` but column doesn't exist in database schema
+
+**What's Working:**
+- ✅ OCR text extraction (Tesseract.js)
+- ✅ Fuzzy matching algorithm
+- ✅ Item detection and parsing (Performance Order format)
+- ✅ Creating new inventory items (IDs 306-313 created successfully)
+- ✅ Pending order creation (ID 10 created)
+- ✅ Manual matching modal working perfectly
+
+**What's Failing:**
+- ❌ Learning data save to `invoice_items` table (missing `detected_price` column)
+
+**Solution Created:**
+1. **Migration file:** `database/migrations/add_detected_price_to_invoice_items.sql`
+   - Adds `detected_price NUMERIC(10,2)` column
+   - Sets default value to 0
+   - Creates performance index
+   - Safe to run multiple times (IF NOT EXISTS)
+
+2. **Instructions:** `database/RUN_THIS_MIGRATION.md`
+   - Step-by-step guide for user
+   - Run in Supabase SQL Editor (30 seconds)
+
+**Next Step:** User needs to run migration in Supabase Dashboard → SQL Editor
+
+**Philosophy Applied:** "Always go forward, never backwards" - Added column to schema instead of removing feature from code
+
+---
 
 ### Session (October 11, 2025):
 
