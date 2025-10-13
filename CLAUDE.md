@@ -4,6 +4,73 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## 🔴 CRITICAL RULE #0: USE EXISTING PATTERNS FIRST
+
+**ALWAYS cross-reference existing code before creating new functions or patterns!**
+
+### The Principle:
+**Don't reinvent the wheel. If it works elsewhere in the codebase, use that pattern.**
+
+### Before creating ANY new function:
+1. **Search** the codebase for similar functionality
+2. **Find** how existing features implement the same behavior
+3. **Copy** the working pattern (don't create a new approach)
+4. **Adapt** the existing pattern to your specific use case
+
+### Examples:
+
+**❌ WRONG Approach:**
+```javascript
+// Creating a new delete button pattern from scratch
+const deleteBtn = document.createElement('button');
+deleteBtn.onclick = () => deleteItem(id);  // Inventing new pattern
+```
+
+**✅ RIGHT Approach:**
+```javascript
+// First: Search for existing delete buttons in codebase
+// Found: deleteInventoryItem uses event delegation with data attributes
+// Use THAT pattern:
+
+const deleteBtn = document.createElement('button');
+deleteBtn.classList.add('delete-item-btn');  // Existing class
+deleteBtn.setAttribute('data-delete-item', id);  // Existing data attribute
+deleteBtn.textContent = '✕';
+// Event listener already exists in main script using delegation
+```
+
+### How to Search for Existing Patterns:
+
+1. **Grep for similar function names:**
+   ```bash
+   grep -n "function delete" index.html
+   grep -n "onclick=" index.html
+   grep -n "addEventListener" index.html
+   ```
+
+2. **Look for working examples:**
+   - Find features that already work
+   - Read how they implement onclick handlers
+   - Copy their exact pattern
+
+3. **Check event listeners:**
+   - Search for `document.addEventListener('click'`
+   - Look for event delegation patterns
+   - Use the same classes and data attributes
+
+### Why This Matters:
+
+- **Consistency:** All buttons work the same way
+- **Reliability:** Existing patterns are already tested and working
+- **Speed:** No need to debug new approaches
+- **Maintainability:** One pattern throughout codebase
+
+### When User Says "Use Existing Methods":
+
+**STOP creating new patterns. Search the codebase, find the working approach, copy it exactly.**
+
+---
+
 ## 🔴 CRITICAL RULE #1: NEVER REMOVE CODE TO FIX ERRORS
 
 **WE NEVER CUT CORNERS OR REDUCE CODE JUST TO MAKE SOMETHING ERROR-FREE!**
@@ -32,6 +99,74 @@ When you encounter an error:
 4. **NEVER** take the "easy way out" by removing functionality
 
 **This is a production system. Everything must work correctly, not just "work without errors."**
+
+---
+
+## 🎯 CRITICAL RULE #2: OUTCOME-DRIVEN PROBLEM SOLVING
+
+**When you know the desired outcome, STOP debugging and BUILD it the right way!**
+
+### The Manage Orders Fix (Oct 12, 2025):
+
+**Problem:** Edit/delete links not showing in table (spent 30+ minutes debugging)
+
+**What I was doing WRONG:**
+- Debugging CSS variables in innerHTML
+- Trying different button styles
+- Adding console logs to trace the issue
+- Iterating on the same broken approach
+- Getting lost in the debugging weeds
+
+**What I should have done from the START:**
+User said: *"you know exactly what we want and you probably know how to achieve it, so just achieve it"*
+
+**The Fix (2 minutes):**
+```javascript
+// ❌ WRONG: innerHTML with template literals
+row.innerHTML = `<td>...</td>`;  // onclick handlers don't always work
+
+// ✅ RIGHT: Pure DOM manipulation
+const cell = document.createElement('td');
+cell.onclick = () => myFunction();
+row.appendChild(cell);
+```
+
+**Why it worked instantly:**
+- `createElement()` + direct property assignment = always works
+- No innerHTML parsing issues
+- No CSS variable resolution problems
+- onclick handlers attached directly to DOM elements
+- Simple, reliable, predictable
+
+### The Principle:
+
+**When the user says "just make it work" - they're telling you to stop debugging the broken approach and rebuild it correctly.**
+
+1. **Know the desired outcome** (edit/delete links in a table)
+2. **Know the right way to do it** (createElement, not innerHTML)
+3. **STOP debugging the wrong approach**
+4. **JUST BUILD IT THE RIGHT WAY**
+
+### When to apply this:
+
+- User says "you know what to do"
+- You've been debugging the same issue for >15 minutes
+- You keep trying variations of the same broken approach
+- There's a simpler, more reliable way you haven't tried yet
+- The fundamental approach is wrong (not just the details)
+
+### Red Flags You're Going Down the Wrong Path:
+
+- "Let me try adding more console logs..."
+- "Maybe if I change this CSS variable..."
+- "Let me try a different button style..."
+- "Let me check the DOM one more time..."
+
+**STOP. Rebuild it the right way.**
+
+### The Right Mindset:
+
+**"I know what the user wants. I know how to build it properly. Stop iterating on broken code - build it correctly from scratch."**
 
 ---
 
