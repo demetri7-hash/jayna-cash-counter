@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS daily_sales (
   other_sales DECIMAL(10, 2),
   other_tips DECIMAL(10, 2),
   total_tips DECIMAL(10, 2),
+  gift_card_payments INTEGER,
+  gift_card_amount DECIMAL(10, 2),
   imported_at TIMESTAMPTZ DEFAULT NOW(),
   source TEXT DEFAULT 'toast_email_auto',
   raw_data JSONB -- Store full parsed data for debugging
