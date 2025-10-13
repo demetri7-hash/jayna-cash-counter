@@ -10369,23 +10369,63 @@
         deliveryDateBg = '#d1fae5'; // Light green background
       }
 
-      row.innerHTML = `
-        <td style="padding: 14px 16px; font-size: 14px; font-weight: 700; color: #1a1a1a;">${order.vendor}</td>
-        <td style="padding: 14px 16px; font-size: 13px; color: #6b6b6b;">${formattedOrderDate}</td>
-        <td style="padding: 14px 16px;">
-          <div style="display: inline-block; padding: 6px 10px; background: ${deliveryDateBg}; border: 2px solid ${deliveryDateColor};">
-            <span style="font-size: 13px; font-weight: 700; color: ${deliveryDateColor};">${formattedDeliveryDate}</span>
-          </div>
-        </td>
-        <td style="padding: 14px 16px; text-align: center;">
-          <span style="display: inline-block; padding: 6px 12px; background: #f9fafb; border: 2px solid #e5e7eb; font-size: 14px; font-weight: 700; color: #1a1a1a;">${order.total_items}</span>
-        </td>
-        <td style="padding: 14px 16px; text-align: center; font-size: 18px;">
-          <a href="javascript:void(0)" onclick="editPendingOrder(${order.id})" style="color: #4a4a4a; text-decoration: underline; cursor: pointer; font-weight: 600;">edit</a>
-          <span style="margin: 0 10px; color: #d1d5db;">|</span>
-          <a href="javascript:void(0)" onclick="deletePendingOrder(${order.id}, '${order.vendor}')" style="color: #dc2626; text-decoration: underline; cursor: pointer; font-weight: 600;">delete</a>
-        </td>
-      `;
+      // Vendor
+      const vendorCell = document.createElement('td');
+      vendorCell.style.cssText = 'padding: 14px 16px; font-size: 14px; font-weight: 700; color: #1a1a1a;';
+      vendorCell.textContent = order.vendor;
+      row.appendChild(vendorCell);
+
+      // Order Date
+      const orderDateCell = document.createElement('td');
+      orderDateCell.style.cssText = 'padding: 14px 16px; font-size: 13px; color: #6b6b6b;';
+      orderDateCell.textContent = formattedOrderDate;
+      row.appendChild(orderDateCell);
+
+      // Delivery Date
+      const deliveryCell = document.createElement('td');
+      deliveryCell.style.cssText = 'padding: 14px 16px;';
+      const deliveryBadge = document.createElement('div');
+      deliveryBadge.style.cssText = `display: inline-block; padding: 6px 10px; background: ${deliveryDateBg}; border: 2px solid ${deliveryDateColor};`;
+      const deliveryText = document.createElement('span');
+      deliveryText.style.cssText = `font-size: 13px; font-weight: 700; color: ${deliveryDateColor};`;
+      deliveryText.textContent = formattedDeliveryDate;
+      deliveryBadge.appendChild(deliveryText);
+      deliveryCell.appendChild(deliveryBadge);
+      row.appendChild(deliveryCell);
+
+      // Items
+      const itemsCell = document.createElement('td');
+      itemsCell.style.cssText = 'padding: 14px 16px; text-align: center;';
+      const itemsBadge = document.createElement('span');
+      itemsBadge.style.cssText = 'display: inline-block; padding: 6px 12px; background: #f9fafb; border: 2px solid #e5e7eb; font-size: 14px; font-weight: 700; color: #1a1a1a;';
+      itemsBadge.textContent = order.total_items;
+      itemsCell.appendChild(itemsBadge);
+      row.appendChild(itemsCell);
+
+      // Actions
+      const actionsCell = document.createElement('td');
+      actionsCell.style.cssText = 'padding: 14px 16px; text-align: center; font-size: 18px;';
+
+      const editLink = document.createElement('a');
+      editLink.href = 'javascript:void(0)';
+      editLink.style.cssText = 'color: #4a4a4a; text-decoration: underline; cursor: pointer; font-weight: 600;';
+      editLink.textContent = 'edit';
+      editLink.onclick = () => editPendingOrder(order.id);
+
+      const separator = document.createElement('span');
+      separator.style.cssText = 'margin: 0 10px; color: #d1d5db;';
+      separator.textContent = '|';
+
+      const deleteLink = document.createElement('a');
+      deleteLink.href = 'javascript:void(0)';
+      deleteLink.style.cssText = 'color: #dc2626; text-decoration: underline; cursor: pointer; font-weight: 600;';
+      deleteLink.textContent = 'delete';
+      deleteLink.onclick = () => deletePendingOrder(order.id, order.vendor);
+
+      actionsCell.appendChild(editLink);
+      actionsCell.appendChild(separator);
+      actionsCell.appendChild(deleteLink);
+      row.appendChild(actionsCell);
 
       tbody.appendChild(row);
       console.log(`✅ Row ${index + 1} appended with EDIT and DELETE buttons`);
