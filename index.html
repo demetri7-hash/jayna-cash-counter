@@ -8986,50 +8986,49 @@
         currentY = doc.lastAutoTable.finalY + 10; // Reduced from 20
       }
       
-      // Daily cash breakdown table
+      // Daily cash breakdown table - Clean left-to-right flow
       if (cashData && cashData.length > 0) {
         const dailyTableData = cashData.map(day => {
-          const actualCashIn = day.pm_total - day.am_total;
+          const toast = day.pm_toast_sales || 0;
+          const actual = (day.pm_total || 0) - (day.am_total || 0);
 
-          // V2.84 LOGIC: Tips absorb shortages
-          const originalDiscrepancy = day.pm_discrepancy || 0;
+          // +/- (Over/Short): Actual - Toast
+          const overShort = actual - toast;
+          const overShortFormatted = overShort >= 0
+            ? `+$${overShort.toFixed(2)}`
+            : `-$${Math.abs(overShort).toFixed(2)}`;
 
-          // ORIGINAL DSCRPNCY: Raw discrepancy (can be negative)
-          const originalDiscFormatted = originalDiscrepancy >= 0
-            ? `+$${originalDiscrepancy.toFixed(2)}`
-            : `-$${Math.abs(originalDiscrepancy).toFixed(2)}`;
+          // ROUND: Adjustment needed to round Toast to whole dollar
+          const rounded = Math.round(toast);
+          const roundAdjust = rounded - toast;
+          const roundFormatted = roundAdjust >= 0
+            ? `+$${roundAdjust.toFixed(2)}`
+            : `-$${Math.abs(roundAdjust).toFixed(2)}`;
 
-          // TIPS TAKEN: WHOLE DOLLAR amount taken from tips (includes rounding + shortage adjustments)
-          // Example: Shortage $0.75 → take $1.00 whole dollar from tips
+          // TIPS $: Whole dollar taken from tips
           const originalTips = day.pm_cash_tips || 0;
           const adjustedTips = day.pm_adjusted_tips || originalTips;
-          const tipsTaken = originalTips - adjustedTips; // Total whole dollars taken
+          const tipsTaken = originalTips - adjustedTips;
 
-          // NET DISC: After tips cover shortage
-          // Shortage → tips covered it → $0
-          // Overage → shows positive amount
-          const netDiscrepancy = originalDiscrepancy < 0 ? 0 : originalDiscrepancy;
-          const netDiscrepancyFormatted = netDiscrepancy > 0 ? `+$${netDiscrepancy.toFixed(2)}` : '$0.00';
-
-          // EXCESS: Net change to cashbox (includes change from breaking whole dollars)
-          const actualExcess = (day.pm_amount_to_keep || 0) - (day.am_total || 0);
+          // CASHBOX: Total excess to cashbox
+          const cashbox = (day.pm_amount_to_keep || 0) - (day.am_total || 0);
 
           return [
             new Date(day.date + 'T12:00:00').toLocaleDateString(),
             day.pm_counter || 'N/A',
-            `$${(day.pm_toast_sales || 0).toFixed(2)}`,
-            `$${actualCashIn.toFixed(2)}`,
-            originalDiscFormatted,        // RAW discrepancy (before tips)
-            `$${tipsTaken.toFixed(2)}`,   // Always show as positive amount taken
-            netDiscrepancyFormatted,      // Always $0 or positive
-            `$${actualExcess.toFixed(2)}`
+            `$${toast.toFixed(2)}`,
+            `$${actual.toFixed(2)}`,
+            overShortFormatted,
+            roundFormatted,
+            `$${tipsTaken.toFixed(2)}`,
+            `$${cashbox.toFixed(2)}`
           ];
         });
 
-        // Calculate totals for numerical columns (skip DATE and NIGHT COUNTER columns)
+        // Calculate totals for numerical columns (skip DATE and COUNTER columns)
         const totalsRow = ['TOTALS', '', '', '', '', '', '', ''];
 
-        // Calculate totals for columns 2-7 (TOAST SALES, ACTUAL CASH IN, DISC, TIPS TAKEN, NET DISC, EXCESS)
+        // Calculate totals for columns 2-7 (TOAST, ACTUAL, +/-, ROUND, TIPS $, CASHBOX)
         for (let col = 2; col < 8; col++) {
           let total = 0;
           dailyTableData.forEach(row => {
@@ -9039,12 +9038,10 @@
             total += isNegative ? -numValue : numValue;
           });
 
-          if (col === 4) { // DISC column (original) - show sign and format
+          // Add sign formatting for +/- and ROUND columns
+          if (col === 4 || col === 5) { // +/- and ROUND columns
             const sign = total >= 0 ? '+' : '';
             totalsRow[col] = `${sign}$${Math.abs(total).toFixed(2)}`;
-          } else if (col === 6) { // NET DISC column (after tips) - show sign and format
-            const sign = total > 0 ? '+' : '';
-            totalsRow[col] = total > 0 ? `${sign}$${total.toFixed(2)}` : '$0.00';
           } else {
             totalsRow[col] = `$${total.toFixed(2)}`;
           }
@@ -9055,62 +9052,53 @@
 
         doc.autoTable({
           startY: currentY,
-          head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DSCRPNCY', 'TIPS TAKEN', 'NET DISC', 'EXCESS']],
+          head: [['DATE', 'COUNTER', 'TOAST', 'ACTUAL', '+/-', 'ROUND', 'TIPS $', 'CASHBOX']],
           body: tableDataWithTotals,
           margin: { left: margin, right: margin },
-          theme: 'grid',
+          theme: 'plain', // No gridlines - clean look
           headStyles: {
             font: 'helvetica',
             fontStyle: 'bold',
             textColor: [0, 0, 0],
-            fillColor: [245, 245, 245],
-            fontSize: 7,        // Smaller font for daily table
-            cellPadding: 2      // Smaller padding for daily table
+            fillColor: [220, 220, 220], // Darker gray header
+            fontSize: 7,
+            cellPadding: 3,
+            halign: 'center'
           },
           bodyStyles: {
             font: 'helvetica',
             textColor: [0, 0, 0],
-            fillColor: null,
-            fontSize: 7,        // Smaller font for daily table
-            cellPadding: 2      // Smaller padding for daily table
+            fontSize: 7,
+            cellPadding: 3
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245] // Soft gray alternating rows
           },
           didParseCell: function(data) {
-            // Apply bold italic styling to totals row
+            // Totals row - slightly darker background and bold
             if (data.row.index === tableDataWithTotals.length - 1) {
-              data.cell.styles.fontStyle = 'bolditalic';
-              data.cell.styles.fillColor = [240, 240, 240]; // Light gray background for totals
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.fillColor = [230, 230, 230]; // Slightly darker gray for totals
             }
 
-            // Color formatting for DISC column (column index 4) - original discrepancy
+            // Color formatting for +/- column (column index 4)
             if (data.column.index === 4 && data.row.index < tableDataWithTotals.length - 1) {
               const cellValue = data.cell.text[0];
               if (cellValue && cellValue.includes('-')) {
-                // Negative discrepancy (shortage) - dark red
-                data.cell.styles.textColor = [139, 0, 0]; // Dark red
+                data.cell.styles.textColor = [200, 0, 0]; // Soft red for shortage
               } else if (cellValue && cellValue.includes('+')) {
-                // Positive discrepancy (overage) - dark green
-                data.cell.styles.textColor = [34, 139, 34]; // Dark green
+                data.cell.styles.textColor = [0, 150, 0]; // Soft green for overage
               }
             }
 
-            // Color formatting for TIPS TAKEN column (column index 5) - show in muted orange if non-zero
+            // Color formatting for ROUND column (column index 5)
             if (data.column.index === 5 && data.row.index < tableDataWithTotals.length - 1) {
               const cellValue = data.cell.text[0];
-              const value = parseFloat(cellValue.replace('$', '').replace(',', '')) || 0;
-              if (value > 0) {
-                // Tips were taken to cover shortage - show in muted orange
-                data.cell.styles.textColor = [184, 134, 11]; // Dark goldenrod
-              }
-            }
-
-            // Color formatting for NET DISC column (column index 6) - after tips absorb shortage
-            if (data.column.index === 6 && data.row.index < tableDataWithTotals.length - 1) {
-              const cellValue = data.cell.text[0];
               if (cellValue && cellValue.includes('+')) {
-                // Positive net discrepancy (overage) - dark green
-                data.cell.styles.textColor = [34, 139, 34]; // Dark green
+                data.cell.styles.textColor = [100, 100, 100]; // Gray for round up
+              } else if (cellValue && cellValue.includes('-')) {
+                data.cell.styles.textColor = [100, 100, 100]; // Gray for round down
               }
-              // No red coloring - net discrepancies are never negative (tips absorb shortages)
             }
           },
           tableWidth: 'auto'
