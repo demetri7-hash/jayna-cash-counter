@@ -1154,6 +1154,17 @@
         </div>
 
         <div class="form-group">
+          <label for="manualNetSales">Manual Net Sales (Optional):</label>
+          <input type="number" id="manualNetSales" class="form-input" step="0.01" placeholder="e.g., 31250.45" inputmode="decimal">
+          <div style="font-size: 12px; color: #666; margin-top: 5px;">
+            <strong>Why?</strong> Manually enter net sales if API data doesn't match Toast web reports. This will be used for labor percentage calculations.
+          </div>
+          <div style="font-size: 11px; color: #999; margin-top: 3px;">
+            If left blank, will use API-fetched net sales data from Toast
+          </div>
+        </div>
+
+        <div class="form-group">
           <label for="calculatedByName">Tips Calculated By:</label>
           <input type="text" id="calculatedByName" class="form-input" placeholder="Your Full Name">
         </div>
@@ -7378,11 +7389,27 @@
         console.log(`  Difference (CA double-time): $${difference.toFixed(2)} (${(difference/apiLaborCost*100).toFixed(1)}%)`);
       }
 
+      // Handle manual net sales override
+      const manualNetSalesInput = parseFloat(document.getElementById('manualNetSales').value) || 0;
+      const apiNetSales = netSales; // Store original API value
+
+      // Use manual net sales if provided, otherwise use API
+      const finalNetSales = manualNetSalesInput > 0 ? manualNetSalesInput : apiNetSales;
+
+      // Log the difference for transparency
+      if (manualNetSalesInput > 0 && apiNetSales > 0) {
+        const difference = manualNetSalesInput - apiNetSales;
+        console.log(`Net Sales Comparison:`);
+        console.log(`  Manual Net Sales: $${manualNetSalesInput.toFixed(2)}`);
+        console.log(`  API Net Sales: $${apiNetSales.toFixed(2)}`);
+        console.log(`  Difference: $${difference.toFixed(2)} (${(difference/apiNetSales*100).toFixed(1)}%)`);
+      }
+
       const demetriSalary = 85000 / 52; // $85k annual salary / 52 weeks
       const subtotalLabor = baseLaborCost + demetriSalary;
       const payrollBurden = subtotalLabor * 0.33; // 33% for taxes, insurance, etc.
       const trueTotalLaborCost = subtotalLabor + payrollBurden;
-      const laborPercentage = netSales > 0 ? (trueTotalLaborCost / netSales) * 100 : 0;
+      const laborPercentage = finalNetSales > 0 ? (trueTotalLaborCost / finalNetSales) * 100 : 0;
       const industryBenchmark = 30.0;
       const laborVariance = laborPercentage - industryBenchmark;
 
@@ -7454,7 +7481,10 @@
           subtotalLabor: subtotalLabor,
           payrollBurden: payrollBurden,
           trueTotalLaborCost: trueTotalLaborCost,
-          netSales: netSales,
+          netSales: finalNetSales,
+          apiNetSales: apiNetSales,
+          manualNetSales: manualNetSalesInput,
+          usingManualNetSales: manualNetSalesInput > 0,
           laborPercentage: laborPercentage,
           industryBenchmark: industryBenchmark,
           laborVariance: laborVariance
@@ -8402,7 +8432,7 @@
         }
       } else {
         // Fallback when no cashbox data is available yet
-        leftColumnEntries.push(['Cashbox Reconciliation', 'N/A - New Feature']);
+        leftColumnEntries.push(['Cashbox Reconciliation', 'N/A']);
       }
 
       const leftColumnMapped = leftColumnEntries.map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
@@ -8414,8 +8444,8 @@
       if (tipPoolSummary.previousVariance && tipPoolSummary.previousVariance > 0) {
         const carriedDate = new Date(tipPoolSummary.carriedFromDate).toLocaleDateString();
         middleColumnEntries.push(
-          ['UNPAID TIPS FROM PREVIOUS WEEK', `$${tipPoolSummary.previousVariance.toFixed(2)}`],
-          [`Carried from ${carriedDate}`, '(ADDED TO POOL)']
+          ['UNPAID TIPS', `$${tipPoolSummary.previousVariance.toFixed(2)}`],
+          [`Carried from ${carriedDate}`, '']
         );
       }
 
@@ -8694,7 +8724,7 @@
       // Always show labor summary boxes (they will fit on page with compressed layout)
       if (true) {
         // Draw two bordered boxes side by side
-        const boxHeight = 70; // Further reduced to 70 to prevent overflow
+        const boxHeight = 95; // Increased to 95 to fit all labor summary content
         const boxWidth = (pageWidth - (2 * margin) - 10) / 2; // 10pt gap between boxes
         const leftBoxX = margin;
         const rightBoxX = margin + boxWidth + 10;
@@ -8707,13 +8737,13 @@
         // Right box border (Labor Summary)
         doc.rect(rightBoxX, currentY, boxWidth, boxHeight, 'S');
 
-        // Left box header - DAILY NOTES
+        // Left box header - NOTES
         doc.setFillColor(240, 240, 240);
         doc.rect(leftBoxX, currentY, boxWidth, 16, 'F'); // Reduced header height to 16
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8); // Reduced from 9
         doc.setTextColor(0, 0, 0);
-        const leftHeaderText = 'DAILY NOTES';
+        const leftHeaderText = 'NOTES';
         const leftHeaderWidth = doc.getTextWidth(leftHeaderText);
         doc.text(leftHeaderText, leftBoxX + (boxWidth - leftHeaderWidth) / 2, currentY + 11);
 
@@ -8772,27 +8802,27 @@
 
           laborEntries.forEach(([label, value]) => {
             doc.setFont('helvetica', 'normal');
-            doc.setFontSize(6.5); // Reduced from 7
+            doc.setFontSize(6.5);
             doc.setTextColor(0, 0, 0);
             doc.text(label, rightBoxX + 5, laborY);
             doc.setFont('helvetica', 'bold');
             doc.text(value, rightBoxX + boxWidth - 5, laborY, { align: 'right' });
-            laborY += 7; // Reduced from 8
+            laborY += 8.5; // Increased spacing for better readability
           });
 
           // Line before total
           doc.setLineWidth(0.5);
           doc.setDrawColor(200, 200, 200);
           doc.line(rightBoxX + 5, laborY + 1, rightBoxX + boxWidth - 5, laborY + 1);
-          laborY += 6; // Reduced from 8
+          laborY += 8; // Increased spacing
 
           // True Total Labor Cost
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(7); // Reduced from 8
+          doc.setFontSize(7);
           doc.setTextColor(0, 0, 0);
           doc.text('True Total Labor Cost:', rightBoxX + 5, laborY);
           doc.text(`$${ld.trueTotalLaborCost.toFixed(2)}`, rightBoxX + boxWidth - 5, laborY, { align: 'right' });
-          laborY += 9; // Reduced from 12
+          laborY += 11; // Increased spacing before Net Sales section
 
           // Net Sales and Labor %
           const isOverBudget = ld.laborVariance > 0;
@@ -8839,24 +8869,23 @@
         currentY += boxHeight + 8; // Further reduced spacing to prevent page overflow
       }
 
-      // Add developer credit - centered, bold, black
-      if (currentY < pageHeight - 30) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(0, 0, 0); // Black
-        const creditText = 'Report Generation App designed and coded by Demetri Gregorakis';
-        const emailText = 'demetri_gregorakis@icloud.com for troubleshooting';
+      // Add developer credit - centered, bold, black, positioned near bottom of page
+      const footerY = pageHeight - 18; // Position near bottom (18pt from edge to prevent cutoff)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0); // Black
+      const creditText = 'Report Generation App designed and coded by Demetri Gregorakis';
+      const emailText = 'demetri_gregorakis@icloud.com for troubleshooting';
 
-        const creditWidth = doc.getTextWidth(creditText);
-        const emailWidth = doc.getTextWidth(emailText);
-        const centerXCredit = (pageWidth - creditWidth) / 2;
-        const centerXEmail = (pageWidth - emailWidth) / 2;
+      const creditWidth = doc.getTextWidth(creditText);
+      const emailWidth = doc.getTextWidth(emailText);
+      const centerXCredit = (pageWidth - creditWidth) / 2;
+      const centerXEmail = (pageWidth - emailWidth) / 2;
 
-        doc.text(creditText, centerXCredit, currentY);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.text(emailText, centerXEmail, currentY + 12);
-      }
+      doc.text(creditText, centerXCredit, footerY);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.text(emailText, centerXEmail, footerY + 8); // Reduced spacing from 12 to 8
       
       // Add payday sign off sheet as page 2
       generatePaydaySignOffPage(doc, startDate, endDate);
