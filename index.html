@@ -8988,22 +8988,20 @@
         const dailyTableData = cashData.map(day => {
           const actualCashIn = day.pm_total - day.am_total;
 
-          // V2.84 LOGIC: Tips absorb shortages, so we show:
-          // 1. Original discrepancy (can be negative)
+          // V2.84 LOGIC: Tips absorb shortages
           const originalDiscrepancy = day.pm_discrepancy || 0;
 
-          // 2. Amount taken from tips to cover shortage (always positive or 0)
-          const originalCashTips = day.pm_cash_tips || 0;
-          const adjustedCashTips = day.pm_adjusted_tips || 0;
-          const tipsTaken = originalCashTips - adjustedCashTips; // Amount deducted from tips
+          // TIPS TAKEN: Exact shortage amount USED (not whole dollar broken)
+          // Example: Shortage $2.50 → we use $2.50 from tips to balance
+          const tipsTaken = originalDiscrepancy < 0 ? Math.abs(originalDiscrepancy) : 0;
 
-          // 3. Net discrepancy to cashbox (after tips absorb shortage)
-          // If original was negative, tips covered it = $0 net discrepancy
-          // If original was positive, it stays positive (overage)
+          // NET DISC: After tips cover shortage
+          // Shortage → tips covered it → $0
+          // Overage → shows positive amount
           const netDiscrepancy = originalDiscrepancy < 0 ? 0 : originalDiscrepancy;
           const netDiscrepancyFormatted = netDiscrepancy > 0 ? `+$${netDiscrepancy.toFixed(2)}` : '$0.00';
 
-          // 4. Excess from breaking whole dollars (net change to cashbox)
+          // EXCESS: Net change to cashbox (includes change from breaking whole dollars)
           const actualExcess = (day.pm_amount_to_keep || 0) - (day.am_total || 0);
 
           return [
