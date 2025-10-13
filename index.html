@@ -14998,10 +14998,10 @@
   }
 
   /**
-   * Convert PDF to image for OCR processing
+   * Convert PDF to images (one per page) for OCR processing
    */
-  async function convertPdfToImage(pdfDataUrl) {
-    console.log('📄 Converting PDF to image...');
+  async function convertPdfToImages(pdfDataUrl) {
+    console.log('📄 Converting PDF to images...');
 
     // Extract base64 data
     const base64Data = pdfDataUrl.split(',')[1];
@@ -15017,31 +15017,40 @@
 
     console.log(`📄 PDF loaded: ${pdf.numPages} page(s)`);
 
-    // Get first page
-    const page = await pdf.getPage(1);
+    const images = [];
 
-    // Set scale for good quality (2 = 2x resolution)
-    const scale = 2.0;
-    const viewport = page.getViewport({ scale });
+    // Process ALL pages
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      console.log(`📄 Processing page ${pageNum}/${pdf.numPages}...`);
 
-    // Create canvas
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
+      const page = await pdf.getPage(pageNum);
 
-    // Render PDF page to canvas
-    await page.render({
-      canvasContext: context,
-      viewport: viewport
-    }).promise;
+      // Set scale for good quality (2 = 2x resolution)
+      const scale = 2.0;
+      const viewport = page.getViewport({ scale });
 
-    console.log('✅ PDF rendered to canvas:', canvas.width, 'x', canvas.height);
+      // Create canvas for this page
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
 
-    // Convert canvas to image data URL
-    const imageDataUrl = canvas.toDataURL('image/png');
+      // Render PDF page to canvas
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
 
-    return imageDataUrl;
+      console.log(`✅ Page ${pageNum} rendered:`, canvas.width, 'x', canvas.height);
+
+      // Convert canvas to image data URL
+      const imageDataUrl = canvas.toDataURL('image/png');
+      images.push(imageDataUrl);
+    }
+
+    console.log(`✅ All ${pdf.numPages} pages converted to images`);
+
+    return images;
   }
 
   /**
@@ -15068,42 +15077,70 @@
       console.log('Image data:', orderingSystemState.currentInvoiceImage?.substring(0, 50));
 
       // Check if this is a PDF file
-      let imageToProcess = orderingSystemState.currentInvoiceImage;
       const isPDF = orderingSystemState.currentInvoiceImage.startsWith('data:application/pdf');
+      let extractedText = '';
 
       if (isPDF) {
-        console.log('📄 PDF detected - converting to image first...');
-        document.getElementById('ocrProgressText').textContent = 'Converting PDF to image...';
+        console.log('📄 PDF detected - converting to images and processing all pages...');
+        document.getElementById('ocrProgressText').textContent = 'Converting PDF to images...';
 
         // Check if PDF.js is loaded
         if (typeof pdfjsLib === 'undefined') {
           throw new Error('PDF.js library not loaded. Please refresh the page.');
         }
 
-        // Convert PDF to image
-        imageToProcess = await convertPdfToImage(orderingSystemState.currentInvoiceImage);
-        console.log('✅ PDF converted to image successfully');
-      }
+        // Convert PDF to multiple images (one per page)
+        const images = await convertPdfToImages(orderingSystemState.currentInvoiceImage);
+        console.log('✅ PDF converted to', images.length, 'image(s)');
 
-      // Use simpler Tesseract.recognize API for single image
-      document.getElementById('ocrProgressText').textContent = 'Loading OCR engine...';
+        // Process each page with OCR
+        for (let i = 0; i < images.length; i++) {
+          const pageNum = i + 1;
+          console.log(`🔍 OCR processing page ${pageNum}/${images.length}...`);
+          document.getElementById('ocrProgressText').textContent = `Extracting text from page ${pageNum}/${images.length}...`;
 
-      const result = await Tesseract.recognize(
-        imageToProcess,
-        'eng',
-        {
-          logger: (m) => {
-            console.log('Tesseract progress:', m);
-            if (m.status === 'recognizing text') {
-              document.getElementById('ocrProgressText').textContent = `Extracting text: ${Math.round(m.progress * 100)}%`;
+          const result = await Tesseract.recognize(
+            images[i],
+            'eng',
+            {
+              logger: (m) => {
+                if (m.status === 'recognizing text') {
+                  const progress = Math.round(m.progress * 100);
+                  document.getElementById('ocrProgressText').textContent = `Page ${pageNum}/${images.length}: ${progress}%`;
+                }
+              }
+            }
+          );
+
+          const pageText = result?.data?.text || '';
+          console.log(`✅ Page ${pageNum} OCR completed: ${pageText.length} characters`);
+
+          // Combine text from all pages
+          extractedText += pageText + '\n\n'; // Add spacing between pages
+        }
+
+        console.log('✅ All pages processed. Total text length:', extractedText.length);
+
+      } else {
+        // Process single image
+        document.getElementById('ocrProgressText').textContent = 'Loading OCR engine...';
+
+        const result = await Tesseract.recognize(
+          orderingSystemState.currentInvoiceImage,
+          'eng',
+          {
+            logger: (m) => {
+              console.log('Tesseract progress:', m);
+              if (m.status === 'recognizing text') {
+                document.getElementById('ocrProgressText').textContent = `Extracting text: ${Math.round(m.progress * 100)}%`;
+              }
             }
           }
-        }
-      );
+        );
 
-      console.log('OCR completed, result:', result);
-
-      const extractedText = result?.data?.text || '';
+        console.log('OCR completed, result:', result);
+        extractedText = result?.data?.text || '';
+      }
       console.log('Extracted text length:', extractedText.length);
       console.log('First 200 chars:', extractedText.substring(0, 200));
 
