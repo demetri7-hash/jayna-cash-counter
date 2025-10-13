@@ -2,6 +2,39 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## 🔴 CRITICAL RULE #1: NEVER REMOVE CODE TO FIX ERRORS
+
+**WE NEVER CUT CORNERS OR REDUCE CODE JUST TO MAKE SOMETHING ERROR-FREE!**
+
+### ❌ NEVER DO THIS:
+- Remove a column reference because it doesn't exist in the database
+- Delete a function call because it's causing an error
+- Comment out code to make errors go away
+- Simplify logic to avoid complexity
+- Remove features to avoid bugs
+
+### ✅ ALWAYS DO THIS:
+- **ADD** the missing column to the database
+- **FIX** the function that's broken
+- **DEBUG** the error and fix the root cause
+- **SOLVE** the complexity properly
+- **BUILD** the feature correctly
+
+### Core Principle:
+**Code exists for a reason. If it doesn't work, we FIX it - we don't delete it!**
+
+When you encounter an error:
+1. **Understand WHY** the code is there
+2. **Find the root cause** of the error
+3. **Fix the database/system** to support the code
+4. **NEVER** take the "easy way out" by removing functionality
+
+**This is a production system. Everything must work correctly, not just "work without errors."**
+
+---
+
 ## Project Overview
 
 **Jayna Cash Counter** is a production restaurant management platform combining:
