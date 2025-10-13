@@ -52,6 +52,7 @@
 - `e9fcbd3`: feat(receive): Add PDF upload + improve price extraction + always show action buttons
 - `a803c3b`: feat(database): Add supabase migration for learning columns
 - `1141e86`: fix(receive): Add PDF-to-image conversion for OCR processing ← **CRITICAL FIX**
+- `703e820`: feat(receive): Process ALL pages of multi-page PDFs for OCR ← **MAJOR ENHANCEMENT**
 
 **Critical Fix Applied (1141e86):**
 - **Problem:** Tesseract.js cannot read PDFs directly (Error: "Error attempting to read image")
@@ -64,6 +65,19 @@
   5. Converts canvas to PNG data URL
   6. Passes PNG to Tesseract for OCR
 - **Libraries:** PDF.js v3.11.174 + worker
+
+**Multi-Page PDF Support (703e820):**
+- **Problem:** Only processing page 1 of multi-page PDFs (Performance orders have 3 pages)
+- **Missing items:** Items from pages 2 and 3 were not being extracted
+- **Solution:** Process ALL pages and combine text
+- **How it works:**
+  1. `convertPdfToImages()` loops through ALL pages (not just page 1)
+  2. Each page converted to separate PNG image
+  3. Tesseract OCR runs on each page individually
+  4. Progress shows: "Page 1/3: 45%", "Page 2/3: 78%", etc.
+  5. Text from all pages combined with spacing: `text1 + "\n\n" + text2 + "\n\n" + text3`
+  6. Combined text parsed by `parseInvoiceText()` to extract all items
+- **Result:** Now captures ALL items from ALL pages of PDF ✅
 
 **Philosophy Applied:** "Always go forward, never backwards"
 - Added PDF support instead of restricting to images only
