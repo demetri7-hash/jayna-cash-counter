@@ -9885,7 +9885,7 @@
       container.appendChild(header);
 
       // Group orders by delivery status
-      const today = new Date().toISOString().split('T')[0];
+      const today = getPacificDate(); // Pacific Time, not UTC
       const ordersToday = orders?.filter(o => o.expected_delivery_date === today) || [];
       const ordersUpcoming = orders?.filter(o => o.expected_delivery_date > today) || [];
       const ordersPast = orders?.filter(o => o.expected_delivery_date < today) || [];
@@ -10052,7 +10052,7 @@
 
     try {
       // Fetch orders due today
-      const today = new Date().toISOString().split('T')[0];
+      const today = getPacificDate(); // Pacific Time, not UTC
       const { data: orders, error } = await supabase
         .from('pending_orders')
         .select(`
@@ -10970,7 +10970,7 @@
       dateInput.type = 'date';
       dateInput.id = 'createOrderDeliveryDate';
       dateInput.value = order.deliveryDate.toISOString().split('T')[0];
-      dateInput.min = new Date().toISOString().split('T')[0];
+      dateInput.min = getPacificDate(); // Pacific Time, not UTC
       dateInput.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; margin-bottom: 20px;';
       content.appendChild(dateInput);
 
@@ -15561,7 +15561,7 @@
       dateInput.type = 'date';
       dateInput.id = 'orderDeliveryDate';
       dateInput.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;';
-      dateInput.min = new Date().toISOString().split('T')[0]; // Can't be in the past
+      dateInput.min = getPacificDate(); // Can't be in the past - Pacific Time, not UTC
       dateSection.appendChild(dateInput);
 
       container.appendChild(dateSection);
