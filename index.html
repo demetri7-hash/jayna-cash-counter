@@ -15328,8 +15328,26 @@
 
           console.log(`✅ Added item: "${itemName}" | Qty: ${quantity} | Price: ${price ? '$' + price : 'N/A'}`);
 
-          // Skip the lines we just processed (SKU + 2 more lines minimum)
-          i += 3;
+          // Skip the lines we just processed
+          // Instead of fixed skip, find the next item by looking for the next SKU
+          // This handles variable spacing (Information lines, blank lines, etc.)
+          let skipCount = 0;
+          for (let j = i + 2; j < lines.length; j++) {
+            skipCount++;
+            const nextLine = lines[j];
+
+            // Stop if we find the next SKU pattern (6 digits)
+            if (nextLine.match(/^\d{6}\s+/)) {
+              skipCount--; // Back up one so loop will land on item name before SKU
+              break;
+            }
+
+            // Safety: max skip 10 lines
+            if (skipCount >= 10) break;
+          }
+
+          console.log(`  → Skipping ${skipCount} lines to next item`);
+          i += skipCount;
         }
       }
 
