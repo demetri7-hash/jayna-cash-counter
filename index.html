@@ -7357,14 +7357,16 @@
       }
 
       // Calculate total Toast cash sales
-      // Use API cashSales if available, otherwise sum from daily PM data
+      // ALWAYS use API cashSales when using API data (never database)
       let totalToastCashSales = 0;
-      if (!hasFiles && cashSales) {
-        // Using API data - use the cashSales from API
-        totalToastCashSales = cashSales;
+      if (!hasFiles) {
+        // Using API data - ALWAYS use API value (even if 0)
+        totalToastCashSales = cashSales || 0;
+        console.log(`Using API cashSales: $${totalToastCashSales.toFixed(2)}`);
       } else {
-        // Using files or have daily data - sum from database
+        // Using files - sum from database
         totalToastCashSales = rangeData.reduce((sum, day) => sum + (day.pm_toast_sales || 0), 0);
+        console.log(`Using database cashSales: $${totalToastCashSales.toFixed(2)}`);
       }
 
       // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
