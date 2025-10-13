@@ -6774,10 +6774,17 @@
       // Reset tip pool state
       tipPoolRecords = [];
       tipPoolSummary = {};
-      
-      // Reset forms
-      document.getElementById('tipPoolForm').reset();
-      document.getElementById('combinedReportForm').reset();
+
+      // Note: tipPoolForm is a div, not a form element, so we manually clear inputs
+      // Clear tip pool form inputs
+      const tipPoolInputs = document.getElementById('tipPoolForm').querySelectorAll('input, select, textarea');
+      tipPoolInputs.forEach(input => {
+        if (input.type === 'checkbox' || input.type === 'radio') {
+          input.checked = false;
+        } else {
+          input.value = '';
+        }
+      });
       
       // Hide results
       document.getElementById('tipPoolResults').style.display = 'none';
@@ -9414,36 +9421,11 @@
       return;
     }
 
-    // Prompt for current cashbox count (only if user wants to use this feature)
-    const shouldPromptCashbox = confirm(
-      'NEW FEATURE: Weekly Cashbox Reconciliation\\n\\n' +
-      'Would you like to enter your current cashbox total for weekly tracking?\\n\\n' +
-      '• This feature tracks total cash on hand (not just registers)\\n' +
-      '• Helps reconcile weekly cashbox changes vs daily discrepancies\\n' +
-      '• Optional - you can skip for now and start using it later\\n\\n' +
-      'Click OK to enter cashbox amount, or Cancel to skip.'
-    );
-    
+    // Weekly cashbox reconciliation (optional feature)
+    // Note: window.confirm() and window.prompt() are blocked in sandboxed iframes (Google Sites embedding)
+    // Users should use the Cash Counting section to count cashbox if they want reconciliation
+    // For now, we skip the cashbox prompt and set to null (optional feature)
     let cashboxTotal = null;
-    if (shouldPromptCashbox) {
-      const cashboxAmount = prompt(
-        'Enter current total cashbox amount:\\n\\n' +
-        'Count all cash and coins in the cashbox and enter the total amount.\\n' +
-        'This will be used to track weekly cashbox changes.\\n\\n' +
-        'Amount (e.g., 1234.56):',
-        ''
-      );
-      
-      if (cashboxAmount === null) {
-        return; // User cancelled
-      }
-      
-      cashboxTotal = parseFloat(cashboxAmount);
-      if (isNaN(cashboxTotal) || cashboxTotal < 0) {
-        showErrorMessage('Please enter a valid cashbox amount (numbers only, no $ sign).');
-        return;
-      }
-    }
 
     try {
       showLoading('Generating Combined Report', 'Fetching cash count data and combining with tip pool...');
