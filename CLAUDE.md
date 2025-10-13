@@ -13,6 +13,63 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Live URL:** https://jayna-cash-counter.vercel.app
 
+---
+
+## 🚨 CRITICAL: NO POPUP WINDOWS RULE
+
+**NEVER use popup windows for notifications, confirmations, or alerts!**
+
+### ❌ BANNED Functions:
+- `window.alert()` - NEVER USE
+- `window.confirm()` - NEVER USE
+- `window.prompt()` - NEVER USE
+
+**Why:** These functions are blocked in sandboxed iframes (Vercel preview environments) and create poor UX.
+
+### ✅ ESTABLISHED PATTERNS:
+
+**For Success/Save Notifications:**
+- Text or box turns GREEN and displays "✓ Saved!"
+- NO save/submit buttons for majority of updates
+- Save automatically on blur/focus out
+- Use inline status indicators
+
+```javascript
+// ✅ CORRECT - Inline success feedback
+const statusDiv = document.getElementById('status');
+statusDiv.textContent = '✓ Saved!';
+statusDiv.style.color = '#065f46';
+statusDiv.style.background = '#d1fae5';
+
+// Or highlight the entire row
+row.style.background = '#d1fae5'; // Success green background
+```
+
+**For Delete Confirmations:**
+- Use prominent button styling (red danger button already signals intent)
+- Button click itself is intentional action - NO confirmation needed
+- Show success feedback after deletion completes
+
+```javascript
+// ✅ CORRECT - No confirmation dialog
+async function deleteItem(id) {
+  showLoading('Deleting', 'Removing item...');
+
+  // Perform deletion
+  await supabase.from('table').delete().eq('id', id);
+
+  // Show success feedback
+  showMessage('✅ Item deleted successfully!', 'success');
+}
+```
+
+**For Errors:**
+- Use existing `showMessage(text, 'error')` function
+- Displays modal only for errors (not for success/info)
+- Red error container with clear message
+
+---
+
 ## Essential Reading on Session Start
 
 **ALWAYS read these files at the start of every session (IN THIS ORDER):**
@@ -37,6 +94,438 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. `CURRENT_PROJECT_DOCUMENTATION.md` - System overview (if needed for context)
 
 **After reading, ask the user:** "What are we working on today?" Then update `CURRENT_STATUS.md` with session start time.
+
+---
+
+## 🎨 DESIGN SYSTEM - STANDARDIZED STYLING
+
+**CRITICAL:** All new features MUST follow these design standards for consistency.
+
+### Color Palette (CSS Variables)
+
+```css
+/* Primary Colors */
+--white: #ffffff
+--gray-900: #1a1a1a        /* Primary text, headers */
+--gray-700: #4a4a4a        /* Secondary text, buttons */
+--gray-600: #6b6b6b        /* Tertiary text */
+--gray-500: #9ca3af        /* Muted text, placeholders */
+--gray-400: #d1d5db        /* Borders */
+--gray-300: #e5e7eb        /* Light borders, dividers */
+--gray-200: #f3f4f6        /* Subtle backgrounds */
+--gray-100: #f9fafb        /* Section backgrounds */
+
+/* Status Colors */
+--success-bg: #d1fae5      /* Green backgrounds */
+--success-text: #065f46    /* Success green text */
+--success-border: #059669  /* Success green borders */
+
+--warning-bg: #fef3c7      /* Yellow/orange backgrounds */
+--warning-text: #92400e    /* Warning brown text */
+--warning-border: #f59e0b  /* Warning orange borders */
+
+--error-bg: #fee2e2        /* Red backgrounds */
+--error-text: #991b1b      /* Error red text */
+--error-border: #dc2626    /* Error red borders */
+
+/* Accent Colors */
+--blue-bg: #dbeafe
+--blue-text: #1e40af
+```
+
+### Typography
+
+```css
+/* Headers */
+h1, h2:           font-size: 18-20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900);
+h3:               font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900);
+h4:               font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900);
+
+/* Body Text */
+Regular:          font-size: 13px; font-weight: 400; color: var(--gray-700);
+Emphasized:       font-size: 13px; font-weight: 600; color: var(--gray-900);
+Muted:            font-size: 12px; font-weight: 400; color: var(--gray-500);
+
+/* Labels */
+Form Labels:      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-700);
+Small Labels:     font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600);
+
+/* Tab Buttons */
+Tab Text:         font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+```
+
+### Buttons
+
+```css
+/* Primary Button (Submit/Save/Confirm) */
+background: var(--gray-900);
+color: white;
+border: 2px solid var(--gray-900);
+padding: 12px 24px;
+font-size: 13px;
+font-weight: 700;
+text-transform: uppercase;
+letter-spacing: 0.5px;
+cursor: pointer;
+border-radius: 0;              /* NO rounded corners! */
+transition: all 0.15s ease;
+
+/* Secondary Button (Cancel/Back) */
+background: var(--gray-100);
+color: var(--gray-900);
+border: 2px solid var(--gray-300);
+/* Same sizing/typography as primary */
+
+/* Danger Button (Delete/Remove) */
+background: #dc2626;
+color: white;
+border: 2px solid #dc2626;
+/* Same sizing/typography as primary */
+
+/* Success Button (Confirm/Complete) */
+background: #059669;
+color: white;
+border: 2px solid #059669;
+/* Same sizing/typography as primary */
+
+/* Tab Button (Active) */
+background: var(--gray-700);
+color: var(--white);
+padding: 12px 10px;
+min-width: 80px;
+font-size: 11px;
+font-weight: 700;
+text-transform: uppercase;
+letter-spacing: 0.8px;
+
+/* Tab Button (Inactive) */
+background: var(--gray-100);
+color: var(--gray-700);
+/* Same sizing as active */
+```
+
+### Form Inputs
+
+```css
+/* Text Inputs */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+select:
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--gray-300);
+  border-radius: 0;              /* NO rounded corners! */
+  font-size: 14px;
+  font-weight: 400;
+  background: white;
+  box-sizing: border-box;
+
+/* Input Focus State */
+input:focus,
+select:focus:
+  border-color: var(--gray-700);
+  outline: none;
+
+/* Input Error State */
+input.error:
+  border-color: #dc2626;
+  background: #fef2f2;
+
+/* Input Success State */
+input.success:
+  border-color: #059669;
+  background: #f0fdf4;
+```
+
+### Containers & Sections
+
+```css
+/* Main Section Container */
+background: var(--white);
+border: 2px solid var(--gray-300);
+padding: 20px;
+margin-bottom: 20px;
+border-radius: 0;              /* NO rounded corners! */
+
+/* Subsection Container */
+background: var(--gray-100);
+border: 2px solid var(--gray-300);
+padding: 16px;
+margin-bottom: 16px;
+border-radius: 0;
+
+/* Alert/Notice Container */
+background: var(--warning-bg);
+border: 2px solid var(--warning-border);
+padding: 12px 16px;
+margin-bottom: 16px;
+border-radius: 0;
+
+/* Success Container */
+background: var(--success-bg);
+border: 2px solid var(--success-border);
+padding: 12px 16px;
+border-radius: 0;
+
+/* Error Container */
+background: var(--error-bg);
+border: 2px solid var(--error-border);
+padding: 12px 16px;
+border-radius: 0;
+```
+
+### Tables
+
+```css
+/* Table Container */
+border: 2px solid var(--gray-300);
+overflow-x: auto;
+background: white;
+
+/* Table Structure */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+/* Table Header */
+thead tr {
+  background: var(--gray-100);
+  border-bottom: 2px solid var(--gray-300);
+}
+
+thead th {
+  padding: 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-700);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Table Body */
+tbody tr {
+  border-bottom: 1px solid var(--gray-200);
+}
+
+tbody td {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+
+/* Table Row Hover */
+tbody tr:hover {
+  background: var(--gray-50);
+}
+```
+
+### Cards & Grid Layouts
+
+```css
+/* Card (Mobile-Optimized Lists) */
+background: white;
+border: 2px solid var(--gray-300);
+padding: 12px;
+margin-bottom: 12px;
+border-radius: 0;
+transition: all 0.15s ease;
+
+/* Card Hover */
+card:hover {
+  border-color: var(--gray-400);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* Responsive Grid */
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+gap: 12px;
+
+/* Two-Column Layout */
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 16px;
+
+/* Three-Column Layout */
+display: grid;
+grid-template-columns: 1fr 1fr 1fr;
+gap: 12px;
+```
+
+### Modals
+
+```css
+/* Modal Overlay */
+position: fixed;
+top: 0;
+left: 0;
+right: 0;
+bottom: 0;
+background: rgba(0,0,0,0.7);
+display: flex;
+align-items: center;
+justify-content: center;
+z-index: 10000;
+overflow-y: auto;
+padding: 20px;
+
+/* Modal Content */
+background: white;
+padding: 24px;
+max-width: 800px;             /* Adjust based on content */
+width: 100%;
+max-height: 90vh;
+overflow-y: auto;
+border: 3px solid var(--gray-700);
+border-radius: 0;             /* NO rounded corners! */
+```
+
+### Status Badges
+
+```css
+/* Pending Status */
+display: inline-block;
+padding: 4px 10px;
+background: var(--warning-bg);
+color: var(--warning-text);
+border-radius: 0;
+font-weight: 600;
+font-size: 12px;
+text-transform: uppercase;
+letter-spacing: 0.5px;
+
+/* Complete Status */
+background: var(--success-bg);
+color: var(--success-text);
+/* Same structure as pending */
+
+/* Error/Failed Status */
+background: var(--error-bg);
+color: var(--error-text);
+/* Same structure as pending */
+
+/* Info Status */
+background: var(--blue-bg);
+color: var(--blue-text);
+/* Same structure as pending */
+```
+
+### Loading Indicators
+
+```css
+/* Spinner */
+.spinner {
+  border: 3px solid var(--gray-300);
+  border-top: 3px solid var(--gray-500);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Loading Container */
+background: var(--gray-100);
+padding: 40px;
+text-align: center;
+border: 2px solid var(--gray-300);
+border-radius: 0;
+```
+
+### Spacing System
+
+```css
+/* Padding/Margin Scale */
+--spacing-4: 4px;
+--spacing-8: 8px;
+--spacing-12: 12px;
+--spacing-16: 16px;
+--spacing-20: 20px;
+--spacing-24: 24px;
+--spacing-40: 40px;
+
+/* Common Patterns */
+Section margin-bottom: 20px;
+Subsection margin-bottom: 16px;
+Element margin-bottom: 12px;
+Inline gap: 8px;
+```
+
+### Responsive Breakpoints
+
+```css
+/* Mobile First Approach */
+Base: < 600px (1 column, stacked)
+Tablet: 600-900px (2 columns)
+Desktop: > 900px (2-3 columns)
+
+/* Touch Targets (Mobile) */
+Minimum: 44px height (iOS/Android guideline)
+Preferred: 48px height
+Button padding: 14px vertical minimum
+```
+
+---
+
+### Design Principles
+
+1. **NO ROUNDED CORNERS** - `border-radius: 0` everywhere (sharp, professional aesthetic)
+2. **Heavy Borders** - Use 2px borders (not 1px) for definition
+3. **ALL CAPS HEADERS** - Headers and labels in uppercase with letter-spacing
+4. **Consistent Weights** - 400 (regular), 600 (emphasis), 700 (headers/buttons)
+5. **Minimal Color Palette** - Primarily grayscale with accent colors for status only
+6. **Touch-Friendly** - 48px minimum touch targets on mobile
+7. **Grid-Based Layouts** - Use CSS Grid (not floats or flexbox for primary layouts)
+8. **Pure DOM Manipulation** - Use `createElement()` and `appendChild()`, not template literals
+9. **No External CSS Frameworks** - All styling inline or in `<style>` tags
+
+---
+
+### Code Examples
+
+#### Button Group
+```javascript
+const buttonGroup = document.createElement('div');
+buttonGroup.style.cssText = 'display: flex; gap: 12px; justify-content: flex-end;';
+
+const cancelBtn = document.createElement('button');
+cancelBtn.textContent = 'CANCEL';
+cancelBtn.style.cssText = 'padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;';
+buttonGroup.appendChild(cancelBtn);
+
+const saveBtn = document.createElement('button');
+saveBtn.textContent = 'SAVE';
+saveBtn.style.cssText = 'padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;';
+buttonGroup.appendChild(saveBtn);
+```
+
+#### Form Field
+```javascript
+const label = document.createElement('label');
+label.textContent = 'DELIVERY DATE';
+label.style.cssText = 'display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;';
+
+const input = document.createElement('input');
+input.type = 'date';
+input.style.cssText = 'width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; margin-bottom: 20px; box-sizing: border-box;';
+```
+
+#### Status Badge
+```javascript
+const badge = document.createElement('span');
+badge.textContent = 'PENDING';
+badge.style.cssText = 'display: inline-block; padding: 4px 10px; background: #fef3c7; color: #92400e; border-radius: 0; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;';
+```
+
+---
 
 ## 🚨 CRITICAL: Session End Protocol
 

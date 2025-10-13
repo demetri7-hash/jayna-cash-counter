@@ -1714,9 +1714,10 @@
 
         <!-- Tab Content: Manage Pending Orders (Password Protected) -->
         <div id="manageOrders" class="tab-content" style="display: none;">
-          <div style="margin-bottom: 20px;">
-            <h3 style="color: var(--gray-900); margin-bottom: 10px; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Manage Pending Orders</h3>
-            <p style="color: var(--gray-500); font-size: 13px; margin-bottom: 20px;">View, edit, and delete all pending orders. Edit delivery dates to control when orders appear in Check-In flow.</p>
+          <!-- Page Header -->
+          <div style="background: var(--gray-100); border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+            <h3 style="color: var(--gray-900); margin: 0 0 12px 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Manage Pending Orders</h3>
+            <p style="color: var(--gray-600); font-size: 13px; margin: 0; line-height: 1.5;">View, edit, and delete all pending orders. Change delivery dates to control when orders appear in the Check-In flow. <strong>Red dates</strong> are overdue, <strong style="color: #f59e0b;">orange</strong> are today, <strong style="color: #059669;">green</strong> are future.</p>
           </div>
 
           <!-- Orders List Container -->
@@ -10263,30 +10264,62 @@
 
     container.innerHTML = '';
 
-    // Summary header
+    // Summary stats bar
     const summary = document.createElement('div');
-    summary.style.cssText = 'background: var(--gray-100); padding: 12px 16px; margin-bottom: 20px; border: 2px solid var(--gray-300);';
+    summary.style.cssText = 'background: white; border: 2px solid var(--gray-300); padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;';
+
+    const totalOrders = orders.length;
+    const overdueCount = orders.filter(o => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const deliveryDate = new Date(o.expected_delivery_date);
+      deliveryDate.setHours(0, 0, 0, 0);
+      return deliveryDate < today;
+    }).length;
+    const todayCount = orders.filter(o => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const deliveryDate = new Date(o.expected_delivery_date);
+      deliveryDate.setHours(0, 0, 0, 0);
+      return deliveryDate.getTime() === today.getTime();
+    }).length;
+
     summary.innerHTML = `
-      <div style="color: var(--gray-700); font-size: 13px; font-weight: 600;">
-        <span style="color: var(--gray-900); font-weight: 700;">${orders.length}</span> pending order(s) found
+      <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+        <div>
+          <div style="font-size: 24px; font-weight: 700; color: var(--gray-900); line-height: 1;">${totalOrders}</div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;">Total Orders</div>
+        </div>
+        ${overdueCount > 0 ? `
+        <div style="padding: 8px 12px; background: #fee2e2; border: 2px solid #dc2626;">
+          <div style="font-size: 20px; font-weight: 700; color: #991b1b; line-height: 1;">${overdueCount}</div>
+          <div style="font-size: 10px; font-weight: 700; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;">Overdue</div>
+        </div>
+        ` : ''}
+        ${todayCount > 0 ? `
+        <div style="padding: 8px 12px; background: #fef3c7; border: 2px solid #f59e0b;">
+          <div style="font-size: 20px; font-weight: 700; color: #92400e; line-height: 1;">${todayCount}</div>
+          <div style="font-size: 10px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;">Due Today</div>
+        </div>
+        ` : ''}
       </div>
     `;
     container.appendChild(summary);
 
-    // Orders table
-    const table = document.createElement('div');
-    table.style.cssText = 'overflow-x: auto; border: 2px solid var(--gray-300);';
+    // Desktop Table (hidden on mobile)
+    const tableContainer = document.createElement('div');
+    tableContainer.style.cssText = 'display: block; overflow-x: auto; border: 2px solid var(--gray-300); background: white;';
+    tableContainer.className = 'desktop-table';
 
     const tableHTML = `
-      <table style="width: 100%; border-collapse: collapse; background: white;">
+      <table style="width: 100%; border-collapse: collapse; background: white; min-width: 800px;">
         <thead>
-          <tr style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
-            <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Vendor</th>
-            <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Order Date</th>
-            <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Delivery Date</th>
-            <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Items</th>
-            <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Status</th>
-            <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Actions</th>
+          <tr style="background: var(--gray-900); border-bottom: 2px solid var(--gray-700);">
+            <th style="padding: 14px 16px; text-align: left; font-size: 11px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.8px;">Vendor</th>
+            <th style="padding: 14px 16px; text-align: left; font-size: 11px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.8px;">Order Date</th>
+            <th style="padding: 14px 16px; text-align: left; font-size: 11px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.8px;">Delivery Date</th>
+            <th style="padding: 14px 16px; text-align: center; font-size: 11px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.8px;">Items</th>
+            <th style="padding: 14px 16px; text-align: center; font-size: 11px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.8px;">Actions</th>
           </tr>
         </thead>
         <tbody id="pendingOrdersTableBody">
@@ -10294,14 +10327,16 @@
       </table>
     `;
 
-    table.innerHTML = tableHTML;
-    container.appendChild(table);
+    tableContainer.innerHTML = tableHTML;
+    container.appendChild(tableContainer);
 
     const tbody = document.getElementById('pendingOrdersTableBody');
 
     orders.forEach(order => {
       const row = document.createElement('tr');
-      row.style.cssText = 'border-bottom: 1px solid var(--gray-200);';
+      row.style.cssText = 'border-bottom: 1px solid var(--gray-200); transition: background 0.15s ease;';
+      row.onmouseover = () => row.style.background = 'var(--gray-100)';
+      row.onmouseout = () => row.style.background = 'white';
 
       const formattedOrderDate = new Date(order.order_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const formattedDeliveryDate = new Date(order.expected_delivery_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -10313,61 +10348,66 @@
       deliveryDate.setHours(0, 0, 0, 0);
 
       let deliveryDateColor = 'var(--gray-900)';
+      let deliveryDateBg = 'transparent';
       if (deliveryDate < today) {
-        deliveryDateColor = '#dc2626'; // Red for past
+        deliveryDateColor = '#991b1b'; // Dark red text
+        deliveryDateBg = '#fee2e2'; // Light red background
       } else if (deliveryDate.getTime() === today.getTime()) {
-        deliveryDateColor = '#f59e0b'; // Orange for today
+        deliveryDateColor = '#92400e'; // Dark orange text
+        deliveryDateBg = '#fef3c7'; // Light orange background
       } else {
-        deliveryDateColor = '#059669'; // Green for future
+        deliveryDateColor = '#065f46'; // Dark green text
+        deliveryDateBg = '#d1fae5'; // Light green background
       }
 
       row.innerHTML = `
-        <td style="padding: 12px; font-size: 13px; font-weight: 600; color: var(--gray-900);">${order.vendor}</td>
-        <td style="padding: 12px; font-size: 13px; color: var(--gray-600);">${formattedOrderDate}</td>
-        <td style="padding: 12px; font-size: 13px; font-weight: 600; color: ${deliveryDateColor};">${formattedDeliveryDate}</td>
-        <td style="padding: 12px; text-align: center; font-size: 13px; color: var(--gray-700);">${order.total_items}</td>
-        <td style="padding: 12px; font-size: 12px;">
-          <span style="
-            display: inline-block;
-            padding: 4px 10px;
-            background: ${order.status === 'pending' ? '#fef3c7' : '#d1fae5'};
-            color: ${order.status === 'pending' ? '#92400e' : '#065f46'};
-            border-radius: 0;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          ">${order.status}</span>
+        <td style="padding: 14px 16px; font-size: 14px; font-weight: 700; color: var(--gray-900);">${order.vendor}</td>
+        <td style="padding: 14px 16px; font-size: 13px; color: var(--gray-600);">${formattedOrderDate}</td>
+        <td style="padding: 14px 16px;">
+          <div style="display: inline-block; padding: 6px 10px; background: ${deliveryDateBg}; border: 2px solid ${deliveryDateColor};">
+            <span style="font-size: 13px; font-weight: 700; color: ${deliveryDateColor};">${formattedDeliveryDate}</span>
+          </div>
         </td>
-        <td style="padding: 12px; text-align: center;">
-          <button
-            onclick="editPendingOrder(${order.id})"
-            style="
-              padding: 6px 12px;
-              background: var(--gray-700);
-              color: white;
-              border: none;
-              cursor: pointer;
-              font-size: 11px;
-              font-weight: 700;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              margin-right: 8px;
-            "
-          >EDIT</button>
-          <button
-            onclick="deletePendingOrder(${order.id}, '${order.vendor}')"
-            style="
-              padding: 6px 12px;
-              background: #dc2626;
-              color: white;
-              border: none;
-              cursor: pointer;
-              font-size: 11px;
-              font-weight: 700;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-            "
-          >DELETE</button>
+        <td style="padding: 14px 16px; text-align: center;">
+          <span style="display: inline-block; padding: 6px 12px; background: var(--gray-100); border: 2px solid var(--gray-300); font-size: 14px; font-weight: 700; color: var(--gray-900);">${order.total_items}</span>
+        </td>
+        <td style="padding: 14px 16px; text-align: center;">
+          <div style="display: inline-flex; gap: 8px; justify-content: center;">
+            <button
+              onclick="editPendingOrder(${order.id})"
+              style="
+                padding: 10px 16px;
+                background: var(--gray-700);
+                color: white;
+                border: 2px solid var(--gray-700);
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='var(--gray-900)'; this.style.borderColor='var(--gray-900)';"
+              onmouseout="this.style.background='var(--gray-700)'; this.style.borderColor='var(--gray-700)';"
+            >EDIT</button>
+            <button
+              onclick="deletePendingOrder(${order.id}, '${order.vendor}')"
+              style="
+                padding: 10px 16px;
+                background: #dc2626;
+                color: white;
+                border: 2px solid #dc2626;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#991b1b'; this.style.borderColor='#991b1b';"
+              onmouseout="this.style.background='#dc2626'; this.style.borderColor='#dc2626';"
+            >DELETE</button>
+          </div>
         </td>
       `;
 
@@ -10586,11 +10626,7 @@
    * Delete entire pending order
    */
   async function deletePendingOrder(orderId, vendorName) {
-    // Use showMessage instead of confirm
-    const userConfirmed = window.confirm(`Delete order from ${vendorName}? This action cannot be undone.`);
-
-    if (!userConfirmed) return;
-
+    // No confirmation needed - red DELETE button is clear intent
     showLoading('Deleting Order', `Removing order from ${vendorName}...`);
 
     try {
