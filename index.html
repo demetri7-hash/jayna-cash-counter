@@ -7276,6 +7276,48 @@
       console.log(`   Previous variance: $0.00 (no carryover)`);
     }
 
+    // Fetch previous week's cash surplus from database (ONLY if positive = surplus)
+    let previousCashSurplus = 0;
+    let cashSurplusFromDate = null;
+
+    console.log(`🔍 Checking for previous week cash surplus from weeks before ${endDate}...`);
+
+    try {
+      const { data: cashData, error: cashError } = await supabase
+        .from('weekly_combined_reports')
+        .select('cash_needed, week_end_date')
+        .lt('week_end_date', endDate)  // Only get weeks BEFORE current week
+        .order('week_end_date', { ascending: false })  // Most recent first
+        .limit(1)
+        .single();
+
+      if (cashError) {
+        // No previous data found (expected on first run)
+        console.log(`✅ No previous week cash data found. This is expected for the first week.`);
+        console.log(`   Current week: ${startDate} to ${endDate}`);
+        console.log(`   Previous cash surplus: $0.00 (no carryover)`);
+      } else if (cashData) {
+        const cashNeededValue = parseFloat(cashData.cash_needed) || 0;
+        // ONLY carry over if it's NEGATIVE (which means surplus in our calculation)
+        // In the code, negative cashNeeded = surplus (excess cash)
+        if (cashNeededValue < 0) {
+          previousCashSurplus = Math.abs(cashNeededValue); // Store as positive number
+          cashSurplusFromDate = cashData.week_end_date;
+          console.log(`✅ Found previous week cash surplus!`);
+          console.log(`   Current week: ${startDate} to ${endDate}`);
+          console.log(`   Carrying over: $${previousCashSurplus.toFixed(2)} from week ending ${cashSurplusFromDate}`);
+          console.log(`   This amount will REDUCE cash needed (or increase surplus)`);
+        } else {
+          console.log(`✅ Previous week needed cash (no surplus to carry over)`);
+          console.log(`   Previous week cash needed: $${cashNeededValue.toFixed(2)}`);
+        }
+      }
+    } catch (err) {
+      console.log(`✅ No previous cash data exists (table may not exist yet or this is the first week)`);
+      console.log(`   Error: ${err.message}`);
+      console.log(`   Previous cash surplus: $0.00 (no carryover)`);
+    }
+
     // Check if we have either files OR API-fetched data
     const hasFiles = laborFile && salesFile;
     const hasAPIData = apiFetchedData.laborData && apiFetchedData.salesData;
@@ -7415,7 +7457,7 @@
       const industryBenchmark = 30.0;
       const laborVariance = laborPercentage - industryBenchmark;
 
-      // Compute tip pool using calculated cash tips + previous variance carryover
+      // Compute tip pool using calculated cash tips + previous variance carryover + previous cash surplus
       const result = computeTipPool(
         payrollData,
         creditTips,
@@ -7423,7 +7465,8 @@
         ezcaterTips,
         tdsDriverTips,
         cashSales,
-        previousVariance
+        previousVariance,
+        previousCashSurplus
       );
 
       // Store global state
@@ -7473,6 +7516,9 @@
         carriedFromDate: carriedFromDate,
         currentVariance: result.currentVariance,
         totalPaidOut: result.totalPaidOut,
+        // Cash surplus tracking
+        previousCashSurplus: previousCashSurplus,
+        cashSurplusFromDate: cashSurplusFromDate,
         // Labor metrics for combined report
         laborData: {
           baseLaborCost: baseLaborCost,
@@ -7831,7 +7877,7 @@
     return { creditTips, cashSales, netSales };
   }
 
-  function computeTipPool(payrollData, creditTips, cashTips, ezcaterTips, tdsDriverTips, cashSales, previousVariance = 0) {
+  function computeTipPool(payrollData, creditTips, cashTips, ezcaterTips, tdsDriverTips, cashSales, previousVariance = 0, previousCashSurplus = 0) {
     // Build equity mapping
     const equityMap = {};
     payrollData.forEach(rec => {
@@ -7887,8 +7933,15 @@
       - Current Variance (carryover to next week): $${currentVariance.toFixed(2)}
     `);
 
-    // Calculate cash needed
-    const cashNeeded = creditTips - tdsDriverTips + ezcaterTips - cashSales;
+    // Calculate cash needed (subtract previous surplus to reduce need or increase surplus)
+    const rawCashNeeded = creditTips - tdsDriverTips + ezcaterTips - cashSales;
+    const cashNeeded = rawCashNeeded - previousCashSurplus;
+
+    console.log(`Cash Need Calculation:
+      - Raw Cash Needed: $${rawCashNeeded.toFixed(2)}
+      - Previous Week Surplus: $${previousCashSurplus.toFixed(2)}
+      - Final Cash Needed: $${cashNeeded.toFixed(2)}
+    `);
 
     return { records, rate, totalWeightedHours, totalTips, pool, cashNeeded, currentVariance, totalPaidOut };
   }
@@ -8532,10 +8585,33 @@
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      
+
+      // Add previous week cash surplus note if applicable
+      let cashSurplusNoteY = cashNeededY + 8;
+      if (tipPoolSummary.previousCashSurplus && tipPoolSummary.previousCashSurplus > 0) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 100, 100); // Gray
+
+        const surplusDate = new Date(tipPoolSummary.cashSurplusFromDate).toLocaleDateString();
+        const surplusText = `Includes $${tipPoolSummary.previousCashSurplus.toFixed(2)} surplus from week ending ${surplusDate}`;
+
+        const surplusWidth = doc.getTextWidth(surplusText);
+        const surplusCenterX = (pageWidth / 2) - (surplusWidth / 2);
+        doc.text(surplusText, surplusCenterX, cashSurplusNoteY);
+
+        // Reset for next section
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+
+        // Move Y position down for next note
+        cashSurplusNoteY += 8;
+      }
+
       // Add note about cashbox reconciliation if not available
       if (!cashboxReconciliation || cashboxReconciliation.isFirstCount) {
-        const noteY = cashNeededY + 8;
+        const noteY = cashSurplusNoteY;
         doc.setFont('helvetica', 'italic');
         doc.setFontSize(7);
         doc.setTextColor(128, 128, 128); // Light gray
@@ -8555,7 +8631,11 @@
       }
       
       // Draw a horizontal line after summary with reduced spacing
-      const postSummaryY = cashNeededY + ((!cashboxReconciliation || cashboxReconciliation.isFirstCount) ? 20 : 12); // Account for note if present
+      // Calculate spacing based on whether we have surplus note and/or cashbox note
+      let extraSpacing = 12;
+      if (tipPoolSummary.previousCashSurplus > 0) extraSpacing += 8; // Add space for surplus note
+      if (!cashboxReconciliation || cashboxReconciliation.isFirstCount) extraSpacing += 8; // Add space for cashbox note
+      const postSummaryY = cashNeededY + extraSpacing;
       doc.setLineWidth(0.5);
       doc.line(margin, postSummaryY, pageWidth - margin, postSummaryY);
       
