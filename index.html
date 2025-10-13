@@ -8741,7 +8741,7 @@
         leftColumnEntries.push(['Current Cashbox Total', `$${cashboxReconciliation.currentTotal.toFixed(2)}`]);
 
         if (!cashboxReconciliation.isFirstCount && cashboxReconciliation.expectedEnding !== undefined) {
-          leftColumnEntries.push(['Expected Based on Discrepancies', `$${cashboxReconciliation.expectedEnding.toFixed(2)}`]);
+          leftColumnEntries.push(['Expected', `$${cashboxReconciliation.expectedEnding.toFixed(2)}`]);
           leftColumnEntries.push(['Total Period Discrepancies', `$${cashboxReconciliation.totalDiscrepancies.toFixed(2)}`]);
 
           if (Math.abs(cashboxReconciliation.actualVariance) >= 0.01) {
@@ -8994,14 +8994,16 @@
           // V2.84 LOGIC: Tips absorb shortages
           const originalDiscrepancy = day.pm_discrepancy || 0;
 
-          // ORIGINAL DISC: Raw discrepancy (can be negative)
+          // ORIGINAL DSCRPNCY: Raw discrepancy (can be negative)
           const originalDiscFormatted = originalDiscrepancy >= 0
             ? `+$${originalDiscrepancy.toFixed(2)}`
             : `-$${Math.abs(originalDiscrepancy).toFixed(2)}`;
 
-          // TIPS TAKEN: Exact shortage amount USED (not whole dollar broken)
-          // Example: Shortage $2.50 → we use $2.50 from tips to balance
-          const tipsTaken = originalDiscrepancy < 0 ? Math.abs(originalDiscrepancy) : 0;
+          // TIPS TAKEN: WHOLE DOLLAR amount taken from tips (includes rounding + shortage adjustments)
+          // Example: Shortage $0.75 → take $1.00 whole dollar from tips
+          const originalTips = day.pm_cash_tips || 0;
+          const adjustedTips = day.pm_adjusted_tips || originalTips;
+          const tipsTaken = originalTips - adjustedTips; // Total whole dollars taken
 
           // NET DISC: After tips cover shortage
           // Shortage → tips covered it → $0
@@ -9053,7 +9055,7 @@
 
         doc.autoTable({
           startY: currentY,
-          head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DISC', 'TIPS TAKEN', 'NET DISC', 'EXCESS']],
+          head: [['DATE', 'NIGHT COUNTER', 'TOAST SALES', 'ACTUAL CASH IN', 'DSCRPNCY', 'TIPS TAKEN', 'NET DISC', 'EXCESS']],
           body: tableDataWithTotals,
           margin: { left: margin, right: margin },
           theme: 'grid',
