@@ -1,13 +1,74 @@
 # CURRENT STATUS - Jayna Cash Counter
-**Last Updated:** 2025-10-12 (Session Active)
+**Last Updated:** 2025-10-12 18:30 (Session Active - Preparing context save)
 **Previous Session:** 2025-10-11 (Invoice System Rebuild + Complete Styling Overhaul)
 
 ---
 
 ## 🎯 Current Work Status
-**Status:** ✅ **ALL FIXES DEPLOYED - OCR SYSTEM ENHANCED**
+**Status:** 🔨 **PENDING ORDER CHECK-IN UX - IN PROGRESS**
 
-### Session (October 12, 2025):
+### Session (October 12, 2025) - PART 2:
+
+**🔨 CURRENT TASK (NOT YET COMPLETE):**
+User wants better UX for checking in pending orders:
+
+**Current Flow (BEFORE):**
+1. Click pending order → Only highlights it
+2. Need to manually upload invoice photo
+3. OCR extracts received quantities
+4. Check in items
+
+**Requested Flow (BUILDING NOW):**
+1. Click pending order → **Shows all ordered items on screen**
+2. **Option A: Manual check-in**
+   - See ordered quantities for each item
+   - Input received quantities manually
+   - Add notes per item ("damaged", "substituted", etc.)
+   - Check in item-by-item OR all at once
+3. **Option B: OCR-assisted**
+   - Upload invoice photo
+   - OCR auto-fills received quantities
+   - **Still allow manual adjustment**
+   - Add notes if needed
+   - Check in
+4. **Reconciliation view**
+   - Show ordered vs received
+   - Highlight discrepancies
+   - Update inventory
+
+**Next Steps:**
+1. Build `showPendingOrderForCheckIn(orderId)` function
+2. Display all ordered items with editable "received qty" fields
+3. Add notes field per item
+4. Add "CHECK IN" button per item
+5. Build reconciliation summary
+6. Keep OCR upload as optional auto-fill
+
+**Files to Modify:**
+- `index.html` - Add pending order display UI
+- Lines ~10126-10161 - Update orderCard.onclick handler
+
+**Bugs Fixed in Part 2:**
+
+1. **400 Error saving learning data** ✅
+   - Issue: Missing database columns for OCR learning
+   - Fix: Created complete migration guide (`RUN_THIS_MIGRATION_NOW_COMPLETE.md`)
+   - Columns needed: detected_item_name, detected_quantity, detected_price, match_confidence, matched_at, checked_in, checked_in_at
+   - User needs to run migration in Supabase SQL Editor
+
+2. **Pending order click didn't navigate** ✅
+   - Issue: Clicking pending order only highlighted, didn't switch tabs
+   - Tried: `.click()` simulation didn't work
+   - Fix: Call `openOrderTab(syntheticEvent, 'checkInInvoice')` directly with synthetic event object
+   - Result: Now properly switches to RECEIVE tab
+
+**Commits (Part 2):**
+- `19b164e`: fix(receive): Auto-navigate to CHECK-IN tab when pending order selected + migration docs
+- `10072be`: fix(receive): Call openOrderTab directly instead of simulating click
+
+---
+
+### Session (October 12, 2025) - PART 1:
 
 #### **✅ OCR INVOICE/ORDER SYSTEM - FULLY ENHANCED** ✅
 **User Request:** Fix console errors + add PDF support + always show action buttons + improve price extraction
