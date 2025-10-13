@@ -8371,7 +8371,7 @@
       });
 
       // Summary section: arrange entries in three columns with tighter spacing
-      doc.setFontSize(9);   // Reduced from 10
+      doc.setFontSize(7);   // Further reduced for better fit
       doc.setFont('helvetica', 'normal');
 
       // Column 1: Cash data
@@ -8438,10 +8438,10 @@
       const rightColumnMapped = rightColumnEntries.map(([label, value]) => [label.toUpperCase(), value.toUpperCase()]);
 
       // Define fixed x offsets for values within each column
-      const colValueOffset = 120;  // Reduced for narrower columns
-      let summaryY = currentY + 66; // Reduced from 86
-      const lineHeight = 11;        // Reduced from 14
       const colWidth = (pageWidth - (2 * margin)) / 3;
+      const colValueOffset = colWidth - 55;  // Dynamic offset based on column width
+      let summaryY = currentY + 66; // Reduced from 86
+      const lineHeight = 9;         // Further reduced to 9 from 11
       const col2X = margin + colWidth;
       const col3X = margin + (colWidth * 2);
 
@@ -8489,7 +8489,7 @@
       }
       
       doc.setFont('helvetica', 'italic');
-      doc.setFontSize(12); // 2pts bigger than normal 10pt text
+      doc.setFontSize(10); // Slightly larger but not too big
       
       // Center the text between the margins
       const textWidth = doc.getTextWidth(cashNeededText);
@@ -8689,12 +8689,12 @@
       }
 
       // Add 2-column section: Daily Notes (left) and Labor Summary (right)
-      currentY = doc.autoTable.previous.finalY + 15;
+      currentY = doc.autoTable.previous.finalY + 10; // Reduced from 15
 
       // Always show labor summary boxes (they will fit on page with compressed layout)
       if (true) {
         // Draw two bordered boxes side by side
-        const boxHeight = 90; // Reduced to fit page 1 without overflow
+        const boxHeight = 70; // Further reduced to 70 to prevent overflow
         const boxWidth = (pageWidth - (2 * margin) - 10) / 2; // 10pt gap between boxes
         const leftBoxX = margin;
         const rightBoxX = margin + boxWidth + 10;
@@ -8709,32 +8709,32 @@
 
         // Left box header - DAILY NOTES
         doc.setFillColor(240, 240, 240);
-        doc.rect(leftBoxX, currentY, boxWidth, 20, 'F');
+        doc.rect(leftBoxX, currentY, boxWidth, 16, 'F'); // Reduced header height to 16
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
+        doc.setFontSize(8); // Reduced from 9
         doc.setTextColor(0, 0, 0);
         const leftHeaderText = 'DAILY NOTES';
         const leftHeaderWidth = doc.getTextWidth(leftHeaderText);
-        doc.text(leftHeaderText, leftBoxX + (boxWidth - leftHeaderWidth) / 2, currentY + 13);
+        doc.text(leftHeaderText, leftBoxX + (boxWidth - leftHeaderWidth) / 2, currentY + 11);
 
         // Right box header - WEEKLY LABOR SUMMARY
         doc.setFillColor(240, 240, 240);
-        doc.rect(rightBoxX, currentY, boxWidth, 20, 'F');
+        doc.rect(rightBoxX, currentY, boxWidth, 16, 'F'); // Reduced header height to 16
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
+        doc.setFontSize(8); // Reduced from 9
         const rightHeaderText = 'WEEKLY LABOR SUMMARY';
         const rightHeaderWidth = doc.getTextWidth(rightHeaderText);
-        doc.text(rightHeaderText, rightBoxX + (boxWidth - rightHeaderWidth) / 2, currentY + 13);
+        doc.text(rightHeaderText, rightBoxX + (boxWidth - rightHeaderWidth) / 2, currentY + 11);
 
         // Horizontal line below headers
         doc.setLineWidth(1);
-        doc.line(leftBoxX, currentY + 20, leftBoxX + boxWidth, currentY + 20);
-        doc.line(rightBoxX, currentY + 20, rightBoxX + boxWidth, currentY + 20);
+        doc.line(leftBoxX, currentY + 16, leftBoxX + boxWidth, currentY + 16); // Adjusted to new header height
+        doc.line(rightBoxX, currentY + 16, rightBoxX + boxWidth, currentY + 16);
 
         // Left box content - Tip Pool Notes Only
-        let notesY = currentY + 35;
+        let notesY = currentY + 26; // Adjusted from 35
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
+        doc.setFontSize(6.5); // Reduced from 7
         doc.setTextColor(0, 0, 0);
 
         // Display custom tip pool notes if available
@@ -8744,19 +8744,19 @@
           noteLines.forEach(line => {
             if (notesY < currentY + boxHeight - 5) {
               doc.text(line, leftBoxX + 5, notesY);
-              notesY += 8;
+              notesY += 7; // Reduced from 8
             }
           });
         } else {
           // No notes message (centered)
           doc.setTextColor(150, 150, 150);
-          doc.text('No additional notes added during tip pool calculation', leftBoxX + boxWidth / 2, currentY + 70, { align: 'center' });
+          doc.text('No additional notes added during tip pool calculation', leftBoxX + boxWidth / 2, currentY + 45, { align: 'center' });
         }
 
         // Right box content - Labor Summary (clean and simple)
-        let laborY = currentY + 30;
+        let laborY = currentY + 26; // Adjusted from 30
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
+        doc.setFontSize(6.5); // Reduced from 7
         doc.setTextColor(0, 0, 0);
 
         if (tipPoolSummary.laborData) {
@@ -8772,27 +8772,27 @@
 
           laborEntries.forEach(([label, value]) => {
             doc.setFont('helvetica', 'normal');
-            doc.setFontSize(7);
+            doc.setFontSize(6.5); // Reduced from 7
             doc.setTextColor(0, 0, 0);
             doc.text(label, rightBoxX + 5, laborY);
             doc.setFont('helvetica', 'bold');
             doc.text(value, rightBoxX + boxWidth - 5, laborY, { align: 'right' });
-            laborY += 8;
+            laborY += 7; // Reduced from 8
           });
 
           // Line before total
           doc.setLineWidth(0.5);
           doc.setDrawColor(200, 200, 200);
-          doc.line(rightBoxX + 5, laborY + 2, rightBoxX + boxWidth - 5, laborY + 2);
-          laborY += 8;
+          doc.line(rightBoxX + 5, laborY + 1, rightBoxX + boxWidth - 5, laborY + 1);
+          laborY += 6; // Reduced from 8
 
           // True Total Labor Cost
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8);
+          doc.setFontSize(7); // Reduced from 8
           doc.setTextColor(0, 0, 0);
           doc.text('True Total Labor Cost:', rightBoxX + 5, laborY);
           doc.text(`$${ld.trueTotalLaborCost.toFixed(2)}`, rightBoxX + boxWidth - 5, laborY, { align: 'right' });
-          laborY += 12;
+          laborY += 9; // Reduced from 12
 
           // Net Sales and Labor %
           const isOverBudget = ld.laborVariance > 0;
@@ -8800,43 +8800,43 @@
 
           // Background bar
           doc.setFillColor(245, 245, 245);
-          doc.rect(rightBoxX + 5, laborY, boxWidth - 10, 24, 'F');
+          doc.rect(rightBoxX + 5, laborY, boxWidth - 10, 18, 'F'); // Reduced from 24
 
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(7);
+          doc.setFontSize(6); // Reduced from 7
           doc.setTextColor(0, 0, 0);
-          doc.text('NET SALES', rightBoxX + 10, laborY + 7);
+          doc.text('NET SALES', rightBoxX + 10, laborY + 5);
           doc.setFont('helvetica', 'bold');
-          doc.text(`$${ld.netSales.toFixed(2)}`, rightBoxX + boxWidth - 10, laborY + 7, { align: 'right' });
+          doc.text(`$${ld.netSales.toFixed(2)}`, rightBoxX + boxWidth - 10, laborY + 5, { align: 'right' });
 
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(7);
+          doc.setFontSize(6); // Reduced from 7
           doc.setTextColor(100, 100, 100);
-          doc.text('LABOR PERCENTAGE', rightBoxX + 10, laborY + 15);
+          doc.text('LABOR PERCENTAGE', rightBoxX + 10, laborY + 11);
 
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9);
+          doc.setFontSize(7.5); // Reduced from 9
           doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-          doc.text(`${ld.laborPercentage.toFixed(2)}%`, rightBoxX + boxWidth - 10, laborY + 15, { align: 'right' });
+          doc.text(`${ld.laborPercentage.toFixed(2)}%`, rightBoxX + boxWidth - 10, laborY + 11, { align: 'right' });
 
           // Variance note (smaller)
-          laborY += 26;
+          laborY += 20; // Reduced from 26
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6);
+          doc.setFontSize(5.5); // Reduced from 6
           doc.setTextColor(100, 100, 100);
           const varianceText = `Target: 30.00% | ${ld.laborVariance > 0 ? '+' : ''}${ld.laborVariance.toFixed(2)}% ${isOverBudget ? 'over' : 'under'}`;
           doc.text(varianceText, rightBoxX + boxWidth / 2, laborY, { align: 'center' });
 
         } else {
           doc.setTextColor(150, 150, 150);
-          doc.text('Labor data not available', rightBoxX + boxWidth / 2, currentY + 70, { align: 'center' });
+          doc.text('Labor data not available', rightBoxX + boxWidth / 2, currentY + 40, { align: 'center' });
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6);
-          doc.text('Calculate tip pool first', rightBoxX + boxWidth / 2, currentY + 80, { align: 'center' });
+          doc.setFontSize(5.5);
+          doc.text('Calculate tip pool first', rightBoxX + boxWidth / 2, currentY + 48, { align: 'center' });
         }
 
         // Move currentY past the boxes
-        currentY += boxHeight + 10; // Reduced spacing to prevent page overflow
+        currentY += boxHeight + 8; // Further reduced spacing to prevent page overflow
       }
 
       // Add developer credit - centered, bold, black
