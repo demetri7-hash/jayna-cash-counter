@@ -53,6 +53,7 @@
 - `a803c3b`: feat(database): Add supabase migration for learning columns
 - `1141e86`: fix(receive): Add PDF-to-image conversion for OCR processing ← **CRITICAL FIX**
 - `703e820`: feat(receive): Process ALL pages of multi-page PDFs for OCR ← **MAJOR ENHANCEMENT**
+- `4a62d77`: fix(receive): Smart line skipping - prevents missing items like Sprite ← **BUG FIX**
 
 **Critical Fix Applied (1141e86):**
 - **Problem:** Tesseract.js cannot read PDFs directly (Error: "Error attempting to read image")
@@ -78,6 +79,18 @@
   5. Text from all pages combined with spacing: `text1 + "\n\n" + text2 + "\n\n" + text3`
   6. Combined text parsed by `parseInvoiceText()` to extract all items
 - **Result:** Now captures ALL items from ALL pages of PDF ✅
+
+**Smart Line Skipping (4a62d77):**
+- **Problem:** Sprite item missing from extraction despite being in PDF
+- **Root cause:** Fixed skip of 3 lines didn't account for "Information: Split Case" lines
+- **Variable spacing:** Some items have 3 lines, some have 4-5 with Information lines
+- **Solution:** Dynamic skip that searches for NEXT SKU pattern
+- **How it works:**
+  1. After processing item, search forward for next 6-digit SKU
+  2. Skip to line before SKU (the item name line)
+  3. Handles any spacing: Information lines, blank lines, etc.
+  4. Console logs show: "→ Skipping X lines to next item"
+- **Result:** No more missed items! All 15 items extracted ✅
 
 **Philosophy Applied:** "Always go forward, never backwards"
 - Added PDF support instead of restricting to images only
