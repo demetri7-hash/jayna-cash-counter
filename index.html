@@ -10450,7 +10450,11 @@
       event.preventDefault();
       const orderId = parseInt(event.target.getAttribute('data-order-id'));
       console.log('🖱️ EDIT clicked for order ID:', orderId);
-      editPendingOrder(orderId);
+      try {
+        editPendingOrder(orderId);
+      } catch (err) {
+        console.error('❌ Error calling editPendingOrder:', err);
+      }
       return;
     }
 
@@ -10460,7 +10464,13 @@
       const orderId = parseInt(event.target.getAttribute('data-order-id'));
       const vendorName = event.target.getAttribute('data-vendor-name');
       console.log('🖱️ DELETE clicked for order ID:', orderId, 'Vendor:', vendorName);
-      deletePendingOrder(orderId, vendorName);
+      console.log('🔧 About to call deletePendingOrder...');
+      try {
+        deletePendingOrder(orderId, vendorName);
+        console.log('✅ deletePendingOrder called successfully');
+      } catch (err) {
+        console.error('❌ Error calling deletePendingOrder:', err);
+      }
       return;
     }
   }
@@ -10699,6 +10709,9 @@
    * Delete entire pending order
    */
   async function deletePendingOrder(orderId, vendorName) {
+    console.log('🚀 deletePendingOrder FUNCTION CALLED with:', orderId, vendorName);
+    console.log('🔍 Supabase client exists?', !!supabase);
+
     // No confirmation needed - red DELETE button is clear intent
     showLoading('Deleting Order', `Removing order from ${vendorName}...`);
 
