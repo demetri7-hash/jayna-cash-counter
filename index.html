@@ -10402,29 +10402,14 @@
       itemsCell.appendChild(itemsBadge);
       row.appendChild(itemsCell);
 
-      // Actions
+      // Actions - using innerHTML like inventory list (WORKING PATTERN)
       const actionsCell = document.createElement('td');
       actionsCell.style.cssText = 'padding: 14px 16px; text-align: center; font-size: 18px;';
-
-      const editLink = document.createElement('a');
-      editLink.href = 'javascript:void(0)';
-      editLink.style.cssText = 'color: #4a4a4a; text-decoration: underline; cursor: pointer; font-weight: 600;';
-      editLink.textContent = 'edit';
-      editLink.onclick = () => editPendingOrder(order.id);
-
-      const separator = document.createElement('span');
-      separator.style.cssText = 'margin: 0 10px; color: #d1d5db;';
-      separator.textContent = '|';
-
-      const deleteLink = document.createElement('a');
-      deleteLink.href = 'javascript:void(0)';
-      deleteLink.style.cssText = 'color: #dc2626; text-decoration: underline; cursor: pointer; font-weight: 600;';
-      deleteLink.textContent = 'delete';
-      deleteLink.onclick = () => deletePendingOrder(order.id, order.vendor);
-
-      actionsCell.appendChild(editLink);
-      actionsCell.appendChild(separator);
-      actionsCell.appendChild(deleteLink);
+      actionsCell.innerHTML = `
+        <a href="javascript:void(0)" onclick="editPendingOrder(${order.id}); return false;" style="color: #4a4a4a; text-decoration: underline; cursor: pointer; font-weight: 600;">edit</a>
+        <span style="margin: 0 10px; color: #d1d5db;">|</span>
+        <a href="javascript:void(0)" onclick="deletePendingOrder(${order.id}, '${order.vendor}'); return false;" style="color: #dc2626; text-decoration: underline; cursor: pointer; font-weight: 600;">delete</a>
+      `;
       row.appendChild(actionsCell);
 
       tbody.appendChild(row);
@@ -10504,34 +10489,13 @@
         const itemDiv = document.createElement('div');
         itemDiv.style.cssText = 'display: grid; grid-template-columns: 3fr 1fr 1fr 40px; gap: 8px; margin-bottom: 12px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb;';
 
-        // Item name
-        const nameDiv = document.createElement('div');
-        nameDiv.style.cssText = 'font-size: 13px; font-weight: 600; color: #1a1a1a;';
-        nameDiv.textContent = item.item_name;
-        itemDiv.appendChild(nameDiv);
-
-        // Quantity input
-        const qtyInput = document.createElement('input');
-        qtyInput.type = 'number';
-        qtyInput.id = `editQty_${item.id}`;
-        qtyInput.value = item.quantity_ordered;
-        qtyInput.min = '0';
-        qtyInput.step = '0.1';
-        qtyInput.style.cssText = 'padding: 8px; border: 2px solid #d1d5db; border-radius: 0; font-size: 13px; text-align: center;';
-        itemDiv.appendChild(qtyInput);
-
-        // Unit
-        const unitDiv = document.createElement('div');
-        unitDiv.style.cssText = 'font-size: 12px; color: #6b6b6b; text-align: center;';
-        unitDiv.textContent = item.unit;
-        itemDiv.appendChild(unitDiv);
-
-        // Delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '✕';
-        deleteBtn.style.cssText = 'padding: 6px; background: #dc2626; color: white; border: none; cursor: pointer; font-size: 11px; font-weight: 700;';
-        deleteBtn.onclick = () => deleteOrderItem(item.id, orderId);
-        itemDiv.appendChild(deleteBtn);
+        // Use innerHTML like the rest of the codebase (WORKING PATTERN)
+        itemDiv.innerHTML = `
+          <div style="font-size: 13px; font-weight: 600; color: #1a1a1a;">${item.item_name}</div>
+          <input type="number" id="editQty_${item.id}" value="${item.quantity_ordered}" min="0" step="0.1" style="padding: 8px; border: 2px solid #d1d5db; border-radius: 0; font-size: 13px; text-align: center;" />
+          <div style="font-size: 12px; color: #6b6b6b; text-align: center;">${item.unit}</div>
+          <button onclick="deleteOrderItem(${item.id}, ${orderId}); return false;" style="padding: 6px; background: #dc2626; color: white; border: none; cursor: pointer; font-size: 11px; font-weight: 700;">✕</button>
+        `;
 
         itemsContainer.appendChild(itemDiv);
       });
