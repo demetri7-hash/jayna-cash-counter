@@ -655,7 +655,16 @@
   <!-- Tip Pool Calculator Dependencies -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+  <!-- OCR Dependencies -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    // Configure PDF.js worker
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
 </head>
 <body>
   <!-- Loading Overlay (consolidated) -->
@@ -14989,6 +14998,53 @@
   }
 
   /**
+   * Convert PDF to image for OCR processing
+   */
+  async function convertPdfToImage(pdfDataUrl) {
+    console.log('📄 Converting PDF to image...');
+
+    // Extract base64 data
+    const base64Data = pdfDataUrl.split(',')[1];
+    const binaryData = atob(base64Data);
+    const uint8Array = new Uint8Array(binaryData.length);
+    for (let i = 0; i < binaryData.length; i++) {
+      uint8Array[i] = binaryData.charCodeAt(i);
+    }
+
+    // Load PDF with PDF.js
+    const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+    const pdf = await loadingTask.promise;
+
+    console.log(`📄 PDF loaded: ${pdf.numPages} page(s)`);
+
+    // Get first page
+    const page = await pdf.getPage(1);
+
+    // Set scale for good quality (2 = 2x resolution)
+    const scale = 2.0;
+    const viewport = page.getViewport({ scale });
+
+    // Create canvas
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    // Render PDF page to canvas
+    await page.render({
+      canvasContext: context,
+      viewport: viewport
+    }).promise;
+
+    console.log('✅ PDF rendered to canvas:', canvas.width, 'x', canvas.height);
+
+    // Convert canvas to image data URL
+    const imageDataUrl = canvas.toDataURL('image/png');
+
+    return imageDataUrl;
+  }
+
+  /**
    * Process invoice with Tesseract OCR
    */
   async function processInvoiceOCR() {
@@ -15011,11 +15067,29 @@
       console.log('Starting OCR process...');
       console.log('Image data:', orderingSystemState.currentInvoiceImage?.substring(0, 50));
 
+      // Check if this is a PDF file
+      let imageToProcess = orderingSystemState.currentInvoiceImage;
+      const isPDF = orderingSystemState.currentInvoiceImage.startsWith('data:application/pdf');
+
+      if (isPDF) {
+        console.log('📄 PDF detected - converting to image first...');
+        document.getElementById('ocrProgressText').textContent = 'Converting PDF to image...';
+
+        // Check if PDF.js is loaded
+        if (typeof pdfjsLib === 'undefined') {
+          throw new Error('PDF.js library not loaded. Please refresh the page.');
+        }
+
+        // Convert PDF to image
+        imageToProcess = await convertPdfToImage(orderingSystemState.currentInvoiceImage);
+        console.log('✅ PDF converted to image successfully');
+      }
+
       // Use simpler Tesseract.recognize API for single image
       document.getElementById('ocrProgressText').textContent = 'Loading OCR engine...';
 
       const result = await Tesseract.recognize(
-        orderingSystemState.currentInvoiceImage,
+        imageToProcess,
         'eng',
         {
           logger: (m) => {
