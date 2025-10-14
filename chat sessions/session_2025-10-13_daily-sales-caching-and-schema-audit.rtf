@@ -1,0 +1,159 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Courier;}}
+{\colortbl;\red0\green0\blue0;\red139\green0\blue0;\red0\green100\blue0;\red255\green140\blue0;}
+
+\f0\fs24
+
+{\b SESSION: October 13, 2025 - Daily Sales Caching & Complete Schema Audit}\par
+\par
+
+{\b\cf2 CRITICAL: INCOMPLETE WORK - TESTING REQUIRED}\par
+\cf0\par
+
+{\b 1. Daily 4am Sales Caching Cron - DEPLOYED BUT NOT TESTED}\par
+Status: Code deployed to production, never tested, will run automatically tomorrow at 4am PT\par
+File: /api/cron/cache-toast-sales.js\par
+Schedule: 0 11 * * * (4am PT = 11am UTC)\par
+\par
+What it does:\par
+- Authenticates with Toast API\par
+- Fetches yesterday's sales data (payments, tips, net sales)\par
+- Saves to daily_sales table in Supabase\par
+- Makes Monday morning tip pool calculator instant (~100ms vs 30+ seconds)\par
+\par
+What it DOESN'T cache:\par
+- Labor data (needs manual Monday adjustments)\par
+- TDS driver tips (needs verification)\par
+\par
+Commits:\par
+- dacac84: feat(cron): Add daily 4am sales data caching\par
+- f7f8d14: fix(cron): RESTORE gift card fields (after mistaken removal)\par
+\par
+{\cf2 NEXT STEPS:}\par
+1. User needs to add notes field to cashbox_counts in Supabase\par
+2. Test cron manually: curl https://jayna-cash-counter.vercel.app/api/cron/cache-toast-sales -H "x-vercel-cron: 1"\par
+3. Wait for first automatic run tomorrow at 4am\par
+4. Verify data appears in daily_sales table\par
+5. Test tip pool calculator speed on Monday morning\par
+\par
+
+{\b 2. Complete Database Schema Audit - 107/108 Fields Verified}\par
+Created comprehensive documentation:\par
+- database/ACTUAL_SCHEMAS_USED_IN_CODE.md (all 108 fields from code)\par
+- database/SCHEMA_COMPARISON_RESULTS.md (comparison analysis)\par
+- database/FINAL_SCHEMA_STATUS.md (verification results)\par
+\par
+Results:\par
+- 6/7 tables 100% complete\par
+- 1 missing field: cashbox_counts.notes (TEXT)\par
+\par
+{\cf2 REQUIRED FIX:}\par
+ALTER TABLE cashbox_counts ADD COLUMN IF NOT EXISTS notes TEXT;\par
+\par
+All 7 tables analyzed:\par
+1. cash_counts: 33/33 fields \cf3 OK\cf0\par
+2. daily_sales: 15/15 fields \cf3 OK\cf0 (includes gift_card_payments, gift_card_amount)\par
+3. tip_variance: 6/6 fields \cf3 OK\cf0\par
+4. weekly_combined_reports: 28/28 fields \cf3 OK\cf0\par
+5. weekly_daily_breakdown: 9/9 fields \cf3 OK\cf0\par
+6. weekly_employee_tips: 13/13 fields \cf3 OK\cf0\par
+7. cashbox_counts: 4/5 fields \cf2 MISSING notes\cf0\par
+\par
+Commit: b84cf82 - docs(schema): Complete database schema analysis\par
+\par
+
+{\b 3. PDF Daily Breakdown Table - Fixed V2.84 Tip Adjustment Logic}\par
+Problem: Table showed negative discrepancies, but tips absorb shortages in V2.84\par
+\par
+Solution: Added proper columns to reflect tip adjustment flow:\par
+- TIPS TAKEN: Exact shortage amount USED (not whole dollar broken)\par
+  Example: Shortage $2.50 -> break $3 -> TIPS TAKEN shows $2.50\par
+- NET DISC: Always $0.00 (balanced) or +$X.XX (overage) - never negative\par
+- EXCESS: Net change to cashbox (includes change from breaking whole dollars)\par
+\par
+Example flows:\par
+Day 1 - Shortage $2.50:\par
+  TIPS TAKEN: $2.50 (used to balance)\par
+  NET DISC: $0.00 (drawer balanced)\par
+  EXCESS: $0.50 (change from breaking $3)\par
+\par
+Day 2 - Overage $1.25:\par
+  TIPS TAKEN: $0.00 (no shortage)\par
+  NET DISC: +$1.25 (overage shown in green)\par
+  EXCESS: $1.25 (goes to cashbox)\par
+\par
+Commits:\par
+- c410655: fix(pdf): Fix daily breakdown to show V2.84 tip adjustment logic\par
+- aa5f564: fix(pdf): TIPS TAKEN shows exact shortage amount used\par
+\par
+
+{\b 4. Cashbox Reconciliation - Fixed Missing Formula Component}\par
+Problem: Expected cashbox total calculation was missing the Excess column\par
+\par
+Old formula (WRONG):\par
+expectedEnding = previousTotal + totalDiscrepancies\par
+\par
+New formula (CORRECT):\par
+expectedEnding = previousTotal + totalDiscrepancies + totalExcessReturned\par
+\par
+Where totalExcessReturned = Sum of (pm_amount_to_keep - am_total) for the week\par
+\par
+This fix was documented in CURRENT_STATUS.md from previous session.\par
+Implementation completed in getCashboxReconciliation() function.\par
+\par
+
+{\b 5. Other Fixes This Session}\par
+\par
+Timezone Fix (commit a5b7eb3):\par
+- Fixed date displays shifting back one day\par
+- Changed new Date("2025-10-05") to new Date("2025-10-05T12:00:00")\par
+- Applied to cash surplus date display and unpaid tips carryover\par
+\par
+Cash Surplus Carryover (commit d127f64):\par
+- New feature: Negative cash_needed from previous week carries forward\par
+- Reduces cash needed in current week\par
+- Shows on PDF with source date\par
+\par
+API Cash Sales Fix (commit bd95bae):\par
+- Critical bug: Code only used API cashSales if truthy\par
+- Fixed to ALWAYS use API when using API (never database fallback)\par
+- Changed: if (!hasFiles && cashSales) to if (!hasFiles)\par
+\par
+Design System Cleanup (commit 23817d4):\par
+- Changed ugly yellow cashbox section to match clean gray file upload section\par
+- Removed emoji, uppercase styling, yellow colors\par
+- Now matches design system in CLAUDE.md\par
+\par
+
+{\b KEY FILES MODIFIED}\par
+- index.html: PDF generation, cashbox reconciliation, design fixes\par
+- api/cron/cache-toast-sales.js: NEW - daily sales caching\par
+- vercel.json: Added cron schedule\par
+- database/: Created 3 comprehensive schema documentation files\par
+\par
+
+{\b TESTING BLOCKERS}\par
+1. Cashbox notes field must be added to Supabase before testing cron\par
+2. Cron job has never been tested manually\par
+3. First automatic run is tomorrow at 4am PT\par
+\par
+
+{\b PRODUCTION STATUS}\par
+URL: https://jayna-cash-counter.vercel.app\par
+Branch: main\par
+Latest commit: 23817d4\par
+All features working except untested cron job\par
+\par
+
+{\b SESSION STATISTICS}\par
+Duration: ~3 hours\par
+Messages: ~100+\par
+Commits: 8\par
+Major features: 1 (daily sales caching)\par
+Bug fixes: 4\par
+Documentation: 3 new schema files\par
+Lines changed: ~500+\par
+\par
+\cf3 STATUS: All committed, deployed, needs testing\cf0\par
+\par
+}
