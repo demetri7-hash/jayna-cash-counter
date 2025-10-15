@@ -1420,6 +1420,20 @@
             letter-spacing: 0.8px;
             transition: all 0.15s ease;
           ">MANAGE</button>
+          <button class="tab-link" onclick="openOrderTab(event, 'priceHistory')" style="
+            flex: 0 0 auto;
+            padding: 12px 10px;
+            min-width: 80px;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            transition: all 0.15s ease;
+          ">PRICES</button>
           </div>
         </div>
 
@@ -1509,6 +1523,54 @@
 
           <div id="inventoryList" style="width: 100%;">
             <p style="text-align: center; padding: 20px;">Loading inventory...</p>
+          </div>
+        </div>
+
+        <!-- Tab Content: Price History -->
+        <div id="priceHistory" class="tab-content" style="display: none;">
+          <div style="border: 2px solid var(--gray-300); padding: 18px; margin-bottom: 18px; background: var(--gray-100);">
+            <h3 style="margin: 0 0 16px 0; color: var(--gray-900); font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;">Price History Explorer</h3>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+              <div style="flex: 1 1 200px;">
+                <label for="priceHistoryStartDate" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-700); margin-bottom: 4px;">Start Date</label>
+                <input type="date" id="priceHistoryStartDate" style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;" />
+              </div>
+              <div style="flex: 1 1 200px;">
+                <label for="priceHistoryEndDate" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-700); margin-bottom: 4px;">End Date</label>
+                <input type="date" id="priceHistoryEndDate" style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;" />
+              </div>
+              <div style="flex: 1 1 220px;">
+                <label for="priceHistoryVendor" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-700); margin-bottom: 4px;">Vendor Filter</label>
+                <select id="priceHistoryVendor" onchange="handlePriceHistoryVendorChange()" style="width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; background: white;">
+                  <option value="ALL">All Vendors</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="border: 2px solid var(--gray-300); background: white; padding: 16px;">
+              <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px;">
+                <div style="flex: 1 1 200px;">
+                  <label for="priceHistoryItemSearch" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-700); margin-bottom: 4px;">Search Items</label>
+                  <input type="text" id="priceHistoryItemSearch" placeholder="Search inventory items..." oninput="handlePriceHistorySearch(this.value)" style="width: 100%; padding: 8px 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px;" />
+                </div>
+                <div style="display: flex; gap: 10px;">
+                  <button type="button" onclick="priceHistorySelectAll()" style="padding: 8px 12px; border: 2px solid var(--gray-400); background: var(--gray-100); color: var(--gray-800); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;">Select All</button>
+                  <button type="button" onclick="priceHistoryClearSelection()" style="padding: 8px 12px; border: 2px solid var(--gray-400); background: white; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;">Clear</button>
+                </div>
+              </div>
+              <div id="priceHistoryItemList" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--gray-200); padding: 8px; background: #f8f9fa;"></div>
+              <p style="margin-top: 8px; font-size: 11px; color: var(--gray-600);">Tip: leave vendor on "All" to compare cross-vendor items. Select at least one item or choose a vendor to analyze.</p>
+            </div>
+
+            <div style="margin-top: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+              <button type="button" onclick="loadPriceHistory()" style="padding: 12px 20px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; cursor: pointer;">Load Price History</button>
+              <span id="priceHistoryStatus" style="font-size: 12px; color: var(--gray-600);"></span>
+            </div>
+          </div>
+
+          <div id="priceHistoryResults" style="border: 2px solid var(--gray-300); padding: 18px; background: white; min-height: 120px;">
+            <p style="margin: 0; font-size: 13px; color: var(--gray-600);">Select a date range and items to view pricing trends.</p>
           </div>
         </div>
 
@@ -10256,7 +10318,15 @@
     currentInvoiceImage: null,
     extractedInvoiceItems: [],
     invoiceType: 'invoice', // 'invoice' or 'order'
-    selectedPendingOrderId: null // For reconciliation against pending order
+    selectedPendingOrderId: null, // For reconciliation against pending order
+    // Price history drill-down state
+    priceHistory: {
+      selectedItemIds: new Set(),
+      results: [],
+      lastFetchParams: null,
+      cache: new Map(),
+      initialized: false
+    }
   };
 
   /**
@@ -10271,6 +10341,8 @@
     try {
       await loadInventoryData();
       calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
+      await refreshUpcomingOrdersUI();
       renderInventoryList();
       renderStockCountList();
       renderPrepCountList(); // Render PREP items in PREP tab
@@ -10318,6 +10390,14 @@
       renderOrdersTab();
     }
 
+    if (tabName === 'priceHistory') {
+      if (!orderingSystemState.priceHistory.initialized) {
+        initializePriceHistoryTab();
+      } else {
+        refreshPriceHistoryControls();
+      }
+    }
+
     // Load orders due today alert when CHECK-IN tab is opened
     if (tabName === 'checkInInvoice') {
       loadOrdersDueTodayAlert();
@@ -10352,7 +10432,7 @@
     // Load both sections
     await renderPendingOrders(pendingSection);
     calculateUpcomingOrders();
-    renderUpcomingOrders(aiSection); // Render AI suggestions into AI section
+    await refreshUpcomingOrdersUI(aiSection); // Ensure price snapshots before rendering suggestions
   }
 
   /**
@@ -10387,6 +10467,18 @@
       if (error) throw error;
 
       console.log('Loaded pending orders:', orders?.length || 0);
+
+      const priceItemIds = [];
+      (orders || []).forEach(order => {
+        (order.pending_order_items || []).forEach(item => {
+          if (item && item.inventory_item_id != null) {
+            priceItemIds.push(item.inventory_item_id);
+          }
+        });
+      });
+      if (priceItemIds.length) {
+        await ensurePriceSnapshotsForItems(priceItemIds);
+      }
 
       // Clear container
       container.innerHTML = '';
@@ -10554,17 +10646,36 @@
 
           order.pending_order_items.forEach(item => {
             const itemRow = document.createElement('div');
-            itemRow.style.cssText = 'display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px;';
+            itemRow.style.cssText = 'padding: 6px 0; font-size: 12px; border-bottom: 1px dashed var(--gray-200);';
+
+            const topRow = document.createElement('div');
+            topRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; gap: 12px;';
 
             const itemName = document.createElement('span');
             itemName.textContent = item.item_name;
-            itemName.style.cssText = 'color: var(--gray-700);';
-            itemRow.appendChild(itemName);
+            itemName.style.cssText = 'color: var(--gray-700); font-weight: 600;';
+            topRow.appendChild(itemName);
 
             const itemQty = document.createElement('span');
             itemQty.textContent = `${item.quantity_ordered} ${item.unit}`;
-            itemQty.style.cssText = 'color: var(--gray-500); font-weight: 700;';
-            itemRow.appendChild(itemQty);
+            itemQty.style.cssText = 'color: var(--gray-500); font-weight: 700; font-size: 12px;';
+            topRow.appendChild(itemQty);
+
+            itemRow.appendChild(topRow);
+
+            if (item.inventory_item_id != null) {
+              const localItem = orderingSystemState.items.find(i => i.id === item.inventory_item_id);
+              const priceInfo = getPriceInfoForInventoryId(
+                item.inventory_item_id,
+                localItem?.currentUnitCost,
+                localItem?.lastCostUpdate
+              );
+
+              const priceDiv = document.createElement('div');
+              priceDiv.style.cssText = 'margin-top: 4px; font-size: 11px;';
+              priceDiv.innerHTML = renderPriceTrendHtml(priceInfo);
+              itemRow.appendChild(priceDiv);
+            }
 
             itemsList.appendChild(itemRow);
           });
@@ -11759,6 +11870,7 @@
       }
 
       orderingSystemState.lastUpdated = new Date();
+      refreshPriceHistoryControls();
       hideLoading();
       console.log('hideLoading called');
     } catch (error) {
@@ -11821,8 +11933,6 @@
     orderingSystemState.calculatedOrders.forEach(order => {
       loadOrderEditsFromStorage(order);
     });
-
-    renderUpcomingOrders();
   }
 
   /**
@@ -11967,36 +12077,263 @@
    * Format timestamp as relative time with precise hours and minutes
    * Examples: "32m ago", "1hr and 32m ago", "5d ago"
    */
-  function formatRelativeTime(dateStr) {
-    if (!dateStr) return 'Never';
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return 'Never';
 
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const date = parsePacificDate(dateStr) || new Date(dateStr);
+  const now = new Date();
+  const nowPacific = getPacificMidday(now);
+  const datePacific = getPacificMidday(date);
+  const diffMs = nowPacific - datePacific;
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMinutes < 60) {
-      // Less than 1 hour: show minutes only
-      return `${diffMinutes}m ago`;
-    } else if (diffHours < 24) {
-      // Less than 24 hours: show hours and minutes
-      const hours = diffHours;
-      const minutes = diffMinutes % 60;
-      if (minutes === 0) {
-        return `${hours}hr ago`;
-      } else {
-        return `${hours}hr and ${minutes}m ago`;
-      }
-    } else if (diffDays < 7) {
-      // Less than 7 days: show days only
-      return `${diffDays}d ago`;
-    } else {
-      // Older than 7 days: show Pacific date
-      return formatPacificDateDisplay(date, { month: 'numeric', day: 'numeric', year: '2-digit' });
-    }
+  if (diffMinutes < 60) {
+    const minutes = Math.max(diffMinutes, 0);
+    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
   }
+
+  if (diffHours < 24) {
+    const hours = diffHours;
+    const minutes = diffMinutes % 60;
+    const hourLabel = `${hours} hour${hours === 1 ? '' : 's'}`;
+    const minuteLabel = minutes > 0 ? ` ${minutes} minute${minutes === 1 ? '' : 's'}` : '';
+    return `${hourLabel}${minuteLabel} ago`;
+  }
+
+  const precise = formatPacificDateDisplay(date, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  return precise;
+}
+
+function formatCurrency(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '--';
+  return `$${Number(value).toFixed(2)}`;
+}
+
+function formatPercentage(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '';
+  return `${Number(value).toFixed(1)}%`;
+}
+
+function getPriceCache() {
+  if (!orderingSystemState.priceHistory.cache) {
+    orderingSystemState.priceHistory.cache = new Map();
+  }
+  return orderingSystemState.priceHistory.cache;
+}
+
+function formatPriceDateLabel(date) {
+  if (!date) return '';
+  const dateObj = date instanceof Date ? date : (parsePacificDate(date) || new Date(date));
+  return formatPacificDateDisplay(dateObj, { month: 'short', day: 'numeric' });
+}
+
+// Load latest + previous invoice prices for the requested inventory items and cache results
+async function ensurePriceSnapshotsForItems(itemIds) {
+  if (!itemIds || itemIds.length === 0) return;
+
+  const cache = getPriceCache();
+  const uniqueIds = Array.from(new Set(
+    itemIds
+      .map(id => parseInt(id, 10))
+      .filter(id => !Number.isNaN(id))
+  ));
+
+  const missing = uniqueIds.filter(id => !cache.has(id));
+  if (missing.length === 0) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('invoice_items')
+      .select(`
+        inventory_item_id,
+        unit_price,
+        detected_price,
+        created_at,
+        invoices!inner(
+          id,
+          invoice_date,
+          vendor_name,
+          vendor
+        )
+      `)
+      .in('inventory_item_id', missing)
+      .order('created_at', { ascending: false })
+      .limit(missing.length * 40);
+
+    if (error) {
+      console.warn('Failed to load price snapshots:', error);
+      return;
+    }
+
+    const grouped = new Map();
+    (data || []).forEach(row => {
+      const itemId = row.inventory_item_id;
+      if (!itemId) return;
+
+      const priceValue = row.unit_price ?? row.detected_price;
+      if (priceValue === null || priceValue === undefined) return;
+
+      const invoice = row.invoices || {};
+      const invoiceDate = invoice.invoice_date || row.created_at;
+      const invoiceDateObj = parsePacificDate(invoiceDate) || new Date(invoiceDate);
+
+      const entry = {
+        price: Number(priceValue),
+        invoiceDate,
+        invoiceDateObj,
+        vendor: invoice.vendor_name || invoice.vendor || null,
+        invoiceId: invoice.id || row.invoice_id || null,
+        createdAt: row.created_at
+      };
+
+      if (!grouped.has(itemId)) grouped.set(itemId, []);
+      grouped.get(itemId).push(entry);
+    });
+
+    grouped.forEach((entries, itemId) => {
+      entries.sort((a, b) => {
+        const aTime = a.invoiceDateObj ? a.invoiceDateObj.getTime() : 0;
+        const bTime = b.invoiceDateObj ? b.invoiceDateObj.getTime() : 0;
+        return bTime - aTime;
+      });
+
+      const latest = entries[0] || null;
+      const previous = entries.find(entry => entry !== latest) || null;
+
+      cache.set(itemId, {
+        history: entries,
+        latest,
+        previous,
+        fetchedAt: new Date()
+      });
+    });
+
+    missing.forEach(id => {
+      if (!cache.has(id)) {
+        cache.set(id, {
+          history: [],
+          latest: null,
+          previous: null,
+          fetchedAt: new Date()
+        });
+      }
+    });
+  } catch (err) {
+    console.warn('Error fetching price snapshots:', err);
+  }
+}
+
+function getPriceInfoForInventoryId(itemId, fallbackPrice, fallbackDate) {
+  if (!itemId && itemId !== 0) return {
+    latestPrice: fallbackPrice != null ? Number(fallbackPrice) : null,
+    latestDate: fallbackDate || null,
+    previousPrice: null,
+    previousDate: null,
+    diff: null,
+    diffPct: null
+  };
+
+  const cache = getPriceCache();
+  const snapshot = cache.get(Number(itemId));
+
+  const latestPrice = snapshot?.latest?.price ?? (fallbackPrice != null ? Number(fallbackPrice) : null);
+  const latestDate = snapshot?.latest?.invoiceDate || fallbackDate || null;
+  const previousPrice = snapshot?.previous?.price ?? null;
+  const previousDate = snapshot?.previous?.invoiceDate || null;
+  const diff = latestPrice != null && previousPrice != null ? latestPrice - previousPrice : null;
+  const diffPct = diff != null && previousPrice !== 0 ? (diff / previousPrice) * 100 : null;
+
+  return {
+    latestPrice,
+    latestDate,
+    previousPrice,
+    previousDate,
+    diff,
+    diffPct
+  };
+}
+
+function getPriceInfoForItem(item) {
+  if (!item) return getPriceInfoForInventoryId(null, null, null);
+  return getPriceInfoForInventoryId(item.id, item.currentUnitCost, item.lastCostUpdate);
+}
+
+// Render a compact price summary (current value + arrow delta) for table display
+function renderPriceTrendHtml(info) {
+  const latest = info.latestPrice != null ? formatCurrency(info.latestPrice) : '--';
+  const latestDateLabel = info.latestDate ? ` (${formatPriceDateLabel(info.latestDate)})` : '';
+
+  let trendHtml = '';
+  if (info.diff != null && info.previousPrice != null) {
+    const arrow = info.diff > 0 ? '▲' : info.diff < 0 ? '▼' : '•';
+    const color = info.diff > 0 ? '#c62828' : info.diff < 0 ? '#2e7d32' : 'var(--gray-500)';
+    const diffAbs = formatCurrency(Math.abs(info.diff));
+    const pct = info.diffPct != null ? formatPercentage(Math.abs(info.diffPct)) : '';
+    const prevDate = info.previousDate ? formatPriceDateLabel(info.previousDate) : '';
+    trendHtml = `<span style="color: ${color}; font-weight: 600; font-size: 11px;">${arrow} ${diffAbs}${pct ? ` (${pct})` : ''}${prevDate ? ` vs ${prevDate}` : ''}</span>`;
+  } else if (info.previousPrice == null) {
+    trendHtml = '<span style="color: var(--gray-500); font-size: 11px;">No prior price</span>';
+  } else {
+    trendHtml = '<span style="color: var(--gray-500); font-size: 11px;">No change</span>';
+  }
+
+  return `
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+      <span style="font-weight: 700; color: var(--gray-900);">${latest}${latestDateLabel}</span>
+      ${trendHtml}
+    </div>
+  `;
+}
+
+// Render price comparison for a new invoice price against cached historical values
+function renderIncomingPriceHtml(itemId, incomingPrice, invoiceDate) {
+  if (incomingPrice === null || incomingPrice === undefined || Number.isNaN(Number(incomingPrice))) {
+    return '<span style="color: var(--gray-500); font-size: 11px;">No price on invoice</span>';
+  }
+
+  const cache = getPriceCache();
+  const snapshot = cache.get(Number(itemId));
+  const previousEntry = snapshot?.latest || snapshot?.previous || null;
+  const previousPrice = previousEntry?.price ?? null;
+  const info = {
+    latestPrice: Number(incomingPrice),
+    latestDate: invoiceDate || null,
+    previousPrice,
+    previousDate: previousEntry?.invoiceDate || null,
+    diff: previousPrice != null ? Number(incomingPrice) - previousPrice : null,
+    diffPct: previousPrice != null && previousPrice !== 0 ? ((Number(incomingPrice) - previousPrice) / previousPrice) * 100 : null
+  };
+
+  return renderPriceTrendHtml(info);
+}
+
+// Ensure price snapshots are loaded before rendering upcoming AI suggestions
+async function refreshUpcomingOrdersUI(targetContainer) {
+  const orders = orderingSystemState.calculatedOrders || [];
+  const itemIds = [];
+  orders.forEach(order => {
+    (order.items || []).forEach(item => {
+      if (item && item.id != null) {
+        itemIds.push(item.id);
+      }
+    });
+  });
+
+  if (itemIds.length) {
+    await ensurePriceSnapshotsForItems(itemIds);
+  }
+
+  orderingSystemState.lastUpdated = new Date();
+  renderUpcomingOrders(targetContainer);
+}
 
   /**
    * Format price with date (e.g., "$24.38 (9/22/25)")
@@ -12110,6 +12447,7 @@
                 <th style="padding: 8px 6px; text-align: left; border: 1px solid var(--gray-300); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Item</th>
                 <th style="padding: 8px 4px; text-align: center; border: 1px solid var(--gray-300); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Qty</th>
                 <th style="padding: 8px 4px; text-align: center; border: 1px solid var(--gray-300); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Unit</th>
+                <th style="padding: 8px 4px; text-align: center; border: 1px solid var(--gray-300); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Price</th>
                 <th style="padding: 8px 4px; text-align: center; border: 1px solid var(--gray-300); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Par</th>
                 <th style="padding: 8px 4px; text-align: center; border: 1px solid var(--gray-300); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Stock</th>
               </tr>
@@ -12137,16 +12475,16 @@
                   reasoningText = `AI: Par ${item.parLevel} - Stock ${item.currentStock} = ${item.quantity} to order`;
                 }
 
-                // Format last count and last price (matches email format)
+                // Format last count and price trends
                 const lastCountStr = item.lastCountedDate ? `Last count: ${formatRelativeTime(item.lastCountedDate)}` : '';
-                const lastPriceStr = item.currentUnitCost ? `Last price: ${formatPriceWithDate(item.currentUnitCost, item.lastCostUpdate)}` : '';
+                const priceInfo = getPriceInfoForItem(item);
+                const priceTrendHtml = renderPriceTrendHtml(priceInfo);
 
                 return `
                 <tr style="background: ${i % 2 === 0 ? 'var(--gray-100)' : 'white'};">
                   <td style="padding: 8px 6px; border: 1px solid var(--gray-300); font-size: 13px;">
                     <strong>${item.itemName}</strong>
                     ${lastCountStr ? `<div style="font-size: 10px; color: var(--gray-500); margin-top: 3px;">${lastCountStr}</div>` : ''}
-                    ${lastPriceStr ? `<div style="font-size: 10px; color: var(--gray-500); margin-top: 2px;">${lastPriceStr}</div>` : ''}
                     <div style="font-size: 9px; color: var(--gray-400); margin-top: 3px; font-style: italic;">${reasoningText}</div>
                   </td>
                   <td style="padding: 6px 4px; text-align: center; border: 1px solid var(--gray-300);">
@@ -12172,6 +12510,7 @@
                       placeholder="CS"
                     />
                   </td>
+                  <td style="padding: 6px 6px; border: 1px solid var(--gray-300); vertical-align: middle;">${priceTrendHtml}</td>
                   <td style="padding: 6px 4px; text-align: center; border: 1px solid var(--gray-300); font-size: 12px; font-weight: 600;">${item.parLevel}</td>
                   <td style="padding: 6px 4px; text-align: center; border: 1px solid var(--gray-300); font-size: 12px; font-weight: 600;">${item.currentStock}</td>
                 </tr>
@@ -12415,7 +12754,7 @@
     const confirmBtn = document.createElement('button');
     confirmBtn.textContent = 'ADD ITEM';
     confirmBtn.style.cssText = 'flex: 2; padding: 14px; background: var(--gray-600); color: white; border: 2px solid var(--gray-600); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
-    confirmBtn.onclick = () => {
+    confirmBtn.onclick = async () => {
       const quantity = parseFloat(qtyInput.value) || 0;
       if (quantity <= 0) {
         showMessage('Please enter a quantity greater than 0', 'warning');
@@ -12439,7 +12778,8 @@
       document.body.removeChild(overlay);
 
       // Re-render the order card to show the new item
-      renderUpcomingOrders();
+      await ensurePriceSnapshotsForItems([item.id]);
+      await refreshUpcomingOrdersUI();
 
       showMessage(`Added ${item.itemName} (${quantity} ${item.unit})`, 'success');
     };
@@ -12920,6 +13260,9 @@
       renderStockCountList();
       renderPrepCountList();
       calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
+      await refreshUpcomingOrdersUI();
+      await refreshUpcomingOrdersUI();
 
     } catch (error) {
       hideLoading();
@@ -14173,6 +14516,7 @@
 
       // Recalculate orders in background
       calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
 
     } catch (error) {
       console.error('Auto-save failed:', error);
@@ -14488,8 +14832,9 @@
       // Clear pending updates
       orderingSystemState.pendingStockUpdates.clear();
 
-      // Recalculate orders
+      // Recalculate orders and refresh UI
       calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
       renderStockCountList();
 
       hideLoading();
@@ -14522,6 +14867,7 @@
 
       // Recalculate orders
       calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
 
       hideLoading();
       showMessage('✅ Par level updated!', 'success');
@@ -14621,6 +14967,8 @@
         lastCountedDate: null
       });
 
+      refreshPriceHistoryControls();
+
       // Reset form
       document.getElementById('addItemForm').reset();
 
@@ -14628,7 +14976,9 @@
       renderInventoryList();
       renderStockCountList();
       renderPrepCountList();
+      refreshPriceHistoryControls();
       calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
 
       hideLoading();
       showMessage('✅ Item added successfully!', 'success');
@@ -14696,6 +15046,8 @@
         batchLifespan: data[0].batch_lifespan_hours,
         lastCountedDate: null
       });
+
+      refreshPriceHistoryControls();
 
       // Reset form
       document.getElementById('addPrepItemForm').reset();
@@ -15132,6 +15484,7 @@
         renderStockCountList();
         renderPrepCountList();
         calculateUpcomingOrders();
+        await refreshUpcomingOrdersUI();
 
         hideLoading();
         showMessage('✅ Item updated successfully!', 'success');
@@ -15351,6 +15704,310 @@
       renameVendor(vendorName, newName);
       closeVendorManagement();
     }
+  }
+
+  // ============================================
+  // PRICE HISTORY EXPLORER
+  // ============================================
+
+  function initializePriceHistoryTab() {
+    const startInput = document.getElementById('priceHistoryStartDate');
+    const endInput = document.getElementById('priceHistoryEndDate');
+
+    if (startInput && !startInput.value) {
+      const defaultStart = formatPacificDate(addPacificDays(getPacificMidday(), -30));
+      startInput.value = defaultStart;
+    }
+
+    if (endInput && !endInput.value) {
+      endInput.value = getPacificDate();
+    }
+
+    refreshPriceHistoryControls();
+    orderingSystemState.priceHistory.initialized = true;
+  }
+
+  function refreshPriceHistoryControls() {
+    const vendorSelect = document.getElementById('priceHistoryVendor');
+    const itemList = document.getElementById('priceHistoryItemList');
+    if (!vendorSelect || !itemList) return;
+
+    const vendors = Array.from(new Set(orderingSystemState.items.map(item => item.vendor || 'Other'))).sort((a, b) => a.localeCompare(b));
+    const previouslySelectedVendor = vendorSelect.value || 'ALL';
+
+    vendorSelect.innerHTML = '<option value="ALL">All Vendors</option>' + vendors.map(vendor => `<option value="${vendor}">${vendor}</option>`).join('');
+    if ([...vendorSelect.options].some(opt => opt.value === previouslySelectedVendor)) {
+      vendorSelect.value = previouslySelectedVendor;
+    }
+
+    const selectedIds = orderingSystemState.priceHistory.selectedItemIds;
+
+    itemList.innerHTML = '';
+    orderingSystemState.items
+      .slice()
+      .sort((a, b) => a.itemName.localeCompare(b.itemName))
+      .forEach(item => {
+        const row = document.createElement('label');
+        row.className = 'price-history-item';
+        row.dataset.vendor = item.vendor || 'Other';
+        row.dataset.name = item.itemName.toLowerCase();
+        row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--gray-200); font-size: 12px; background: white;';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = item.id;
+        checkbox.checked = selectedIds.has(item.id);
+        checkbox.onchange = () => handlePriceHistoryItemToggle(item.id, checkbox.checked);
+        row.appendChild(checkbox);
+
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = `${item.itemName} (${item.vendor || 'Other'})`;
+        labelSpan.style.cssText = 'flex: 1; margin-left: 8px; color: var(--gray-800);';
+        row.appendChild(labelSpan);
+
+        itemList.appendChild(row);
+      });
+
+    handlePriceHistoryVendorChange();
+    const searchInput = document.getElementById('priceHistoryItemSearch');
+    handlePriceHistorySearch(searchInput ? searchInput.value : '');
+  }
+
+  function handlePriceHistoryItemToggle(itemId, checked) {
+    const selected = orderingSystemState.priceHistory.selectedItemIds;
+    if (checked) {
+      selected.add(itemId);
+    } else {
+      selected.delete(itemId);
+    }
+  }
+
+  function handlePriceHistoryVendorChange() {
+    const vendorSelect = document.getElementById('priceHistoryVendor');
+    const vendor = vendorSelect ? vendorSelect.value : 'ALL';
+    const searchInput = document.getElementById('priceHistoryItemSearch');
+    const query = searchInput ? searchInput.value : '';
+    handlePriceHistorySearch(query, vendor);
+  }
+
+  function handlePriceHistorySearch(value, vendorOverride) {
+    const query = (value || '').trim().toLowerCase();
+    const vendorSelect = document.getElementById('priceHistoryVendor');
+    const vendor = vendorOverride || (vendorSelect ? vendorSelect.value : 'ALL');
+
+    const rows = document.querySelectorAll('#priceHistoryItemList .price-history-item');
+    rows.forEach(row => {
+      const matchesVendor = vendor === 'ALL' || row.dataset.vendor === vendor;
+      const matchesText = !query || row.dataset.name.includes(query);
+      row.style.display = matchesVendor && matchesText ? 'flex' : 'none';
+    });
+  }
+
+  function priceHistorySelectAll() {
+    const rows = document.querySelectorAll('#priceHistoryItemList .price-history-item');
+    rows.forEach(row => {
+      if (row.style.display === 'none') return;
+      const checkbox = row.querySelector('input[type="checkbox"]');
+      if (checkbox && !checkbox.checked) {
+        checkbox.checked = true;
+        handlePriceHistoryItemToggle(Number(checkbox.value), true);
+      }
+    });
+  }
+
+  function priceHistoryClearSelection() {
+    const rows = document.querySelectorAll('#priceHistoryItemList .price-history-item input[type="checkbox"]');
+    rows.forEach(checkbox => {
+      checkbox.checked = false;
+    });
+    orderingSystemState.priceHistory.selectedItemIds.clear();
+  }
+
+  async function loadPriceHistory() {
+    const statusEl = document.getElementById('priceHistoryStatus');
+    const resultsContainer = document.getElementById('priceHistoryResults');
+    if (!resultsContainer) return;
+
+    if (statusEl) statusEl.textContent = 'Loading...';
+    resultsContainer.innerHTML = '<p style="font-size: 12px; color: var(--gray-500);">Fetching price data...</p>';
+
+    const startInput = document.getElementById('priceHistoryStartDate');
+    const endInput = document.getElementById('priceHistoryEndDate');
+    const vendorSelect = document.getElementById('priceHistoryVendor');
+
+    const todayPacific = getPacificMidday();
+    const defaultStart = formatPacificDate(addPacificDays(todayPacific, -30));
+    const defaultEnd = formatPacificDate(todayPacific);
+
+    const startDate = startInput?.value || defaultStart;
+    const endDate = endInput?.value || defaultEnd;
+
+    if (startInput && !startInput.value) startInput.value = startDate;
+    if (endInput && !endInput.value) endInput.value = endDate;
+
+    const vendorFilter = vendorSelect ? vendorSelect.value : 'ALL';
+
+    let itemIds = Array.from(orderingSystemState.priceHistory.selectedItemIds);
+    if (itemIds.length === 0 && vendorFilter !== 'ALL') {
+      itemIds = orderingSystemState.items
+        .filter(item => (item.vendor || 'Other') === vendorFilter)
+        .map(item => item.id);
+    }
+
+    if (itemIds.length === 0) {
+      if (statusEl) statusEl.textContent = 'Select at least one item or choose a vendor.';
+      resultsContainer.innerHTML = '<p style="color: var(--gray-600); font-size: 12px;">Select inventory items to analyze price history.</p>';
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('invoice_items')
+        .select(`
+          inventory_item_id,
+          item_description,
+          unit_price,
+          detected_price,
+          created_at,
+          invoices!inner(
+            invoice_date,
+            vendor_name,
+            vendor
+          )
+        `)
+        .in('inventory_item_id', itemIds)
+        .order('created_at', { ascending: false })
+        .limit(itemIds.length * 200);
+
+      if (error) throw error;
+
+      const startObj = parsePacificDate(startDate);
+      const endObj = parsePacificDate(endDate);
+      const endInclusive = endObj ? addPacificDays(endObj, 1) : null;
+
+      const itemLookup = new Map(orderingSystemState.items.map(item => [item.id, item]));
+
+      const grouped = new Map();
+      (data || []).forEach(row => {
+        const itemId = row.inventory_item_id;
+        if (!itemId) return;
+
+        const priceValue = row.unit_price ?? row.detected_price;
+        if (priceValue === null || priceValue === undefined) return;
+
+        const invoice = row.invoices || {};
+        const invoiceDate = invoice.invoice_date || row.created_at;
+        const invoiceDateObj = parsePacificDate(invoiceDate) || new Date(invoiceDate);
+
+        if (startObj && invoiceDateObj < startObj) return;
+        if (endInclusive && invoiceDateObj >= endInclusive) return;
+
+        const entry = {
+          price: Number(priceValue),
+          invoiceDate,
+          invoiceDateObj,
+          vendor: invoice.vendor_name || invoice.vendor || (itemLookup.get(itemId)?.vendor || 'Unknown'),
+          createdAt: row.created_at
+        };
+
+        if (!grouped.has(itemId)) grouped.set(itemId, []);
+        grouped.get(itemId).push(entry);
+      });
+
+      const results = [];
+      grouped.forEach((entries, itemId) => {
+        entries.sort((a, b) => (b.invoiceDateObj?.getTime() || 0) - (a.invoiceDateObj?.getTime() || 0));
+        const computedEntries = entries.map((entry, index) => {
+          const prev = entries[index + 1] || null;
+          const diff = prev ? entry.price - prev.price : null;
+          const diffPct = diff != null && prev.price !== 0 ? (diff / prev.price) * 100 : null;
+          return {
+            ...entry,
+            diff,
+            diffPct,
+            previousPrice: prev ? prev.price : null,
+            previousDate: prev ? prev.invoiceDate : null
+          };
+        });
+
+        const inventoryItem = itemLookup.get(itemId);
+        results.push({
+          itemId,
+          item: inventoryItem,
+          entries: computedEntries
+        });
+      });
+
+      orderingSystemState.priceHistory.results = results;
+      orderingSystemState.priceHistory.lastFetchParams = { startDate, endDate, vendorFilter, itemIds };
+
+      renderPriceHistoryResults(results);
+
+      if (statusEl) {
+        const totalEntries = results.reduce((sum, group) => sum + group.entries.length, 0);
+        statusEl.textContent = `${totalEntries} price point${totalEntries === 1 ? '' : 's'} across ${results.length} item${results.length === 1 ? '' : 's'}.`;
+      }
+    } catch (error) {
+      console.error('Failed to load price history:', error);
+      if (statusEl) statusEl.textContent = 'Failed to load price history.';
+      resultsContainer.innerHTML = `<p style="color: #c62828; font-size: 12px;">Error: ${error.message}</p>`;
+    }
+  }
+
+  function renderPriceHistoryResults(results) {
+    const container = document.getElementById('priceHistoryResults');
+    if (!container) return;
+
+    if (!results || results.length === 0) {
+      container.innerHTML = '<p style="color: var(--gray-600); font-size: 12px;">No pricing data found for the selected filters.</p>';
+      return;
+    }
+
+    let html = '';
+    results.forEach(group => {
+      const itemName = group.item ? group.item.itemName : `Item #${group.itemId}`;
+      const vendor = group.item ? (group.item.vendor || 'Other') : 'Unknown';
+
+      html += `
+        <div style="border: 2px solid var(--gray-300); margin-bottom: 18px; background: white;">
+          <div style="padding: 12px 16px; background: var(--gray-900); color: white; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">${itemName}</div>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.8);">Vendor: ${vendor}</div>
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+              <tr style="background: #f5f5f5; color: #444; text-transform: uppercase; font-size: 11px;">
+                <th style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: left;">Date</th>
+                <th style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: left;">Vendor</th>
+                <th style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;">Price</th>
+                <th style="padding: 8px; border-bottom: 1px solid #e0e0e0; text-align: right;">Δ vs Prev</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${group.entries.map((entry, idx) => {
+                const rowColor = idx % 2 === 0 ? 'white' : '#fafafa';
+                const arrow = entry.diff > 0 ? '▲' : entry.diff < 0 ? '▼' : '•';
+                const color = entry.diff > 0 ? '#c62828' : entry.diff < 0 ? '#2e7d32' : 'var(--gray-500)';
+                const diffLabel = entry.diff != null ? `${formatCurrency(Math.abs(entry.diff))}${entry.diffPct != null ? ` (${formatPercentage(Math.abs(entry.diffPct))})` : ''}` : '--';
+                const diffHtml = entry.diff != null
+                  ? `<span style="color: ${color}; font-weight: 600;">${arrow} ${diffLabel}</span>`
+                  : '<span style="color: var(--gray-400);">--</span>';
+                return `
+                  <tr style="background: ${rowColor};">
+                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${formatPacificDateDisplay(entry.invoiceDateObj, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${entry.vendor || 'Unknown'}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0; text-align: right; font-weight: 600;">${formatCurrency(entry.price)}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0; text-align: right;">${diffHtml}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
   }
 
   // ============================================
@@ -18211,9 +18868,17 @@
           quantityOrdered: orderedItem.quantity_ordered,
           quantityReceived: receivedItem ? receivedItem.detectedQuantity : 0,
           variance: receivedItem ? (receivedItem.detectedQuantity - orderedItem.quantity_ordered) : -orderedItem.quantity_ordered,
-          hasReceived: !!receivedItem
+          hasReceived: !!receivedItem,
+          invoicePrice: receivedItem && receivedItem.detectedPrice != null ? Number(receivedItem.detectedPrice) : null
         };
       });
+
+      const reconciliationItemIds = reconciliationData
+        .map(item => item.inventoryItemId)
+        .filter(id => id !== null && id !== undefined);
+      if (reconciliationItemIds.length) {
+        await ensurePriceSnapshotsForItems(reconciliationItemIds);
+      }
 
       // Create modal
       const overlay = document.createElement('div');
@@ -18267,9 +18932,9 @@
 
       // Table header
       const headerRow = document.createElement('div');
-      headerRow.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 10px; background: var(--gray-100); border-bottom: 2px solid var(--gray-300); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-700);';
+      headerRow.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1.6fr; gap: 8px; padding: 10px; background: var(--gray-100); border-bottom: 2px solid var(--gray-300); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-700);';
 
-      ['ITEM', 'ORDERED', 'RECEIVED', 'VARIANCE'].forEach(label => {
+      ['ITEM', 'ORDERED', 'RECEIVED', 'VARIANCE', 'PRICE'].forEach(label => {
         const cell = document.createElement('div');
         cell.textContent = label;
         cell.style.textAlign = label === 'ITEM' ? 'left' : 'center';
@@ -18280,7 +18945,7 @@
       // Table rows
       reconciliationData.forEach((item, index) => {
         const row = document.createElement('div');
-        row.style.cssText = `display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 12px 10px; background: ${index % 2 === 0 ? 'white' : '#f9fafb'}; border-bottom: 1px solid var(--gray-200); align-items: center;`;
+        row.style.cssText = `display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1.6fr; gap: 8px; padding: 12px 10px; background: ${index % 2 === 0 ? 'white' : '#f9fafb'}; border-bottom: 1px solid var(--gray-200); align-items: center;`;
 
         // Item name
         const nameCell = document.createElement('div');
@@ -18339,6 +19004,11 @@
           varianceCell.style.color = 'var(--gray-600)'; // Gray - exact
         }
         row.appendChild(varianceCell);
+
+        const priceCell = document.createElement('div');
+        priceCell.style.cssText = 'text-align: center; font-size: 11px;';
+        priceCell.innerHTML = item.inventoryItemId ? renderIncomingPriceHtml(item.inventoryItemId, item.invoicePrice, orderData.expected_delivery_date) : '<span style="color: var(--gray-500); font-size: 11px;">N/A</span>';
+        row.appendChild(priceCell);
 
         table.appendChild(row);
       });
@@ -18453,6 +19123,16 @@
 
       if (invoiceError) throw invoiceError;
 
+      const reconciledItemIds = reconciliationData
+        .map(item => item.inventoryItemId)
+        .filter(id => id !== null && id !== undefined);
+
+      const priceCache = getPriceCache();
+      reconciledItemIds.forEach(id => priceCache.delete(id));
+      if (reconciledItemIds.length) {
+        await ensurePriceSnapshotsForItems(reconciledItemIds);
+      }
+
       hideLoading();
 
       // Close modal
@@ -18472,6 +19152,8 @@
 
       // Reload inventory
       await loadInventoryData();
+      calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
 
       showMessage(`✅ Order reconciled! Status: ${newStatus.toUpperCase()}`, 'success');
 
