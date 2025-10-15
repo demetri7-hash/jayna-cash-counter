@@ -2139,13 +2139,133 @@
     });
   }
   
-  function getPacificDate() {
-    const now = new Date();
-    const pacific = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
-    const year = pacific.getFullYear();
-    const month = String(pacific.getMonth() + 1).padStart(2, '0');
-    const day = String(pacific.getDate()).padStart(2, '0');
+  const PACIFIC_TIMEZONE = 'America/Los_Angeles';
+
+  /**
+   * Determine the offset (in minutes) for Pacific time at a specific moment.
+   * We rely on Intl to hand us either PDT/PST or a GMT offset string.
+   */
+  function getPacificOffsetMinutes(date) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      timeZoneName: 'short'
+    }).formatToParts(date);
+
+    const tzName = parts.find(part => part.type === 'timeZoneName')?.value || 'PST';
+
+    if (tzName.includes('PDT')) return 420; // UTC-7
+    if (tzName.includes('PST')) return 480; // UTC-8
+
+    const gmtMatch = tzName.match(/GMT([+-]\d{2})(\d{2})?/i);
+    if (gmtMatch) {
+      const hours = parseInt(gmtMatch[1], 10);
+      const minutes = gmtMatch[2] ? parseInt(gmtMatch[2], 10) : 0;
+      return Math.abs(hours) * 60 + minutes;
+    }
+
+    // Default to standard time if we hit an unexpected string.
+    return 480;
+  }
+
+  /**
+   * Create a Date that represents a Pacific-local wall clock time by
+   * translating the supplied components into the correct UTC instant.
+   * We default to 12:00 (noon) to avoid DST edge cases right at midnight.
+   */
+  function createPacificDate(year, month, day, hour = 12, minute = 0, second = 0) {
+    const utcMillis = Date.UTC(year, month - 1, day, hour, minute, second);
+    const tempUtcDate = new Date(utcMillis);
+    const offsetMinutes = getPacificOffsetMinutes(tempUtcDate);
+    return new Date(utcMillis + offsetMinutes * 60000);
+  }
+
+  /**
+   * Convert any JS Date into a Pacific-local date (defaulting to midday).
+   */
+  function getPacificMidday(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+
+    const year = Number(parts.find(part => part.type === 'year')?.value);
+    const month = Number(parts.find(part => part.type === 'month')?.value);
+    const day = Number(parts.find(part => part.type === 'day')?.value);
+
+    return createPacificDate(year, month, day, 12, 0, 0);
+  }
+
+  /**
+   * Parse a YYYY-MM-DD string into a Pacific-local Date (midday).
+   */
+  function parsePacificDate(dateString) {
+    if (!dateString) return null;
+    const [year, month, day] = dateString.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return createPacificDate(year, month, day, 12, 0, 0);
+  }
+
+  /**
+   * Format a Date as YYYY-MM-DD in Pacific time.
+   */
+  function formatPacificDate(date) {
+    if (!date) return '';
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+
+    const year = parts.find(part => part.type === 'year')?.value;
+    const month = parts.find(part => part.type === 'month')?.value;
+    const day = parts.find(part => part.type === 'day')?.value;
+
     return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Format helper for display strings while forcing Pacific timezone.
+   */
+  function formatPacificDateDisplay(date, options = {}) {
+    if (!date) return '';
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      ...options
+    }).format(date);
+  }
+
+  function formatPacificWeekday(date) {
+    return formatPacificDateDisplay(date, { weekday: 'long' });
+  }
+
+  function getPacificHour(date) {
+    if (!date) return null;
+    const hourString = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      hour: '2-digit',
+      hour12: false
+    }).format(date);
+    return Number(hourString);
+  }
+
+  /**
+   * Add days to a Pacific Date and return the normalized Pacific midday Date.
+   */
+  function addPacificDays(date, days) {
+    if (!date) return null;
+    const pacificMidday = getPacificMidday(date);
+    const nextUtc = new Date(pacificMidday.getTime() + days * 86400000);
+    return getPacificMidday(nextUtc);
+  }
+
+  /**
+   * Return the current Pacific date as YYYY-MM-DD (optionally pass a Date).
+   */
+  function getPacificDate(date = new Date()) {
+    return formatPacificDate(date);
   }
   
   function showMessage(text, type) {
@@ -2874,7 +2994,7 @@
       counter: counterName,
       total: total,
       denominations: denominations,
-      date: new Date().toISOString().split('T')[0]
+      date: getPacificDate()
     };
   }
 
@@ -2958,7 +3078,7 @@
       const { data, error } = await supabase
         .from('cashbox_counts')
         .insert([{
-          date: new Date().toISOString().split('T')[0],
+          date: getPacificDate(),
           counter: counterName,
           denominations: denominations,
           total: total,
@@ -2992,7 +3112,7 @@
       const { data, error } = await supabase
         .from('cashbox_counts')
         .insert([{
-          date: new Date().toISOString().split('T')[0],
+          date: getPacificDate(),
           counter: counterName,
           denominations: { manual_entry: true }, // Mark as manual entry from report
           total: total,
@@ -10371,10 +10491,15 @@
         vendor.style.cssText = 'color: var(--gray-900); margin: 0 0 4px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;';
         leftSide.appendChild(vendor);
 
-        const orderDate = document.createElement('div');
-        orderDate.textContent = `Ordered: ${new Date(order.order_date).toLocaleDateString()}`;
-        orderDate.style.cssText = 'color: var(--gray-600); font-size: 11px;';
-        leftSide.appendChild(orderDate);
+        const orderDateElement = document.createElement('div');
+        const orderDatePacific = parsePacificDate(order.order_date);
+        orderDateElement.textContent = `Ordered: ${
+          orderDatePacific
+            ? formatPacificDateDisplay(orderDatePacific, { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'Unknown'
+        }`;
+        orderDateElement.style.cssText = 'color: var(--gray-600); font-size: 11px;';
+        leftSide.appendChild(orderDateElement);
 
         header.appendChild(leftSide);
 
@@ -10382,15 +10507,36 @@
         rightSide.style.textAlign = 'right';
 
         const deliveryDate = document.createElement('div');
-        const daysUntil = Math.ceil((new Date(order.expected_delivery_date) - new Date(today)) / (1000 * 60 * 60 * 24));
-        let dateText = `Expected: ${new Date(order.expected_delivery_date).toLocaleDateString()}`;
-        if (daysUntil === 0) dateText += ' (TODAY)';
-        else if (daysUntil < 0) dateText += ` (${Math.abs(daysUntil)} days overdue)`;
-        else if (daysUntil === 1) dateText += ' (Tomorrow)';
-        else if (daysUntil <= 7) dateText += ` (in ${daysUntil} days)`;
+        const expectedDatePacific = parsePacificDate(order.expected_delivery_date);
+        const todayPacific = parsePacificDate(today);
+        const dayDifference = (expectedDatePacific && todayPacific)
+          ? Math.round((expectedDatePacific.getTime() - todayPacific.getTime()) / 86400000)
+          : null;
+
+        let dateText = 'Expected: ';
+        dateText += expectedDatePacific
+          ? formatPacificDateDisplay(expectedDatePacific, { month: 'short', day: 'numeric', year: 'numeric' })
+          : 'Unknown';
+
+        if (dayDifference === 0) dateText += ' (TODAY)';
+        else if (dayDifference === 1) dateText += ' (Tomorrow)';
+        else if (typeof dayDifference === 'number') {
+          if (dayDifference < 0) {
+            const overdueDays = Math.abs(dayDifference);
+            dateText += ` (${overdueDays} day${overdueDays === 1 ? '' : 's'} overdue)`;
+          } else if (dayDifference <= 7) {
+            dateText += ` (in ${dayDifference} days)`;
+          }
+        }
+
+        const deliveryStyle = dayDifference === 0
+          ? 'color: #f59e0b; font-size: 11px; font-weight: 700;'
+          : (typeof dayDifference === 'number' && dayDifference < 0
+            ? 'color: #ef4444; font-size: 11px; font-weight: 700;'
+            : 'color: var(--gray-600); font-size: 11px;');
 
         deliveryDate.textContent = dateText;
-        deliveryDate.style.cssText = daysUntil === 0 ? 'color: #f59e0b; font-size: 11px; font-weight: 700;' : (daysUntil < 0 ? 'color: #ef4444; font-size: 11px; font-weight: 700;' : 'color: var(--gray-600); font-size: 11px;');
+        deliveryDate.style.cssText = deliveryStyle;
         rightSide.appendChild(deliveryDate);
 
         const itemCount = document.createElement('div');
@@ -10634,19 +10780,14 @@
     summary.style.cssText = 'background: white; border: 2px solid var(--gray-300); padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;';
 
     const totalOrders = orders.length;
+    const todayPacific = getPacificMidday();
     const overdueCount = orders.filter(o => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const deliveryDate = new Date(o.expected_delivery_date);
-      deliveryDate.setHours(0, 0, 0, 0);
-      return deliveryDate < today;
+      const deliveryDatePacific = parsePacificDate(o.expected_delivery_date);
+      return deliveryDatePacific && deliveryDatePacific < todayPacific;
     }).length;
     const todayCount = orders.filter(o => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const deliveryDate = new Date(o.expected_delivery_date);
-      deliveryDate.setHours(0, 0, 0, 0);
-      return deliveryDate.getTime() === today.getTime();
+      const deliveryDatePacific = parsePacificDate(o.expected_delivery_date);
+      return deliveryDatePacific && deliveryDatePacific.getTime() === todayPacific.getTime();
     }).length;
 
     summary.innerHTML = `
@@ -10707,24 +10848,27 @@
       row.onmouseover = () => row.style.background = '#f9fafb';
       row.onmouseout = () => row.style.background = 'white';
 
-      const formattedOrderDate = new Date(order.order_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      const formattedDeliveryDate = new Date(order.expected_delivery_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const orderDatePacific = parsePacificDate(order.order_date);
+      const deliveryDatePacific = parsePacificDate(order.expected_delivery_date);
+      const formattedOrderDate = orderDatePacific
+        ? formatPacificDateDisplay(orderDatePacific, { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'Unknown';
+      const formattedDeliveryDate = deliveryDatePacific
+        ? formatPacificDateDisplay(deliveryDatePacific, { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'Unknown';
 
-      // Determine if delivery date is in the past, today, or future
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const deliveryDate = new Date(order.expected_delivery_date);
-      deliveryDate.setHours(0, 0, 0, 0);
+      // Determine if delivery date is in the past, today, or future (Pacific time)
+      const todayPacific = getPacificMidday();
 
       let deliveryDateColor = 'var(--gray-900)';
       let deliveryDateBg = 'transparent';
-      if (deliveryDate < today) {
+      if (deliveryDatePacific && deliveryDatePacific < todayPacific) {
         deliveryDateColor = '#991b1b'; // Dark red text
         deliveryDateBg = '#fee2e2'; // Light red background
-      } else if (deliveryDate.getTime() === today.getTime()) {
+      } else if (deliveryDatePacific && deliveryDatePacific.getTime() === todayPacific.getTime()) {
         deliveryDateColor = '#92400e'; // Dark orange text
         deliveryDateBg = '#fef3c7'; // Light orange background
-      } else {
+      } else if (deliveryDatePacific) {
         deliveryDateColor = '#065f46'; // Dark green text
         deliveryDateBg = '#d1fae5'; // Light green background
       }
@@ -11166,7 +11310,12 @@
       orderInfo.style.cssText = 'display: flex; gap: 20px; flex-wrap: wrap;';
 
       const date = document.createElement('div');
-      date.innerHTML = `<strong>Expected:</strong> ${orderData.expected_delivery_date}`;
+      const expectedDatePacific = parsePacificDate(orderData.expected_delivery_date);
+      date.innerHTML = `<strong>Expected:</strong> ${
+        expectedDatePacific
+          ? formatPacificDateDisplay(expectedDatePacific, { month: 'short', day: 'numeric', year: 'numeric', weekday: 'long' })
+          : 'Unknown'
+      }`;
       date.style.cssText = 'font-size: 12px; color: #78350f;';
       orderInfo.appendChild(date);
 
@@ -11624,14 +11773,13 @@
    */
   function calculateUpcomingOrders() {
     console.log('calculateUpcomingOrders() called');
-    const now = new Date();
+    const now = getPacificMidday();
     const orders = [];
 
     // Check next 7 days
     for (let i = 0; i < 7; i++) {
-      const checkDate = new Date(now);
-      checkDate.setDate(checkDate.getDate() + i);
-      const dayName = checkDate.toLocaleDateString('en-US', { weekday: 'long' });
+      const checkDate = addPacificDays(now, i);
+      const dayName = formatPacificWeekday(checkDate);
 
       // Greenleaf - Daily orders (except Saturday)
       if (dayName !== 'Saturday') {
@@ -11701,8 +11849,7 @@
 
     if (items.length === 0) return null;
 
-    const deliveryDate = new Date(orderDate);
-    deliveryDate.setDate(deliveryDate.getDate() + 1);
+    const deliveryDate = addPacificDays(orderDate, 1);
 
     return {
       vendor: 'Greenleaf',
@@ -11735,8 +11882,7 @@
 
     if (items.length === 0) return null;
 
-    const deliveryDate = new Date(orderDate);
-    deliveryDate.setDate(deliveryDate.getDate() + 1);
+    const deliveryDate = addPacificDays(orderDate, 1);
 
     return {
       vendor: 'Performance',
@@ -11772,8 +11918,7 @@
 
     if (items.length === 0) return null;
 
-    const deliveryDate = new Date(orderDate);
-    deliveryDate.setDate(deliveryDate.getDate() + 1);
+    const deliveryDate = addPacificDays(orderDate, 1);
 
     return {
       vendor: 'Mani Imports',
@@ -11806,8 +11951,7 @@
 
     if (items.length === 0) return null;
 
-    const deliveryDate = new Date(orderDate);
-    deliveryDate.setDate(deliveryDate.getDate() + 1); // Thursday delivery
+    const deliveryDate = addPacificDays(orderDate, 1); // Thursday delivery
 
     return {
       vendor: 'Eatopia Foods',
@@ -11849,8 +11993,8 @@
       // Less than 7 days: show days only
       return `${diffDays}d ago`;
     } else {
-      // Older than 7 days: show date
-      return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+      // Older than 7 days: show Pacific date
+      return formatPacificDateDisplay(date, { month: 'numeric', day: 'numeric', year: '2-digit' });
     }
   }
 
@@ -11865,8 +12009,10 @@
 
     if (!dateStr) return formattedPrice;
 
-    const date = new Date(dateStr);
-    const formattedDate = date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+    const pacificDate = parsePacificDate(dateStr) || new Date(dateStr);
+    const formattedDate = pacificDate
+      ? formatPacificDateDisplay(pacificDate, { month: 'numeric', day: 'numeric', year: '2-digit' })
+      : '';
 
     return `${formattedPrice} (${formattedDate})`;
   }
@@ -11898,15 +12044,25 @@
 
     html += `
       <div style="font-size: 12px; color: #666; margin-bottom: 20px;">
-        Last updated: ${orderingSystemState.lastUpdated ? orderingSystemState.lastUpdated.toLocaleString() : 'Never'}
+        Last updated: ${
+          orderingSystemState.lastUpdated
+            ? formatPacificDateDisplay(orderingSystemState.lastUpdated, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })
+            : 'Never'
+        }
       </div>
     `;
 
     orderingSystemState.calculatedOrders.forEach((order, index) => {
-      const orderDateStr = order.orderDate.toLocaleDateString('en-US', {
+      const orderDateStr = formatPacificDateDisplay(order.orderDate, {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
       });
-      const deliveryDateStr = order.deliveryDate.toLocaleDateString('en-US', {
+      const deliveryDateStr = formatPacificDateDisplay(order.deliveryDate, {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
       });
 
@@ -11961,8 +12117,8 @@
             <tbody>
               ${order.items.map((item, i) => {
                 // Calculate reasoning text (matches email format)
-                const isFriday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Friday';
-                const isThursday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Thursday';
+                const isFriday = formatPacificWeekday(order.orderDate) === 'Friday';
+                const isThursday = formatPacificWeekday(order.orderDate) === 'Thursday';
                 let reasoningText = '';
 
                 if (order.vendor === 'Greenleaf' && isFriday) {
@@ -12348,7 +12504,12 @@
       detailsBox.appendChild(orderDateLabel);
 
       const orderDateValue = document.createElement('div');
-      orderDateValue.textContent = order.orderDate.toLocaleDateString();
+      orderDateValue.textContent = formatPacificDateDisplay(order.orderDate, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+      });
       orderDateValue.style.cssText = 'font-size: 14px; color: var(--gray-900); margin-bottom: 12px;';
       detailsBox.appendChild(orderDateValue);
 
@@ -12373,7 +12534,7 @@
       const dateInput = document.createElement('input');
       dateInput.type = 'date';
       dateInput.id = 'createOrderDeliveryDate';
-      dateInput.value = order.deliveryDate.toISOString().split('T')[0];
+      dateInput.value = formatPacificDate(order.deliveryDate);
       dateInput.min = getPacificDate(); // Pacific Time, not UTC
       dateInput.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; margin-bottom: 20px;';
       content.appendChild(dateInput);
@@ -12411,7 +12572,7 @@
       confirmBtn.style.cssText = 'flex: 2; padding: 14px; background: #212121; color: white; border: 2px solid #212121; border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
       confirmBtn.onclick = async () => {
         // Update order object with modal inputs BEFORE saving and generating PDF
-        order.deliveryDate = new Date(dateInput.value);
+      order.deliveryDate = parsePacificDate(dateInput.value);
         order.notes = notesInput.value;
 
         const success = await saveAIPendingOrder(order, dateInput.value, notesInput.value, overlay);
@@ -12440,6 +12601,15 @@
       return false;
     }
 
+    // Normalize delivery date to Pacific YYYY-MM-DD for Supabase storage.
+    const deliveryDatePacific = parsePacificDate(deliveryDate);
+    if (!deliveryDatePacific) {
+      showMessage('Delivery date is invalid', 'error');
+      return false;
+    }
+    const deliveryDateStr = formatPacificDate(deliveryDatePacific);
+    order.deliveryDate = deliveryDatePacific;
+
     showLoading('Creating Order', 'Saving order for receiving...');
 
     try {
@@ -12448,8 +12618,8 @@
         .from('pending_orders')
         .insert({
           vendor: order.vendor,
-          order_date: order.orderDate.toISOString().split('T')[0],
-          expected_delivery_date: deliveryDate,
+          order_date: formatPacificDate(order.orderDate),
+          expected_delivery_date: deliveryDateStr,
           status: 'pending',
           created_by: 'System (AI Suggestion)',
           notes: notes || `Cutoff: ${order.cutoffTime}`,
@@ -13742,16 +13912,17 @@
    */
   function getAutomaticCountSession() {
     const now = new Date();
-    const hour = now.getHours();
+    const hour = getPacificHour(now);
+    const effectiveHour = (hour === null || Number.isNaN(hour)) ? now.getHours() : hour;
 
-    if (hour < 15) { // Before 3pm
+    if (effectiveHour < 15) { // Before 3pm Pacific
       return {
         value: 'morning_prep',
         name: 'Morning Prep',
         icon: '🌅',
         time: '7:00 AM - 3:00 PM'
       };
-    } else if (hour < 20) { // 3pm-8pm
+    } else if (effectiveHour < 20) { // 3pm-8pm Pacific
       return {
         value: 'afternoon_prep',
         name: 'Afternoon Prep',
@@ -13786,7 +13957,7 @@
     await fetchAndDisplaySessionStats(session.value);
 
     // Update session record in database
-    const today = new Date().toISOString().split('T')[0];
+    const today = getPacificDate();
     try {
       await supabase
         .from('prep_count_sessions')
@@ -13807,7 +13978,7 @@
    * Fetch and display completion stats for previous count sessions
    */
   async function fetchAndDisplaySessionStats(currentSession) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getPacificDate();
     const statsContainer = document.getElementById('sessionCompletionStats');
 
     try {
@@ -13823,25 +13994,25 @@
       const morningCount = prepItems.filter(item => {
         if (!item.last_counted_date) return false;
         const lastCounted = new Date(item.last_counted_date);
-        const isToday = lastCounted.toISOString().split('T')[0] === today;
-        const hour = lastCounted.getHours();
-        return isToday && hour < 15; // Before 3pm
+        const isToday = formatPacificDate(lastCounted) === today;
+        const hour = getPacificHour(lastCounted);
+        return isToday && hour !== null && hour < 15; // Before 3pm Pacific
       }).length;
 
       const afternoonCount = prepItems.filter(item => {
         if (!item.last_counted_date) return false;
         const lastCounted = new Date(item.last_counted_date);
-        const isToday = lastCounted.toISOString().split('T')[0] === today;
-        const hour = lastCounted.getHours();
-        return isToday && hour >= 15 && hour < 20; // 3pm-8pm
+        const isToday = formatPacificDate(lastCounted) === today;
+        const hour = getPacificHour(lastCounted);
+        return isToday && hour !== null && hour >= 15 && hour < 20; // 3pm-8pm Pacific
       }).length;
 
       const closingCount = prepItems.filter(item => {
         if (!item.last_counted_date) return false;
         const lastCounted = new Date(item.last_counted_date);
-        const isToday = lastCounted.toISOString().split('T')[0] === today;
-        const hour = lastCounted.getHours();
-        return isToday && hour >= 20; // After 8pm
+        const isToday = formatPacificDate(lastCounted) === today;
+        const hour = getPacificHour(lastCounted);
+        return isToday && hour !== null && hour >= 20; // After 8pm Pacific
       }).length;
 
       // Build status message based on current session
@@ -13942,7 +14113,7 @@
       if (item && item.itemType === 'prep') {
         const currentSession = orderingSystemState.currentCountSession;
         const previousData = orderingSystemState.previousCounts.get(itemId);
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const today = getPacificDate(); // YYYY-MM-DD in Pacific time
 
         // If we have a previous count from a different session, calculate consumption
         if (previousData && previousData.session !== currentSession) {
@@ -15203,8 +15374,10 @@
     }
 
     // Fetch consumption data for all prep items
-    const today = new Date().toISOString().split('T')[0];
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const todayPacificDate = getPacificMidday();
+    const today = formatPacificDate(todayPacificDate);
+    const sevenDaysAgoDate = addPacificDays(todayPacificDate, -7);
+    const sevenDaysAgo = formatPacificDate(sevenDaysAgoDate);
 
     try {
       const { data: consumptionData, error } = await supabase
@@ -15593,15 +15766,13 @@
       const black = [33, 33, 33]; // #212121
       const lightGray = [245, 245, 245]; // #f5f5f5
 
-      // Date logic: If after 8pm, use next day's date
+      // Date logic: If after 8pm Pacific, use next day's date
       const now = new Date();
-      const currentHour = now.getHours();
-      const prepDate = new Date(now);
-      if (currentHour >= 20) { // 8pm or later
-        prepDate.setDate(prepDate.getDate() + 1);
-      }
-      const dateStr = prepDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const currentHour = getPacificHour(now);
+      const baseDate = getPacificMidday(now);
+      const prepDate = currentHour !== null && currentHour >= 20 ? addPacificDays(baseDate, 1) : baseDate;
+      const dateStr = formatPacificDateDisplay(prepDate, { month: '2-digit', day: '2-digit', year: 'numeric' });
+      const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit' });
 
       // Header
       doc.setFontSize(14);
@@ -15738,15 +15909,13 @@
       const black = [33, 33, 33];
       const lightGray = [245, 245, 245];
 
-      // Date logic: If after 8pm, use next day's date
+      // Date logic: If after 8pm Pacific, use next day's date
       const now = new Date();
-      const currentHour = now.getHours();
-      const prepDate = new Date(now);
-      if (currentHour >= 20) {
-        prepDate.setDate(prepDate.getDate() + 1);
-      }
-      const dateStr = prepDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const currentHour = getPacificHour(now);
+      const baseDate = getPacificMidday(now);
+      const prepDate = currentHour !== null && currentHour >= 20 ? addPacificDays(baseDate, 1) : baseDate;
+      const dateStr = formatPacificDateDisplay(prepDate, { month: '2-digit', day: '2-digit', year: 'numeric' });
+      const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit' });
 
       // Header
       doc.setFontSize(14);
@@ -17879,7 +18048,7 @@
         .from('pending_orders')
         .insert({
           vendor: vendor,
-          order_date: new Date().toISOString().split('T')[0],
+          order_date: getPacificDate(),
           expected_delivery_date: deliveryDate,
           status: 'pending',
           created_by: 'System',
@@ -17917,7 +18086,7 @@
       const { data: invoiceData, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
-          invoice_date: new Date().toISOString().split('T')[0],
+          invoice_date: getPacificDate(),
           vendor_name: vendor,
           invoice_type: 'order', // Added by migration
           entered_by: 'System',
@@ -18071,7 +18240,12 @@
       header.appendChild(title);
 
       const subtitle = document.createElement('p');
-      subtitle.textContent = `Expected: ${new Date(orderData.expected_delivery_date).toLocaleDateString()} | ${reconciliationData.length} item(s)`;
+      const expectedReconciliationDate = parsePacificDate(orderData.expected_delivery_date);
+      subtitle.textContent = `Expected: ${
+        expectedReconciliationDate
+          ? formatPacificDateDisplay(expectedReconciliationDate, { month: 'short', day: 'numeric', year: 'numeric', weekday: 'long' })
+          : 'Unknown'
+      } | ${reconciliationData.length} item(s)`;
       subtitle.style.cssText = 'margin: 0; font-size: 11px; color: #b0b0b0;';
       header.appendChild(subtitle);
 
@@ -18236,7 +18410,7 @@
             .from('inventory_items')
             .update({
               current_stock: newStock,
-              last_counted_date: new Date().toISOString().split('T')[0]
+              last_counted_date: getPacificDate()
             })
             .eq('id', item.inventoryItemId);
 
@@ -18267,7 +18441,7 @@
         .from('invoices')
         .insert({
           vendor: orderData.vendor,
-          invoice_date: new Date().toISOString().split('T')[0],
+          invoice_date: getPacificDate(),
           invoice_type: 'invoice',
           pending_order_id: pendingOrderId,
           total_items: reconciliationData.filter(i => i.quantityReceived > 0).length,
@@ -18357,7 +18531,7 @@
       const { data: invoiceData, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
-          invoice_date: new Date().toISOString().split('T')[0],
+          invoice_date: getPacificDate(),
           vendor: 'MIXED', // Could be enhanced to detect vendor from items
           invoice_type: orderingSystemState.invoiceType || 'invoice',
           total_items: matchedItems.length,
@@ -18749,8 +18923,8 @@
     `);
 
     // Order details
-    const orderDateStr = order.orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const deliveryDateStr = order.deliveryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const orderDateStr = formatPacificDateDisplay(order.orderDate, { month: 'short', day: 'numeric', year: 'numeric' });
+    const deliveryDateStr = formatPacificDateDisplay(order.deliveryDate, { month: 'short', day: 'numeric', year: 'numeric' });
 
     printWindow.document.write(`
       <div class="order-details">
@@ -18769,8 +18943,8 @@
     // Table
     printWindow.document.write('<table><thead><tr><th>Item</th><th style="text-align:center;">Qty</th><th style="text-align:center;">Unit</th><th style="text-align:center;">Par</th><th style="text-align:center;">Current</th></tr></thead><tbody>');
 
-    const isFriday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Friday';
-    const isThursday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Thursday';
+    const isFriday = formatPacificWeekday(order.orderDate) === 'Friday';
+    const isThursday = formatPacificWeekday(order.orderDate) === 'Thursday';
 
     order.items.forEach(item => {
       let reasoningText = '';
@@ -18848,8 +19022,8 @@
       doc.line(20, 25, 190, 25);
 
       // Order details in compact grid
-      const orderDateStr = order.orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      const deliveryDateStr = order.deliveryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const orderDateStr = formatPacificDateDisplay(order.orderDate, { month: 'short', day: 'numeric', year: 'numeric' });
+      const deliveryDateStr = formatPacificDateDisplay(order.deliveryDate, { month: 'short', day: 'numeric', year: 'numeric' });
 
       doc.setFillColor(245, 245, 245);
       doc.rect(20, 28, 170, 16, 'F');
@@ -18887,8 +19061,8 @@
       }
 
       // Table with compact styling
-      const isFriday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Friday';
-      const isThursday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Thursday';
+      const isFriday = formatPacificWeekday(order.orderDate) === 'Friday';
+      const isThursday = formatPacificWeekday(order.orderDate) === 'Thursday';
 
       const tableData = order.items.map(item => {
         let reasoningText = '';
@@ -19006,7 +19180,7 @@
         doc.text(`Page ${i} of ${pageCount}`, 190, 287, { align: 'right' });
       }
 
-      doc.save(`${order.vendor}_Order_${order.orderDate.toISOString().split('T')[0]}.pdf`);
+      doc.save(`${order.vendor}_Order_${formatPacificDate(order.orderDate)}.pdf`);
 
       hideLoading();
       showMessage('✅ PDF generated successfully!', 'success');
@@ -19024,7 +19198,7 @@
     const order = orderingSystemState.calculatedOrders[orderIndex];
     if (!order) return;
 
-    const storageKey = `orderEdits_${order.vendor}_${order.orderDate.toISOString().split('T')[0]}`;
+    const storageKey = `orderEdits_${order.vendor}_${formatPacificDate(order.orderDate)}`;
     const edits = {};
 
     order.items.forEach(item => {
@@ -19041,7 +19215,7 @@
    * Load order edits from localStorage
    */
   function loadOrderEditsFromStorage(order) {
-    const storageKey = `orderEdits_${order.vendor}_${order.orderDate.toISOString().split('T')[0]}`;
+    const storageKey = `orderEdits_${order.vendor}_${formatPacificDate(order.orderDate)}`;
     const saved = localStorage.getItem(storageKey);
 
     if (saved) {
@@ -19155,7 +19329,7 @@
         // Order details
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Order Date: ${order.orderDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 20, 35);
+        doc.text(`Order Date: ${formatPacificDateDisplay(order.orderDate, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 20, 35);
         doc.text(`Cutoff Time: ${order.cutoffTime}`, 20, 42);
         doc.text(`Delivery Date: ${order.deliveryDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 20, 49);
 
@@ -19165,8 +19339,8 @@
         }
 
         // Table with AI reasoning
-        const isFriday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Friday';
-        const isThursday = order.orderDate.toLocaleDateString('en-US', { weekday: 'long' }) === 'Thursday';
+        const isFriday = formatPacificWeekday(order.orderDate) === 'Friday';
+        const isThursday = formatPacificWeekday(order.orderDate) === 'Thursday';
 
         const tableData = order.items.map(item => {
           // Calculate reasoning text (matches email format)
@@ -19272,7 +19446,7 @@
         doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: 'right' });
       }
 
-      const filename = `Jayna_All_Orders_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `Jayna_All_Orders_${getPacificDate()}.pdf`;
       doc.save(filename);
 
       hideLoading();
