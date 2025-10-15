@@ -2022,9 +2022,9 @@
     MANAGER_EMAIL: 'smanager@jaynagyro.com, GSS4168CTJJA73@PRINT.EPSONCONNECT.COM'
   };
   const BOTTLED_SAUCE_ITEMS = [
-    { label: 'Spicy Aioli Bottled', aliases: ['spicy aioli bottled'] },
-    { label: 'Tzatiki Bottled', aliases: ['tzatiki bottled', 'tzatziki bottled'] },
-    { label: 'Lemon Vinaigrette Bottled', aliases: ['lemon vinaigrette bottled'] }
+    { label: 'Spicy Aioli Bottled', aliases: ['spicy aioli bottled', 'spicy aioli - bottled'] },
+    { label: 'Tzatziki Bottled', aliases: ['tzatziki bottled', 'tzatziki - bottled'] },
+    { label: 'Lemon Vinaigrette Bottled', aliases: ['lemon vinaigrette bottled', 'lemon vinaigrette - bottled'] }
   ];
 
   // Elegant Loading and Success Functions
@@ -16813,18 +16813,25 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   function buildBottledSauceSummary(recommendations = []) {
-    return BOTTLED_SAUCE_ITEMS.map((config) => {
+    const summary = [];
+
+    BOTTLED_SAUCE_ITEMS.forEach((config) => {
       const match = recommendations.find((item) => {
         const name = (item.itemName || '').trim().toLowerCase();
-        return config.aliases.some(alias => alias === name);
+        return config.aliases.some(alias => name.includes(alias));
       });
-      const quantitySource = match && match.currentStock != null ? match.currentStock : match?.recommendedAmount;
-      return {
+
+      if (!match) return;
+
+      const quantitySource = match.currentStock != null ? match.currentStock : match.recommendedAmount;
+      summary.push({
         label: config.label,
         quantity: formatPrepQuantity(quantitySource),
-        lastCounted: formatLastCountedDetail(match?.lastCountedDate)
-      };
+        lastCounted: formatLastCountedDetail(match.lastCountedDate)
+      });
     });
+
+    return summary;
   }
 
   function formatPrepQuantity(value) {
