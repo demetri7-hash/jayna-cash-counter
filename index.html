@@ -2021,6 +2021,11 @@
     TEMPLATE_ID: 'template_cash_report',
     MANAGER_EMAIL: 'smanager@jaynagyro.com, GSS4168CTJJA73@PRINT.EPSONCONNECT.COM'
   };
+  const BOTTLED_SAUCE_ITEMS = [
+    { label: 'Spicy Aioli Bottled', aliases: ['spicy aioli bottled'] },
+    { label: 'Tzatiki Bottled', aliases: ['tzatiki bottled', 'tzatziki bottled'] },
+    { label: 'Lemon Vinaigrette Bottled', aliases: ['lemon vinaigrette bottled'] }
+  ];
 
   // Elegant Loading and Success Functions
   function showLoading(title, message) {
@@ -16550,32 +16555,25 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos += 0.6;
       }
 
+      // Bottled sauce summary
+      const sauceSummary = buildBottledSauceSummary(recommendations);
+      if (sauceSummary.length > 0) {
+        yPos = renderSauceSummaryTable(doc, sauceSummary, yPos);
+      }
+
       // Group by priority
-      // FIRST: Filter MAKE FIRST items (urgent flag set), sorted by stock %
       const makeFirst = recommendations.filter(r => r.urgent === true)
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-
-      // SECOND: Filter LINE COOKS PREP items (lineCooksPrep flag set, exclude urgent items)
       const lineCooksPrep = recommendations.filter(r => r.lineCooksPrep === true && r.urgent !== true)
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-
-      // THEN: Regular priority groups (exclude urgent and lineCooksPrep flagged items)
       const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true && r.lineCooksPrep !== true);
       const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true && r.lineCooksPrep !== true);
       const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true && r.lineCooksPrep !== true);
       const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true && r.lineCooksPrep !== true);
 
-      // Render MAKE FIRST category at the very top
       if (makeFirst.length > 0) {
         yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0]); // Red color for emphasis
       }
-
-      // Render LINE COOKS PREP category second
-      if (lineCooksPrep.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130]); // Purple color for line cooks
-      }
-
-      // Render each priority group
       if (urgent.length > 0) {
         yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black);
       }
@@ -16587,6 +16585,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       }
       if (low.length > 0) {
         yPos = renderPrepPDFSection(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray);
+      }
+      if (lineCooksPrep.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130]); // Purple color for line cooks
       }
 
       // Footer with disclaimer
@@ -16691,6 +16692,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos += 0.6;
       }
 
+      // Bottled sauce summary
+      const sauceSummary = buildBottledSauceSummary(recommendations);
+      if (sauceSummary.length > 0) {
+        yPos = renderSauceSummaryTable(doc, sauceSummary, yPos);
+      }
+
       // Group by priority
       const makeFirst = recommendations.filter(r => r.urgent === true)
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
@@ -16704,9 +16711,6 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       if (makeFirst.length > 0) {
         yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0]);
       }
-      if (lineCooksPrep.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130]);
-      }
       if (urgent.length > 0) {
         yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black);
       }
@@ -16718,6 +16722,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       }
       if (low.length > 0) {
         yPos = renderPrepPDFSection(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray);
+      }
+      if (lineCooksPrep.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130]);
       }
 
       // Footer
@@ -16803,6 +16810,73 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const leftColEndY = topMargin + (leftColItems.length * lineHeight);
     const rightColEndY = topMargin + (rightColItems.length * lineHeight);
     return Math.max(leftColEndY, rightColEndY) + 0.15;
+  }
+
+  function buildBottledSauceSummary(recommendations = []) {
+    return BOTTLED_SAUCE_ITEMS.map((config) => {
+      const match = recommendations.find((item) => {
+        const name = (item.itemName || '').trim().toLowerCase();
+        return config.aliases.some(alias => alias === name);
+      });
+      const quantitySource = match && match.currentStock != null ? match.currentStock : match?.recommendedAmount;
+      return {
+        label: config.label,
+        quantity: formatPrepQuantity(quantitySource),
+        lastCounted: formatLastCountedDetail(match?.lastCountedDate)
+      };
+    });
+  }
+
+  function formatPrepQuantity(value) {
+    if (value === null || value === undefined) return '—';
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '—';
+    if (Math.abs(number % 1) < 0.01) return number.toString();
+    return number.toFixed(2).replace(/\.00$/, '');
+  }
+
+  function formatLastCountedDetail(dateStr) {
+    if (!dateStr) return 'Never';
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) return 'Never';
+    const datePart = formatPacificDateDisplay(date, { month: '2-digit', day: '2-digit', year: 'numeric' });
+    const timePart = formatPacificDateDisplay(date, { hour: '2-digit', minute: '2-digit' });
+    return `${datePart} ${timePart}`;
+  }
+
+  function renderSauceSummaryTable(doc, summary, startY) {
+    const headerColor = [33, 150, 243];
+    const textColor = [33, 33, 33];
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text('BOTTLED SAUCE CHECK', 0.6, startY + 0.18);
+
+    doc.autoTable({
+      startY: startY + 0.3,
+      head: [['ITEM', 'QTY', 'LAST COUNTED']],
+      body: summary.map(row => [row.label, row.quantity, row.lastCounted]),
+      theme: 'grid',
+      styles: {
+        fontSize: 7,
+        cellPadding: 1.8,
+        halign: 'left'
+      },
+      headStyles: {
+        fillColor: headerColor,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        1: { halign: 'center' },
+        2: { halign: 'right' }
+      },
+      margin: { left: 0.5, right: 0.5 }
+    });
+
+    const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : startY + 0.8;
+    return finalY + 0.2;
   }
 
   /**
