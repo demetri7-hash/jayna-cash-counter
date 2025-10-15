@@ -12225,18 +12225,7 @@ async function ensurePriceSnapshotsForItems(itemIds) {
   try {
     const { data, error } = await supabase
       .from('invoice_items')
-      .select(`
-        inventory_item_id,
-        unit_price,
-        detected_price,
-        created_at,
-        invoices!inner(
-          id,
-          invoice_date,
-          vendor_name,
-          vendor
-        )
-      `)
+      .select('inventory_item_id, invoice_id, unit_price, detected_price, created_at')
       .in('inventory_item_id', missing)
       .order('created_at', { ascending: false })
       .limit(missing.length * 40);
@@ -12244,6 +12233,21 @@ async function ensurePriceSnapshotsForItems(itemIds) {
     if (error) {
       console.warn('Failed to load price snapshots:', error);
       return;
+    }
+
+    const invoiceIds = Array.from(new Set((data || []).map(row => row.invoice_id).filter(id => id != null)));
+    const invoiceMap = new Map();
+    if (invoiceIds.length) {
+      const { data: invoiceRows, error: invoiceError } = await supabase
+        .from('invoices')
+        .select('id, invoice_date, vendor_name, vendor')
+        .in('id', invoiceIds);
+
+      if (!invoiceError && invoiceRows) {
+        invoiceRows.forEach(row => {
+          invoiceMap.set(row.id, row);
+        });
+      }
     }
 
     const grouped = new Map();
@@ -12254,16 +12258,16 @@ async function ensurePriceSnapshotsForItems(itemIds) {
       const priceValue = row.unit_price ?? row.detected_price;
       if (priceValue === null || priceValue === undefined) return;
 
-      const invoice = row.invoices || {};
-      const invoiceDate = invoice.invoice_date || row.created_at;
+      const invoice = row.invoice_id != null ? invoiceMap.get(row.invoice_id) : null;
+      const invoiceDate = invoice?.invoice_date || row.created_at;
       const invoiceDateObj = parsePacificDate(invoiceDate) || new Date(invoiceDate);
 
       const entry = {
         price: Number(priceValue),
         invoiceDate,
         invoiceDateObj,
-        vendor: invoice.vendor_name || invoice.vendor || null,
-        invoiceId: invoice.id || row.invoice_id || null,
+        vendor: invoice?.vendor_name || invoice?.vendor || null,
+        invoiceId: invoice?.id || row.invoice_id || null,
         createdAt: row.created_at
       };
 
@@ -15936,18 +15940,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     try {
       const { data, error } = await supabase
         .from('invoice_items')
-        .select(`
-          inventory_item_id,
-          item_description,
-          unit_price,
-          detected_price,
-          created_at,
-          invoices!inner(
-            invoice_date,
-            vendor_name,
-            vendor
-          )
-        `)
+        .select('inventory_item_id, invoice_id, item_description, unit_price, detected_price, created_at')
         .in('inventory_item_id', itemIds)
         .order('created_at', { ascending: false })
         .limit(itemIds.length * 200);
@@ -15960,6 +15953,19 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
       const itemLookup = new Map(orderingSystemState.items.map(item => [item.id, item]));
 
+      const invoiceIds = Array.from(new Set((data || []).map(row => row.invoice_id).filter(id => id != null)));
+      const invoiceMap = new Map();
+      if (invoiceIds.length) {
+        const { data: invoiceRows, error: invoiceError } = await supabase
+          .from('invoices')
+          .select('id, invoice_date, vendor_name, vendor')
+          .in('id', invoiceIds);
+
+        if (!invoiceError && invoiceRows) {
+          invoiceRows.forEach(row => invoiceMap.set(row.id, row));
+        }
+      }
+
       const grouped = new Map();
       (data || []).forEach(row => {
         const itemId = row.inventory_item_id;
@@ -15968,8 +15974,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         const priceValue = row.unit_price ?? row.detected_price;
         if (priceValue === null || priceValue === undefined) return;
 
-        const invoice = row.invoices || {};
-        const invoiceDate = invoice.invoice_date || row.created_at;
+        const invoice = row.invoice_id != null ? invoiceMap.get(row.invoice_id) : null;
+        const invoiceDate = invoice?.invoice_date || row.created_at;
         const invoiceDateObj = parsePacificDate(invoiceDate) || new Date(invoiceDate);
 
         if (startObj && invoiceDateObj < startObj) return;
@@ -15979,7 +15985,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           price: Number(priceValue),
           invoiceDate,
           invoiceDateObj,
-          vendor: invoice.vendor_name || invoice.vendor || (itemLookup.get(itemId)?.vendor || 'Unknown'),
+          vendor: invoice?.vendor_name || invoice?.vendor || (itemLookup.get(itemId)?.vendor || 'Unknown'),
           createdAt: row.created_at
         };
 
