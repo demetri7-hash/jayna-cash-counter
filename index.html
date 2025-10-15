@@ -11325,40 +11325,113 @@
    */
   async function deletePendingOrder(orderId, vendorName) {
     if (!orderId) {
-      alert('ERROR: No order ID');
+      showMessage('Order ID missing. Unable to delete.', 'error');
       return;
     }
 
-    showLoading('Deleting...', 'Removing order');
+    const overlay = document.createElement('div');
+    overlay.id = 'deleteOrderModal';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 11000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    `;
+
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      background: white;
+      border: 2px solid #b91c1c;
+      max-width: 420px;
+      width: 100%;
+      padding: 24px 24px 20px 24px;
+      box-shadow: 0 12px 24px rgba(0,0,0,0.18);
+    `;
+
+    modal.innerHTML = `
+      <div style="color: #7f1d1d; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px;">Confirm delete</div>
+      <p style="margin: 0 0 18px 0; color: #4b5563; font-size: 13px; line-height: 1.5;">
+        Permanently delete the pending order for <strong>${vendorName || 'this vendor'}</strong>?<br>
+        This will remove all associated items and cannot be undone.
+      </p>
+      <div style="display: flex; gap: 12px;">
+        <button type="button" id="cancelDeleteOrder" style="flex: 1; padding: 12px; background: white; border: 2px solid var(--gray-300); color: var(--gray-700); font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; cursor: pointer;">Cancel</button>
+        <button type="button" id="confirmDeleteOrder" style="flex: 1; padding: 12px; background: #b91c1c; border: 2px solid #991b1b; color: white; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; cursor: pointer;">Delete</button>
+      </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    const removeOverlay = () => {
+      if (overlay && overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+    };
+
+    modal.querySelector('#cancelDeleteOrder').onclick = removeOverlay;
+    overlay.onclick = (evt) => {
+      if (evt.target === overlay) removeOverlay();
+    };
+
+    modal.querySelector('#confirmDeleteOrder').onclick = async () => {
+      await performPendingOrderDeletion(orderId, vendorName, overlay);
+    };
+  }
+
+  async function performPendingOrderDeletion(orderId, vendorName, overlay) {
+    showLoading('Deleting Order', `Removing ${vendorName || 'order'}...`);
 
     try {
-      // Delete items first
+      const { data: orderItems, error: fetchItemsError } = await supabase
+        .from('pending_order_items')
+        .select('inventory_item_id')
+        .eq('order_id', orderId);
+
+      if (fetchItemsError) throw new Error(fetchItemsError.message);
+
+      const itemIds = (orderItems || [])
+        .map(row => row.inventory_item_id)
+        .filter(id => id !== null && id !== undefined);
+
       const { error: itemsError } = await supabase
         .from('pending_order_items')
         .delete()
         .eq('order_id', orderId);
 
-      if (itemsError) throw new Error('Items delete failed: ' + itemsError.message);
+      if (itemsError) throw new Error(itemsError.message);
 
-      // Delete order
       const { error: orderError } = await supabase
         .from('pending_orders')
         .delete()
         .eq('id', orderId);
 
-      if (orderError) throw new Error('Order delete failed: ' + orderError.message);
+      if (orderError) throw new Error(orderError.message);
+
+      const cache = getPriceCache();
+      itemIds.forEach(id => cache.delete(id));
+      if (itemIds.length) {
+        await ensurePriceSnapshotsForItems(itemIds);
+      }
 
       hideLoading();
-      alert('✅ DELETED ' + vendorName);
+      if (overlay) overlay.remove();
 
-      // Reload
       await loadAllPendingOrders();
       await loadOrdersDueTodayAlert();
+      calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
 
+      showMessage(`✅ Deleted pending order for ${vendorName || 'vendor'}`, 'success');
     } catch (error) {
       hideLoading();
-      alert('DELETE FAILED: ' + error.message);
-      console.error(error);
+      if (overlay) overlay.remove();
+      console.error('Failed to delete order:', error);
+      showMessage(`Failed to delete order: ${error.message}`, 'error');
     }
   }
   window.deletePendingOrder = deletePendingOrder;
