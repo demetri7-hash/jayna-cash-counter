@@ -13442,7 +13442,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         lifespanInput.value = item.batchLifespan || '';
         lifespanInput.placeholder = 'e.g., 24';
         lifespanInput.dataset.itemId = item.id;
-        lifespanInput.dataset.field = 'batch_lifespan';
+        lifespanInput.dataset.field = 'batch_lifespan_hours';
         lifespanInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; box-sizing: border-box;';
         lifespanField.appendChild(lifespanLabel);
         lifespanField.appendChild(lifespanInput);
@@ -13531,17 +13531,25 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         updates[itemId][field] = input.checked;
       }
       // Handle number fields
-      else if (field === 'par_level' || field === 'batch_lifespan') {
+      else if (field === 'par_level' || field === 'batch_lifespan_hours') {
         const value = input.value.trim();
-        updates[itemId][field] = parseFloat(value) || 0;
+        if (value !== '') {
+          updates[itemId][field] = parseFloat(value) || 0;
+        }
       }
       // Handle unit (uppercase)
       else if (field === 'unit') {
-        updates[itemId][field] = input.value.trim().toUpperCase();
+        const value = input.value.trim();
+        if (value !== '') {
+          updates[itemId][field] = value.toUpperCase();
+        }
       }
-      // Handle all other text fields
+      // Handle all other text fields - only if not empty
       else {
-        updates[itemId][field] = input.value.trim();
+        const value = input.value.trim();
+        if (value !== '') {
+          updates[itemId][field] = value;
+        }
       }
     });
 
@@ -13555,12 +13563,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       // Update each item
       for (const [itemId, data] of Object.entries(updates)) {
         try {
+          console.log(`Updating item ${itemId} with data:`, data);
+          
           const { error } = await supabase
             .from('inventory_items')
             .update(data)
             .eq('id', parseInt(itemId));
 
-          if (error) throw error;
+          if (error) {
+            console.error(`Supabase error for item ${itemId}:`, error);
+            throw error;
+          }
 
           // Update local state
           const localItem = orderingSystemState.items.find(i => i.id === parseInt(itemId));
@@ -13570,7 +13583,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             if (data.unit) localItem.unit = data.unit;
             if (data.par_level !== undefined) localItem.parLevel = data.par_level;
             if (data.item_type) localItem.itemType = data.item_type;
-            if (data.batch_lifespan !== undefined) localItem.batchLifespan = data.batch_lifespan;
+            if (data.batch_lifespan_hours !== undefined) localItem.batchLifespan = data.batch_lifespan_hours;
             if (data.urgent !== undefined) localItem.urgent = data.urgent;
             if (data.line_cooks_prep !== undefined) localItem.lineCooksPrep = data.line_cooks_prep;
             if (data.not_made_daily !== undefined) localItem.notMadeDaily = data.not_made_daily;
