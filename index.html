@@ -13450,6 +13450,38 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       }
 
       itemCard.appendChild(fieldsGrid);
+      
+      // Add compact checkboxes section
+      const checkboxSection = document.createElement('div');
+      checkboxSection.style.cssText = 'margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--gray-200); display: grid; grid-template-columns: 1fr 1fr; gap: 6px;';
+      
+      // Checkbox helper function
+      const createCheckbox = (id, label, checked, field) => {
+        const wrapper = document.createElement('label');
+        wrapper.style.cssText = 'display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 10px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.3px;';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = checked;
+        checkbox.dataset.itemId = item.id;
+        checkbox.dataset.field = field;
+        checkbox.style.cssText = 'width: 12px; height: 12px; cursor: pointer; margin: 0;';
+        
+        const text = document.createElement('span');
+        text.textContent = label;
+        
+        wrapper.appendChild(checkbox);
+        wrapper.appendChild(text);
+        return wrapper;
+      };
+      
+      // Add all checkboxes
+      checkboxSection.appendChild(createCheckbox(`urgent-${item.id}`, 'Make First', item.urgent, 'urgent'));
+      checkboxSection.appendChild(createCheckbox(`line-cooks-${item.id}`, 'Line Cooks', item.lineCooksPrep, 'line_cooks_prep'));
+      checkboxSection.appendChild(createCheckbox(`not-daily-${item.id}`, 'Not Daily', item.notMadeDaily, 'not_made_daily'));
+      checkboxSection.appendChild(createCheckbox(`bottle-${item.id}`, 'Bottle Count', item.showInBottleCount, 'show_in_bottle_count'));
+      
+      itemCard.appendChild(checkboxSection);
       content.appendChild(itemCard);
     });
 
@@ -13489,18 +13521,27 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     inputs.forEach(input => {
       const itemId = parseInt(input.dataset.itemId);
       const field = input.dataset.field;
-      const value = input.value.trim();
-
+      
       if (!updates[itemId]) {
         updates[itemId] = {};
       }
 
-      if (field === 'par_level' || field === 'batch_lifespan') {
+      // Handle checkboxes
+      if (input.type === 'checkbox') {
+        updates[itemId][field] = input.checked;
+      }
+      // Handle number fields
+      else if (field === 'par_level' || field === 'batch_lifespan') {
+        const value = input.value.trim();
         updates[itemId][field] = parseFloat(value) || 0;
-      } else if (field === 'unit') {
-        updates[itemId][field] = value.toUpperCase();
-      } else {
-        updates[itemId][field] = value;
+      }
+      // Handle unit (uppercase)
+      else if (field === 'unit') {
+        updates[itemId][field] = input.value.trim().toUpperCase();
+      }
+      // Handle all other text fields
+      else {
+        updates[itemId][field] = input.value.trim();
       }
     });
 
@@ -13530,6 +13571,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             if (data.par_level !== undefined) localItem.parLevel = data.par_level;
             if (data.item_type) localItem.itemType = data.item_type;
             if (data.batch_lifespan !== undefined) localItem.batchLifespan = data.batch_lifespan;
+            if (data.urgent !== undefined) localItem.urgent = data.urgent;
+            if (data.line_cooks_prep !== undefined) localItem.lineCooksPrep = data.line_cooks_prep;
+            if (data.not_made_daily !== undefined) localItem.notMadeDaily = data.not_made_daily;
+            if (data.show_in_bottle_count !== undefined) localItem.showInBottleCount = data.show_in_bottle_count;
           }
 
           successCount++;
