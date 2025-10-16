@@ -13672,11 +13672,39 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const date = new Date(dateStr);
       const now = new Date();
       const diffMs = now - date;
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       const diffDays = Math.floor(diffHours / 24);
 
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays < 7) return `${diffDays}d ago`;
+      // Less than 1 hour: show minutes
+      if (diffMinutes < 60) {
+        return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+      }
+      
+      // Less than 24 hours: show hours and minutes
+      if (diffHours < 24) {
+        const remainingMinutes = diffMinutes % 60;
+        if (remainingMinutes === 0) {
+          return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+        }
+        return `${diffHours} hour${diffHours === 1 ? '' : 's'} and ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'} ago`;
+      }
+      
+      // Less than 7 days: show days, hours, and minutes
+      if (diffDays < 7) {
+        const remainingHours = diffHours % 24;
+        const remainingMinutes = diffMinutes % 60;
+        let result = `${diffDays} day${diffDays === 1 ? '' : 's'}`;
+        if (remainingHours > 0) {
+          result += `, ${remainingHours} hour${remainingHours === 1 ? '' : 's'}`;
+        }
+        if (remainingMinutes > 0) {
+          result += `, ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}`;
+        }
+        return result + ' ago';
+      }
+      
+      // 7+ days: show date
       return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
     }
 
@@ -13892,11 +13920,39 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const date = new Date(dateStr);
       const now = new Date();
       const diffMs = now - date;
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       const diffDays = Math.floor(diffHours / 24);
 
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays < 7) return `${diffDays}d ago`;
+      // Less than 1 hour: show minutes
+      if (diffMinutes < 60) {
+        return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+      }
+      
+      // Less than 24 hours: show hours and minutes
+      if (diffHours < 24) {
+        const remainingMinutes = diffMinutes % 60;
+        if (remainingMinutes === 0) {
+          return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+        }
+        return `${diffHours} hour${diffHours === 1 ? '' : 's'} and ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'} ago`;
+      }
+      
+      // Less than 7 days: show days, hours, and minutes
+      if (diffDays < 7) {
+        const remainingHours = diffHours % 24;
+        const remainingMinutes = diffMinutes % 60;
+        let result = `${diffDays} day${diffDays === 1 ? '' : 's'}`;
+        if (remainingHours > 0) {
+          result += `, ${remainingHours} hour${remainingHours === 1 ? '' : 's'}`;
+        }
+        if (remainingMinutes > 0) {
+          result += `, ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}`;
+        }
+        return result + ' ago';
+      }
+      
+      // 7+ days: show date
       return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
     }
 
@@ -14117,7 +14173,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                     style="width: 18px; height: 18px; cursor: pointer;"
                   />
                   <label for="bottle-count-${item.id}" style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;">
-                    📋 SHOW IN BOTTLE COUNT
+                    SHOW IN BOTTLE COUNT
                   </label>
                 </div>
               </div>
@@ -14275,11 +14331,39 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const date = new Date(dateStr);
       const now = new Date();
       const diffMs = now - date;
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       const diffDays = Math.floor(diffHours / 24);
 
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays < 7) return `${diffDays}d ago`;
+      // Less than 1 hour: show minutes
+      if (diffMinutes < 60) {
+        return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+      }
+      
+      // Less than 24 hours: show hours and minutes
+      if (diffHours < 24) {
+        const remainingMinutes = diffMinutes % 60;
+        if (remainingMinutes === 0) {
+          return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+        }
+        return `${diffHours} hour${diffHours === 1 ? '' : 's'} and ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'} ago`;
+      }
+      
+      // Less than 7 days: show days, hours, and minutes
+      if (diffDays < 7) {
+        const remainingHours = diffHours % 24;
+        const remainingMinutes = diffMinutes % 60;
+        let result = `${diffDays} day${diffDays === 1 ? '' : 's'}`;
+        if (remainingHours > 0) {
+          result += `, ${remainingHours} hour${remainingHours === 1 ? '' : 's'}`;
+        }
+        if (remainingMinutes > 0) {
+          result += `, ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}`;
+        }
+        return result + ' ago';
+      }
+      
+      // 7+ days: show date
       return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
     }
 
