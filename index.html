@@ -13565,6 +13565,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         try {
           console.log(`Updating item ${itemId} with data:`, data);
           
+          // Add last_counted_date to mark item as counted
+          data.last_counted_date = new Date().toISOString();
+          
           const { error } = await supabase
             .from('inventory_items')
             .update(data)
@@ -13588,6 +13591,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             if (data.line_cooks_prep !== undefined) localItem.lineCooksPrep = data.line_cooks_prep;
             if (data.not_made_daily !== undefined) localItem.notMadeDaily = data.not_made_daily;
             if (data.show_in_bottle_count !== undefined) localItem.showInBottleCount = data.show_in_bottle_count;
+            if (data.last_counted_date) localItem.lastCountedDate = data.last_counted_date;
           }
 
           successCount++;
