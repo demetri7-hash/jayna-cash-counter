@@ -755,7 +755,7 @@
         <span style="color: var(--gray-400);">|</span>
         <a onclick="requirePasswordFor('Manager Dashboard', () => window.location.href='manager.html')">Manager</a>
         <span style="color: var(--gray-400);">|</span>
-        <a onclick="requirePasswordFor('COGs Management', accessCOGs)">COGs</a>
+        <a onclick="requirePasswordFor('Catering Operations', accessCatering)">Catering</a>
       </div>
       
       <!-- AM Count Form -->
@@ -1509,6 +1509,7 @@
               "
             >
               <option value="">All Vendors</option>
+              <option value="PREP">PREP</option>
               <option value="Greenleaf">Greenleaf</option>
               <option value="Performance">Performance</option>
               <option value="Mani Imports">Mani Imports</option>
@@ -2027,6 +2028,18 @@
     { label: 'Lemon Vinaigrette Bottled', aliases: ['lemon vinaigrette bottled', 'lemon vinaigrette - bottled'] }
   ];
 
+  // Function to check if an item should be in bottled/to-go section
+  function isBottledOrToGoItem(itemName) {
+    const name = (itemName || '').trim().toLowerCase();
+    // Check if it's in the bottled sauce list
+    const isBottled = BOTTLED_SAUCE_ITEMS.some(config => 
+      config.aliases.some(alias => name.includes(alias))
+    );
+    // Check if it has "to go" or "to-go" in the name
+    const isToGo = name.includes('to go') || name.includes('to-go');
+    return isBottled || isToGo;
+  }
+
   // Elegant Loading and Success Functions
   function showLoading(title, message) {
     const overlay = document.getElementById('loadingOverlay');
@@ -2539,9 +2552,9 @@
     showManagerPasswordModal(featureName, callback);
   }
 
-  // COGs access function - redirects to cogs.html with session persistence
-  function accessCOGs() {
-    window.location.href = 'cogs.html';
+  // Catering access function - redirects to catering.html with session persistence
+  function accessCatering() {
+    window.location.href = 'catering.html';
   }
 
   function showManagerPasswordModal(featureName, callback) {
@@ -10404,17 +10417,18 @@
     }
 
     // Load orders due today alert when CHECK-IN tab is opened
-    if (tabName === 'checkInInvoice') {
-      loadOrdersDueTodayAlert();
-    }
+  if (tabName === 'checkInInvoice') {
+    loadOrdersDueTodayAlert();
+    renderReceivePendingOrders();
+  }
   }
 
   /**
    * Render complete ORDERS tab (pending orders + AI suggestions)
    */
-  async function renderOrdersTab() {
-    const container = document.getElementById('upcomingOrders');
-    container.innerHTML = '<div style="text-align: center; padding: 40px;"><p style="color: var(--gray-500);">Loading...</p></div>';
+async function renderOrdersTab() {
+  const container = document.getElementById('upcomingOrders');
+  container.innerHTML = '<div style="text-align: center; padding: 40px;"><p style="color: var(--gray-500);">Loading...</p></div>';
 
     // Create wrapper for both sections
     const wrapper = document.createElement('div');
@@ -10850,7 +10864,11 @@
             quantity_ordered,
             unit,
             item_name,
-            vendor
+            vendor,
+            quantity_received,
+            variance,
+            unit_price,
+            receiving_notes
           )
         `)
         .order('expected_delivery_date', { ascending: true });
@@ -11440,6 +11458,7 @@
     }
   }
   window.deletePendingOrder = deletePendingOrder;
+  window.loadPendingOrderForCheckIn = loadPendingOrderForCheckIn;
 
   /**
    * Display pending order items for manual check-in
@@ -11518,7 +11537,7 @@
 
       // Instructions
       const instructions = document.createElement('p');
-      instructions.textContent = 'Enter received quantities and add notes, then check in each item:';
+      instructions.textContent = 'Update received quantities, enter prices (required), add notes, then click CONFIRM ORDER to finalize.';
       instructions.style.cssText = 'color: var(--gray-600); font-size: 13px; margin-bottom: 16px;';
       container.appendChild(instructions);
 
@@ -11528,9 +11547,9 @@
 
       // Table header
       const thead = document.createElement('div');
-      thead.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 2fr 120px; gap: 8px; padding: 10px; background: var(--gray-900); color: white; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;';
+      thead.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 2fr 120px; gap: 8px; padding: 10px; background: var(--gray-900); color: white; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;';
 
-      ['Item', 'Ordered', 'Received', 'Unit', 'Notes', 'Action'].forEach(label => {
+      ['Item', 'Ordered', 'Received', 'Unit', 'Price', 'Notes', 'Action'].forEach(label => {
         const th = document.createElement('div');
         th.textContent = label;
         thead.appendChild(th);
@@ -11539,27 +11558,32 @@
       table.appendChild(thead);
 
       // Items (stored for later updates)
-      if (!orderingSystemState.checkInItems) {
-        orderingSystemState.checkInItems = {};
-      }
+      orderingSystemState.checkInItems = {};
 
       // Table body
       orderData.pending_order_items.forEach((item, index) => {
         // Initialize item state
+        const inventoryItem = orderingSystemState.items?.find(i => i.id === item.inventory_item_id);
+        const defaultPrice = item.unit_price != null
+          ? parseFloat(item.unit_price)
+          : inventoryItem?.currentUnitCost != null
+            ? parseFloat(inventoryItem.currentUnitCost)
+            : null;
+
         orderingSystemState.checkInItems[item.id] = {
           id: item.id,
           inventoryItemId: item.inventory_item_id,
           itemName: item.item_name,
-          ordered: item.quantity_ordered,
-          received: item.quantity_ordered, // Default to ordered quantity
+          ordered: Number(item.quantity_ordered) || 0,
+          received: item.quantity_received != null ? Number(item.quantity_received) : Number(item.quantity_ordered) || 0,
           unit: item.unit,
-          notes: '',
-          checkedIn: false
+          price: defaultPrice,
+          notes: item.receiving_notes || ''
         };
 
         const row = document.createElement('div');
         row.id = `checkInRow${item.id}`;
-        row.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 2fr 120px; gap: 8px; padding: 12px; border-top: 1px solid var(--gray-300); background: white;';
+        row.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 2fr 120px; gap: 8px; padding: 12px; border-top: 1px solid var(--gray-300); background: white;';
 
         // Item name
         const nameCell = document.createElement('div');
@@ -11579,7 +11603,7 @@
         receivedInput.type = 'number';
         receivedInput.min = '0';
         receivedInput.step = '0.25';
-        receivedInput.value = item.quantity_ordered;
+        receivedInput.value = orderingSystemState.checkInItems[item.id].received;
         receivedInput.id = `receivedQty${item.id}`;
         receivedInput.style.cssText = 'width: 100%; padding: 6px; border: 2px solid var(--gray-300); font-size: 12px; font-weight: 600; text-align: center;';
         receivedInput.onchange = function() {
@@ -11602,6 +11626,36 @@
         unitCell.style.cssText = 'font-size: 11px; color: var(--gray-600);';
         row.appendChild(unitCell);
 
+        // Price input
+        const priceCell = document.createElement('div');
+        const priceInput = document.createElement('input');
+        priceInput.type = 'number';
+        priceInput.min = '0';
+        priceInput.step = '0.01';
+        priceInput.id = `price${item.id}`;
+        priceInput.value = defaultPrice != null ? formatCurrencyInput(defaultPrice) : '';
+        priceInput.placeholder = '0.00';
+        priceInput.style.cssText = 'width: 100%; padding: 6px; border: 2px solid var(--gray-300); font-size: 12px; font-weight: 600; text-align: center;';
+        if (defaultPrice == null) {
+          priceInput.style.borderColor = '#dc2626';
+          priceInput.style.background = '#fee2e2';
+        }
+        priceInput.onchange = function() {
+          const value = parseFloat(this.value);
+          if (Number.isFinite(value) && value > 0) {
+            orderingSystemState.checkInItems[item.id].price = value;
+            this.value = formatCurrencyInput(value);
+            this.style.borderColor = 'var(--gray-300)';
+            this.style.background = 'white';
+          } else {
+            orderingSystemState.checkInItems[item.id].price = null;
+            this.style.borderColor = '#dc2626';
+            this.style.background = '#fee2e2';
+          }
+        };
+        priceCell.appendChild(priceInput);
+        row.appendChild(priceCell);
+
         // Notes (editable input)
         const notesCell = document.createElement('div');
         const notesInput = document.createElement('input');
@@ -11609,20 +11663,22 @@
         notesInput.placeholder = 'Add notes...';
         notesInput.id = `notes${item.id}`;
         notesInput.style.cssText = 'width: 100%; padding: 6px; border: 2px solid var(--gray-300); font-size: 11px;';
+        if (orderingSystemState.checkInItems[item.id].notes) {
+          notesInput.value = orderingSystemState.checkInItems[item.id].notes;
+        }
         notesInput.onchange = function() {
           orderingSystemState.checkInItems[item.id].notes = this.value;
         };
         notesCell.appendChild(notesInput);
         row.appendChild(notesCell);
 
-        // Check in button
+        // Actions (delete)
         const actionCell = document.createElement('div');
-        const checkInBtn = document.createElement('button');
-        checkInBtn.textContent = 'CHECK IN';
-        checkInBtn.id = `checkInBtn${item.id}`;
-        checkInBtn.style.cssText = 'width: 100%; padding: 8px 6px; background: var(--gray-700); color: white; border: none; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; cursor: pointer; text-transform: uppercase;';
-        checkInBtn.onclick = () => checkInSingleItem(item.id);
-        actionCell.appendChild(checkInBtn);
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'DELETE';
+        deleteBtn.style.cssText = 'width: 100%; padding: 8px 6px; background: #dc2626; color: white; border: none; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; cursor: pointer; text-transform: uppercase;';
+        deleteBtn.onclick = () => deleteCheckInItem(item.id, orderId);
+        actionCell.appendChild(deleteBtn);
         row.appendChild(actionCell);
 
         table.appendChild(row);
@@ -11653,11 +11709,11 @@
       bulkActions.appendChild(autoFillBtn);
 
       // Check in all button
-      const checkInAllBtn = document.createElement('button');
-      checkInAllBtn.textContent = 'CHECK IN ALL ITEMS';
-      checkInAllBtn.style.cssText = 'flex: 1; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer; text-transform: uppercase;';
-      checkInAllBtn.onclick = () => checkInAllItems(orderId);
-      bulkActions.appendChild(checkInAllBtn);
+      const confirmBtn = document.createElement('button');
+      confirmBtn.textContent = 'CONFIRM ORDER';
+      confirmBtn.style.cssText = 'flex: 1; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer; text-transform: uppercase;';
+      confirmBtn.onclick = () => confirmPendingOrder(orderId);
+      bulkActions.appendChild(confirmBtn);
 
       container.appendChild(bulkActions);
 
@@ -11681,97 +11737,77 @@
     }
   }
 
-  /**
-   * Check in a single item
-   */
-  async function checkInSingleItem(itemId) {
-    const itemData = orderingSystemState.checkInItems[itemId];
-    if (!itemData || itemData.checkedIn) {
-      showMessage('Item already checked in', 'info');
-      return;
-    }
-
-    const btn = document.getElementById(`checkInBtn${itemId}`);
-    const row = document.getElementById(`checkInRow${itemId}`);
+  async function deleteCheckInItem(itemId, orderId) {
+    showLoading('Removing Item', 'Deleting item from pending order...');
 
     try {
-      btn.disabled = true;
-      btn.textContent = 'CHECKING IN...';
+      const { error } = await supabase
+        .from('pending_order_items')
+        .delete()
+        .eq('id', itemId);
 
-      // Update inventory stock
-      const { data: currentItem, error: fetchError } = await supabase
-        .from('inventory_items')
-        .select('current_stock')
-        .eq('id', itemData.inventoryItemId)
-        .single();
+      if (error) throw error;
 
-      if (fetchError) throw fetchError;
+      delete orderingSystemState.checkInItems[itemId];
 
-      const newStock = (parseFloat(currentItem.current_stock) || 0) + itemData.received;
+      hideLoading();
+      showMessage('Item removed from pending order', 'success');
 
-      const { error: updateError } = await supabase
-        .from('inventory_items')
-        .update({
-          current_stock: newStock,
-          last_counted_date: getPacificDate()
-        })
-        .eq('id', itemData.inventoryItemId);
-
-      if (updateError) throw updateError;
-
-      // Mark as checked in
-      itemData.checkedIn = true;
-
-      // Visual feedback
-      row.style.background = '#d1fae5';
-      btn.textContent = '✓ CHECKED IN';
-      btn.style.background = '#059669';
-      btn.disabled = true;
-
-      // Disable inputs
-      document.getElementById(`receivedQty${itemId}`).disabled = true;
-      document.getElementById(`notes${itemId}`).disabled = true;
-
-      showMessage(`✓ ${itemData.itemName} checked in! Stock updated to ${newStock} ${itemData.unit}`, 'success');
-
-      // Check if all items are checked in
-      const allCheckedIn = Object.values(orderingSystemState.checkInItems).every(i => i.checkedIn);
-      if (allCheckedIn) {
-        setTimeout(() => {
-          finalizeOrderCheckIn();
-        }, 1000);
-      }
-
+      await loadPendingOrderForCheckIn(orderId);
     } catch (error) {
-      console.error('Error checking in item:', error);
-      showMessage('Failed to check in item: ' + error.message, 'error');
-      btn.disabled = false;
-      btn.textContent = 'CHECK IN';
+      hideLoading();
+      console.error('Failed to delete check-in item:', error);
+      showMessage('Failed to delete item: ' + error.message, 'error');
     }
   }
 
-  /**
-   * Check in all items at once
-   */
-  async function checkInAllItems(orderId) {
-    const items = Object.values(orderingSystemState.checkInItems).filter(i => !i.checkedIn);
+  async function confirmPendingOrder(orderId) {
+    const items = Object.values(orderingSystemState.checkInItems || {});
 
-    if (items.length === 0) {
-      showMessage('All items already checked in', 'info');
+    if (!items.length) {
+      showMessage('No items left to receive for this order.', 'error');
       return;
     }
 
-    // No confirmation needed - button click is intentional action
-    showLoading('Checking In', `Processing ${items.length} items...`);
+    let hasPriceError = false;
+    items.forEach(item => {
+      const priceInput = document.getElementById(`price${item.id}`);
+      const value = Number(item.price);
+      if (!Number.isFinite(value) || value <= 0) {
+        hasPriceError = true;
+        if (priceInput) {
+          priceInput.style.borderColor = '#dc2626';
+          priceInput.style.background = '#fee2e2';
+        }
+      }
+    });
+
+    if (hasPriceError) {
+      showMessage('Enter a valid price for every item before confirming.', 'error');
+      return;
+    }
+
+    showLoading('Confirming Order', 'Updating inventory and closing order...');
 
     try {
-      let successCount = 0;
-      let errorCount = 0;
-
       for (const item of items) {
-        try {
-          // Update inventory stock
-          const { data: currentItem, error: fetchError} = await supabase
+        const receivedQty = Number(item.received) || 0;
+        const orderedQty = Number(item.ordered) || 0;
+
+        const { error: updateItemError } = await supabase
+          .from('pending_order_items')
+          .update({
+            quantity_received: receivedQty,
+            variance: receivedQty - orderedQty,
+            unit_price: item.price,
+            receiving_notes: item.notes || null
+          })
+          .eq('id', item.id);
+
+        if (updateItemError) throw updateItemError;
+
+        if (item.inventoryItemId && receivedQty > 0) {
+          const { data: currentItem, error: fetchError } = await supabase
             .from('inventory_items')
             .select('current_stock')
             .eq('id', item.inventoryItemId)
@@ -11779,102 +11815,60 @@
 
           if (fetchError) throw fetchError;
 
-          const newStock = (parseFloat(currentItem.current_stock) || 0) + item.received;
+          const currentStock = Number(currentItem?.current_stock) || 0;
+          const newStock = currentStock + receivedQty;
 
-          const { error: updateError } = await supabase
+          const { error: inventoryError } = await supabase
             .from('inventory_items')
             .update({
               current_stock: newStock,
-              last_counted_date: getPacificDate()
+              last_counted_date: getPacificDate(),
+              current_unit_cost: item.price,
+              last_cost_update: new Date().toISOString()
             })
             .eq('id', item.inventoryItemId);
 
-          if (updateError) throw updateError;
-
-          // Mark as checked in
-          item.checkedIn = true;
-
-          // Visual feedback
-          const row = document.getElementById(`checkInRow${item.id}`);
-          const btn = document.getElementById(`checkInBtn${item.id}`);
-
-          if (row) row.style.background = '#d1fae5';
-          if (btn) {
-            btn.textContent = '✓ CHECKED IN';
-            btn.style.background = '#059669';
-            btn.disabled = true;
-          }
-
-          // Disable inputs
-          const qtyInput = document.getElementById(`receivedQty${item.id}`);
-          const notesInput = document.getElementById(`notes${item.id}`);
-          if (qtyInput) qtyInput.disabled = true;
-          if (notesInput) notesInput.disabled = true;
-
-          successCount++;
-        } catch (error) {
-          console.error(`Error checking in ${item.itemName}:`, error);
-          errorCount++;
+          if (inventoryError) throw inventoryError;
         }
       }
 
-      hideLoading();
+      const allReceived = items.every(item => (Number(item.received) || 0) >= (Number(item.ordered) || 0));
+      const anyReceived = items.some(item => (Number(item.received) || 0) > 0);
 
-      if (errorCount === 0) {
-        showMessage(`✅ All ${successCount} items checked in successfully!`, 'success');
-        setTimeout(() => {
-          finalizeOrderCheckIn();
-        }, 1500);
-      } else {
-        showMessage(`⚠️ ${successCount} items checked in, ${errorCount} failed`, 'warning');
-      }
-
-    } catch (error) {
-      hideLoading();
-      console.error('Error checking in all items:', error);
-      showMessage('Failed to check in items: ' + error.message, 'error');
-    }
-  }
-
-  /**
-   * Finalize order after all items checked in
-   */
-  async function finalizeOrderCheckIn() {
-    if (!orderingSystemState.selectedPendingOrderId) return;
-
-    try {
-      // Update pending order status and record received date
-      const { error } = await supabase
+      const { error: orderError } = await supabase
         .from('pending_orders')
         .update({
-          status: 'completed',
-          received_date: getPacificDate()
+          status: anyReceived ? (allReceived ? 'completed' : 'partial') : 'pending',
+          received_date: anyReceived ? getPacificDate() : null,
+          updated_at: new Date().toISOString()
         })
-        .eq('id', orderingSystemState.selectedPendingOrderId);
+        .eq('id', orderId);
 
-      if (error) throw error;
+      if (orderError) throw orderError;
 
-      showMessage('🎉 Order check-in complete! Inventory updated.', 'success');
+      hideLoading();
+      showMessage('🎉 Order confirmed and inventory updated!', 'success');
 
-      // Clear and hide check-in view
       const container = document.getElementById('pendingOrderCheckInView');
       if (container) {
-        setTimeout(() => {
-          container.style.display = 'none';
-          container.innerHTML = '';
-        }, 2000);
+        container.style.display = 'none';
+        container.innerHTML = '';
       }
 
-      // Reload orders due today
-      loadOrdersDueTodayAlert();
+      orderingSystemState.selectedPendingOrderId = null;
+      orderingSystemState.currentCheckInOrder = null;
+      orderingSystemState.checkInItems = {};
 
-      // Refresh inventory and calculations
       await loadInventoryData();
+      await loadAllPendingOrders();
+      await loadOrdersDueTodayAlert();
       calculateUpcomingOrders();
+      renderReceivePendingOrders();
 
     } catch (error) {
-      console.error('Error finalizing order:', error);
-      showMessage('Order checked in but failed to update status', 'warning');
+      hideLoading();
+      console.error('Failed to confirm order:', error);
+      showMessage('Failed to confirm order: ' + error.message, 'error');
     }
   }
 
@@ -12188,6 +12182,139 @@ function formatRelativeTime(dateStr) {
     minute: '2-digit'
   });
   return precise;
+}
+
+async function renderReceivePendingOrders() {
+  const container = document.getElementById('pendingOrderCheckInView');
+  if (!container || !container.parentNode) return;
+
+  let pendingSection = document.getElementById('receivePendingOrdersSection');
+  if (!pendingSection) {
+    pendingSection = document.createElement('div');
+    pendingSection.id = 'receivePendingOrdersSection';
+    pendingSection.style.cssText = 'margin-top: 32px; border: 2px solid var(--gray-300); background: white;';
+    container.parentNode.insertBefore(pendingSection, container.nextSibling);
+  }
+
+  pendingSection.innerHTML = `
+    <div style="padding: 16px 20px; border-bottom: 2px solid var(--gray-300); background: var(--gray-100);">
+      <h3 style="margin: 0 0 6px 0; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px; font-size: 16px;">Pending Orders to Check In</h3>
+      <p style="margin: 0; color: var(--gray-600); font-size: 12px;">Select an order to review received quantities, enter prices, and confirm delivery.</p>
+    </div>
+    <div id="receiveOrdersList" style="padding: 0 20px 20px 20px;">Loading...</div>
+  `;
+
+  let listContainer = document.getElementById('receiveOrdersList');
+
+  try {
+    const { data: orders, error } = await supabase
+      .from('pending_orders')
+      .select(`
+        id,
+        vendor,
+        order_date,
+        expected_delivery_date,
+        status,
+        total_items,
+        notes,
+        pending_order_items (
+          id,
+          inventory_item_id,
+          quantity_ordered,
+          quantity_received,
+          variance,
+          unit,
+          item_name,
+          unit_price,
+          receiving_notes
+        )
+      `)
+      .order('expected_delivery_date', { ascending: true });
+
+    if (error) throw error;
+
+    if (!orders || orders.length === 0) {
+      listContainer.innerHTML = '<p style="padding: 20px; color: var(--gray-600); font-size: 13px;">No pending orders found.</p>';
+      return;
+    }
+
+    const today = getPacificDate();
+
+    listContainer.innerHTML = orders.map(order => {
+      const deliveryDate = parsePacificDate(order.expected_delivery_date);
+      let badgeColor = '#d1fae5';
+      let badgeBorder = '#059669';
+      let badgeText = '#064e3b';
+      let badgeLabel = 'Future Delivery';
+
+      if (deliveryDate) {
+        const deliveryDateStr = formatPacificDate(deliveryDate);
+        if (deliveryDateStr === today) {
+          badgeColor = '#fef3c7';
+          badgeBorder = '#f59e0b';
+          badgeText = '#92400e';
+          badgeLabel = 'Due Today';
+        } else if (deliveryDate < parsePacificDate(today)) {
+          badgeColor = '#fee2e2';
+          badgeBorder = '#b91c1c';
+          badgeText = '#7f1d1d';
+          badgeLabel = 'Past Due';
+        }
+      }
+
+      const deliveryDisplay = deliveryDate
+        ? formatPacificDateDisplay(deliveryDate, { month: 'short', day: 'numeric', year: 'numeric', weekday: 'long' })
+        : 'Unknown';
+
+      const previewItems = (order.pending_order_items || []).slice(0, 3).map(item => {
+        const priceText = item.unit_price != null ? `$${Number(item.unit_price).toFixed(2)}` : 'No price';
+        return `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray-600);margin-top:6px;">
+                  <span style="font-weight:600;color:var(--gray-700);">${item.item_name}</span>
+                  <span>${item.quantity_ordered} ${item.unit || ''} • ${priceText}</span>
+                </div>`;
+      }).join('');
+
+      const remainingCount = Math.max(0, (order.pending_order_items || []).length - 3);
+      const remainingText = remainingCount > 0
+        ? `<div style='font-size:11px;color:var(--gray-500);margin-top:6px;'>+${remainingCount} more items</div>`
+        : '';
+
+      return `
+        <div class="receive-order-card" data-order-id="${order.id}" style="border:2px solid var(--gray-300);margin-top:16px;background:white;cursor:pointer;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:16px 18px;gap:18px;">
+            <div style="flex:1;">
+              <h4 style="margin:0 0 6px 0;color:var(--gray-900);font-size:15px;">${order.vendor}</h4>
+              <div style="font-size:12px;color:var(--gray-600);">Ordered: ${order.order_date || 'Unknown'}</div>
+              <div style="font-size:12px;color:var(--gray-600);">Expected: ${deliveryDisplay}</div>
+              <div style="font-size:12px;color:var(--gray-600);">${order.total_items || 0} item(s)</div>
+            </div>
+            <div style="min-width:140px;">
+              <span style="display:inline-block;padding:6px 10px;background:${badgeColor};border:2px solid ${badgeBorder};color:${badgeText};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;">${badgeLabel}</span>
+            </div>
+          </div>
+          <div style="padding:0 18px 14px 18px;">
+            ${previewItems}
+            ${remainingText}
+          </div>
+        </div>`;
+    }).join('');
+
+    listContainer.querySelectorAll('.receive-order-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const orderId = Number(card.dataset.orderId);
+        loadPendingOrderForCheckIn(orderId);
+        listContainer.querySelectorAll('.receive-order-card').forEach(el => el.style.borderColor = 'var(--gray-300)');
+        card.style.borderColor = '#2563eb';
+      });
+    });
+
+  } catch (error) {
+    console.error('Failed to load pending orders for receive view:', error);
+    listContainer = document.getElementById('receiveOrdersList');
+    if (listContainer) {
+      listContainer.innerHTML = `<p style="padding:20px;color:#dc2626;font-size:13px;">Failed to load pending orders: ${error.message}</p>`;
+    }
+  }
 }
 
 function formatCurrency(value) {
@@ -13370,7 +13497,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           onclick="toggleBulkEditMode()"
           style="
             padding: 12px 20px;
-            background: ${bulkEditMode ? '#212121' : 'var(--gray-700)'};
+            background: ${bulkEdITMode ? '#212121' : 'var(--gray-700)'};
             color: white;
             border: none;
             border-radius: 0;
@@ -13972,6 +14099,20 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                   />
                   <label for="not-made-daily-${item.id}" style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;">
                     NOT MADE DAILY
+                  </label>
+                </div>
+
+                <!-- Show in Bottle Count Checkbox -->
+                <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                  <input
+                    type="checkbox"
+                    id="bottle-count-${item.id}"
+                    ${item.showInBottleCount ? 'checked' : ''}
+                    onchange="toggleBottleCount(${item.id}, this.checked)"
+                    style="width: 18px; height: 18px; cursor: pointer;"
+                  />
+                  <label for="bottle-count-${item.id}" style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;">
+                    📋 SHOW IN BOTTLE COUNT
                   </label>
                 </div>
               </div>
@@ -14838,6 +14979,76 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
+   * Toggle show in bottle count checkbox for prep item
+   */
+  async function toggleBottleCount(itemId, showInBottle) {
+    const checkbox = document.getElementById(`bottle-count-${itemId}`);
+    const label = checkbox?.nextElementSibling;
+    const statusDiv = document.getElementById(`save-status-${itemId}`);
+
+    // Visual feedback - saving state
+    if (checkbox) checkbox.disabled = true;
+    if (label) label.style.opacity = '0.5';
+
+    // Show saving status
+    if (statusDiv) {
+      statusDiv.textContent = '💾 Saving...';
+      statusDiv.style.color = '#ff9800';
+      statusDiv.style.opacity = '1';
+    }
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ show_in_bottle_count: showInBottle })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.showInBottleCount = showInBottle;
+      }
+
+      // Success feedback
+      if (statusDiv) {
+        statusDiv.textContent = '✓ Saved';
+        statusDiv.style.color = '#4caf50';
+      }
+
+      setTimeout(() => {
+        if (checkbox) checkbox.disabled = false;
+        if (label) label.style.opacity = '1';
+        if (statusDiv) statusDiv.style.opacity = '0';
+      }, 800);
+
+      // Refresh prep sheet to update recommendations
+      refreshPrepSheet();
+
+    } catch (error) {
+      console.error('Failed to toggle bottle count:', error);
+
+      // Error feedback
+      if (statusDiv) {
+        statusDiv.textContent = '✗ Failed';
+        statusDiv.style.color = '#d32f2f';
+      }
+
+      // Revert checkbox state
+      if (checkbox) checkbox.checked = !showInBottle;
+
+      setTimeout(() => {
+        if (checkbox) checkbox.disabled = false;
+        if (label) label.style.opacity = '1';
+        if (statusDiv) statusDiv.style.opacity = '0';
+      }, 1000);
+
+      showMessage(`Failed to update bottle count status: ${error.message}`, 'error');
+    }
+  }
+
+  /**
    * Quick adjust stock count with +/- buttons (Mobile-Optimized)
    */
   function quickAdjustStock(itemId, adjustment) {
@@ -15435,6 +15646,56 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         box-sizing: border-box;
       `;
       formContainer.appendChild(createField('Batch Lifespan (Hours)', lifespanInput));
+
+      // Show in Bottle Count checkbox (ONLY for PREP items)
+      const bottleCheckboxContainer = document.createElement('div');
+      bottleCheckboxContainer.style.cssText = `
+        margin-bottom: 16px;
+        padding: 12px;
+        background: #e3f2fd;
+        border: 2px solid #2196f3;
+        border-radius: 4px;
+      `;
+
+      const bottleCheckboxLabel = document.createElement('label');
+      bottleCheckboxLabel.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--gray-900);
+      `;
+
+      const bottleCheckbox = document.createElement('input');
+      bottleCheckbox.type = 'checkbox';
+      bottleCheckbox.id = 'editItemShowInBottle';
+      bottleCheckbox.checked = item.showInBottleCount || false;
+      bottleCheckbox.style.cssText = `
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      `;
+
+      const bottleCheckboxText = document.createElement('span');
+      bottleCheckboxText.textContent = '📋 Show in "BOTTLED & TO-GO PREP CHECK" section';
+      
+      const bottleCheckboxHint = document.createElement('div');
+      bottleCheckboxHint.textContent = 'Check this to include item in the bottled/to-go PDF section (in addition to items with "BOTTLED" or "TO GO" in the name)';
+      bottleCheckboxHint.style.cssText = `
+        font-size: 11px;
+        color: var(--gray-600);
+        margin-left: 28px;
+        margin-top: 4px;
+        line-height: 1.4;
+      `;
+
+      bottleCheckboxLabel.appendChild(bottleCheckbox);
+      bottleCheckboxLabel.appendChild(bottleCheckboxText);
+      bottleCheckboxContainer.appendChild(bottleCheckboxLabel);
+      bottleCheckboxContainer.appendChild(bottleCheckboxHint);
+      formContainer.appendChild(bottleCheckboxContainer);
     }
 
     // Button container
@@ -15525,12 +15786,16 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       // Add PREP-specific fields if present
       const itemTypeInput = document.getElementById('editItemType');
       const lifespanInput = document.getElementById('editItemLifespan');
+      const bottleCheckbox = document.getElementById('editItemShowInBottle');
 
       if (itemTypeInput) {
         updatedData.item_type = itemTypeInput.value.trim();
       }
       if (lifespanInput && lifespanInput.value) {
         updatedData.batch_lifespan_hours = parseInt(lifespanInput.value) || null;
+      }
+      if (bottleCheckbox) {
+        updatedData.show_in_bottle_count = bottleCheckbox.checked;
       }
 
       // Validate
@@ -15557,6 +15822,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           localItem.vendor = updatedData.vendor;
           localItem.unit = updatedData.unit;
           localItem.parLevel = updatedData.par_level;
+          localItem.showInBottleCount = updatedData.show_in_bottle_count;
           if (updatedData.item_type) localItem.itemType = updatedData.item_type;
           if (updatedData.batch_lifespan_hours !== undefined) localItem.batchLifespan = updatedData.batch_lifespan_hours;
         }
@@ -16519,7 +16785,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(black[0], black[1], black[2]);
-      doc.text('PREP SHEET - ' + dateStr, 4.25, 0.7, { align: 'center' });
+      doc.text('PREP SHEET - ' + dateStr + ' [v3.0]', 4.25, 0.7, { align: 'center' });
 
       // Blue underline
       doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
@@ -16530,7 +16796,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(102, 102, 102);
-      doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
+      doc.text('Generated ' + timeStr + ' - NEW 6-COLUMN FORMAT', 4.25, 0.95, { align: 'center' });
 
       let yPos = 1.1;
 
@@ -16555,21 +16821,33 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos += 0.6;
       }
 
-      // Bottled sauce summary
-      const sauceSummary = buildBottledSauceSummary(recommendations);
-      if (sauceSummary.length > 0) {
-        yPos = renderSauceSummaryTable(doc, sauceSummary, yPos);
+      // Bottled & To-Go items section (before main priority sections)
+      const bottledItems = recommendations.filter(r => {
+        const nameMatch = isBottledOrToGoItem(r.itemName);
+        const checkboxMatch = r.showInBottleCount === true;
+        return nameMatch || checkboxMatch;
+      });
+
+      if (bottledItems.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243]);
       }
 
+      // Filter out bottled/to-go items from main prep sections
+      const prepItems = recommendations.filter(r => {
+        const nameMatch = isBottledOrToGoItem(r.itemName);
+        const checkboxMatch = r.showInBottleCount === true;
+        return !nameMatch && !checkboxMatch;
+      });
+
       // Group by priority
-      const makeFirst = recommendations.filter(r => r.urgent === true)
+      const makeFirst = prepItems.filter(r => r.urgent === true)
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      const lineCooksPrep = recommendations.filter(r => r.lineCooksPrep === true && r.urgent !== true)
+      const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && r.urgent !== true)
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true && r.lineCooksPrep !== true);
-      const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true && r.lineCooksPrep !== true);
-      const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true && r.lineCooksPrep !== true);
-      const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true && r.lineCooksPrep !== true);
+      const urgent = prepItems.filter(r => r.priority === 'urgent' && r.urgent !== true && r.lineCooksPrep !== true);
+      const high = prepItems.filter(r => r.priority === 'high' && r.urgent !== true && r.lineCooksPrep !== true);
+      const medium = prepItems.filter(r => r.priority === 'medium' && r.urgent !== true && r.lineCooksPrep !== true);
+      const low = prepItems.filter(r => r.priority === 'low' && r.urgent !== true && r.lineCooksPrep !== true);
 
       if (makeFirst.length > 0) {
         yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0]); // Red color for emphasis
@@ -16692,21 +16970,33 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos += 0.6;
       }
 
-      // Bottled sauce summary
-      const sauceSummary = buildBottledSauceSummary(recommendations);
-      if (sauceSummary.length > 0) {
-        yPos = renderSauceSummaryTable(doc, sauceSummary, yPos);
+      // Bottled & To-Go items section (before main priority sections)
+      const bottledItems = recommendations.filter(r => {
+        const nameMatch = isBottledOrToGoItem(r.itemName);
+        const checkboxMatch = r.showInBottleCount === true;
+        return nameMatch || checkboxMatch;
+      });
+
+      if (bottledItems.length > 0) {
+        yPos = renderPrepPDFSection(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243]);
       }
 
+      // Filter out bottled/to-go items from main prep sections
+      const prepItems = recommendations.filter(r => {
+        const nameMatch = isBottledOrToGoItem(r.itemName);
+        const checkboxMatch = r.showInBottleCount === true;
+        return !nameMatch && !checkboxMatch;
+      });
+
       // Group by priority
-      const makeFirst = recommendations.filter(r => r.urgent === true)
+      const makeFirst = prepItems.filter(r => r.urgent === true)
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      const lineCooksPrep = recommendations.filter(r => r.lineCooksPrep === true && r.urgent !== true)
+      const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && r.urgent !== true)
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      const urgent = recommendations.filter(r => r.priority === 'urgent' && r.urgent !== true && r.lineCooksPrep !== true);
-      const high = recommendations.filter(r => r.priority === 'high' && r.urgent !== true && r.lineCooksPrep !== true);
-      const medium = recommendations.filter(r => r.priority === 'medium' && r.urgent !== true && r.lineCooksPrep !== true);
-      const low = recommendations.filter(r => r.priority === 'low' && r.urgent !== true && r.lineCooksPrep !== true);
+      const urgent = prepItems.filter(r => r.priority === 'urgent' && r.urgent !== true && r.lineCooksPrep !== true);
+      const high = prepItems.filter(r => r.priority === 'high' && r.urgent !== true && r.lineCooksPrep !== true);
+      const medium = prepItems.filter(r => r.priority === 'medium' && r.urgent !== true && r.lineCooksPrep !== true);
+      const low = prepItems.filter(r => r.priority === 'low' && r.urgent !== true && r.lineCooksPrep !== true);
 
       if (makeFirst.length > 0) {
         yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0]);
@@ -16770,66 +17060,30 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     }
   }
 
-  /**
-   * Render low priority items in extra compact list format
-   */
-  function renderCompactPrepList(doc, items, startY) {
-    // 2-COLUMN LAYOUT for LOW PRIORITY items
-    const leftColX = 0.6;        // Left column start
-    const rightColX = 4.3;       // Right column start (middle of page)
-    const colWidth = 3.5;        // Each column width
-    const lineHeight = 0.12;
-    const topMargin = startY + 0.08;
-
-    // Split items into 2 columns (left half and right half)
-    const itemsPerColumn = Math.ceil(items.length / 2);
-    const leftColItems = items.slice(0, itemsPerColumn);
-    const rightColItems = items.slice(itemsPerColumn);
-
-    doc.setFontSize(5.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(66, 66, 66);
-
-    // Render LEFT COLUMN
-    let y = topMargin;
-    leftColItems.forEach((item) => {
-      const stockText = `${item.itemName} (${item.stockPercentage.toFixed(0)}%)`;
-      doc.text(stockText, leftColX, y, { maxWidth: colWidth });
-      y += lineHeight;
-    });
-
-    // Render RIGHT COLUMN
-    y = topMargin;
-    rightColItems.forEach((item) => {
-      const stockText = `${item.itemName} (${item.stockPercentage.toFixed(0)}%)`;
-      doc.text(stockText, rightColX, y, { maxWidth: colWidth });
-      y += lineHeight;
-    });
-
-    // Return the max Y position (whichever column ended lower)
-    const leftColEndY = topMargin + (leftColItems.length * lineHeight);
-    const rightColEndY = topMargin + (rightColItems.length * lineHeight);
-    return Math.max(leftColEndY, rightColEndY) + 0.15;
-  }
-
   function buildBottledSauceSummary(recommendations = []) {
     const summary = [];
 
-    BOTTLED_SAUCE_ITEMS.forEach((config) => {
-      const match = recommendations.find((item) => {
-        const name = (item.itemName || '').trim().toLowerCase();
-        return config.aliases.some(alias => name.includes(alias));
-      });
-
-      if (!match) return;
-
-      const quantitySource = match.currentStock != null ? match.currentStock : match.recommendedAmount;
-      summary.push({
-        label: config.label,
-        quantity: formatPrepQuantity(quantitySource),
-        lastCounted: formatLastCountedDetail(match.lastCountedDate)
-      });
+    // Get all bottled/to-go items from recommendations
+    recommendations.forEach((item) => {
+      // Check if item should be in bottle section:
+      // 1. Has "BOTTLED" in name
+      // 2. Has "TO GO" or "TO-GO" in name
+      // 3. Has showInBottleCount checkbox checked
+      const nameMatch = isBottledOrToGoItem(item.itemName);
+      const checkboxMatch = item.showInBottleCount === true;
+      
+      if (nameMatch || checkboxMatch) {
+        const quantitySource = item.currentStock != null ? item.currentStock : item.recommendedAmount;
+        summary.push({
+          label: item.itemName,
+          quantity: formatPrepQuantity(quantitySource),
+          lastCounted: formatLastCountedDetail(item.lastCountedDate)
+        });
+      }
     });
+
+    // Sort alphabetically by label
+    summary.sort((a, b) => a.label.localeCompare(b.label));
 
     return summary;
   }
@@ -16842,6 +17096,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     return number.toFixed(2).replace(/\.00$/, '');
   }
 
+  function formatCurrencyInput(value) {
+    if (!Number.isFinite(value)) return '';
+    return Number(value).toFixed(2);
+  }
+
   function formatLastCountedDetail(dateStr) {
     if (!dateStr) return 'Never';
     const date = new Date(dateStr);
@@ -16851,47 +17110,102 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     return `${datePart} ${timePart}`;
   }
 
-  function renderSauceSummaryTable(doc, summary, startY) {
+  function renderSauceSummaryCard(doc, summary, startY) {
+    if (!summary.length) return startY;
+
     const headerColor = [33, 150, 243];
-    const textColor = [33, 33, 33];
+    const pageTop = 0.7;
+    const pageBottom = 10.4;
+    const itemColX = 0.6;
+    const itemColWidth = 3.8;
+    const qtyColX = 4.8;
+    const lastColX = 5.7;
+    const lastColWidth = 2.2;
+    const lineGap = 0.16;
 
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-    doc.text('BOTTLED SAUCE CHECK', 0.6, startY + 0.18);
+    const drawHeader = (y, continuation = false) => {
+      if (y > pageBottom) {
+        doc.addPage();
+        y = pageTop;
+      }
 
-    doc.autoTable({
-      startY: startY + 0.3,
-      head: [['ITEM', 'QTY', 'LAST COUNTED']],
-      body: summary.map(row => [row.label, row.quantity, row.lastCounted]),
-      theme: 'grid',
-      styles: {
-        fontSize: 7,
-        cellPadding: 1.8,
-        halign: 'left'
-      },
-      headStyles: {
-        fillColor: headerColor,
-        textColor: [255, 255, 255],
-        fontStyle: 'bold'
-      },
-      columnStyles: {
-        1: { halign: 'center' },
-        2: { halign: 'right' }
-      },
-      margin: { left: 0.5, right: 0.5 }
+      doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
+      doc.rect(0.5, y, 7.5, 0.25, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(255, 255, 255);
+      doc.text(continuation ? 'BOTTLED & TO-GO PREP CHECK (CONT.)' : 'BOTTLED & TO-GO PREP CHECK', 0.6, y + 0.17);
+      
+      const columnHeaderY = y + 0.32;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.5);
+      doc.setTextColor(102, 102, 102);
+      doc.text('ITEM NAME', itemColX, columnHeaderY);
+      doc.text('CURRENT', qtyColX, columnHeaderY);
+      doc.text('LAST COUNTED', lastColX, columnHeaderY);
+
+      doc.setDrawColor(224, 224, 224);
+      doc.setLineWidth(0.01);
+      doc.line(0.5, columnHeaderY + 0.05, 8.0, columnHeaderY + 0.05);
+
+      return columnHeaderY + 0.12;
+    };
+
+    let yPos = drawHeader(startY);
+
+    summary.forEach((row) => {
+      const itemLines = doc.splitTextToSize(row.label.toUpperCase(), itemColWidth);
+      const lastLines = doc.splitTextToSize(row.lastCounted, lastColWidth);
+      const rowLineCount = Math.max(itemLines.length, lastLines.length);
+      const rowHeight = rowLineCount * lineGap + 0.1;
+
+      if (yPos + rowHeight > pageBottom) {
+        yPos = drawHeader(pageTop, true);
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.4);
+      doc.setTextColor(33, 33, 33);
+      doc.text(itemLines[0], itemColX, yPos, { maxWidth: itemColWidth });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.4);
+      for (let i = 1; i < itemLines.length; i++) {
+        doc.text(itemLines[i], itemColX, yPos + (i * lineGap), { maxWidth: itemColWidth });
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(33, 33, 33);
+      doc.text(row.quantity, qtyColX, yPos);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.4);
+      doc.setTextColor(102, 102, 102);
+      lastLines.forEach((line, idx) => {
+        doc.text(line, lastColX, yPos + (idx * lineGap), { maxWidth: lastColWidth });
+      });
+
+      const rowBottom = yPos + rowHeight - 0.05;
+      doc.setDrawColor(224, 224, 224);
+      doc.setLineWidth(0.005);
+      doc.line(0.5, rowBottom, 8.0, rowBottom);
+
+      yPos = rowBottom + 0.07;
     });
 
-    const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : startY + 0.8;
-    return finalY + 0.2;
+    return yPos + 0.15;
   }
 
   /**
-   * Render a priority section in the PDF (compact original format)
+   * Render a priority section in the PDF with clean, well-spaced tables
    */
   function renderPrepPDFSection(doc, title, items, startY, headerColor) {
-    const jaynaBlue = [33, 150, 243];
-    const lightGray = [245, 245, 245];
+    const white = [255, 255, 255];
+    const darkText = [33, 33, 33];
+    const grayText = [102, 102, 102];
+    const lightGray = [136, 136, 136];
+    const redText = [211, 47, 47];
 
     // Check if we need a new page
     if (startY > 9.5) {
@@ -16899,31 +17213,27 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       startY = 0.7;
     }
 
-    // Section header
+    // Section header with colored background
     doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
     doc.rect(0.5, startY, 7.5, 0.25, 'F');
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(white[0], white[1], white[2]);
     doc.text(`${title} (${items.length} items)`, 0.6, startY + 0.17);
 
     startY += 0.25;
 
-    // LOW PRIORITY items: use even more compact list format
-    if (title.includes('LOW PRIORITY')) {
-      return renderCompactPrepList(doc, items, startY);
-    }
-
-    // Table setup - simple one-line format
+    // Prepare table data - each item is ONE row with ALL info
     const tableData = items.map(item => {
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
       const isOut = item.currentStock === 0;
       const stockDisplay = isOut ? 'OUT' : `${item.currentStock} ${item.unit}`;
       const parDisplay = `${item.parLevel} ${item.unit}`;
-      const recommendValue = item.recommendedAmount > 0 ? String(item.recommendedAmount) : '—';
+      const recommendValue = item.recommendedAmount > 0 ? `${item.recommendedAmount} ${item.unit}` : '—';
 
       return [
-        `${item.itemName} (${lastCountStr})`,
+        item.itemName,
+        lastCountStr,
         stockDisplay,
         parDisplay,
         recommendValue,
@@ -16931,46 +17241,46 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       ];
     });
 
-    // Compact rendering with reduced padding and smaller units
+    // Render table with proper spacing
     doc.autoTable({
       startY: startY,
-      head: [['ITEM NAME', 'CURRENT', 'PAR', 'RECOMMEND', 'REASONING']],
+      head: [['ITEM', 'LAST COUNTED', 'CURRENT', 'PAR', 'MAKE', 'REASON']],
       body: tableData,
-      theme: 'plain',
+      theme: 'grid',
       margin: { left: 0.5, right: 0.5 },
       styles: {
         fontSize: 6.5,
-        cellPadding: 0.04,  // Reduced from 0.08
-        lineColor: [224, 224, 224],
-        lineWidth: 0.01,
-        valign: 'middle'
+        cellPadding: 0.06,
+        lineColor: lightGray,
+        lineWidth: 0.005,
+        valign: 'middle',
+        minCellHeight: 0.28,
+        halign: 'left',
+        textColor: darkText
       },
       headStyles: {
-        fillColor: lightGray,
-        textColor: [102, 102, 102],
+        fillColor: [240, 240, 240],
+        textColor: grayText,
         fontStyle: 'bold',
-        fontSize: 6,
-        cellPadding: 0.03,  // Reduced
-        halign: 'left'
+        fontSize: 5.5,
+        cellPadding: 0.05,
+        halign: 'left',
+        valign: 'middle'
       },
       columnStyles: {
-        0: { cellWidth: 2.5, fontStyle: 'bold', fontSize: 6.5, textColor: [33, 33, 33] },
-        1: { cellWidth: 1.2, halign: 'center', fontSize: 6, fontStyle: 'normal' },  // Units not bold, smaller
-        2: { cellWidth: 1.2, halign: 'center', fontSize: 6, fontStyle: 'normal' },  // Units not bold, smaller
-        3: { cellWidth: 0.8, halign: 'center', fontStyle: 'bold', fontSize: 8, textColor: jaynaBlue },
-        4: { cellWidth: 2.3, fontSize: 5.5, textColor: [102, 102, 102], fontStyle: 'italic' }
+        0: { cellWidth: 1.8, fontStyle: 'bold', fontSize: 6.5 },  // ITEM
+        1: { cellWidth: 1.3, fontSize: 5.5, textColor: grayText },  // LAST COUNTED
+        2: { cellWidth: 0.9, halign: 'center', fontSize: 6.5 },     // CURRENT
+        3: { cellWidth: 0.9, halign: 'center', fontSize: 6.5 },     // PAR
+        4: { cellWidth: 0.9, halign: 'center', fontSize: 6.5 },     // MAKE
+        5: { cellWidth: 1.7, fontSize: 5.8, textColor: grayText, fontStyle: 'italic' }  // REASON
       },
       didParseCell: function(data) {
-        // Add border only to body cells
-        if (data.section === 'body') {
-          data.cell.styles.lineColor = [224, 224, 224];
-          data.cell.styles.lineWidth = 0.005;
-        }
         // Highlight OUT items in red
-        if (data.column.index === 1 && data.section === 'body') {
+        if (data.column.index === 2 && data.section === 'body') {
           const cellText = data.cell.text[0];
           if (cellText && cellText.includes('OUT')) {
-            data.cell.styles.textColor = [211, 47, 47];
+            data.cell.styles.textColor = redText;
             data.cell.styles.fontStyle = 'bold';
             data.cell.styles.fontSize = 7;
           }
@@ -16978,32 +17288,15 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       }
     });
 
-    return doc.lastAutoTable.finalY + 0.15;  // Reduced spacing between sections
+    return doc.lastAutoTable.finalY + 0.15;
   }
 
   /**
-   * Print prep sheet with compact grayscale design
+   * Send prep sheet PDF to printer via email
    */
   function printPrepSheet() {
-    const recommendations = orderingSystemState.prepRecommendations;
-    if (!recommendations || recommendations.length === 0) {
-      showMessage('No prep recommendations to print', 'warning');
-      return;
-    }
-
-    const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-
-    // Group by priority and sort by stock percentage (lowest to highest)
-    const urgent = recommendations.filter(r => r.priority === 'urgent')
-      .sort((a, b) => a.stockPercentage - b.stockPercentage);
-    const high = recommendations.filter(r => r.priority === 'high')
-      .sort((a, b) => a.stockPercentage - b.stockPercentage);
-    const medium = recommendations.filter(r => r.priority === 'medium')
-      .sort((a, b) => a.stockPercentage - b.stockPercentage);
-    const low = recommendations.filter(r => r.priority === 'low')
-      .sort((a, b) => a.stockPercentage - b.stockPercentage);
-
-    const printWindow = window.open('', '', 'height=800,width=1000');
+    // Print button now emails PDF to printer
+    emailPrepSheetToPrinter();
 
     let html = `
 <!DOCTYPE html>
@@ -19973,7 +20266,14 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         },
         didDrawCell: function(data) {
           if (data.column.index === 0 && data.cell.section === 'body') {
-            const cellData = tableData[data.row.index][0];
+            const rowData = tableData[data.row.index];
+            if (!rowData) {
+              return;
+            }
+            const cellData = rowData[0];
+            if (!cellData) {
+              return;
+            }
             const lines = cellData.split('\n');
 
             if (lines.length > 1) {
