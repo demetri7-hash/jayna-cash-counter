@@ -13315,12 +13315,24 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const vendorLabel = document.createElement('label');
       vendorLabel.textContent = 'VENDOR';
       vendorLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;';
-      const vendorInput = document.createElement('input');
-      vendorInput.type = 'text';
-      vendorInput.value = item.vendor;
+      
+      // Get unique vendors from all items
+      const allVendors = [...new Set(orderingSystemState.items.map(i => i.vendor).filter(v => v))].sort();
+      
+      const vendorInput = document.createElement('select');
       vendorInput.dataset.itemId = item.id;
       vendorInput.dataset.field = 'vendor';
-      vendorInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; box-sizing: border-box;';
+      vendorInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; box-sizing: border-box; background: white; cursor: pointer;';
+      
+      // Add options for each vendor
+      allVendors.forEach(vendor => {
+        const option = document.createElement('option');
+        option.value = vendor;
+        option.textContent = vendor;
+        option.selected = vendor === item.vendor;
+        vendorInput.appendChild(option);
+      });
+      
       vendorField.appendChild(vendorLabel);
       vendorField.appendChild(vendorInput);
       fieldsGrid.appendChild(vendorField);
@@ -13404,7 +13416,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    * Save bulk edits for all selected items
    */
   async function saveBulkEdits(modal, overlay) {
-    const inputs = modal.querySelectorAll('input[data-item-id]');
+    const inputs = modal.querySelectorAll('input[data-item-id], select[data-item-id]');
     const updates = {};
 
     // Group updates by item ID
@@ -16915,7 +16927,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos += 0.6;
       }
 
-      // Bottled & To-Go items section (before main priority sections)
+      // Bottled & To-Go items section (before main priority sections) - COMPACT FORMAT
       const bottledItems = recommendations.filter(r => {
         const nameMatch = isBottledOrToGoItem(r.itemName);
         const checkboxMatch = r.showInBottleCount === true;
@@ -16923,7 +16935,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       });
 
       if (bottledItems.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243]);
+        yPos = renderCompactList(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243], 3);
       }
 
       // Filter out bottled/to-go items from main prep sections
@@ -16956,7 +16968,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos = renderPrepPDFSection(doc, 'MEDIUM PRIORITY', medium, yPos, darkGray);
       }
       if (low.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray);
+        yPos = renderCompactList(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray, 2);
       }
       if (lineCooksPrep.length > 0) {
         yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130]); // Purple color for line cooks
@@ -17064,7 +17076,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos += 0.6;
       }
 
-      // Bottled & To-Go items section (before main priority sections)
+      // Bottled & To-Go items section (before main priority sections) - COMPACT FORMAT
       const bottledItems = recommendations.filter(r => {
         const nameMatch = isBottledOrToGoItem(r.itemName);
         const checkboxMatch = r.showInBottleCount === true;
@@ -17072,7 +17084,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       });
 
       if (bottledItems.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243]);
+        yPos = renderCompactList(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243], 3);
       }
 
       // Filter out bottled/to-go items from main prep sections
@@ -17105,7 +17117,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos = renderPrepPDFSection(doc, 'MEDIUM PRIORITY', medium, yPos, darkGray);
       }
       if (low.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray);
+        yPos = renderCompactList(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray, 2);
       }
       if (lineCooksPrep.length > 0) {
         yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130]);
@@ -17292,6 +17304,65 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
+   * Render a compact list format (for bottle count and low priority)
+   */
+  function renderCompactList(doc, title, items, startY, headerColor, columns = 2) {
+    const white = [255, 255, 255];
+    const darkText = [33, 33, 33];
+    const grayText = [102, 102, 102];
+
+    // Check if we need a new page
+    if (startY > 9.5) {
+      doc.addPage();
+      startY = 0.7;
+    }
+
+    // Section header
+    doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
+    doc.rect(0.5, startY, 7.5, 0.22, 'F');
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(white[0], white[1], white[2]);
+    doc.text(`${title} (${items.length} items)`, 0.6, startY + 0.15);
+
+    startY += 0.22;
+
+    // Calculate column width
+    const columnWidth = 7.5 / columns;
+    const itemsPerColumn = Math.ceil(items.length / columns);
+
+    // Render items in columns
+    let currentY = startY + 0.08;
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const columnIndex = Math.floor(i / itemsPerColumn);
+      const rowIndex = i % itemsPerColumn;
+      const x = 0.5 + (columnIndex * columnWidth);
+      const y = startY + 0.08 + (rowIndex * 0.16);
+
+      // Item name (bold)
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(darkText[0], darkText[1], darkText[2]);
+      const itemText = item.itemName.length > 30 ? item.itemName.substring(0, 28) + '...' : item.itemName;
+      doc.text(itemText, x + 0.08, y);
+
+      // Quantity and last counted (smaller, gray)
+      doc.setFontSize(5.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(grayText[0], grayText[1], grayText[2]);
+      const qtyText = `${item.currentStock || 0} ${item.unit || ''}`;
+      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+      doc.text(`${qtyText} • ${lastCountStr}`, x + 0.08, y + 0.10);
+
+      currentY = Math.max(currentY, y + 0.16);
+    }
+
+    return currentY + 0.08;
+  }
+
+  /**
    * Render a priority section in the PDF with clean, well-spaced tables
    */
   function renderPrepPDFSection(doc, title, items, startY, headerColor) {
@@ -17309,13 +17380,13 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     // Section header with colored background
     doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
-    doc.rect(0.5, startY, 7.5, 0.25, 'F');
-    doc.setFontSize(8);
+    doc.rect(0.5, startY, 7.5, 0.22, 'F');
+    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(white[0], white[1], white[2]);
-    doc.text(`${title} (${items.length} items)`, 0.6, startY + 0.17);
+    doc.text(`${title} (${items.length} items)`, 0.6, startY + 0.15);
 
-    startY += 0.25;
+    startY += 0.22;
 
     // Prepare table data - each item is ONE row with ALL info
     const tableData = items.map(item => {
@@ -17335,7 +17406,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       ];
     });
 
-    // Render table with proper spacing
+    // Render table with compact spacing
     doc.autoTable({
       startY: startY,
       head: [['ITEM', 'LAST COUNTED', 'CURRENT', 'PAR', 'MAKE', 'REASON']],
@@ -17343,12 +17414,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       theme: 'grid',
       margin: { left: 0.5, right: 0.5 },
       styles: {
-        fontSize: 6.5,
-        cellPadding: 0.06,
+        fontSize: 6,
+        cellPadding: 0.04,
         lineColor: lightGray,
         lineWidth: 0.005,
         valign: 'middle',
-        minCellHeight: 0.28,
+        minCellHeight: 0.22,
         halign: 'left',
         textColor: darkText
       },
@@ -17362,12 +17433,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         valign: 'middle'
       },
       columnStyles: {
-        0: { cellWidth: 1.8, fontStyle: 'bold', fontSize: 6.5 },  // ITEM
-        1: { cellWidth: 1.3, fontSize: 5.5, textColor: grayText },  // LAST COUNTED
-        2: { cellWidth: 0.9, halign: 'center', fontSize: 6.5 },     // CURRENT
-        3: { cellWidth: 0.9, halign: 'center', fontSize: 6.5 },     // PAR
-        4: { cellWidth: 0.9, halign: 'center', fontSize: 6.5 },     // MAKE
-        5: { cellWidth: 1.7, fontSize: 5.8, textColor: grayText, fontStyle: 'italic' }  // REASON
+        0: { cellWidth: 1.7, fontStyle: 'bold', fontSize: 6 },      // ITEM
+        1: { cellWidth: 1.1, fontSize: 5.2, textColor: grayText },  // LAST COUNTED
+        2: { cellWidth: 0.85, halign: 'center', fontSize: 6 },      // CURRENT
+        3: { cellWidth: 0.85, halign: 'center', fontSize: 6 },      // PAR
+        4: { cellWidth: 0.85, halign: 'center', fontSize: 6 },      // MAKE
+        5: { cellWidth: 1.6, fontSize: 5.5, textColor: grayText, fontStyle: 'italic' }  // REASON
       },
       didParseCell: function(data) {
         // Highlight OUT items in red
@@ -17382,7 +17453,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       }
     });
 
-    return doc.lastAutoTable.finalY + 0.15;
+    return doc.lastAutoTable.finalY + 0.08;
   }
 
   /**
