@@ -1689,13 +1689,13 @@
 
           <!-- Action Buttons -->
           <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
-            <button class="submit-btn" onclick="refreshPrepSheet()" style="background: var(--gray-700); flex: 1;">
+            <button class="submit-btn" onclick="refreshPrepSheet()" style="background: #808080; color: white; flex: 1; min-width: 150px;">
               REFRESH
             </button>
-            <button class="submit-btn" onclick="generatePrepSheetPDF()" style="background: var(--gray-600); flex: 1;">
+            <button class="submit-btn" onclick="generatePrepSheetPDF()" style="background: #808080; color: white; flex: 1; min-width: 150px;">
               DOWNLOAD PDF
             </button>
-            <button class="submit-btn" onclick="emailPrepSheetToPrinter()" style="background: var(--gray-600); flex: 1;">
+            <button class="submit-btn" onclick="emailPrepSheetToPrinter()" style="background: #808080; color: white; flex: 1; min-width: 150px;">
               EMAIL TO PRINTER
             </button>
           </div>
@@ -16752,7 +16752,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     }
 
     // URGENT, HIGH, MEDIUM: full table format
-    const headerBg = priority === 'urgent' ? '#212121' : '#424242';
+    const headerBg = priority === 'makeFirst' ? '#dc0000' : priority === 'lineCooksPrep' ? '#4a148c' : priority === 'urgent' ? '#212121' : '#424242';
 
     const itemsHTML = items.map(item => {
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
@@ -16762,8 +16762,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       return `
         <div style="
           display: grid;
-          grid-template-columns: 2fr 1fr 1fr 1fr 2fr;
-          gap: 12px;
+          grid-template-columns: 2fr 1fr 1fr 1fr 0.75fr 2fr;
+          gap: 8px;
           padding: 12px 16px;
           border-bottom: 1px solid #e0e0e0;
           align-items: center;
@@ -16773,16 +16773,20 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             <div style="font-size: 10px; color: #999; margin-top: 2px;">Last count: ${lastCountStr}</div>
           </div>
           <div style="text-align: center;">
-            <div style="font-weight: 700; font-size: 16px; color: ${isOut ? '#d32f2f' : '#212121'};">${stockStatus}</div>
+            <div style="font-weight: 700; font-size: 14px; color: ${isOut ? '#d32f2f' : '#212121'};">${stockStatus}</div>
             <div style="font-size: 9px; color: #666; text-transform: uppercase; margin-top: 2px;">Current</div>
           </div>
           <div style="text-align: center;">
-            <div style="font-weight: 700; font-size: 16px; color: #212121;">${item.parLevel} ${item.unit}</div>
+            <div style="font-weight: 700; font-size: 14px; color: #212121;">${item.parLevel} ${item.unit}</div>
             <div style="font-size: 9px; color: #666; text-transform: uppercase; margin-top: 2px;">Par</div>
           </div>
           <div style="text-align: center;">
-            <div style="font-weight: 700; font-size: 18px; color: #2196F3;">${item.recommendedAmount > 0 ? item.recommendedAmount : '—'}</div>
-            <div style="font-size: 9px; color: #666; text-transform: uppercase; margin-top: 2px;">To Make</div>
+            <div style="font-weight: 700; font-size: 16px; color: #2196F3;">${item.recommendedAmount > 0 ? item.recommendedAmount : '—'}</div>
+            <div style="font-size: 9px; color: #666; text-transform: uppercase; margin-top: 2px;">Make</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-weight: 700; font-size: 14px; color: #666;">${item.unit}</div>
+            <div style="font-size: 9px; color: #666; text-transform: uppercase; margin-top: 2px;">Unit</div>
           </div>
           <div style="font-size: 11px; color: #666; font-style: italic;">
             ${item.reasoning}
@@ -16809,8 +16813,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           <!-- Header Row -->
           <div style="
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 2fr;
-            gap: 12px;
+            grid-template-columns: 2fr 1fr 1fr 1fr 0.75fr 2fr;
+            gap: 8px;
             padding: 8px 16px;
             background: #f5f5f5;
             border-bottom: 2px solid #e0e0e0;
@@ -16823,8 +16827,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             <div>ITEM NAME</div>
             <div style="text-align: center;">CURRENT</div>
             <div style="text-align: center;">PAR</div>
-            <div style="text-align: center;">RECOMMEND</div>
-            <div>REASONING</div>
+            <div style="text-align: center;">MAKE</div>
+            <div style="text-align: center;">UNIT</div>
+            <div>REASON</div>
           </div>
           ${itemsHTML}
         </div>
