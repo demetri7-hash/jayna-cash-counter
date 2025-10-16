@@ -13328,6 +13328,22 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const fieldsGrid = document.createElement('div');
       fieldsGrid.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 12px;';
 
+      // Item Name
+      const nameField = document.createElement('div');
+      nameField.style.cssText = 'grid-column: 1 / -1;';
+      const nameLabel = document.createElement('label');
+      nameLabel.textContent = 'ITEM NAME';
+      nameLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;';
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.value = item.itemName;
+      nameInput.dataset.itemId = item.id;
+      nameInput.dataset.field = 'item_name';
+      nameInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; box-sizing: border-box;';
+      nameField.appendChild(nameLabel);
+      nameField.appendChild(nameInput);
+      fieldsGrid.appendChild(nameField);
+
       // Vendor
       const vendorField = document.createElement('div');
       const vendorLabel = document.createElement('label');
@@ -13386,20 +13402,52 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       parField.appendChild(parInput);
       fieldsGrid.appendChild(parField);
 
-      // Item Name
-      const nameField = document.createElement('div');
-      const nameLabel = document.createElement('label');
-      nameLabel.textContent = 'ITEM NAME';
-      nameLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;';
-      const nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.value = item.itemName;
-      nameInput.dataset.itemId = item.id;
-      nameInput.dataset.field = 'item_name';
-      nameInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; box-sizing: border-box;';
-      nameField.appendChild(nameLabel);
-      nameField.appendChild(nameInput);
-      fieldsGrid.appendChild(nameField);
+      // Current Stock (read-only)
+      const stockField = document.createElement('div');
+      const stockLabel = document.createElement('label');
+      stockLabel.textContent = 'CURRENT STOCK (READ-ONLY)';
+      stockLabel.style.cssText = 'display: block; color: var(--gray-600); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;';
+      const stockInput = document.createElement('input');
+      stockInput.type = 'number';
+      stockInput.value = item.currentStock || 0;
+      stockInput.readOnly = true;
+      stockInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; box-sizing: border-box; background: var(--gray-100); color: var(--gray-600);';
+      stockField.appendChild(stockLabel);
+      stockField.appendChild(stockInput);
+      fieldsGrid.appendChild(stockField);
+
+      // Item Type (if exists)
+      if (item.itemType || item.vendor === 'PREP') {
+        const typeField = document.createElement('div');
+        const typeLabel = document.createElement('label');
+        typeLabel.textContent = 'ITEM TYPE';
+        typeLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;';
+        const typeInput = document.createElement('input');
+        typeInput.type = 'text';
+        typeInput.value = item.itemType || 'prep';
+        typeInput.dataset.itemId = item.id;
+        typeInput.dataset.field = 'item_type';
+        typeInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; box-sizing: border-box;';
+        typeField.appendChild(typeLabel);
+        typeField.appendChild(typeInput);
+        fieldsGrid.appendChild(typeField);
+
+        // Batch Lifespan
+        const lifespanField = document.createElement('div');
+        const lifespanLabel = document.createElement('label');
+        lifespanLabel.textContent = 'BATCH LIFESPAN (HOURS)';
+        lifespanLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;';
+        const lifespanInput = document.createElement('input');
+        lifespanInput.type = 'number';
+        lifespanInput.value = item.batchLifespan || '';
+        lifespanInput.placeholder = 'e.g., 24';
+        lifespanInput.dataset.itemId = item.id;
+        lifespanInput.dataset.field = 'batch_lifespan';
+        lifespanInput.style.cssText = 'width: 100%; padding: 8px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; box-sizing: border-box;';
+        lifespanField.appendChild(lifespanLabel);
+        lifespanField.appendChild(lifespanInput);
+        fieldsGrid.appendChild(lifespanField);
+      }
 
       itemCard.appendChild(fieldsGrid);
       content.appendChild(itemCard);
@@ -13447,7 +13495,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         updates[itemId] = {};
       }
 
-      if (field === 'par_level') {
+      if (field === 'par_level' || field === 'batch_lifespan') {
         updates[itemId][field] = parseFloat(value) || 0;
       } else if (field === 'unit') {
         updates[itemId][field] = value.toUpperCase();
@@ -13480,6 +13528,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             if (data.vendor) localItem.vendor = data.vendor;
             if (data.unit) localItem.unit = data.unit;
             if (data.par_level !== undefined) localItem.parLevel = data.par_level;
+            if (data.item_type) localItem.itemType = data.item_type;
+            if (data.batch_lifespan !== undefined) localItem.batchLifespan = data.batch_lifespan;
           }
 
           successCount++;
