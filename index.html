@@ -13262,6 +13262,24 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
+   * Toggle selection for all items in a vendor
+   */
+  function toggleVendorSelection(vendor) {
+    const vendorItems = orderingSystemState.items.filter(item => item.vendor === vendor);
+    const allSelected = vendorItems.every(item => selectedItemsForBulkEdit.has(item.id));
+    
+    if (allSelected) {
+      // Deselect all items in this vendor
+      vendorItems.forEach(item => selectedItemsForBulkEdit.delete(item.id));
+    } else {
+      // Select all items in this vendor
+      vendorItems.forEach(item => selectedItemsForBulkEdit.add(item.id));
+    }
+    
+    renderInventoryList();
+  }
+
+  /**
    * Open bulk edit modal for selected items
    */
   async function openBulkEditModal() {
@@ -13567,12 +13585,39 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const items = itemsByVendor[vendor];
       const isPrepCategory = vendor === 'PREP';
       const headerColor = isPrepCategory ? '#212121' : 'var(--gray-700)';
+      
+      // Check if all items in this vendor are selected
+      const allSelected = items.every(item => selectedItemsForBulkEdit.has(item.id));
 
       html += `
         <div style="margin-bottom: 24px;">
-          <h4 style="background: ${headerColor}; color: white; padding: 12px 16px; border-radius: 0; margin-bottom: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-            ${vendor} <span style="opacity: 0.7; font-weight: 400; font-size: 12px;">(${items.length})</span>
-          </h4>
+          <div style="background: ${headerColor}; color: white; padding: 12px 16px; border-radius: 0; margin-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+              ${vendor} <span style="opacity: 0.7; font-weight: 400; font-size: 12px;">(${items.length})</span>
+            </h4>
+            ${bulkEditMode ? `
+              <button
+                onclick="toggleVendorSelection('${vendor.replace(/'/g, "\\'")}')"
+                style="
+                  background: ${allSelected ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.15)'};
+                  border: 2px solid rgba(255, 255, 255, 0.4);
+                  border-radius: 4px;
+                  color: white;
+                  padding: 6px 12px;
+                  font-size: 11px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                "
+                onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'"
+                onmouseout="this.style.background='${allSelected ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.15)'}'"
+              >
+                ${allSelected ? '✓ DESELECT ALL' : 'SELECT ALL'}
+              </button>
+            ` : ''}
+          </div>
           <div style="background: white; border: 2px solid var(--gray-300); border-top: none;">
             ${items.map((item, i) => {
               const isSelected = selectedItemsForBulkEdit.has(item.id);
