@@ -17310,6 +17310,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const white = [255, 255, 255];
     const darkText = [33, 33, 33];
     const grayText = [102, 102, 102];
+    const lightGray = [220, 220, 220];
 
     // Check if we need a new page
     if (startY > 9.5) {
@@ -17317,49 +17318,62 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       startY = 0.7;
     }
 
-    // Section header
+    // Section header - sleek and minimal
     doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
-    doc.rect(0.5, startY, 7.5, 0.22, 'F');
-    doc.setFontSize(7.5);
+    doc.rect(0.5, startY, 7.5, 0.18, 'F');
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(white[0], white[1], white[2]);
-    doc.text(`${title} (${items.length} items)`, 0.6, startY + 0.15);
+    doc.text(`${title} (${items.length})`, 0.6, startY + 0.12);
 
-    startY += 0.22;
+    startY += 0.18;
 
-    // Calculate column width
+    // Add subtle separator line
+    doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
+    doc.setLineWidth(0.003);
+    doc.line(0.5, startY, 8, startY);
+
+    // Calculate column width and padding
     const columnWidth = 7.5 / columns;
     const itemsPerColumn = Math.ceil(items.length / columns);
+    const lineHeight = 0.12; // Tighter line spacing
 
     // Render items in columns
-    let currentY = startY + 0.08;
+    let maxY = startY;
     
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const columnIndex = Math.floor(i / itemsPerColumn);
       const rowIndex = i % itemsPerColumn;
-      const x = 0.5 + (columnIndex * columnWidth);
-      const y = startY + 0.08 + (rowIndex * 0.16);
+      const x = 0.5 + (columnIndex * columnWidth) + 0.08;
+      const y = startY + 0.06 + (rowIndex * lineHeight);
 
-      // Item name (bold)
-      doc.setFontSize(6.5);
+      // Item name and quantity on same line - cleaner look
+      doc.setFontSize(5.8);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(darkText[0], darkText[1], darkText[2]);
-      const itemText = item.itemName.length > 30 ? item.itemName.substring(0, 28) + '...' : item.itemName;
-      doc.text(itemText, x + 0.08, y);
-
-      // Quantity and last counted (smaller, gray)
-      doc.setFontSize(5.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(grayText[0], grayText[1], grayText[2]);
+      
+      // Truncate long names more aggressively
+      const maxNameLength = columns === 3 ? 18 : 28;
+      const itemName = item.itemName.length > maxNameLength 
+        ? item.itemName.substring(0, maxNameLength - 2) + '...' 
+        : item.itemName;
+      
+      // Format: "ITEM NAME: Qty Unit"
       const qtyText = `${item.currentStock || 0} ${item.unit || ''}`;
-      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
-      doc.text(`${qtyText} • ${lastCountStr}`, x + 0.08, y + 0.10);
+      doc.text(itemName, x, y);
+      
+      // Quantity in lighter weight on same line
+      const nameWidth = doc.getTextWidth(itemName);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.5);
+      doc.setTextColor(grayText[0], grayText[1], grayText[2]);
+      doc.text(`: ${qtyText}`, x + nameWidth, y);
 
-      currentY = Math.max(currentY, y + 0.16);
+      maxY = Math.max(maxY, y + 0.02);
     }
 
-    return currentY + 0.08;
+    return maxY + 0.08;
   }
 
   /**
@@ -17378,15 +17392,15 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       startY = 0.7;
     }
 
-    // Section header with colored background
+    // Section header with colored background - sleek and compact
     doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
-    doc.rect(0.5, startY, 7.5, 0.22, 'F');
-    doc.setFontSize(7.5);
+    doc.rect(0.5, startY, 7.5, 0.18, 'F');
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(white[0], white[1], white[2]);
-    doc.text(`${title} (${items.length} items)`, 0.6, startY + 0.15);
+    doc.text(`${title} (${items.length})`, 0.6, startY + 0.12);
 
-    startY += 0.22;
+    startY += 0.18;
 
     // Prepare table data - each item is ONE row with ALL info
     const tableData = items.map(item => {
@@ -17415,12 +17429,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       margin: { left: 0.5, right: 0.5 },
       tableWidth: 6.25,
       styles: {
-        fontSize: 6,
-        cellPadding: 0.04,
+        fontSize: 5.8,
+        cellPadding: 0.03,
         lineColor: lightGray,
-        lineWidth: 0.005,
+        lineWidth: 0.003,
         valign: 'middle',
-        minCellHeight: 0.22,
+        minCellHeight: 0.18,
         halign: 'left',
         textColor: darkText,
         overflow: 'linebreak'
@@ -17429,18 +17443,18 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         fillColor: [240, 240, 240],
         textColor: grayText,
         fontStyle: 'bold',
-        fontSize: 5.5,
-        cellPadding: 0.05,
+        fontSize: 5.2,
+        cellPadding: 0.03,
         halign: 'left',
         valign: 'middle'
       },
       columnStyles: {
-        0: { cellWidth: 1.5, fontStyle: 'bold', fontSize: 6 },      // ITEM
-        1: { cellWidth: 1.0, fontSize: 5.2, textColor: grayText },  // LAST COUNTED
-        2: { cellWidth: 0.75, halign: 'center', fontSize: 6 },      // CURRENT
-        3: { cellWidth: 0.75, halign: 'center', fontSize: 6 },      // PAR
-        4: { cellWidth: 0.75, halign: 'center', fontSize: 6 },      // MAKE
-        5: { cellWidth: 1.5, fontSize: 5.5, textColor: grayText, fontStyle: 'italic' }  // REASON
+        0: { cellWidth: 1.5, fontStyle: 'bold', fontSize: 5.8 },      // ITEM
+        1: { cellWidth: 1.0, fontSize: 5.0, textColor: grayText },    // LAST COUNTED
+        2: { cellWidth: 0.75, halign: 'center', fontSize: 5.8 },      // CURRENT
+        3: { cellWidth: 0.75, halign: 'center', fontSize: 5.8 },      // PAR
+        4: { cellWidth: 0.75, halign: 'center', fontSize: 5.8 },      // MAKE
+        5: { cellWidth: 1.5, fontSize: 5.3, textColor: grayText, fontStyle: 'italic' }  // REASON
       },
       didParseCell: function(data) {
         // Highlight OUT items in red
@@ -17455,7 +17469,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       }
     });
 
-    return doc.lastAutoTable.finalY + 0.08;
+    return doc.lastAutoTable.finalY + 0.06;
   }
 
   /**
