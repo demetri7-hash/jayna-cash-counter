@@ -1644,10 +1644,10 @@
             ">+ Add Prep Item</button>
           </div>
 
-          <div style="margin-bottom: 20px;">
-            <h3 style="color: var(--gray-900); margin-bottom: 10px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Today's Prep Recommendations</h3>
-            <p style="color: var(--gray-500); font-size: 13px; margin-bottom: 20px;">
-              Smart recommendations based on current stock levels, consumption patterns, and batch lifespans.
+          <!-- Info Notice -->
+          <div style="margin-bottom: 20px; padding: 12px 16px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 0;">
+            <p style="color: #1565c0; font-size: 12px; margin: 0; font-weight: 600;">
+              💡 View today's full prep recommendations at the bottom of this page
             </p>
           </div>
 
@@ -15028,68 +15028,136 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    */
   async function fetchAndDisplaySessionStats(currentSession) {
     const today = getPacificDate();
+    const yesterday = formatPacificDate(addPacificDays(getPacificMidday(new Date()), -1));
     const statsContainer = document.getElementById('sessionCompletionStats');
 
     try {
-      // Count PREP items that were updated today, grouped by hour ranges
+      // Fetch PREP items with their names and stock levels for detail view
       const { data: prepItems, error } = await supabase
         .from('inventory_items')
-        .select('last_counted_date, item_type, vendor')
+        .select('id, item_name, last_counted_date, current_stock, item_type, vendor')
         .or('item_type.eq.prep,vendor.eq.PREP');
 
       if (error) throw error;
 
-      // Count items updated in each session today
-      const morningCount = prepItems.filter(item => {
+      // Group items by session (with full details for expandable view)
+      const yesterdayClosingItems = prepItems.filter(item => {
+        if (!item.last_counted_date) return false;
+        const lastCounted = new Date(item.last_counted_date);
+        const countDate = formatPacificDate(lastCounted);
+        const hour = getPacificHour(lastCounted);
+        return countDate === yesterday && hour !== null && hour >= 20; // Yesterday after 8pm
+      });
+
+      const morningItems = prepItems.filter(item => {
         if (!item.last_counted_date) return false;
         const lastCounted = new Date(item.last_counted_date);
         const isToday = formatPacificDate(lastCounted) === today;
         const hour = getPacificHour(lastCounted);
         return isToday && hour !== null && hour < 15; // Before 3pm Pacific
-      }).length;
+      });
 
-      const afternoonCount = prepItems.filter(item => {
+      const afternoonItems = prepItems.filter(item => {
         if (!item.last_counted_date) return false;
         const lastCounted = new Date(item.last_counted_date);
         const isToday = formatPacificDate(lastCounted) === today;
         const hour = getPacificHour(lastCounted);
         return isToday && hour !== null && hour >= 15 && hour < 20; // 3pm-8pm Pacific
-      }).length;
+      });
 
-      const closingCount = prepItems.filter(item => {
+      const closingItems = prepItems.filter(item => {
         if (!item.last_counted_date) return false;
         const lastCounted = new Date(item.last_counted_date);
         const isToday = formatPacificDate(lastCounted) === today;
         const hour = getPacificHour(lastCounted);
         return isToday && hour !== null && hour >= 20; // After 8pm Pacific
-      }).length;
+      });
 
       // Build status message based on current session
       let statusHTML = '';
 
       if (currentSession === 'morning_prep') {
-        // Morning: No previous sessions today
-        statusHTML = '<div style="color: var(--gray-600); font-style: italic;">First count session of the day</div>';
+        // Morning: Show yesterday's closing line count
+        if (yesterdayClosingItems.length > 0) {
+          statusHTML = `
+            <div style="cursor: pointer; padding: 8px; background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px; margin-bottom: 4px;" onclick="toggleSessionDetails('yesterday-closing')">
+              <strong>${yesterdayClosingItems.length}</strong> prep items counted during Yesterday's Closing Line
+              <span id="toggle-yesterday-closing" style="float: right; font-size: 10px;">▼ Show Details</span>
+            </div>
+            <div id="details-yesterday-closing" style="display: none; padding: 12px; background: var(--gray-50); border: 1px solid var(--gray-200); margin-top: 4px; font-size: 11px; max-height: 200px; overflow-y: auto;">
+              ${yesterdayClosingItems.map(item => `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--gray-200);">
+                  <span>${item.item_name}</span>
+                  <span style="font-weight: 600;">${item.current_stock || 0} ${orderingSystemState.items.find(i => i.id === item.id)?.unit || ''}</span>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        } else {
+          statusHTML = '<div style="color: var(--gray-500); font-style: italic;">No items counted during yesterday\'s Closing Line</div>';
+        }
       } else if (currentSession === 'afternoon_prep') {
         // Afternoon: Show morning count
-        if (morningCount > 0) {
-          statusHTML = `<div><strong>${morningCount}</strong> prep items counted during Morning Prep</div>`;
+        if (morningItems.length > 0) {
+          statusHTML = `
+            <div style="cursor: pointer; padding: 8px; background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px; margin-bottom: 4px;" onclick="toggleSessionDetails('morning')">
+              <strong>${morningItems.length}</strong> prep items counted during Morning Prep
+              <span id="toggle-morning" style="float: right; font-size: 10px;">▼ Show Details</span>
+            </div>
+            <div id="details-morning" style="display: none; padding: 12px; background: var(--gray-50); border: 1px solid var(--gray-200); margin-top: 4px; font-size: 11px; max-height: 200px; overflow-y: auto;">
+              ${morningItems.map(item => `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--gray-200);">
+                  <span>${item.item_name}</span>
+                  <span style="font-weight: 600;">${item.current_stock || 0} ${orderingSystemState.items.find(i => i.id === item.id)?.unit || ''}</span>
+                </div>
+              `).join('')}
+            </div>
+          `;
         } else {
           statusHTML = '<div style="color: var(--gray-500); font-style: italic;">No items counted during Morning Prep</div>';
         }
       } else { // closing_line
         // Closing: Show both morning and afternoon
-        const lines = [];
-        if (morningCount > 0) {
-          lines.push(`<div><strong>${morningCount}</strong> prep items counted during Morning Prep</div>`);
+        const sections = [];
+        
+        if (morningItems.length > 0) {
+          sections.push(`
+            <div style="cursor: pointer; padding: 8px; background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px; margin-bottom: 4px;" onclick="toggleSessionDetails('morning-closing')">
+              <strong>${morningItems.length}</strong> prep items counted during Morning Prep
+              <span id="toggle-morning-closing" style="float: right; font-size: 10px;">▼ Show Details</span>
+            </div>
+            <div id="details-morning-closing" style="display: none; padding: 12px; background: var(--gray-50); border: 1px solid var(--gray-200); margin-top: 4px; margin-bottom: 8px; font-size: 11px; max-height: 200px; overflow-y: auto;">
+              ${morningItems.map(item => `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--gray-200);">
+                  <span>${item.item_name}</span>
+                  <span style="font-weight: 600;">${item.current_stock || 0} ${orderingSystemState.items.find(i => i.id === item.id)?.unit || ''}</span>
+                </div>
+              `).join('')}
+            </div>
+          `);
         }
-        if (afternoonCount > 0) {
-          lines.push(`<div><strong>${afternoonCount}</strong> prep items counted during Afternoon Prep</div>`);
+        
+        if (afternoonItems.length > 0) {
+          sections.push(`
+            <div style="cursor: pointer; padding: 8px; background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px; margin-bottom: 4px;" onclick="toggleSessionDetails('afternoon')">
+              <strong>${afternoonItems.length}</strong> prep items counted during Afternoon Prep
+              <span id="toggle-afternoon" style="float: right; font-size: 10px;">▼ Show Details</span>
+            </div>
+            <div id="details-afternoon" style="display: none; padding: 12px; background: var(--gray-50); border: 1px solid var(--gray-200); margin-top: 4px; font-size: 11px; max-height: 200px; overflow-y: auto;">
+              ${afternoonItems.map(item => `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--gray-200);">
+                  <span>${item.item_name}</span>
+                  <span style="font-weight: 600;">${item.current_stock || 0} ${orderingSystemState.items.find(i => i.id === item.id)?.unit || ''}</span>
+                </div>
+              `).join('')}
+            </div>
+          `);
         }
-        if (lines.length === 0) {
+        
+        if (sections.length === 0) {
           statusHTML = '<div style="color: var(--gray-500); font-style: italic;">No prep counts completed today</div>';
         } else {
-          statusHTML = lines.join('');
+          statusHTML = sections.join('');
         }
       }
 
@@ -15098,6 +15166,24 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     } catch (error) {
       console.error('Error fetching session stats:', error);
       statsContainer.innerHTML = '<div style="color: var(--gray-500); font-style: italic;">Unable to load count statistics</div>';
+    }
+  }
+
+  /**
+   * Toggle visibility of session detail items
+   */
+  function toggleSessionDetails(sessionId) {
+    const detailsDiv = document.getElementById(`details-${sessionId}`);
+    const toggleSpan = document.getElementById(`toggle-${sessionId}`);
+    
+    if (detailsDiv && toggleSpan) {
+      if (detailsDiv.style.display === 'none') {
+        detailsDiv.style.display = 'block';
+        toggleSpan.textContent = '▲ Hide Details';
+      } else {
+        detailsDiv.style.display = 'none';
+        toggleSpan.textContent = '▼ Show Details';
+      }
     }
   }
 
