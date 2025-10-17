@@ -18428,12 +18428,16 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         5: { cellWidth: 1.6, fontSize: 4.8, textColor: grayText, halign: 'right' }        // LAST COUNTED
       },
       didParseCell: function(data) {
-        // YELLOW HIGHLIGHT: Items that are both URGENT and LINE COOKS PREP (need immediate attention)
+        // YELLOW HIGHLIGHT: Items in LINE COOKS PREP that need immediate attention
+        // Highlight if: (URGENT + LINE COOKS PREP) OR (OUT of stock + LINE COOKS PREP)
         if (data.section === 'body') {
           const rowIndex = data.row.index;
           const item = items[rowIndex];
-          if (item && item.urgent === true && item.lineCooksPrep === true) {
-            data.cell.styles.fillColor = [255, 255, 200]; // Light yellow highlight
+          if (item && item.lineCooksPrep === true) {
+            // Yellow highlight if urgent OR out of stock
+            if (item.urgent === true || item.currentStock === 0) {
+              data.cell.styles.fillColor = [255, 255, 200]; // Light yellow highlight
+            }
           }
         }
         
