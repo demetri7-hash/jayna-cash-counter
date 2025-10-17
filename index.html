@@ -19504,16 +19504,25 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    * Returns {id, itemName, confidence} or null
    */
   function fuzzyMatchInventoryItem(detectedName) {
-    if (!detectedName || orderingSystemState.items.length === 0) return null;
+    console.log('🔍 fuzzyMatchInventoryItem called with:', detectedName);
+    console.log('📦 Total inventory items:', orderingSystemState.items.length);
+    console.log('📚 Total learned aliases:', orderingSystemState.aliases ? Object.keys(orderingSystemState.aliases).length : 0);
+    
+    if (!detectedName || orderingSystemState.items.length === 0) {
+      console.log('❌ No detected name or empty inventory, returning null');
+      return null;
+    }
 
     const normalizedDetected = detectedName.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+    console.log('🔤 Normalized detected name:', normalizedDetected);
 
     // LEARNING: Check if we've matched this exact name before (aliases)
     if (orderingSystemState.aliases && orderingSystemState.aliases[normalizedDetected]) {
       const aliasMatch = orderingSystemState.aliases[normalizedDetected];
+      console.log('💡 Found alias match:', aliasMatch);
       const item = orderingSystemState.items.find(i => i.id === aliasMatch.inventory_item_id);
       if (item) {
-        console.log('✅ LEARNED MATCH:', detectedName, '→', item.itemName);
+        console.log('✅ LEARNED MATCH:', detectedName, '→', item.itemName, '(ID:', item.id, ')');
         return {
           id: item.id,
           itemName: item.itemName, // ALWAYS uses existing name, never overwrites
@@ -19523,8 +19532,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     }
 
     // If no learned match, do fuzzy matching
+    console.log('🔎 No alias match, starting fuzzy matching...');
     let bestMatch = null;
     let bestScore = 0;
+    let allScores = []; // Track all scores for debugging
 
     for (const item of orderingSystemState.items) {
       const normalizedItem = item.itemName.toLowerCase().replace(/[^a-z0-9\s]/g, '');
@@ -19546,6 +19557,15 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
       const score = matchCount / Math.max(detectedWords.length, itemWords.length);
 
+      // Store score for debugging
+      if (score > 0) {
+        allScores.push({
+          itemName: item.itemName,
+          itemId: item.id,
+          score: score.toFixed(3)
+        });
+      }
+
       if (score > bestScore) {
         bestScore = score;
         bestMatch = {
@@ -19556,8 +19576,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       }
     }
 
+    console.log('📊 Top 10 fuzzy match scores:', allScores.sort((a, b) => b.score - a.score).slice(0, 10));
+    console.log('🏆 Best match:', bestMatch, 'Score:', bestScore.toFixed(3), 'Threshold: 0.4');
+
     // Only return match if confidence is above threshold
-    return bestScore > 0.4 ? bestMatch : null;
+    if (bestScore > 0.4) {
+      console.log('✅ Match found above threshold:', bestMatch.itemName, '(ID:', bestMatch.id, ')');
+      return bestMatch;
+    } else {
+      console.log('❌ No match found above threshold (best score:', bestScore.toFixed(3), ')');
+      return null;
+    }
   }
 
   /**
@@ -20736,7 +20765,13 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
       for (const item of matchedItems) {
         try {
-          // Save to invoice_items table
+          // LEARNING: Save to invoice_items table - this creates the learning data
+          console.log('💾 SAVING LEARNING DATA:', {
+            detected_name: item.detectedName,
+            inventory_item_id: item.matchedInventoryId,
+            confidence: item.matchConfidence
+          });
+          
           const { error: itemError } = await supabase
             .from('invoice_items')
             .insert({
@@ -20751,7 +20786,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
               checked_in_at: new Date().toISOString()
             });
 
-          if (itemError) throw itemError;
+          if (itemError) {
+            console.error('❌ Failed to save learning data:', itemError);
+            throw itemError;
+          }
+          console.log('✅ Learning data saved successfully!');
 
           // Update inventory stock
           // Get current stock first
