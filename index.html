@@ -10518,6 +10518,19 @@ async function renderOrdersTab() {
 
       container.appendChild(header);
 
+      // Add action buttons for PDF and Email
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.style.cssText = 'display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;';
+      buttonsDiv.innerHTML = `
+        <button class="submit-btn" onclick="generatePendingOrdersPDF()" style="background: #808080; color: white; flex: 1; min-width: 150px; padding: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border: none; cursor: pointer;">
+          DOWNLOAD PDF
+        </button>
+        <button class="submit-btn" onclick="emailPendingOrdersToPrinter()" style="background: #808080; color: white; flex: 1; min-width: 150px; padding: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border: none; cursor: pointer;">
+          EMAIL TO PRINTER
+        </button>
+      `;
+      container.appendChild(buttonsDiv);
+
       // Group orders by delivery status
       const today = getPacificDate(); // Pacific Time, not UTC
       const ordersToday = orders?.filter(o => o.expected_delivery_date === today) || [];
@@ -14046,6 +14059,108 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                       "
                     ></div>
                   </div>
+
+                  <!-- Par Level Editor -->
+                  <div style="margin-top: 14px;">
+                    <label style="display: block; font-size: 11px; color: #666; margin-bottom: 6px; font-weight: 500;">
+                      Par Level
+                    </label>
+                    <div style="display: flex; gap: 4px; align-items: stretch;">
+                      <!-- Decrement Button (Smaller) -->
+                      <button
+                        type="button"
+                        onclick="quickAdjustParLevel(${item.id}, -0.25)"
+                        style="
+                          flex: 0 0 32px;
+                          padding: 0;
+                          font-size: 18px;
+                          font-weight: 700;
+                          background: #f5f5f5;
+                          border: 2px solid #e0e0e0;
+                          border-radius: 6px;
+                          color: #666;
+                          cursor: pointer;
+                          transition: all 0.2s;
+                          min-height: 36px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                        onmousedown="this.style.background='#e0e0e0'; this.style.transform='scale(0.95)';"
+                        onmouseup="this.style.background='#f5f5f5'; this.style.transform='scale(1)';"
+                        onmouseleave="this.style.background='#f5f5f5'; this.style.transform='scale(1)';"
+                      >−</button>
+
+                      <!-- Par Level Input Field (Smaller) -->
+                      <input
+                        type="number"
+                        inputmode="decimal"
+                        id="par-${item.id}"
+                        value="${item.parLevel}"
+                        min="0"
+                        step="0.25"
+                        onblur="autoSaveParLevel(${item.id}, this.value, this)"
+                        onchange="autoSaveParLevel(${item.id}, this.value, this)"
+                        style="
+                          flex: 1;
+                          padding: 8px 4px;
+                          font-size: 16px;
+                          font-weight: 600;
+                          text-align: center;
+                          border: 2px solid #999;
+                          border-radius: 6px;
+                          background: #ffffff;
+                          color: #333;
+                          box-sizing: border-box;
+                          -webkit-appearance: none;
+                          -moz-appearance: textfield;
+                          min-height: 36px;
+                          transition: all 0.2s;
+                        "
+                        onfocus="this.style.borderColor='#1976d2'; this.style.background='#f0f9ff'; this.select();"
+                        onblur="this.style.borderColor='#999'; this.style.background='#ffffff';"
+                      />
+
+                      <!-- Increment Button (Smaller) -->
+                      <button
+                        type="button"
+                        onclick="quickAdjustParLevel(${item.id}, 0.25)"
+                        style="
+                          flex: 0 0 32px;
+                          padding: 0;
+                          font-size: 18px;
+                          font-weight: 700;
+                          background: #1976d2;
+                          border: 2px solid #1976d2;
+                          border-radius: 6px;
+                          color: white;
+                          cursor: pointer;
+                          transition: all 0.2s;
+                          min-height: 36px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                        onmousedown="this.style.background='#1565c0'; this.style.transform='scale(0.95)';"
+                        onmouseup="this.style.background='#1976d2'; this.style.transform='scale(1)';"
+                        onmouseleave="this.style.background='#1976d2'; this.style.transform='scale(1)';"
+                      >+</button>
+                    </div>
+
+                    <!-- Par Save Status Indicator -->
+                    <div
+                      id="par-save-status-${item.id}"
+                      style="
+                        margin-top: 4px;
+                        font-size: 10px;
+                        text-align: center;
+                        min-height: 14px;
+                        font-weight: 600;
+                        opacity: 0;
+                        transition: opacity 0.2s;
+                      "
+                    ></div>
+                  </div>
                 </div>
               `;
             }).join('')}
@@ -14283,6 +14398,108 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                       font-size: 11px;
                       text-align: center;
                       min-height: 16px;
+                      font-weight: 600;
+                      opacity: 0;
+                      transition: opacity 0.2s;
+                    "
+                  ></div>
+                </div>
+
+                <!-- Par Level Editor -->
+                <div style="margin-top: 16px;">
+                  <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Par Level
+                  </label>
+                  <div style="display: flex; gap: 4px; align-items: stretch;">
+                    <!-- Decrement Button (Smaller) -->
+                    <button
+                      type="button"
+                      onclick="quickAdjustParLevel(${item.id}, -0.25)"
+                      style="
+                        flex: 0 0 32px;
+                        padding: 0;
+                        font-size: 18px;
+                        font-weight: 700;
+                        background: var(--gray-100);
+                        border: 2px solid var(--gray-300);
+                        border-radius: 0;
+                        color: var(--gray-700);
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        min-height: 36px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                      "
+                      onmousedown="this.style.background='var(--gray-300)'; this.style.transform='scale(0.95)';"
+                      onmouseup="this.style.background='var(--gray-100)'; this.style.transform='scale(1)';"
+                      onmouseleave="this.style.background='var(--gray-100)'; this.style.transform='scale(1)';"
+                    >−</button>
+
+                    <!-- Par Level Input Field (Smaller) -->
+                    <input
+                      type="number"
+                      inputmode="decimal"
+                      id="par-${item.id}"
+                      value="${item.parLevel}"
+                      min="0"
+                      step="0.25"
+                      onblur="autoSaveParLevel(${item.id}, this.value, this)"
+                      onchange="autoSaveParLevel(${item.id}, this.value, this)"
+                      style="
+                        flex: 1;
+                        padding: 8px 4px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        text-align: center;
+                        border: 2px solid var(--gray-400);
+                        border-radius: 0;
+                        background: var(--white);
+                        color: var(--gray-900);
+                        box-sizing: border-box;
+                        -webkit-appearance: none;
+                        -moz-appearance: textfield;
+                        min-height: 36px;
+                        transition: all 0.2s;
+                      "
+                      onfocus="this.style.borderColor='var(--gray-900)'; this.style.background='#f0f9ff'; this.select();"
+                      onblur="this.style.borderColor='var(--gray-400)'; this.style.background='var(--white)';"
+                    />
+
+                    <!-- Increment Button (Smaller) -->
+                    <button
+                      type="button"
+                      onclick="quickAdjustParLevel(${item.id}, 0.25)"
+                      style="
+                        flex: 0 0 32px;
+                        padding: 0;
+                        font-size: 18px;
+                        font-weight: 700;
+                        background: var(--gray-600);
+                        border: 2px solid var(--gray-600);
+                        border-radius: 0;
+                        color: var(--white);
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        min-height: 36px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                      "
+                      onmousedown="this.style.background='var(--gray-800)'; this.style.transform='scale(0.95)';"
+                      onmouseup="this.style.background='var(--gray-600)'; this.style.transform='scale(1)';"
+                      onmouseleave="this.style.background='var(--gray-600)'; this.style.transform='scale(1)';"
+                    >+</button>
+                  </div>
+
+                  <!-- Par Save Status Indicator -->
+                  <div
+                    id="par-save-status-${item.id}"
+                    style="
+                      margin-top: 4px;
+                      font-size: 10px;
+                      text-align: center;
+                      min-height: 14px;
                       font-weight: 600;
                       opacity: 0;
                       transition: opacity 0.2s;
@@ -15323,6 +15540,105 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     // Trigger auto-save
     autoSaveStockCount(itemId, roundedValue, inputElement);
+  }
+
+  /**
+   * Quick adjust par level with +/- buttons
+   */
+  function quickAdjustParLevel(itemId, adjustment) {
+    const inputElement = document.getElementById(`par-${itemId}`);
+    if (!inputElement) return;
+
+    const currentValue = parseFloat(inputElement.value) || 0;
+    const newValue = Math.max(0, currentValue + adjustment); // Don't go below 0
+
+    // Round to 2 decimal places to avoid floating point errors
+    const roundedValue = Math.round(newValue * 100) / 100;
+
+    inputElement.value = roundedValue;
+
+    // Trigger auto-save
+    autoSaveParLevel(itemId, roundedValue, inputElement);
+  }
+
+  /**
+   * Auto-save par level when input loses focus or +/- buttons clicked
+   */
+  async function autoSaveParLevel(itemId, newValue, inputElement) {
+    const parValue = parseFloat(newValue);
+    if (isNaN(parValue)) return;
+
+    // Visual feedback - saving state
+    const originalBorder = inputElement.style.borderColor;
+    const originalBg = inputElement.style.background;
+    const statusDiv = document.getElementById(`par-save-status-${itemId}`);
+
+    inputElement.style.borderColor = '#ff9800';
+    inputElement.style.background = '#fff3e0';
+    inputElement.disabled = true;
+
+    // Show "Saving..." status
+    if (statusDiv) {
+      statusDiv.textContent = '💾 Saving...';
+      statusDiv.style.color = '#ff9800';
+      statusDiv.style.opacity = '1';
+    }
+
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({
+          par_level: parValue
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.parLevel = parValue;
+      }
+
+      // Success feedback - green
+      inputElement.style.borderColor = '#2e7d32';
+      inputElement.style.background = '#e8f5e9';
+      inputElement.disabled = false;
+
+      if (statusDiv) {
+        statusDiv.textContent = '✅ Saved';
+        statusDiv.style.color = '#2e7d32';
+        setTimeout(() => {
+          statusDiv.style.opacity = '0';
+        }, 2000);
+      }
+
+      // Recalculate orders since par level changed
+      calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
+
+    } catch (error) {
+      console.error('Error saving par level:', error);
+      
+      // Error feedback - red
+      inputElement.style.borderColor = '#d32f2f';
+      inputElement.style.background = '#ffebee';
+      inputElement.disabled = false;
+
+      if (statusDiv) {
+        statusDiv.textContent = '❌ Failed';
+        statusDiv.style.color = '#d32f2f';
+        setTimeout(() => {
+          statusDiv.style.opacity = '0';
+        }, 3000);
+      }
+    }
+
+    // Reset to original after delay
+    setTimeout(() => {
+      inputElement.style.borderColor = originalBorder;
+      inputElement.style.background = originalBg;
+    }, 2500);
   }
 
   /**
@@ -17383,6 +17699,296 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const datePart = formatPacificDateDisplay(date, { month: '2-digit', day: '2-digit', year: 'numeric' });
     const timePart = formatPacificDateDisplay(date, { hour: '2-digit', minute: '2-digit' });
     return `${datePart} ${timePart}`;
+  }
+
+  /**
+   * Generate pending orders PDF
+   */
+  async function generatePendingOrdersPDF() {
+    showMessage('Generating pending orders PDF...', 'info');
+
+    try {
+      // Check if jsPDF is loaded
+      if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
+        throw new Error('jsPDF library not loaded. Please refresh the page.');
+      }
+
+      // Fetch pending orders
+      const { data: orders, error } = await supabase
+        .from('pending_orders')
+        .select(`
+          *,
+          pending_order_items (
+            id,
+            inventory_item_id,
+            quantity_ordered,
+            unit,
+            item_name,
+            quantity_received,
+            variance
+          )
+        `)
+        .in('status', ['pending', 'partial'])
+        .order('expected_delivery_date', { ascending: true });
+
+      if (error) throw error;
+
+      if (!orders || orders.length === 0) {
+        showMessage('No pending orders to export', 'warning');
+        return;
+      }
+
+      const { jsPDF } = jspdf;
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'in',
+        format: 'letter'
+      });
+
+      const jaynaBlue = [33, 150, 243];
+      const black = [33, 33, 33];
+      const darkGray = [66, 66, 66];
+
+      // Header
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(black[0], black[1], black[2]);
+      doc.text('PENDING ORDERS', 4.25, 0.7, { align: 'center' });
+
+      // Blue underline
+      doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+      doc.setLineWidth(0.02);
+      doc.line(0.5, 0.78, 8, 0.78);
+
+      // Generated timestamp
+      const now = new Date();
+      const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit', month: '2-digit', day: '2-digit', year: 'numeric' });
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(102, 102, 102);
+      doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
+
+      let yPos = 1.2;
+
+      // Render each order
+      for (const order of orders) {
+        // Check if we need a new page
+        if (yPos > 9.5) {
+          doc.addPage();
+          yPos = 0.7;
+        }
+
+        // Order header
+        doc.setFillColor(240, 240, 240);
+        doc.rect(0.5, yPos, 7.5, 0.3, 'F');
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(black[0], black[1], black[2]);
+        doc.text(`${order.vendor} - Delivery: ${order.expected_delivery_date}`, 0.6, yPos + 0.2);
+
+        yPos += 0.4;
+
+        // Items table header
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+        doc.text('ITEM', 0.6, yPos);
+        doc.text('QTY', 6.5, yPos);
+        doc.text('UNIT', 7.2, yPos);
+
+        yPos += 0.15;
+
+        // Items
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        
+        const items = order.pending_order_items || [];
+        for (const item of items) {
+          if (yPos > 10) {
+            doc.addPage();
+            yPos = 0.7;
+          }
+
+          doc.setTextColor(black[0], black[1], black[2]);
+          doc.text(item.item_name || 'Unknown Item', 0.6, yPos, { maxWidth: 5.5 });
+          doc.text(String(item.quantity_ordered || 0), 6.5, yPos);
+          doc.text(item.unit || '', 7.2, yPos);
+
+          yPos += 0.18;
+        }
+
+        yPos += 0.2; // Space between orders
+      }
+
+      // Footer credit
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(150, 150, 150);
+      doc.text('PREP GENERATION FLOW CREATED AND DESIGNED BY DEMETRI GREGORAKIS', 4.25, 10.7, { align: 'center' });
+
+      // Save PDF
+      const filename = `Pending_Orders_${getPacificDate()}.pdf`;
+      doc.save(filename);
+
+      showMessage('Pending orders PDF generated successfully!', 'success');
+
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      showMessage('Failed to generate PDF: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Email pending orders PDF to printer
+   */
+  async function emailPendingOrdersToPrinter() {
+    showMessage('Generating and sending pending orders to printer...', 'info');
+
+    try {
+      // Check if jsPDF is loaded
+      if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
+        throw new Error('jsPDF library not loaded. Please refresh the page.');
+      }
+
+      // Fetch pending orders
+      const { data: orders, error } = await supabase
+        .from('pending_orders')
+        .select(`
+          *,
+          pending_order_items (
+            id,
+            inventory_item_id,
+            quantity_ordered,
+            unit,
+            item_name,
+            quantity_received,
+            variance
+          )
+        `)
+        .in('status', ['pending', 'partial'])
+        .order('expected_delivery_date', { ascending: true });
+
+      if (error) throw error;
+
+      if (!orders || orders.length === 0) {
+        showMessage('No pending orders to send', 'warning');
+        return;
+      }
+
+      const { jsPDF } = jspdf;
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'in',
+        format: 'letter'
+      });
+
+      const jaynaBlue = [33, 150, 243];
+      const black = [33, 33, 33];
+      const darkGray = [66, 66, 66];
+
+      // Header
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(black[0], black[1], black[2]);
+      doc.text('PENDING ORDERS', 4.25, 0.7, { align: 'center' });
+
+      // Blue underline
+      doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+      doc.setLineWidth(0.02);
+      doc.line(0.5, 0.78, 8, 0.78);
+
+      // Generated timestamp
+      const now = new Date();
+      const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit', month: '2-digit', day: '2-digit', year: 'numeric' });
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(102, 102, 102);
+      doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
+
+      let yPos = 1.2;
+
+      // Render each order
+      for (const order of orders) {
+        // Check if we need a new page
+        if (yPos > 9.5) {
+          doc.addPage();
+          yPos = 0.7;
+        }
+
+        // Order header
+        doc.setFillColor(240, 240, 240);
+        doc.rect(0.5, yPos, 7.5, 0.3, 'F');
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(black[0], black[1], black[2]);
+        doc.text(`${order.vendor} - Delivery: ${order.expected_delivery_date}`, 0.6, yPos + 0.2);
+
+        yPos += 0.4;
+
+        // Items table header
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
+        doc.text('ITEM', 0.6, yPos);
+        doc.text('QTY', 6.5, yPos);
+        doc.text('UNIT', 7.2, yPos);
+
+        yPos += 0.15;
+
+        // Items
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        
+        const items = order.pending_order_items || [];
+        for (const item of items) {
+          if (yPos > 10) {
+            doc.addPage();
+            yPos = 0.7;
+          }
+
+          doc.setTextColor(black[0], black[1], black[2]);
+          doc.text(item.item_name || 'Unknown Item', 0.6, yPos, { maxWidth: 5.5 });
+          doc.text(String(item.quantity_ordered || 0), 6.5, yPos);
+          doc.text(item.unit || '', 7.2, yPos);
+
+          yPos += 0.18;
+        }
+
+        yPos += 0.2; // Space between orders
+      }
+
+      // Footer credit
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(150, 150, 150);
+      doc.text('PREP GENERATION FLOW CREATED AND DESIGNED BY DEMETRI GREGORAKIS', 4.25, 10.7, { align: 'center' });
+
+      // Convert PDF to base64
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+      // Send email using EmailJS
+      const emailParams = {
+        to_email: 'jaynaprinter@gmail.com',
+        subject: `Pending Orders - ${getPacificDate()}`,
+        message: `Pending orders generated at ${timeStr}`,
+        attachment: pdfBase64,
+        filename: `Pending_Orders_${getPacificDate()}.pdf`
+      };
+
+      await emailjs.send(
+        'service_3hgxezm',
+        'template_9lxqeqc',
+        emailParams
+      );
+
+      showMessage('✅ Pending orders sent to printer successfully!', 'success');
+
+    } catch (error) {
+      console.error('Email error:', error);
+      showMessage('Failed to send to printer: ' + error.message, 'error');
+    }
   }
 
   function renderSauceSummaryCard(doc, summary, startY) {
