@@ -17460,6 +17460,57 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
+   * Calculate estimated height for all PDF content
+   */
+  function calculateContentHeight(sections, customNotesHeight) {
+    let totalHeight = 0;
+    
+    // Header: 0.4" (fixed)
+    totalHeight += 0.4;
+    
+    // Custom notes (if any)
+    totalHeight += customNotesHeight;
+    
+    // Each section
+    sections.forEach(section => {
+      if (!section.items || section.items.length === 0) return;
+      
+      // Section header: 0.18"
+      totalHeight += 0.18;
+      
+      if (section.isCompact) {
+        // Compact format: header gap + (items * lineHeight) + bottom margin
+        const itemsPerColumn = Math.ceil(section.items.length / section.columns);
+        totalHeight += 0.08 + (itemsPerColumn * 0.20) + 0.08;
+      } else {
+        // Table format: header + (rows * avgRowHeight) + bottom margin
+        const avgRowHeight = 0.21; // 0.18 minCellHeight + 0.03 padding
+        totalHeight += (section.items.length * avgRowHeight) + 0.06;
+      }
+    });
+    
+    // Footer: 0.4"
+    totalHeight += 0.4;
+    
+    return totalHeight;
+  }
+
+  /**
+   * Calculate dynamic scale factor to fit content on one page
+   */
+  function calculateScaleFactor(estimatedHeight) {
+    const MAX_PAGE_HEIGHT = 9.5; // Usable page height (0.7" to 10.2")
+    
+    if (estimatedHeight <= MAX_PAGE_HEIGHT) {
+      return 1.0; // No scaling needed
+    }
+    
+    // Calculate scale factor, but don't go below 0.70 (70%) for readability
+    const scaleFactor = MAX_PAGE_HEIGHT / estimatedHeight;
+    return Math.max(0.70, Math.min(1.0, scaleFactor));
+  }
+
+  /**
    * Generate prep sheet PDF with compact grayscale design
    */
   async function generatePrepSheetPDF() {
@@ -17497,8 +17548,69 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const dateStr = formatPacificDateDisplay(prepDate, { month: '2-digit', day: '2-digit', year: 'numeric' });
       const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit' });
 
+      // Calculate custom notes height
+      const customNotes = document.getElementById('prepSheetNotes')?.value.trim();
+      let customNotesHeight = 0;
+      if (customNotes) {
+        const notesLines = doc.splitTextToSize(customNotes, 7).length;
+        customNotesHeight = 0.6 + (notesLines > 2 ? (notesLines - 2) * 0.1 : 0);
+      }
+
+      // Prepare all sections for height calculation
+      const bottledItems = recommendations.filter(r => {
+        const nameMatch = isBottledOrToGoItem(r.itemName);
+        const checkboxMatch = r.showInBottleCount === true;
+        return nameMatch || checkboxMatch;
+      });
+
+      const prepItems = recommendations.filter(r => {
+        const nameMatch = isBottledOrToGoItem(r.itemName);
+        const checkboxMatch = r.showInBottleCount === true;
+        return !nameMatch && !checkboxMatch;
+      });
+
+      const needsToBePrepped = (item) => {
+        return item.currentStock === 0 || item.stockPercentage < 100 || item.recommendedAmount > 0;
+      };
+
+      const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && needsToBePrepped(r))
+        .sort((a, b) => a.stockPercentage - b.stockPercentage);
+      
+      const makeFirst = prepItems.filter(r => r.urgent === true && !r.lineCooksPrep && needsToBePrepped(r))
+        .sort((a, b) => a.stockPercentage - b.stockPercentage);
+      
+      const markedButNotNeeded = prepItems.filter(r => 
+        (r.urgent === true && !r.lineCooksPrep) && !needsToBePrepped(r)
+      );
+      
+      const urgent = prepItems.filter(r => r.priority === 'urgent' && !r.urgent && !r.lineCooksPrep);
+      const high = prepItems.filter(r => r.priority === 'high' && !r.urgent && !r.lineCooksPrep);
+      const medium = prepItems.filter(r => r.priority === 'medium' && !r.urgent && !r.lineCooksPrep);
+      
+      const low = [
+        ...prepItems.filter(r => r.priority === 'low' && !r.urgent && !r.lineCooksPrep),
+        ...markedButNotNeeded
+      ];
+
+      // Build sections array for height calculation
+      const sections = [
+        { items: bottledItems, isCompact: true, columns: 3 },
+        { items: makeFirst, isCompact: false },
+        { items: urgent, isCompact: false },
+        { items: high, isCompact: false },
+        { items: medium, isCompact: false },
+        { items: low, isCompact: true, columns: 2 },
+        { items: lineCooksPrep, isCompact: false }
+      ];
+
+      // Calculate total content height and scale factor
+      const estimatedHeight = calculateContentHeight(sections, customNotesHeight);
+      const scaleFactor = calculateScaleFactor(estimatedHeight);
+
+      console.log(`PDF Content: ${estimatedHeight.toFixed(2)}" estimated, scale factor: ${scaleFactor.toFixed(2)}`);
+
       // Header
-      doc.setFontSize(14);
+      doc.setFontSize(14 * scaleFactor);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(black[0], black[1], black[2]);
       doc.text('PREP SHEET - ' + dateStr, 4.25, 0.7, { align: 'center' });
@@ -17509,32 +17621,31 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.line(0.5, 0.78, 8, 0.78);
 
       // Subtitle
-      doc.setFontSize(7);
+      doc.setFontSize(7 * scaleFactor);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(102, 102, 102);
       doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
 
       let yPos = 1.1;
 
-      // Custom Notes Section (if provided)
-      const customNotes = document.getElementById('prepSheetNotes')?.value.trim();
+      // Custom Notes Section (if provided) with dynamic font size
       if (customNotes) {
         doc.setFillColor(255, 249, 196); // Light yellow background
-        doc.rect(0.5, yPos, 7.5, 0.5, 'F');
+        doc.rect(0.5, yPos, 7.5, 0.5 * scaleFactor, 'F');
         doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
         doc.setLineWidth(0.02);
-        doc.rect(0.5, yPos, 7.5, 0.5);
+        doc.rect(0.5, yPos, 7.5, 0.5 * scaleFactor);
 
-        doc.setFontSize(8);
+        doc.setFontSize(8 * scaleFactor);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(black[0], black[1], black[2]);
-        doc.text('CUSTOM NOTES:', 0.6, yPos + 0.15);
+        doc.text('CUSTOM NOTES:', 0.6, yPos + (0.15 * scaleFactor));
 
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
+        doc.setFontSize(7 * scaleFactor);
         const notesLines = doc.splitTextToSize(customNotes, 7);
-        doc.text(notesLines, 0.6, yPos + 0.3);
-        yPos += 0.6;
+        doc.text(notesLines, 0.6, yPos + (0.3 * scaleFactor));
+        yPos += 0.6 * scaleFactor;
       }
 
       // Bottled & To-Go items section (before main priority sections) - COMPACT FORMAT
@@ -17545,79 +17656,41 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       });
 
       if (bottledItems.length > 0) {
-        yPos = renderCompactList(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243], 3);
+        yPos = renderCompactList(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243], 3, scaleFactor);
       }
 
-      // Filter out bottled/to-go items from main prep sections
-      const prepItems = recommendations.filter(r => {
-        const nameMatch = isBottledOrToGoItem(r.itemName);
-        const checkboxMatch = r.showInBottleCount === true;
-        return !nameMatch && !checkboxMatch;
-      });
-
-      // FIXED LOGIC: Only show items if they actually need to be made
-      const needsToBePrepped = (item) => {
-        return item.currentStock === 0 || // Out of stock
-               item.stockPercentage < 100 || // Below par
-               item.recommendedAmount > 0; // System recommends making
-      };
-
-      // NEW LOGIC: LINE COOKS PREP items ALWAYS go to line cooks section (never anywhere else)
-      // If an item is marked LINE COOKS PREP, it goes ONLY there regardless of other flags
-      const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && needsToBePrepped(r))
-        .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      
-      // MAKE FIRST: Only items marked urgent AND NOT marked as line cooks prep
-      const makeFirst = prepItems.filter(r => r.urgent === true && !r.lineCooksPrep && needsToBePrepped(r))
-        .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      
-      // Items marked but don't need prep go to low priority (unless they're line cooks items)
-      const markedButNotNeeded = prepItems.filter(r => 
-        (r.urgent === true && !r.lineCooksPrep) && !needsToBePrepped(r)
-      );
-      
-      // Other sections: Exclude line cooks items AND urgent items
-      const urgent = prepItems.filter(r => r.priority === 'urgent' && !r.urgent && !r.lineCooksPrep);
-      const high = prepItems.filter(r => r.priority === 'high' && !r.urgent && !r.lineCooksPrep);
-      const medium = prepItems.filter(r => r.priority === 'medium' && !r.urgent && !r.lineCooksPrep);
-      
-      // Low priority: Exclude line cooks items, include marked-but-not-needed
-      const low = [
-        ...prepItems.filter(r => r.priority === 'low' && !r.urgent && !r.lineCooksPrep),
-        ...markedButNotNeeded
-      ];
-
+      // Render all sections with scale factor
       if (makeFirst.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0]); // Red color for emphasis
+        yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0], scaleFactor);
       }
       if (urgent.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black);
+        yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black, scaleFactor);
       }
       if (high.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'HIGH PRIORITY - Low Stock', high, yPos, darkGray);
+        yPos = renderPrepPDFSection(doc, 'HIGH PRIORITY - Low Stock', high, yPos, darkGray, scaleFactor);
       }
       if (medium.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'MEDIUM PRIORITY', medium, yPos, darkGray);
+        yPos = renderPrepPDFSection(doc, 'MEDIUM PRIORITY', medium, yPos, darkGray, scaleFactor);
       }
       if (low.length > 0) {
-        yPos = renderCompactList(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray, 2);
+        yPos = renderCompactList(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray, 2, scaleFactor);
       }
       if (lineCooksPrep.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130]); // Purple color for line cooks
+        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130], scaleFactor);
       }
 
-      // Footer with disclaimer
+      // Footer with disclaimer (dynamically scaled)
       if (yPos < 10) {
         doc.setDrawColor(224, 224, 224);
         doc.line(0.5, 10.2, 8, 10.2);
-        doc.setFontSize(6);
+        doc.setFontSize(6 * scaleFactor);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(153, 153, 153);
         doc.text('MISTAKES HAPPEN, PLEASE USE YOUR BRAIN WHEN READING THIS LIST AND', 4.25, 10.32, { align: 'center' });
         doc.text('DOUBLE CHECK BY CLARIFYING WITH YOUR MANAGER IF YOU DOUBT ANYTHING.', 4.25, 10.40, { align: 'center' });
         
         // Credit line
-        doc.setFontSize(5.5);
+        doc.setFontSize(5.5 * scaleFactor);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(170, 170, 170);
         doc.text('PREP GENERATION FLOW CREATED AND DESIGNED BY DEMETRI GREGORAKIS', 4.25, 10.52, { align: 'center' });
@@ -17676,8 +17749,69 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const dateStr = formatPacificDateDisplay(prepDate, { month: '2-digit', day: '2-digit', year: 'numeric' });
       const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit' });
 
+      // Calculate custom notes height
+      const customNotes = document.getElementById('prepSheetNotes')?.value.trim();
+      let customNotesHeight = 0;
+      if (customNotes) {
+        const notesLines = doc.splitTextToSize(customNotes, 7).length;
+        customNotesHeight = 0.6 + (notesLines > 2 ? (notesLines - 2) * 0.1 : 0);
+      }
+
+      // Prepare all sections for height calculation (same as generatePrepSheetPDF)
+      const bottledItems = recommendations.filter(r => {
+        const nameMatch = isBottledOrToGoItem(r.itemName);
+        const checkboxMatch = r.showInBottleCount === true;
+        return nameMatch || checkboxMatch;
+      });
+
+      const prepItems = recommendations.filter(r => {
+        const nameMatch = isBottledOrToGoItem(r.itemName);
+        const checkboxMatch = r.showInBottleCount === true;
+        return !nameMatch && !checkboxMatch;
+      });
+
+      const needsToBePrepped = (item) => {
+        return item.currentStock === 0 || item.stockPercentage < 100 || item.recommendedAmount > 0;
+      };
+
+      const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && needsToBePrepped(r))
+        .sort((a, b) => a.stockPercentage - b.stockPercentage);
+      
+      const makeFirst = prepItems.filter(r => r.urgent === true && !r.lineCooksPrep && needsToBePrepped(r))
+        .sort((a, b) => a.stockPercentage - b.stockPercentage);
+      
+      const markedButNotNeeded = prepItems.filter(r => 
+        (r.urgent === true && !r.lineCooksPrep) && !needsToBePrepped(r)
+      );
+      
+      const urgent = prepItems.filter(r => r.priority === 'urgent' && !r.urgent && !r.lineCooksPrep);
+      const high = prepItems.filter(r => r.priority === 'high' && !r.urgent && !r.lineCooksPrep);
+      const medium = prepItems.filter(r => r.priority === 'medium' && !r.urgent && !r.lineCooksPrep);
+      
+      const low = [
+        ...prepItems.filter(r => r.priority === 'low' && !r.urgent && !r.lineCooksPrep),
+        ...markedButNotNeeded
+      ];
+
+      // Build sections array for height calculation
+      const sections = [
+        { items: bottledItems, isCompact: true, columns: 3 },
+        { items: makeFirst, isCompact: false },
+        { items: urgent, isCompact: false },
+        { items: high, isCompact: false },
+        { items: medium, isCompact: false },
+        { items: low, isCompact: true, columns: 2 },
+        { items: lineCooksPrep, isCompact: false }
+      ];
+
+      // Calculate total content height and scale factor
+      const estimatedHeight = calculateContentHeight(sections, customNotesHeight);
+      const scaleFactor = calculateScaleFactor(estimatedHeight);
+
+      console.log(`PDF Email Content: ${estimatedHeight.toFixed(2)}" estimated, scale factor: ${scaleFactor.toFixed(2)}`);
+
       // Header
-      doc.setFontSize(14);
+      doc.setFontSize(14 * scaleFactor);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(black[0], black[1], black[2]);
       doc.text('PREP SHEET - ' + dateStr, 4.25, 0.7, { align: 'center' });
@@ -17686,115 +17820,68 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.setLineWidth(0.02);
       doc.line(0.5, 0.78, 8, 0.78);
 
-      doc.setFontSize(7);
+      doc.setFontSize(7 * scaleFactor);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(102, 102, 102);
       doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
 
       let yPos = 1.1;
 
-      // Custom Notes
-      const customNotes = document.getElementById('prepSheetNotes')?.value.trim();
+      // Custom Notes with dynamic font size
       if (customNotes) {
         doc.setFillColor(255, 249, 196);
-        doc.rect(0.5, yPos, 7.5, 0.5, 'F');
+        doc.rect(0.5, yPos, 7.5, 0.5 * scaleFactor, 'F');
         doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
         doc.setLineWidth(0.02);
-        doc.rect(0.5, yPos, 7.5, 0.5);
+        doc.rect(0.5, yPos, 7.5, 0.5 * scaleFactor);
 
-        doc.setFontSize(8);
+        doc.setFontSize(8 * scaleFactor);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(black[0], black[1], black[2]);
-        doc.text('CUSTOM NOTES:', 0.6, yPos + 0.15);
+        doc.text('CUSTOM NOTES:', 0.6, yPos + (0.15 * scaleFactor));
 
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
+        doc.setFontSize(7 * scaleFactor);
         const notesLines = doc.splitTextToSize(customNotes, 7);
-        doc.text(notesLines, 0.6, yPos + 0.3);
-        yPos += 0.6;
+        doc.text(notesLines, 0.6, yPos + (0.3 * scaleFactor));
+        yPos += 0.6 * scaleFactor;
       }
 
-      // Bottled & To-Go items section (before main priority sections) - COMPACT FORMAT
-      const bottledItems = recommendations.filter(r => {
-        const nameMatch = isBottledOrToGoItem(r.itemName);
-        const checkboxMatch = r.showInBottleCount === true;
-        return nameMatch || checkboxMatch;
-      });
-
+      // Render all sections with scale factor
       if (bottledItems.length > 0) {
-        yPos = renderCompactList(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243], 3);
+        yPos = renderCompactList(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243], 3, scaleFactor);
       }
-
-      // Filter out bottled/to-go items from main prep sections
-      const prepItems = recommendations.filter(r => {
-        const nameMatch = isBottledOrToGoItem(r.itemName);
-        const checkboxMatch = r.showInBottleCount === true;
-        return !nameMatch && !checkboxMatch;
-      });
-
-      // FIXED LOGIC: Only show items if they actually need to be made
-      const needsToBePrepped = (item) => {
-        return item.currentStock === 0 || // Out of stock
-               item.stockPercentage < 100 || // Below par
-               item.recommendedAmount > 0; // System recommends making
-      };
-
-      // NEW LOGIC: LINE COOKS PREP items ALWAYS go to line cooks section (never anywhere else)
-      // If an item is marked LINE COOKS PREP, it goes ONLY there regardless of other flags
-      const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && needsToBePrepped(r))
-        .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      
-      // MAKE FIRST: Only items marked urgent AND NOT marked as line cooks prep
-      const makeFirst = prepItems.filter(r => r.urgent === true && !r.lineCooksPrep && needsToBePrepped(r))
-        .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      
-      // Items marked but don't need prep go to low priority (unless they're line cooks items)
-      const markedButNotNeeded = prepItems.filter(r => 
-        (r.urgent === true && !r.lineCooksPrep) && !needsToBePrepped(r)
-      );
-      
-      // Other sections: Exclude line cooks items AND urgent items
-      const urgent = prepItems.filter(r => r.priority === 'urgent' && !r.urgent && !r.lineCooksPrep);
-      const high = prepItems.filter(r => r.priority === 'high' && !r.urgent && !r.lineCooksPrep);
-      const medium = prepItems.filter(r => r.priority === 'medium' && !r.urgent && !r.lineCooksPrep);
-      
-      // Low priority: Exclude line cooks items, include marked-but-not-needed
-      const low = [
-        ...prepItems.filter(r => r.priority === 'low' && !r.urgent && !r.lineCooksPrep),
-        ...markedButNotNeeded
-      ];
-
       if (makeFirst.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0]);
+        yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0], scaleFactor);
       }
       if (urgent.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black);
+        yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black, scaleFactor);
       }
       if (high.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'HIGH PRIORITY - Low Stock', high, yPos, darkGray);
+        yPos = renderPrepPDFSection(doc, 'HIGH PRIORITY - Low Stock', high, yPos, darkGray, scaleFactor);
       }
       if (medium.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'MEDIUM PRIORITY', medium, yPos, darkGray);
+        yPos = renderPrepPDFSection(doc, 'MEDIUM PRIORITY', medium, yPos, darkGray, scaleFactor);
       }
       if (low.length > 0) {
-        yPos = renderCompactList(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray, 2);
+        yPos = renderCompactList(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray, 2, scaleFactor);
       }
       if (lineCooksPrep.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130]);
+        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130], scaleFactor);
       }
 
-      // Footer
+      // Footer (dynamically scaled)
       if (yPos < 10) {
         doc.setDrawColor(224, 224, 224);
         doc.line(0.5, 10.2, 8, 10.2);
-        doc.setFontSize(6);
+        doc.setFontSize(6 * scaleFactor);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(153, 153, 153);
         doc.text('MISTAKES HAPPEN, PLEASE USE YOUR BRAIN WHEN READING THIS LIST AND', 4.25, 10.32, { align: 'center' });
         doc.text('DOUBLE CHECK BY CLARIFYING WITH YOUR MANAGER IF YOU DOUBT ANYTHING.', 4.25, 10.40, { align: 'center' });
         
         // Credit line
-        doc.setFontSize(5.5);
+        doc.setFontSize(5.5 * scaleFactor);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(170, 170, 170);
         doc.text('PREP GENERATION FLOW CREATED AND DESIGNED BY DEMETRI GREGORAKIS', 4.25, 10.52, { align: 'center' });
@@ -18262,7 +18349,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   /**
    * Render a compact list format (for bottle count and low priority)
    */
-  function renderCompactList(doc, title, items, startY, headerColor, columns = 2) {
+  function renderCompactList(doc, title, items, startY, headerColor, columns = 2, scaleFactor = 1.0) {
     const white = [255, 255, 255];
     const darkText = [33, 33, 33];
     const grayText = [102, 102, 102];
@@ -18274,28 +18361,29 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       startY = 0.7;
     }
 
-    // Section header - sleek and minimal
+    // Section header - sleek and minimal (dynamically scaled)
+    const headerHeight = 0.18 * scaleFactor;
     doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
-    doc.rect(0.5, startY, 7.5, 0.18, 'F');
-    doc.setFontSize(7);
+    doc.rect(0.5, startY, 7.5, headerHeight, 'F');
+    doc.setFontSize(7 * scaleFactor);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(white[0], white[1], white[2]);
-    doc.text(`${title} (${items.length})`, 0.6, startY + 0.12);
+    doc.text(`${title} (${items.length})`, 0.6, startY + (0.12 * scaleFactor));
 
-    startY += 0.18;
+    startY += headerHeight;
 
     // Add subtle separator line
     doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
     doc.setLineWidth(0.003);
     doc.line(0.5, startY, 8, startY);
 
-    // Reduced spacing - move content closer to header
-    startY += 0.08; // Was 0.26, now much tighter
+    // Reduced spacing - move content closer to header (dynamically scaled)
+    startY += 0.08 * scaleFactor;
 
     // Calculate column width and padding
     const columnWidth = 7.5 / columns;
     const itemsPerColumn = Math.ceil(items.length / columns);
-    const lineHeight = 0.20; // Increased from 0.14 to prevent overlap with 2-line entries
+    const lineHeight = 0.20 * scaleFactor; // Dynamically scaled
 
     // Render items in columns
     let maxY = startY;
@@ -18307,8 +18395,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const x = 0.5 + (columnIndex * columnWidth) + 0.08;
       const y = startY + (rowIndex * lineHeight);
 
-      // FULL item name (no truncation) with qty and last counted
-      doc.setFontSize(5.8);
+      // FULL item name (no truncation) with qty and last counted (dynamically scaled fonts)
+      doc.setFontSize(5.8 * scaleFactor);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(darkText[0], darkText[1], darkText[2]);
       
@@ -18331,27 +18419,27 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       // Quantity with dash on same line
       const nameDisplayWidth = doc.getTextWidth(itemName + ':');
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(5.5);
+      doc.setFontSize(5.5 * scaleFactor);
       doc.setTextColor(grayText[0], grayText[1], grayText[2]);
       doc.text(` ${qtyText}`, x + nameDisplayWidth, y);
 
       // Last counted time on second line
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
-      doc.setFontSize(4.5);
+      doc.setFontSize(4.5 * scaleFactor);
       doc.setFont('helvetica', 'italic');
       doc.setTextColor(lightGray[0] - 40, lightGray[1] - 40, lightGray[2] - 40);
-      doc.text(`  Last: ${lastCountStr}`, x, y + 0.08);
+      doc.text(`  Last: ${lastCountStr}`, x, y + (0.08 * scaleFactor));
 
-      maxY = Math.max(maxY, y + 0.12);
+      maxY = Math.max(maxY, y + (0.12 * scaleFactor));
     }
 
-    return maxY + 0.08;
+    return maxY + (0.08 * scaleFactor);
   }
 
   /**
    * Render a priority section in the PDF with clean, well-spaced tables
    */
-  function renderPrepPDFSection(doc, title, items, startY, headerColor) {
+  function renderPrepPDFSection(doc, title, items, startY, headerColor, scaleFactor = 1.0) {
     const white = [255, 255, 255];
     const darkText = [33, 33, 33];
     const grayText = [102, 102, 102];
@@ -18365,15 +18453,16 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       startY = 0.7;
     }
 
-    // Section header with colored background - sleek and compact
+    // Section header with colored background - sleek and compact (dynamically scaled)
+    const headerHeight = 0.18 * scaleFactor;
     doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
-    doc.rect(0.5, startY, 7.5, 0.18, 'F');
-    doc.setFontSize(7);
+    doc.rect(0.5, startY, 7.5, headerHeight, 'F');
+    doc.setFontSize(7 * scaleFactor);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(white[0], white[1], white[2]);
-    doc.text(`${title} (${items.length})`, 0.6, startY + 0.12);
+    doc.text(`${title} (${items.length})`, 0.6, startY + (0.12 * scaleFactor));
 
-    startY += 0.18;
+    startY += headerHeight;
 
     // Prepare table data - each item is ONE row with ALL info
     // Order: ITEM, CURRENT, MAKE, PAR, REASON, LAST COUNTED
@@ -18394,7 +18483,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       ];
     });
 
-    // Render table with compact spacing
+    // Render table with compact spacing (dynamically scaled)
     doc.autoTable({
       startY: startY,
       head: [['ITEM', 'CURRENT', 'MAKE', 'PAR', 'REASON', 'LAST COUNTED']],
@@ -18403,12 +18492,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       margin: { left: 0.5, right: 0.5 },
       tableWidth: 7.5,
       styles: {
-        fontSize: 5.8,
-        cellPadding: 0.03,
+        fontSize: 5.8 * scaleFactor,
+        cellPadding: 0.03 * scaleFactor,
         lineColor: lightGray,
         lineWidth: 0.003,
         valign: 'middle',
-        minCellHeight: 0.18,
+        minCellHeight: 0.18 * scaleFactor,
         halign: 'left',
         textColor: darkText,
         overflow: 'linebreak'
@@ -18417,18 +18506,18 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         fillColor: [240, 240, 240],
         textColor: grayText,
         fontStyle: 'bold',
-        fontSize: 5.2,
-        cellPadding: 0.03,
+        fontSize: 5.2 * scaleFactor,
+        cellPadding: 0.03 * scaleFactor,
         halign: 'left',
         valign: 'middle'
       },
       columnStyles: {
-        0: { cellWidth: 1.4, fontStyle: 'bold', fontSize: 5.8 },                           // ITEM
-        1: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 },                          // CURRENT
-        2: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 },                          // MAKE
-        3: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 },                          // PAR
-        4: { cellWidth: 2.5, fontSize: 5.3, textColor: grayText, fontStyle: 'italic' },   // REASON
-        5: { cellWidth: 1.6, fontSize: 4.8, textColor: grayText, halign: 'right' }        // LAST COUNTED
+        0: { cellWidth: 1.4, fontStyle: 'bold', fontSize: 5.8 * scaleFactor },                                     // ITEM
+        1: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 * scaleFactor },                                    // CURRENT
+        2: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 * scaleFactor },                                    // MAKE
+        3: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 * scaleFactor },                                    // PAR
+        4: { cellWidth: 2.5, fontSize: 5.3 * scaleFactor, textColor: grayText, fontStyle: 'italic' },             // REASON
+        5: { cellWidth: 1.6, fontSize: 4.8 * scaleFactor, textColor: grayText, halign: 'right' }                  // LAST COUNTED
       },
       didParseCell: function(data) {
         // YELLOW HIGHLIGHT: Items in LINE COOKS PREP that need immediate attention
@@ -18448,7 +18537,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         if (isMakeFirstSection && data.column.index === 1 && data.section === 'body') {
           data.cell.styles.textColor = redText;
           data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fontSize = 6.5;
+          data.cell.styles.fontSize = 6.5 * scaleFactor;
         }
         // Highlight OUT items in red in other sections (column index 1 for CURRENT)
         else if (!isMakeFirstSection && data.column.index === 1 && data.section === 'body') {
@@ -18456,13 +18545,13 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           if (cellText && cellText.includes('OUT')) {
             data.cell.styles.textColor = redText;
             data.cell.styles.fontStyle = 'bold';
-            data.cell.styles.fontSize = 7;
+            data.cell.styles.fontSize = 7 * scaleFactor;
           }
         }
       }
     });
 
-    return doc.lastAutoTable.finalY + 0.06;
+    return doc.lastAutoTable.finalY + (0.06 * scaleFactor);
   }
 
   /**
