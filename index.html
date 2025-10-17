@@ -18289,10 +18289,13 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     doc.setLineWidth(0.003);
     doc.line(0.5, startY, 8, startY);
 
+    // Reduced spacing - move content closer to header
+    startY += 0.08; // Was 0.26, now much tighter
+
     // Calculate column width and padding
     const columnWidth = 7.5 / columns;
     const itemsPerColumn = Math.ceil(items.length / columns);
-    const lineHeight = 0.14; // Slightly tighter spacing for more info
+    const lineHeight = 0.20; // Increased from 0.14 to prevent overlap with 2-line entries
 
     // Render items in columns
     let maxY = startY;
@@ -18302,35 +18305,44 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const columnIndex = Math.floor(i / itemsPerColumn);
       const rowIndex = i % itemsPerColumn;
       const x = 0.5 + (columnIndex * columnWidth) + 0.08;
-      const y = startY + 0.26 + (rowIndex * lineHeight);
+      const y = startY + (rowIndex * lineHeight);
 
       // FULL item name (no truncation) with qty and last counted
       doc.setFontSize(5.8);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(darkText[0], darkText[1], darkText[2]);
       
-      // Show full name
-      const itemName = item.itemName;
+      // Show full name but check if it fits in column width
+      const maxWidth = columnWidth - 0.16; // Leave padding
+      let itemName = item.itemName;
+      
+      // If name is too long, wrap to multiple lines or truncate smartly
+      const nameWidth = doc.getTextWidth(itemName);
+      if (nameWidth > maxWidth * 0.7) { // If name takes more than 70% of column
+        // Truncate but show most of the name
+        const chars = Math.floor((maxWidth * 0.7) / (nameWidth / itemName.length));
+        itemName = itemName.substring(0, chars - 3) + '...';
+      }
       
       // Format: "ITEM NAME: Qty - Unit"
       const qtyText = `${item.currentStock || 0} - ${item.unit || ''}`;
-      doc.text(itemName, x, y);
+      doc.text(itemName + ':', x, y);
       
       // Quantity with dash on same line
-      const nameWidth = doc.getTextWidth(itemName);
+      const nameDisplayWidth = doc.getTextWidth(itemName + ':');
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(5.5);
       doc.setTextColor(grayText[0], grayText[1], grayText[2]);
-      doc.text(`: ${qtyText}`, x + nameWidth, y);
+      doc.text(` ${qtyText}`, x + nameDisplayWidth, y);
 
       // Last counted time on second line
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
-      doc.setFontSize(4.8);
+      doc.setFontSize(4.5);
       doc.setFont('helvetica', 'italic');
-      doc.setTextColor(lightGray[0] - 40, lightGray[1] - 40, lightGray[2] - 40); // Slightly darker than lightGray
+      doc.setTextColor(lightGray[0] - 40, lightGray[1] - 40, lightGray[2] - 40);
       doc.text(`  Last: ${lastCountStr}`, x, y + 0.08);
 
-      maxY = Math.max(maxY, y + 0.10);
+      maxY = Math.max(maxY, y + 0.12);
     }
 
     return maxY + 0.08;
@@ -18363,6 +18375,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     startY += 0.18;
 
     // Prepare table data - each item is ONE row with ALL info
+    // Order: ITEM, CURRENT, MAKE, PAR, REASON, LAST COUNTED
     const tableData = items.map(item => {
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
       const isOut = item.currentStock === 0;
@@ -18371,23 +18384,23 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const recommendValue = item.recommendedAmount > 0 ? `${item.recommendedAmount} - ${item.unit}` : '—';
 
       return [
-        item.itemName,
-        lastCountStr,
-        stockDisplay,
-        parDisplay,
-        recommendValue,
-        item.reasoning
+        item.itemName,        // ITEM
+        stockDisplay,         // CURRENT
+        recommendValue,       // MAKE
+        parDisplay,           // PAR
+        item.reasoning,       // REASON
+        lastCountStr          // LAST COUNTED
       ];
     });
 
     // Render table with compact spacing
     doc.autoTable({
       startY: startY,
-      head: [['ITEM', 'LAST COUNTED', 'CURRENT', 'PAR', 'MAKE', 'REASON']],
+      head: [['ITEM', 'CURRENT', 'MAKE', 'PAR', 'REASON', 'LAST COUNTED']],
       body: tableData,
       theme: 'grid',
       margin: { left: 0.5, right: 0.5 },
-      tableWidth: 6.25,
+      tableWidth: 7.5,
       styles: {
         fontSize: 5.8,
         cellPadding: 0.03,
@@ -18409,16 +18422,16 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         valign: 'middle'
       },
       columnStyles: {
-        0: { cellWidth: 1.5, fontStyle: 'bold', fontSize: 5.8 },      // ITEM
-        1: { cellWidth: 1.0, fontSize: 5.0, textColor: grayText },    // LAST COUNTED
-        2: { cellWidth: 0.75, halign: 'center', fontSize: 5.8 },      // CURRENT
-        3: { cellWidth: 0.75, halign: 'center', fontSize: 5.8 },      // PAR
-        4: { cellWidth: 0.75, halign: 'center', fontSize: 5.8 },      // MAKE
-        5: { cellWidth: 1.5, fontSize: 5.3, textColor: grayText, fontStyle: 'italic' }  // REASON
+        0: { cellWidth: 1.4, fontStyle: 'bold', fontSize: 5.8 },                           // ITEM
+        1: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 },                          // CURRENT
+        2: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 },                          // MAKE
+        3: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 },                          // PAR
+        4: { cellWidth: 2.5, fontSize: 5.3, textColor: grayText, fontStyle: 'italic' },   // REASON
+        5: { cellWidth: 1.6, fontSize: 4.8, textColor: grayText, halign: 'right' }        // LAST COUNTED
       },
       didParseCell: function(data) {
-        // Highlight OUT items in red
-        if (data.column.index === 2 && data.section === 'body') {
+        // Highlight OUT items in red (now column index 1 for CURRENT)
+        if (data.column.index === 1 && data.section === 'body') {
           const cellText = data.cell.text[0];
           if (cellText && cellText.includes('OUT')) {
             data.cell.styles.textColor = redText;
