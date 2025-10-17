@@ -11937,26 +11937,55 @@ async function renderOrdersTab() {
       console.log('orderingSystemState.items:', orderingSystemState.items);
       console.log('orderingSystemState.items.length:', orderingSystemState.items.length);
 
-      // LEARNING: Load aliases from past successful matches
+      // LEARNING: Load aliases from past successful matches with intelligence
+      // Prioritize manual matches (100% confidence) and frequent matches
       console.log('Loading learned aliases from invoice history...');
       const { data: aliasData, error: aliasError } = await supabase
         .from('invoice_items')
-        .select('detected_item_name, inventory_item_id')
+        .select('detected_item_name, inventory_item_id, match_confidence, checked_in_at')
         .eq('checked_in', true)
         .not('detected_item_name', 'is', null)
-        .not('inventory_item_id', 'is', null);
+        .not('inventory_item_id', 'is', null)
+        .order('checked_in_at', { ascending: false }); // Most recent first
 
       if (!aliasError && aliasData) {
         orderingSystemState.aliases = {};
+        
+        // Build frequency map to prioritize common matches
+        const aliasFrequency = {};
         aliasData.forEach(alias => {
           const normalized = alias.detected_item_name.toLowerCase().replace(/[^a-z0-9\s]/g, '');
-          // Keep the most recent match for each detected name
-          orderingSystemState.aliases[normalized] = {
-            inventory_item_id: alias.inventory_item_id,
-            detected_name: alias.detected_item_name
-          };
+          const key = `${normalized}:${alias.inventory_item_id}`;
+          aliasFrequency[key] = (aliasFrequency[key] || 0) + 1;
         });
+
+        // Process aliases with intelligent prioritization
+        aliasData.forEach(alias => {
+          const normalized = alias.detected_item_name.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+          const key = `${normalized}:${alias.inventory_item_id}`;
+          const frequency = aliasFrequency[key];
+          const isManualMatch = alias.match_confidence === 1.0;
+          
+          // Only store if:
+          // 1. Not already stored (keeps most recent)
+          // 2. OR this is a manual match (100% confidence) overriding auto-match
+          // 3. OR this match appears frequently (3+ times)
+          if (!orderingSystemState.aliases[normalized] || 
+              isManualMatch || 
+              frequency >= 3) {
+            orderingSystemState.aliases[normalized] = {
+              inventory_item_id: alias.inventory_item_id,
+              detected_name: alias.detected_item_name,
+              confidence: alias.match_confidence,
+              frequency: frequency,
+              is_manual: isManualMatch
+            };
+          }
+        });
+        
         console.log('✅ Loaded', Object.keys(orderingSystemState.aliases).length, 'learned aliases');
+        console.log('📊 Manual matches:', Object.values(orderingSystemState.aliases).filter(a => a.is_manual).length);
+        console.log('📊 Frequent matches (3+):', Object.values(orderingSystemState.aliases).filter(a => a.frequency >= 3).length);
       }
 
       orderingSystemState.lastUpdated = new Date();
@@ -19080,6 +19109,42 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
+   * Detect vendor from OCR text
+   * Looks for known vendor names in the header of the invoice
+   */
+  function detectVendorFromText(text) {
+    if (!text) return null;
+
+    // Check first 500 characters (vendor info usually at top)
+    const header = text.substring(0, 500).toLowerCase();
+    
+    // Known vendor patterns (add more as needed)
+    const vendorPatterns = [
+      { pattern: /greenleaf|green\s*leaf/i, vendor: 'Greenleaf' },
+      { pattern: /performance\s*food|pfg/i, vendor: 'Performance' },
+      { pattern: /mani\s*imports?/i, vendor: 'Mani Imports' },
+      { pattern: /eatopia/i, vendor: 'Eatopia' },
+      { pattern: /restaurant\s*depot/i, vendor: 'Restaurant Depot' },
+      { pattern: /alsco/i, vendor: 'Alsco' },
+      { pattern: /src\s*pumping/i, vendor: 'SRC Pumping' },
+      { pattern: /southern\s*glazer/i, vendor: 'Southern Glazer\'s' },
+      { pattern: /breakthru\s*bev/i, vendor: 'Breakthru Beverage' },
+      { pattern: /sysco/i, vendor: 'Sysco' },
+      { pattern: /us\s*foods/i, vendor: 'US Foods' }
+    ];
+
+    for (const { pattern, vendor } of vendorPatterns) {
+      if (pattern.test(header)) {
+        console.log('✅ Vendor detected:', vendor, 'from pattern:', pattern);
+        return vendor;
+      }
+    }
+
+    console.log('⚠️ No vendor detected from text');
+    return null;
+  }
+
+  /**
    * Analyze corrections to detect patterns
    * This is a simple version - can be enhanced with ML
    */
@@ -19210,6 +19275,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const extractedItems = parseInvoiceText(extractedText);
       console.log('Parsed items:', extractedItems.length);
 
+      // Detect vendor from OCR text for better matching
+      const detectedVendor = detectVendorFromText(extractedText);
+      console.log('🏢 Detected vendor from invoice:', detectedVendor || 'none');
+
       // Update progress
       document.getElementById('ocrProgressText').textContent = 'Matching items with inventory...';
 
@@ -19218,10 +19287,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         console.warn('No inventory items loaded for matching');
       }
 
-      // Match items with inventory using fuzzy matching (only if items were found)
+      // Match items with inventory using advanced fuzzy matching (only if items were found)
       if (extractedItems.length > 0) {
         for (const item of extractedItems) {
-          const match = fuzzyMatchInventoryItem(item.detectedName);
+          const match = fuzzyMatchInventoryItem(item.detectedName, detectedVendor);
           if (match) {
             item.matchedInventoryId = match.id;
             item.matchConfidence = match.confidence;
@@ -19503,8 +19572,77 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    * Fuzzy match detected item name with inventory items
    * Returns {id, itemName, confidence} or null
    */
-  function fuzzyMatchInventoryItem(detectedName) {
-    console.log('🔍 fuzzyMatchInventoryItem called with:', detectedName);
+  /**
+   * Calculate Levenshtein distance between two strings
+   * Industry-standard algorithm for string similarity
+   */
+  function levenshteinDistance(str1, str2) {
+    const len1 = str1.length;
+    const len2 = str2.length;
+    const matrix = Array(len2 + 1).fill(null).map(() => Array(len1 + 1).fill(0));
+
+    for (let i = 0; i <= len1; i++) matrix[0][i] = i;
+    for (let j = 0; j <= len2; j++) matrix[j][0] = j;
+
+    for (let j = 1; j <= len2; j++) {
+      for (let i = 1; i <= len1; i++) {
+        const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1,     // deletion
+          matrix[j - 1][i] + 1,     // insertion
+          matrix[j - 1][i - 1] + cost // substitution
+        );
+      }
+    }
+
+    return matrix[len2][len1];
+  }
+
+  /**
+   * Advanced normalization for better matching
+   * Handles common OCR errors and variations
+   */
+  function normalizeForMatching(text) {
+    return text
+      .toLowerCase()
+      .replace(/\b(case|cs|pack|pk|box|bx|ea|each|lb|lbs|pound|oz|ounce)\b/gi, '') // Remove unit words
+      .replace(/[^\w\s]/g, ' ')  // Replace special chars with space
+      .replace(/\s+/g, ' ')      // Collapse multiple spaces
+      .trim();
+  }
+
+  /**
+   * Generate character n-grams for fuzzy matching
+   * Helps catch OCR errors and misspellings
+   */
+  function getNgrams(text, n = 2) {
+    const ngrams = new Set();
+    for (let i = 0; i <= text.length - n; i++) {
+      ngrams.add(text.substring(i, i + n));
+    }
+    return ngrams;
+  }
+
+  /**
+   * Calculate n-gram similarity between two strings
+   * More robust than simple word matching
+   */
+  function ngramSimilarity(str1, str2, n = 2) {
+    const ngrams1 = getNgrams(str1, n);
+    const ngrams2 = getNgrams(str2, n);
+    
+    const intersection = new Set([...ngrams1].filter(x => ngrams2.has(x)));
+    const union = new Set([...ngrams1, ...ngrams2]);
+    
+    return union.size > 0 ? intersection.size / union.size : 0;
+  }
+
+  /**
+   * Advanced fuzzy matching with multiple strategies
+   * Based on industry best practices for OCR and user input matching
+   */
+  function fuzzyMatchInventoryItem(detectedName, contextVendor = null) {
+    console.log('🔍 fuzzyMatchInventoryItem called with:', detectedName, 'vendor:', contextVendor);
     console.log('📦 Total inventory items:', orderingSystemState.items.length);
     console.log('📚 Total learned aliases:', orderingSystemState.aliases ? Object.keys(orderingSystemState.aliases).length : 0);
     
@@ -19513,74 +19651,136 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       return null;
     }
 
-    const normalizedDetected = detectedName.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+    const normalizedDetected = normalizeForMatching(detectedName);
     console.log('🔤 Normalized detected name:', normalizedDetected);
 
-    // LEARNING: Check if we've matched this exact name before (aliases)
-    if (orderingSystemState.aliases && orderingSystemState.aliases[normalizedDetected]) {
-      const aliasMatch = orderingSystemState.aliases[normalizedDetected];
+    // PRIORITY 1: Check learned aliases (exact match from past manual selections)
+    const simpleNormalized = detectedName.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+    if (orderingSystemState.aliases && orderingSystemState.aliases[simpleNormalized]) {
+      const aliasMatch = orderingSystemState.aliases[simpleNormalized];
       console.log('💡 Found alias match:', aliasMatch);
       const item = orderingSystemState.items.find(i => i.id === aliasMatch.inventory_item_id);
       if (item) {
         console.log('✅ LEARNED MATCH:', detectedName, '→', item.itemName, '(ID:', item.id, ')');
         return {
           id: item.id,
-          itemName: item.itemName, // ALWAYS uses existing name, never overwrites
+          itemName: item.itemName,
           confidence: 1.0 // 100% confidence from learned alias
         };
       }
     }
 
-    // If no learned match, do fuzzy matching
-    console.log('🔎 No alias match, starting fuzzy matching...');
+    // PRIORITY 2: Advanced fuzzy matching with multiple algorithms
+    console.log('🔎 No alias match, starting multi-strategy fuzzy matching...');
     let bestMatch = null;
     let bestScore = 0;
-    let allScores = []; // Track all scores for debugging
+    let allScores = [];
+
+    const detectedWords = normalizedDetected.split(/\s+/).filter(w => w.length > 2);
+    const detectedBigrams = getNgrams(normalizedDetected, 2);
+    const detectedTrigrams = getNgrams(normalizedDetected, 3);
 
     for (const item of orderingSystemState.items) {
-      const normalizedItem = item.itemName.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+      const normalizedItem = normalizeForMatching(item.itemName);
+      const itemWords = normalizedItem.split(/\s+/).filter(w => w.length > 2);
 
-      // Calculate similarity score (simple word matching)
-      const detectedWords = normalizedDetected.split(/\s+/);
-      const itemWords = normalizedItem.split(/\s+/);
-
-      let matchCount = 0;
-      for (const word of detectedWords) {
-        if (word.length < 3) continue; // Skip short words
+      // Strategy 1: Token-based matching (word overlap with better logic)
+      let tokenScore = 0;
+      let matchedWords = 0;
+      for (const detWord of detectedWords) {
+        let bestWordMatch = 0;
         for (const itemWord of itemWords) {
-          if (itemWord.includes(word) || word.includes(itemWord)) {
-            matchCount++;
-            break;
+          // Check both substring containment and similarity
+          if (itemWord.includes(detWord) || detWord.includes(itemWord)) {
+            bestWordMatch = 1.0;
+          } else {
+            // Use Levenshtein for near-matches
+            const maxLen = Math.max(detWord.length, itemWord.length);
+            const dist = levenshteinDistance(detWord, itemWord);
+            const similarity = 1 - (dist / maxLen);
+            if (similarity > 0.7) { // 70% similar words count
+              bestWordMatch = Math.max(bestWordMatch, similarity);
+            }
           }
         }
+        if (bestWordMatch > 0) {
+          matchedWords++;
+          tokenScore += bestWordMatch;
+        }
+      }
+      tokenScore = detectedWords.length > 0 ? tokenScore / detectedWords.length : 0;
+
+      // Strategy 2: Character n-gram similarity (catches OCR errors)
+      const bigramScore = ngramSimilarity(normalizedDetected, normalizedItem, 2);
+      const trigramScore = ngramSimilarity(normalizedDetected, normalizedItem, 3);
+      const ngramScore = (bigramScore * 0.6 + trigramScore * 0.4);
+
+      // Strategy 3: Levenshtein distance (normalized)
+      const maxLen = Math.max(normalizedDetected.length, normalizedItem.length);
+      const levDist = levenshteinDistance(normalizedDetected, normalizedItem);
+      const levScore = 1 - (levDist / maxLen);
+
+      // Strategy 4: Exact substring bonus
+      let substringBonus = 0;
+      if (normalizedItem.includes(normalizedDetected) || normalizedDetected.includes(normalizedItem)) {
+        substringBonus = 0.3;
       }
 
-      const score = matchCount / Math.max(detectedWords.length, itemWords.length);
+      // Strategy 5: Vendor context bonus (if vendor is known from invoice)
+      let vendorBonus = 0;
+      if (contextVendor && item.vendor.toLowerCase().includes(contextVendor.toLowerCase())) {
+        vendorBonus = 0.15;
+      }
 
-      // Store score for debugging
-      if (score > 0) {
+      // Weighted combination of all strategies
+      // Token matching is most important (40%), then n-grams (25%), then Levenshtein (20%)
+      // Bonuses add to the final score
+      const combinedScore = (
+        tokenScore * 0.40 +
+        ngramScore * 0.25 +
+        levScore * 0.20 +
+        (matchedWords / Math.max(detectedWords.length, itemWords.length, 1)) * 0.15
+      ) + substringBonus + vendorBonus;
+
+      // Store detailed score for debugging
+      if (combinedScore > 0.15) { // Only log meaningful scores
         allScores.push({
           itemName: item.itemName,
           itemId: item.id,
-          score: score.toFixed(3)
+          vendor: item.vendor,
+          finalScore: combinedScore.toFixed(3),
+          breakdown: {
+            token: tokenScore.toFixed(3),
+            ngram: ngramScore.toFixed(3),
+            levenshtein: levScore.toFixed(3),
+            substring: substringBonus.toFixed(3),
+            vendor: vendorBonus.toFixed(3)
+          }
         });
       }
 
-      if (score > bestScore) {
-        bestScore = score;
+      if (combinedScore > bestScore) {
+        bestScore = combinedScore;
         bestMatch = {
           id: item.id,
           itemName: item.itemName,
-          confidence: score
+          confidence: Math.min(combinedScore, 0.99) // Cap at 99% (only learned aliases get 100%)
         };
       }
     }
 
-    console.log('📊 Top 10 fuzzy match scores:', allScores.sort((a, b) => b.score - a.score).slice(0, 10));
-    console.log('🏆 Best match:', bestMatch, 'Score:', bestScore.toFixed(3), 'Threshold: 0.4');
+    // Sort and log top matches
+    allScores.sort((a, b) => parseFloat(b.finalScore) - parseFloat(a.finalScore));
+    console.log('📊 Top 10 fuzzy match candidates:', allScores.slice(0, 10));
+    console.log('🏆 Best match:', bestMatch, 'Final score:', bestScore.toFixed(3));
 
-    // Only return match if confidence is above threshold
-    if (bestScore > 0.4) {
+    // Adaptive threshold based on match quality
+    // Use lower threshold (0.35) if we have high token matches
+    // Use higher threshold (0.50) for low-quality matches
+    const threshold = bestScore > 0.6 ? 0.35 : 0.50;
+    console.log('📏 Using threshold:', threshold);
+
+    if (bestScore >= threshold) {
       console.log('✅ Match found above threshold:', bestMatch.itemName, '(ID:', bestMatch.id, ')');
       return bestMatch;
     } else {
