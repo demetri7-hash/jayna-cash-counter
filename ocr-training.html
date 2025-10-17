@@ -13,6 +13,13 @@
   <!-- External Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    // Configure PDF.js worker (MUST be done before using pdfjsLib)
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
 
   <style>
     /* Jayna Brand Design - Sky Blue & Grayscale */
@@ -657,7 +664,63 @@ function handleFileSelect(event) {
 }
 
 // ============================================
-// OCR PROCESSING
+// PDF TO IMAGE CONVERSION (SAME AS INDEX.HTML)
+// ============================================
+async function convertPdfToImages(pdfDataUrl) {
+  console.log('📄 Converting PDF to images...');
+
+  // Extract base64 data
+  const base64Data = pdfDataUrl.split(',')[1];
+  const binaryData = atob(base64Data);
+  const uint8Array = new Uint8Array(binaryData.length);
+  for (let i = 0; i < binaryData.length; i++) {
+    uint8Array[i] = binaryData.charCodeAt(i);
+  }
+
+  // Load PDF with PDF.js
+  const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+  const pdf = await loadingTask.promise;
+
+  console.log(`📄 PDF loaded: ${pdf.numPages} page(s)`);
+
+  const images = [];
+
+  // Process ALL pages
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    console.log(`📄 Processing page ${pageNum}/${pdf.numPages}...`);
+
+    const page = await pdf.getPage(pageNum);
+
+    // Set scale for good quality (2 = 2x resolution)
+    const scale = 2.0;
+    const viewport = page.getViewport({ scale });
+
+    // Create canvas for this page
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    // Render PDF page to canvas
+    await page.render({
+      canvasContext: context,
+      viewport: viewport
+    }).promise;
+
+    console.log(`✅ Page ${pageNum} rendered:`, canvas.width, 'x', canvas.height);
+
+    // Convert canvas to image data URL
+    const imageDataUrl = canvas.toDataURL('image/png');
+    images.push(imageDataUrl);
+  }
+
+  console.log(`✅ All ${pdf.numPages} pages converted to images`);
+
+  return images;
+}
+
+// ============================================
+// OCR PROCESSING (MATCHES INDEX.HTML EXACTLY)
 // ============================================
 async function processWithOCR() {
   if (!state.currentImage) return;
@@ -672,30 +735,87 @@ async function processWithOCR() {
   try {
     console.log('Starting OCR processing...');
 
-    const result = await Tesseract.recognize(
-      state.currentImage,
-      'eng',
-      {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+    // Check if this is a PDF file (SAME AS INDEX.HTML)
+    const isPDF = state.currentImage.startsWith('data:application/pdf');
+    let extractedText = '';
+    let avgConfidence = 0;
+
+    if (isPDF) {
+      console.log('📄 PDF detected - converting to images and processing all pages...');
+
+      // Check if PDF.js is loaded
+      if (typeof pdfjsLib === 'undefined') {
+        throw new Error('PDF.js library not loaded. Please refresh the page.');
+      }
+
+      // Convert PDF to multiple images (one per page)
+      const images = await convertPdfToImages(state.currentImage);
+      console.log('✅ PDF converted to', images.length, 'image(s)');
+
+      // Process each page with OCR
+      let totalConfidence = 0;
+      for (let i = 0; i < images.length; i++) {
+        const pageNum = i + 1;
+        console.log(`🔍 OCR processing page ${pageNum}/${images.length}...`);
+
+        const result = await Tesseract.recognize(
+          images[i],
+          'eng',
+          {
+            logger: (m) => {
+              if (m.status === 'recognizing text') {
+                const progress = Math.round(m.progress * 100);
+                console.log(`Page ${pageNum}/${images.length}: ${progress}%`);
+              }
+            }
+          }
+        );
+
+        const pageText = result?.data?.text || '';
+        const pageConfidence = result?.data?.confidence || 0;
+        totalConfidence += pageConfidence;
+
+        console.log(`✅ Page ${pageNum} OCR completed: ${pageText.length} characters, ${pageConfidence.toFixed(1)}% confidence`);
+
+        // Combine text from all pages
+        extractedText += pageText + '\n\n'; // Add spacing between pages
+      }
+
+      avgConfidence = images.length > 0 ? totalConfidence / images.length : 0;
+      console.log('✅ All pages processed. Total text length:', extractedText.length);
+
+      // Store the first page result for compatibility
+      state.ocrResult = { data: { text: extractedText, confidence: avgConfidence } };
+
+    } else {
+      // Process single image (SAME AS INDEX.HTML)
+      console.log('🖼️ Image detected - processing with OCR...');
+
+      const result = await Tesseract.recognize(
+        state.currentImage,
+        'eng',
+        {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+            }
           }
         }
-      }
-    );
+      );
 
-    state.ocrResult = result;
-    const ocrText = result.data.text;
-    const avgConfidence = result.data.confidence;
+      state.ocrResult = result;
+      extractedText = result.data.text;
+      avgConfidence = result.data.confidence;
+    }
 
     console.log(`OCR Complete! Confidence: ${avgConfidence.toFixed(1)}%`);
-    console.log('Extracted text length:', ocrText.length);
+    console.log('Extracted text length:', extractedText.length);
 
     // Display OCR text
-    document.getElementById('ocrText').textContent = ocrText;
+    document.getElementById('ocrText').textContent = extractedText;
 
     // Extract items from OCR text
-    const extractedItems = extractItemsFromOCR(ocrText, avgConfidence);
+    const extractedItems = extractItemsFromOCR(extractedText, avgConfidence);
 
     console.log(`Extracted ${extractedItems.length} items`);
 
