@@ -1085,7 +1085,7 @@ function detectVendor(items) {
 }
 
 // ============================================
-// DISPLAY ITEMS
+// DISPLAY ITEMS (ENHANCED WITH SKIP & POSITION LEARNING)
 // ============================================
 function displayItems(items) {
   const itemsList = document.getElementById('itemsList');
@@ -1094,11 +1094,18 @@ function displayItems(items) {
   document.getElementById('itemCount').textContent = items.length;
 
   items.forEach((item, index) => {
+    // Skip if marked as skipped
+    if (item.skipped) return;
+
     const card = document.createElement('div');
     card.className = 'item-card';
+    card.id = `item-card-${index}`;
 
     // Add status class
-    if (item.matchConfidence >= 0.7) {
+    if (item.skipped) {
+      card.style.display = 'none';
+      return;
+    } else if (item.matchConfidence >= 0.7) {
       card.classList.add('corrected');
     } else if (item.matchConfidence < 0.5) {
       card.classList.add('needs-review');
@@ -1119,18 +1126,30 @@ function displayItems(items) {
     }
     card.appendChild(badge);
 
-    // Item content
+    // RAW OCR LINE (for context)
+    const rawLine = document.createElement('div');
+    rawLine.style.cssText = 'background: var(--gray-200); padding: 8px; margin-bottom: 12px; font-family: monospace; font-size: 11px; border-left: 3px solid var(--primary-blue);';
+    rawLine.innerHTML = `<strong>OCR Text:</strong> ${item.rawOcrLine}`;
+    card.appendChild(rawLine);
+
+    // Item content - ALL FIELDS EDITABLE
     const itemGrid = document.createElement('div');
     itemGrid.className = 'item-grid';
+    itemGrid.style.gridTemplateColumns = '2fr 1fr 1fr 1fr 1fr'; // Added column for Qty Shipped
 
     // Name field
-    const nameGroup = createEditableField('Name', item.detectedName, (value) => {
+    const nameGroup = createEditableField('Name (detected)', item.detectedName, (value) => {
       item.correctedName = value;
     });
 
-    // Quantity field
-    const qtyGroup = createEditableField('Qty', item.detectedQuantity, (value) => {
+    // Quantity ORDERED field
+    const qtyOrderedGroup = createEditableField('Qty Ordered', item.detectedQuantity, (value) => {
       item.correctedQuantity = parseFloat(value) || null;
+    }, 'number');
+
+    // Quantity SHIPPED field (NEW!)
+    const qtyShippedGroup = createEditableField('Qty Shipped', item.detectedQuantityShipped || '', (value) => {
+      item.correctedQuantityShipped = parseFloat(value) || null;
     }, 'number');
 
     // Unit field
@@ -1144,47 +1163,61 @@ function displayItems(items) {
     }, 'number');
 
     itemGrid.appendChild(nameGroup);
-    itemGrid.appendChild(qtyGroup);
+    itemGrid.appendChild(qtyOrderedGroup);
+    itemGrid.appendChild(qtyShippedGroup);
     itemGrid.appendChild(unitGroup);
     itemGrid.appendChild(priceGroup);
 
     card.appendChild(itemGrid);
 
-    // Match suggestion
-    if (item.matchedItemName) {
-      const suggestion = document.createElement('div');
-      suggestion.className = 'match-suggestion';
-      suggestion.innerHTML = `
-        Suggested match: <strong>${item.matchedItemName}</strong> (${item.matchedVendor})
-        <a onclick="acceptMatch(${index})">Accept</a>
-      `;
-      card.appendChild(suggestion);
-    } else {
-      // Search inventory
-      const searchGroup = document.createElement('div');
-      searchGroup.className = 'form-group';
-      searchGroup.style.marginTop = '12px';
+    // INVENTORY MATCHING SECTION (ALWAYS SHOW - even for auto-matched)
+    const matchingSection = document.createElement('div');
+    matchingSection.style.cssText = 'margin-top: 16px; padding-top: 16px; border-top: 2px solid var(--gray-300);';
 
-      const label = document.createElement('label');
-      label.className = 'form-label';
-      label.textContent = 'Match to inventory item:';
+    const matchLabel = document.createElement('label');
+    matchLabel.className = 'form-label';
+    matchLabel.textContent = item.matchedItemName ? 'Auto-matched to (you can change):' : 'Match to inventory item:';
+    matchLabel.style.marginBottom = '8px';
 
-      const select = document.createElement('select');
-      select.className = 'form-select';
+    const matchSelect = document.createElement('select');
+    matchSelect.className = 'form-select';
+    matchSelect.style.marginBottom = '8px';
 
-      const defaultOption = document.createElement('option');
-      defaultOption.value = '';
-      defaultOption.textContent = '-- Select inventory item --';
-      select.appendChild(defaultOption);
+    // Add options
+    const skipOption = document.createElement('option');
+    skipOption.value = '__SKIP__';
+    skipOption.textContent = '-- Skip this item (not important) --';
+    matchSelect.appendChild(skipOption);
 
-      state.inventoryItems.forEach(invItem => {
-        const option = document.createElement('option');
-        option.value = invItem.id;
-        option.textContent = `${invItem.item_name} (${invItem.vendor}) - ${invItem.unit}`;
-        select.appendChild(option);
-      });
+    const noneOption = document.createElement('option');
+    noneOption.value = '';
+    noneOption.textContent = '-- Select inventory item --';
+    matchSelect.appendChild(noneOption);
 
-      select.addEventListener('change', (e) => {
+    state.inventoryItems.forEach(invItem => {
+      const option = document.createElement('option');
+      option.value = invItem.id;
+      option.textContent = `${invItem.item_name} (${invItem.vendor}) - ${invItem.unit}`;
+
+      // Pre-select if auto-matched
+      if (item.matchedInventoryId === invItem.id) {
+        option.selected = true;
+      }
+
+      matchSelect.appendChild(option);
+    });
+
+    matchSelect.addEventListener('change', (e) => {
+      if (e.target.value === '__SKIP__') {
+        // Skip this item
+        item.skipped = true;
+        card.style.display = 'none';
+        console.log(`Skipped item: "${item.detectedName}"`);
+
+        // Update count
+        const visibleItems = state.detectedItems.filter(i => !i.skipped);
+        document.getElementById('itemCount').textContent = visibleItems.length;
+      } else {
         const selectedId = parseInt(e.target.value);
         if (selectedId) {
           const invItem = state.inventoryItems.find(i => i.id === selectedId);
@@ -1194,17 +1227,84 @@ function displayItems(items) {
             item.matchedVendor = invItem.vendor;
             item.matchConfidence = 1.0;
             console.log(`Manual match: "${item.detectedName}" → "${invItem.item_name}"`);
-          }
-        }
-      });
 
-      searchGroup.appendChild(label);
-      searchGroup.appendChild(select);
-      card.appendChild(searchGroup);
-    }
+            // Update badge
+            badge.className = 'confidence-badge confidence-high';
+            badge.textContent = '100% Match';
+            card.classList.remove('needs-review');
+            card.classList.add('corrected');
+          }
+        } else {
+          // Cleared selection
+          item.matchedInventoryId = null;
+          item.matchedItemName = null;
+          item.matchedVendor = null;
+          item.matchConfidence = 0;
+        }
+      }
+    });
+
+    matchingSection.appendChild(matchLabel);
+    matchingSection.appendChild(matchSelect);
+
+    // FIELD POSITION LEARNING SECTION (ADVANCED)
+    const positionSection = document.createElement('details');
+    positionSection.style.cssText = 'margin-top: 12px; padding: 12px; background: var(--light-blue); border: 1px solid var(--primary-blue);';
+
+    const positionSummary = document.createElement('summary');
+    positionSummary.style.cssText = 'cursor: pointer; font-size: 11px; font-weight: 700; color: var(--primary-blue); text-transform: uppercase; letter-spacing: 0.5px;';
+    positionSummary.textContent = 'Teach Field Positions (Advanced)';
+
+    const positionContent = document.createElement('div');
+    positionContent.style.cssText = 'margin-top: 12px; font-size: 12px;';
+    positionContent.innerHTML = `
+      <p style="margin-bottom: 8px; color: var(--gray-700);">
+        Help the system learn WHERE to find each field in future invoices:
+      </p>
+      <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px; font-size: 11px;">
+        <strong>Name position:</strong> <input type="text" placeholder="e.g., 'start of line'" value="${item.namePosition || ''}" onchange="state.detectedItems[${index}].namePosition = this.value" style="padding: 4px; border: 1px solid var(--gray-300);">
+        <strong>Qty position:</strong> <input type="text" placeholder="e.g., 'before name'" value="${item.qtyPosition || ''}" onchange="state.detectedItems[${index}].qtyPosition = this.value" style="padding: 4px; border: 1px solid var(--gray-300);">
+        <strong>Unit position:</strong> <input type="text" placeholder="e.g., 'after name'" value="${item.unitPosition || ''}" onchange="state.detectedItems[${index}].unitPosition = this.value" style="padding: 4px; border: 1px solid var(--gray-300);">
+        <strong>Price position:</strong> <input type="text" placeholder="e.g., 'end of line'" value="${item.pricePosition || ''}" onchange="state.detectedItems[${index}].pricePosition = this.value" style="padding: 4px; border: 1px solid var(--gray-300);">
+      </div>
+      <p style="margin-top: 8px; font-size: 10px; color: var(--gray-600); font-style: italic;">
+        Examples: "start of line", "before name", "after qty", "end of line", "column 3"
+      </p>
+    `;
+
+    positionSection.appendChild(positionSummary);
+    positionSection.appendChild(positionContent);
+    matchingSection.appendChild(positionSection);
+
+    card.appendChild(matchingSection);
+
+    // ACTION BUTTONS
+    const actionButtons = document.createElement('div');
+    actionButtons.style.cssText = 'display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end;';
+
+    const skipBtn = document.createElement('button');
+    skipBtn.className = 'btn';
+    skipBtn.textContent = 'Skip Item';
+    skipBtn.style.cssText = 'background: var(--gray-300); border-color: var(--gray-400); font-size: 11px; padding: 8px 16px;';
+    skipBtn.onclick = () => {
+      item.skipped = true;
+      card.style.display = 'none';
+      console.log(`Skipped item: "${item.detectedName}"`);
+
+      // Update count
+      const visibleItems = state.detectedItems.filter(i => !i.skipped);
+      document.getElementById('itemCount').textContent = visibleItems.length;
+    };
+
+    actionButtons.appendChild(skipBtn);
+    card.appendChild(actionButtons);
 
     itemsList.appendChild(card);
   });
+
+  // Update visible count
+  const visibleItems = items.filter(i => !i.skipped);
+  document.getElementById('itemCount').textContent = visibleItems.length;
 }
 
 function createEditableField(label, value, onChange, type = 'text') {
@@ -1319,6 +1419,12 @@ async function saveTrainingData() {
       const contextBefore = ocrLines.slice(Math.max(0, lineNum - 2), lineNum).join('\n');
       const contextAfter = ocrLines.slice(lineNum + 1, Math.min(ocrLines.length, lineNum + 3)).join('\n');
 
+      // Skip if item was skipped
+      if (item.skipped) {
+        console.log(`Skipping: "${item.detectedName}" (marked as skipped)`);
+        continue;
+      }
+
       // Create correction record
       const correction = {
         session_id: state.currentSession.id,
@@ -1340,7 +1446,19 @@ async function saveTrainingData() {
         context_after: contextAfter,
         line_position: lineNum / ocrLines.length,
         was_auto_matched: item.matchConfidence > 0,
-        user_time_spent_ms: Date.now() - state.sessionStartTime
+        user_time_spent_ms: Date.now() - state.sessionStartTime,
+        metadata: {
+          // POSITION LEARNING DATA (NEW!)
+          namePosition: item.namePosition || null,
+          qtyPosition: item.qtyPosition || null,
+          unitPosition: item.unitPosition || null,
+          pricePosition: item.pricePosition || null,
+          qtyShipped: item.correctedQuantityShipped || item.detectedQuantityShipped || null,
+          // Additional context for learning
+          rawLineLength: item.rawOcrLine.length,
+          lineIndex: lineNum,
+          totalLines: ocrLines.length
+        }
       };
 
       corrections.push(correction);
