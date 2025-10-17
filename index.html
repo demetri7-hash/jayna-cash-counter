@@ -19473,7 +19473,37 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             item.matchedInventoryId = match.id;
             item.matchConfidence = match.confidence;
             item.matchedItemName = match.itemName;
+            item.matchedVendor = match.vendor; // NEW: Get vendor from matched inventory item
+            
+            // If unit wasn't detected, use inventory item's unit
+            if (!item.detectedUnit && match.unit) {
+              item.detectedUnit = match.unit;
+            }
           }
+        }
+        
+        // NEW: Determine the most likely vendor from matched items
+        const vendorCounts = {};
+        extractedItems.forEach(item => {
+          if (item.matchedVendor) {
+            vendorCounts[item.matchedVendor] = (vendorCounts[item.matchedVendor] || 0) + 1;
+          }
+        });
+        
+        // Get vendor with most matches
+        let determinedVendor = null;
+        let maxCount = 0;
+        for (const [vendor, count] of Object.entries(vendorCounts)) {
+          if (count > maxCount) {
+            maxCount = count;
+            determinedVendor = vendor;
+          }
+        }
+        
+        if (determinedVendor) {
+          console.log(`🏢 Vendor determined from item matching: ${determinedVendor} (${maxCount}/${extractedItems.length} items matched)`);
+          // Store for later use
+          orderingSystemState.determinedVendor = determinedVendor;
         }
       }
 
@@ -19622,17 +19652,51 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             console.log(`  ⚠️ No price found for "${itemName}"`);
           }
 
+          // Extract unit from nearby lines (CS, EA, LB, etc.)
+          let detectedUnit = null;
+          for (let j = Math.max(0, i - 1); j < Math.min(i + 5, lines.length); j++) {
+            const unitLine = lines[j];
+            const unitMatch = unitLine.match(/\b(cs|case|ea|each|lb|lbs|pound|kg|oz|gallon|gal|bt|bottle)\b/i);
+            if (unitMatch) {
+              detectedUnit = unitMatch[1].toUpperCase();
+              if (detectedUnit === 'CASE') detectedUnit = 'CS';
+              if (detectedUnit === 'EACH') detectedUnit = 'EA';
+              if (detectedUnit === 'POUND' || detectedUnit === 'LBS') detectedUnit = 'LB';
+              if (detectedUnit === 'GALLON') detectedUnit = 'GAL';
+              if (detectedUnit === 'BOTTLE') detectedUnit = 'BT';
+              console.log(`  ✓ Detected unit: ${detectedUnit} from line ${j}`);
+              break;
+            }
+          }
+
+          // Try to extract Qty Shipped (if different from Qty Ordered)
+          // Look for patterns like "Shipped: X" or "Ship Qty: X"
+          let qtyShipped = null;
+          for (let j = i; j < Math.min(i + 5, lines.length); j++) {
+            const shippedMatch = lines[j].match(/(?:shipped|ship\s*qty|qty\s*ship):?\s*(\d+)/i);
+            if (shippedMatch) {
+              qtyShipped = parseInt(shippedMatch[1]);
+              if (qtyShipped !== quantity) {
+                console.log(`  ✓ Qty Shipped: ${qtyShipped} (different from ordered: ${quantity})`);
+              }
+              break;
+            }
+          }
+
           items.push({
             id: Date.now() + Math.random() + i,
             detectedName: itemName,
             detectedQuantity: quantity,
+            detectedQuantityShipped: qtyShipped, // NEW: Track shipped vs ordered
+            detectedUnit: detectedUnit,          // NEW: Unit detection
             detectedPrice: price,
             matchedInventoryId: null,
             matchConfidence: 0,
-            matchedItemName: null
+            matchedItemName: null,
+            matchedVendor: null                   // NEW: Will be set after matching
           });
 
-          console.log(`✅ Added item: "${itemName}" | Qty: ${quantity} | Price: ${price ? '$' + price : 'N/A'}`);
+          console.log(`✅ Added item: "${itemName}" | Ordered: ${quantity}${qtyShipped && qtyShipped !== quantity ? ` | Shipped: ${qtyShipped}` : ''} | Unit: ${detectedUnit || 'N/A'} | Price: ${price ? '$' + price : 'N/A'}`);
 
           // Skip the lines we just processed
           // Instead of fixed skip, find the next item by looking for the next SKU
@@ -19665,9 +19729,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     }
 
     // ==== STANDARD INVOICE FORMAT ====
-    // Pattern to match: quantity, item name, price
-    // Example: "2 Arugula 4# CS 12.50" or "1.5 Fresh Basil Bunch 8.99"
+    // Pattern to match: quantity, item name, unit, price
+    // Example: "2 Arugula 4# CS 12.50" or "1.5 Fresh Basil Bunch EA 8.99"
     const itemPattern = /^[\s]*([0-9]+\.?[0-9]*)\s+(.+?)\s+([0-9]+\.[0-9]{2})[\s]*$/;
+    
+    // Enhanced pattern to catch unit in the line
+    const itemWithUnitPattern = /^[\s]*([0-9]+\.?[0-9]*)\s+(.+?)\s+(CS|EA|LB|KG|OZ|GAL|BT|CASE|EACH|POUND)\s+([0-9]+\.[0-9]{2})[\s]*$/i;
 
     // Try pattern matching first
     let patternMatchCount = 0;
@@ -19675,24 +19742,61 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const trimmed = line.trim();
       if (trimmed.length < 5) continue; // Skip short lines
 
-      const match = trimmed.match(itemPattern);
+      // Try unit-aware pattern first
+      let match = trimmed.match(itemWithUnitPattern);
+      let detectedUnit = null;
+      
       if (match) {
         const quantity = parseFloat(match[1]);
         const name = match[2].trim();
-        const price = parseFloat(match[3]);
+        detectedUnit = match[3].toUpperCase();
+        const price = parseFloat(match[4]);
+        
+        // Normalize unit names
+        if (detectedUnit === 'CASE') detectedUnit = 'CS';
+        if (detectedUnit === 'EACH') detectedUnit = 'EA';
+        if (detectedUnit === 'POUND') detectedUnit = 'LB';
 
         // Only add if quantity is reasonable (0.25 to 1000)
         if (quantity >= 0.25 && quantity <= 1000 && name.length > 2) {
           items.push({
-            id: Date.now() + Math.random(), // Temporary ID
+            id: Date.now() + Math.random(),
             detectedName: name,
             detectedQuantity: quantity,
+            detectedQuantityShipped: null,
+            detectedUnit: detectedUnit,
             detectedPrice: price,
             matchedInventoryId: null,
             matchConfidence: 0,
-            matchedItemName: null
+            matchedItemName: null,
+            matchedVendor: null
           });
           patternMatchCount++;
+        }
+      } else {
+        // Try standard pattern (no unit in line)
+        match = trimmed.match(itemPattern);
+        if (match) {
+          const quantity = parseFloat(match[1]);
+          const name = match[2].trim();
+          const price = parseFloat(match[3]);
+
+          // Only add if quantity is reasonable (0.25 to 1000)
+          if (quantity >= 0.25 && quantity <= 1000 && name.length > 2) {
+            items.push({
+              id: Date.now() + Math.random(),
+              detectedName: name,
+              detectedQuantity: quantity,
+              detectedQuantityShipped: null,
+              detectedUnit: null,
+              detectedPrice: price,
+              matchedInventoryId: null,
+              matchConfidence: 0,
+              matchedItemName: null,
+              matchedVendor: null
+            });
+            patternMatchCount++;
+          }
         }
       }
     }
@@ -19733,10 +19837,13 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           id: Date.now() + Math.random() + i, // Temporary ID
           detectedName: trimmed,
           detectedQuantity: 1, // Default quantity
+          detectedQuantityShipped: null,
+          detectedUnit: null,
           detectedPrice: null, // No price detected
           matchedInventoryId: null,
           matchConfidence: 0,
-          matchedItemName: null
+          matchedItemName: null,
+          matchedVendor: null
         });
       }
 
@@ -19843,6 +19950,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         return {
           id: item.id,
           itemName: item.itemName,
+          vendor: item.vendor,
+          unit: item.unit,
           confidence: 1.0 // 100% confidence from learned alias
         };
       }
@@ -19942,6 +20051,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         bestMatch = {
           id: item.id,
           itemName: item.itemName,
+          vendor: item.vendor,        // NEW: Include vendor from inventory item
+          unit: item.unit,            // NEW: Include unit from inventory item
           confidence: Math.min(combinedScore, 0.99) // Cap at 99% (only learned aliases get 100%)
         };
       }
@@ -19959,7 +20070,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     console.log('📏 Using threshold:', threshold);
 
     if (bestScore >= threshold) {
-      console.log('✅ Match found above threshold:', bestMatch.itemName, '(ID:', bestMatch.id, ')');
+      console.log('✅ Match found above threshold:', bestMatch.itemName, '(ID:', bestMatch.id, 'Vendor:', bestMatch.vendor, 'Unit:', bestMatch.unit, ')');
       return bestMatch;
     } else {
       console.log('❌ No match found above threshold (best score:', bestScore.toFixed(3), ')');
