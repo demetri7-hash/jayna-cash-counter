@@ -18357,6 +18357,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const grayText = [102, 102, 102];
     const lightGray = [136, 136, 136];
     const redText = [211, 47, 47];
+    const isMakeFirstSection = title === 'MAKE FIRST';
 
     // Check if we need a new page
     if (startY > 9.5) {
@@ -18443,8 +18444,14 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           }
         }
         
-        // Highlight OUT items in red (column index 1 for CURRENT)
-        if (data.column.index === 1 && data.section === 'body') {
+        // RED TEXT: CURRENT column in MAKE FIRST section (highest priority - always needs attention)
+        if (isMakeFirstSection && data.column.index === 1 && data.section === 'body') {
+          data.cell.styles.textColor = redText;
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 6.5;
+        }
+        // Highlight OUT items in red in other sections (column index 1 for CURRENT)
+        else if (!isMakeFirstSection && data.column.index === 1 && data.section === 'body') {
           const cellText = data.cell.text[0];
           if (cellText && cellText.includes('OUT')) {
             data.cell.styles.textColor = redText;
