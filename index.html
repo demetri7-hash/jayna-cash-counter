@@ -12199,11 +12199,12 @@ async function renderOrdersTab() {
 function formatRelativeTime(dateStr) {
   if (!dateStr) return 'Never';
 
+  // Use actual timestamps, NOT midday-normalized dates (that loses hour/minute precision!)
   const date = parsePacificDate(dateStr) || new Date(dateStr);
   const now = new Date();
-  const nowPacific = getPacificMidday(now);
-  const datePacific = getPacificMidday(date);
-  const diffMs = nowPacific - datePacific;
+  
+  // Calculate difference in milliseconds using actual timestamps
+  const diffMs = now - date;
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -12224,24 +12225,19 @@ function formatRelativeTime(dateStr) {
     }
   }
 
-  // More than 24 hours: "1 day ago", "1 day, 4 hours, 34 minutes ago"
-  if (diffDays === 1 && diffHours % 24 === 0) {
-    return '1 day ago';
-  }
-  
+  // More than 24 hours: Always show detailed breakdown
   const days = diffDays;
   const remainingHours = diffHours % 24;
   const remainingMinutes = diffMinutes % 60;
   
   let result = `${days} day${days === 1 ? '' : 's'}`;
   
-  if (remainingHours > 0 || remainingMinutes > 0) {
-    if (remainingHours > 0) {
-      result += `, ${remainingHours} hour${remainingHours === 1 ? '' : 's'}`;
-    }
-    if (remainingMinutes > 0) {
-      result += `, ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}`;
-    }
+  // Always add hours and minutes if present (removed the shortcut for "1 day ago")
+  if (remainingHours > 0) {
+    result += `, ${remainingHours} hour${remainingHours === 1 ? '' : 's'}`;
+  }
+  if (remainingMinutes > 0) {
+    result += `, ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}`;
   }
   
   return result + ' ago';
@@ -17557,34 +17553,35 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         return !nameMatch && !checkboxMatch;
       });
 
-      // FIXED LOGIC: Only show MAKE FIRST items if they actually need to be made (not just marked)
-      // Check if item is low or out of stock
+      // FIXED LOGIC: Only show items if they actually need to be made
       const needsToBePrepped = (item) => {
         return item.currentStock === 0 || // Out of stock
                item.stockPercentage < 100 || // Below par
                item.recommendedAmount > 0; // System recommends making
       };
 
-      // Group by priority
-      const makeFirst = prepItems.filter(r => r.urgent === true && needsToBePrepped(r))
+      // NEW LOGIC: LINE COOKS PREP items ALWAYS go to line cooks section (never anywhere else)
+      // If an item is marked LINE COOKS PREP, it goes ONLY there regardless of other flags
+      const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && needsToBePrepped(r))
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
       
-      // FIXED LOGIC: LINE COOKS PREP only shows if marked AND needs to be made
-      const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && needsToBePrepped(r) && r.urgent !== true)
+      // MAKE FIRST: Only items marked urgent AND NOT marked as line cooks prep
+      const makeFirst = prepItems.filter(r => r.urgent === true && !r.lineCooksPrep && needsToBePrepped(r))
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
       
-      // Items marked MAKE FIRST or LINE COOKS PREP but don't need prep go to low priority
+      // Items marked but don't need prep go to low priority (unless they're line cooks items)
       const markedButNotNeeded = prepItems.filter(r => 
-        (r.urgent === true || r.lineCooksPrep === true) && !needsToBePrepped(r)
+        (r.urgent === true && !r.lineCooksPrep) && !needsToBePrepped(r)
       );
       
-      const urgent = prepItems.filter(r => r.priority === 'urgent' && r.urgent !== true && r.lineCooksPrep !== true);
-      const high = prepItems.filter(r => r.priority === 'high' && r.urgent !== true && r.lineCooksPrep !== true);
-      const medium = prepItems.filter(r => r.priority === 'medium' && r.urgent !== true && r.lineCooksPrep !== true);
+      // Other sections: Exclude line cooks items AND urgent items
+      const urgent = prepItems.filter(r => r.priority === 'urgent' && !r.urgent && !r.lineCooksPrep);
+      const high = prepItems.filter(r => r.priority === 'high' && !r.urgent && !r.lineCooksPrep);
+      const medium = prepItems.filter(r => r.priority === 'medium' && !r.urgent && !r.lineCooksPrep);
       
-      // Add marked-but-not-needed items to low priority
+      // Low priority: Exclude line cooks items, include marked-but-not-needed
       const low = [
-        ...prepItems.filter(r => r.priority === 'low' && r.urgent !== true && r.lineCooksPrep !== true),
+        ...prepItems.filter(r => r.priority === 'low' && !r.urgent && !r.lineCooksPrep),
         ...markedButNotNeeded
       ];
 
@@ -17733,34 +17730,35 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         return !nameMatch && !checkboxMatch;
       });
 
-      // FIXED LOGIC: Only show MAKE FIRST items if they actually need to be made (not just marked)
-      // Check if item is low or out of stock
+      // FIXED LOGIC: Only show items if they actually need to be made
       const needsToBePrepped = (item) => {
         return item.currentStock === 0 || // Out of stock
                item.stockPercentage < 100 || // Below par
                item.recommendedAmount > 0; // System recommends making
       };
 
-      // Group by priority
-      const makeFirst = prepItems.filter(r => r.urgent === true && needsToBePrepped(r))
+      // NEW LOGIC: LINE COOKS PREP items ALWAYS go to line cooks section (never anywhere else)
+      // If an item is marked LINE COOKS PREP, it goes ONLY there regardless of other flags
+      const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && needsToBePrepped(r))
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
       
-      // FIXED LOGIC: LINE COOKS PREP only shows if marked AND needs to be made
-      const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && needsToBePrepped(r) && r.urgent !== true)
+      // MAKE FIRST: Only items marked urgent AND NOT marked as line cooks prep
+      const makeFirst = prepItems.filter(r => r.urgent === true && !r.lineCooksPrep && needsToBePrepped(r))
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
       
-      // Items marked MAKE FIRST or LINE COOKS PREP but don't need prep go to low priority
+      // Items marked but don't need prep go to low priority (unless they're line cooks items)
       const markedButNotNeeded = prepItems.filter(r => 
-        (r.urgent === true || r.lineCooksPrep === true) && !needsToBePrepped(r)
+        (r.urgent === true && !r.lineCooksPrep) && !needsToBePrepped(r)
       );
       
-      const urgent = prepItems.filter(r => r.priority === 'urgent' && r.urgent !== true && r.lineCooksPrep !== true);
-      const high = prepItems.filter(r => r.priority === 'high' && r.urgent !== true && r.lineCooksPrep !== true);
-      const medium = prepItems.filter(r => r.priority === 'medium' && r.urgent !== true && r.lineCooksPrep !== true);
+      // Other sections: Exclude line cooks items AND urgent items
+      const urgent = prepItems.filter(r => r.priority === 'urgent' && !r.urgent && !r.lineCooksPrep);
+      const high = prepItems.filter(r => r.priority === 'high' && !r.urgent && !r.lineCooksPrep);
+      const medium = prepItems.filter(r => r.priority === 'medium' && !r.urgent && !r.lineCooksPrep);
       
-      // Add marked-but-not-needed items to low priority
+      // Low priority: Exclude line cooks items, include marked-but-not-needed
       const low = [
-        ...prepItems.filter(r => r.priority === 'low' && r.urgent !== true && r.lineCooksPrep !== true),
+        ...prepItems.filter(r => r.priority === 'low' && !r.urgent && !r.lineCooksPrep),
         ...markedButNotNeeded
       ];
 
@@ -18430,7 +18428,16 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         5: { cellWidth: 1.6, fontSize: 4.8, textColor: grayText, halign: 'right' }        // LAST COUNTED
       },
       didParseCell: function(data) {
-        // Highlight OUT items in red (now column index 1 for CURRENT)
+        // YELLOW HIGHLIGHT: Items that are both URGENT and LINE COOKS PREP (need immediate attention)
+        if (data.section === 'body') {
+          const rowIndex = data.row.index;
+          const item = items[rowIndex];
+          if (item && item.urgent === true && item.lineCooksPrep === true) {
+            data.cell.styles.fillColor = [255, 255, 200]; // Light yellow highlight
+          }
+        }
+        
+        // Highlight OUT items in red (column index 1 for CURRENT)
         if (data.column.index === 1 && data.section === 'body') {
           const cellText = data.cell.text[0];
           if (cellText && cellText.includes('OUT')) {
