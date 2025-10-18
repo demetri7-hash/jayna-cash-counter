@@ -641,6 +641,272 @@
     return Object.keys(FOH_CHECKLISTS);
   }
 
+  // ============================================
+  // PHOTO UPLOAD FUNCTIONS
+  // ============================================
+
+  /**
+   * Compress image before upload (reduces storage space)
+   * Resizes to max 1920px wide, converts to JPEG at 80% quality
+   */
+  async function compressImage(file, maxWidth = 1920, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Resize if wider than maxWidth
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Convert to blob (JPEG format)
+          canvas.toBlob(
+            (blob) => {
+              resolve(blob);
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  }
+
+  /**
+   * Upload photo to Supabase Storage
+   * Returns public URL of uploaded photo
+   */
+  async function uploadPhoto(file, folder = 'task-photos') {
+    try {
+      // Compress image first
+      const compressedBlob = await compressImage(file);
+
+      // Generate unique filename
+      const fileExt = 'jpg'; // Always JPEG after compression
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${folder}/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('foh-checklist-photos')
+        .upload(filePath, compressedBlob, {
+          contentType: 'image/jpeg',
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('foh-checklist-photos')
+        .getPublicUrl(filePath);
+
+      console.log('✓ Photo uploaded:', publicUrl);
+      return publicUrl;
+
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload task photo (1 photo limit per task)
+   */
+  async function uploadTaskPhoto(taskId, sessionId, file) {
+    const username = localStorage.getItem('foh_username') || 'Staff';
+
+    try {
+      // Check if photo already exists for this task
+      const { data: existingPhotos, error: checkError } = await supabase
+        .from('foh_checklist_task_photos')
+        .select('id')
+        .eq('task_id', taskId)
+        .eq('session_id', sessionId)
+        .eq('is_deleted', false);
+
+      if (checkError) throw checkError;
+
+      if (existingPhotos && existingPhotos.length > 0) {
+        showMessage('Only 1 photo allowed per task. Delete existing photo first.', 'error');
+        return null;
+      }
+
+      // Upload photo to storage
+      showLoading('Uploading Photo', 'Compressing and uploading...');
+      const photoUrl = await uploadPhoto(file, 'task-photos');
+
+      // Save photo record to database
+      const { data, error } = await supabase
+        .from('foh_checklist_task_photos')
+        .insert({
+          task_id: taskId,
+          session_id: sessionId,
+          photo_url: photoUrl,
+          uploaded_by: username,
+          uploaded_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      hideLoading();
+      showMessage('✅ Photo uploaded successfully!', 'success');
+      return data;
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error uploading task photo:', error);
+      showMessage(`Error uploading photo: ${error.message}`, 'error');
+      return null;
+    }
+  }
+
+  /**
+   * Upload session photo (5 photo limit per session)
+   */
+  async function uploadSessionPhoto(sessionId, file, caption = '') {
+    const username = localStorage.getItem('foh_username') || 'Staff';
+
+    try {
+      // Check photo count (max 5)
+      const { data: existingPhotos, error: checkError } = await supabase
+        .from('foh_checklist_session_photos')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('is_deleted', false);
+
+      if (checkError) throw checkError;
+
+      if (existingPhotos && existingPhotos.length >= 5) {
+        showMessage('Maximum 5 photos allowed per session. Delete a photo first.', 'error');
+        return null;
+      }
+
+      // Upload photo to storage
+      showLoading('Uploading Photo', 'Compressing and uploading...');
+      const photoUrl = await uploadPhoto(file, 'session-photos');
+
+      // Get next display order
+      const displayOrder = existingPhotos ? existingPhotos.length : 0;
+
+      // Save photo record to database
+      const { data, error } = await supabase
+        .from('foh_checklist_session_photos')
+        .insert({
+          session_id: sessionId,
+          photo_url: photoUrl,
+          caption: caption || null,
+          uploaded_by: username,
+          uploaded_at: new Date().toISOString(),
+          display_order: displayOrder
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      hideLoading();
+      showMessage('✅ Photo uploaded successfully!', 'success');
+      return data;
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error uploading session photo:', error);
+      showMessage(`Error uploading photo: ${error.message}`, 'error');
+      return null;
+    }
+  }
+
+  /**
+   * Soft delete photo (staff can delete their own)
+   * Photo remains in database and Watchdog with deletion info
+   */
+  async function deletePhoto(photoId, photoType = 'task') {
+    const username = localStorage.getItem('foh_username') || 'Staff';
+    const tableName = photoType === 'task' ? 'foh_checklist_task_photos' : 'foh_checklist_session_photos';
+
+    try {
+      // Soft delete: mark as deleted with username and timestamp
+      const { error } = await supabase
+        .from(tableName)
+        .update({
+          is_deleted: true,
+          deleted_by: username,
+          deleted_at: new Date().toISOString()
+        })
+        .eq('id', photoId);
+
+      if (error) throw error;
+
+      showMessage('✅ Photo deleted (visible to managers in Watchdog)', 'success');
+      return true;
+
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      showMessage(`Error deleting photo: ${error.message}`, 'error');
+      return false;
+    }
+  }
+
+  /**
+   * Load photos for a task
+   */
+  async function loadTaskPhotos(taskId, sessionId) {
+    try {
+      const { data, error } = await supabase
+        .from('foh_checklist_task_photos')
+        .select('*')
+        .eq('task_id', taskId)
+        .eq('session_id', sessionId)
+        .order('uploaded_at', { ascending: true });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error loading task photos:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Load photos for a session
+   */
+  async function loadSessionPhotos(sessionId) {
+    try {
+      const { data, error } = await supabase
+        .from('foh_checklist_session_photos')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error loading session photos:', error);
+      return [];
+    }
+  }
+
   // Loading functions
   function showLoading(title, message) {
     const overlay = document.getElementById('loadingOverlay');
@@ -2209,6 +2475,31 @@
         </p>
       </div>
 
+      <!-- CREATE NEW CHECKLIST BUTTON -->
+      <div style="margin-bottom: 24px;">
+        <div
+          style="
+            background: var(--success-bg);
+            border: 2px solid var(--success-border);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border-radius: 0;
+            text-align: center;
+          "
+          onmouseover="this.style.background='#a7f3d0'; this.style.borderColor='#047857';"
+          onmouseout="this.style.background='var(--success-bg)'; this.style.borderColor='var(--success-border)';"
+          onclick="createNewChecklist()"
+        >
+          <h4 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: var(--success-text); text-transform: uppercase; letter-spacing: 1px;">
+            ➕ CREATE NEW CHECKLIST
+          </h4>
+          <p style="margin: 0; font-size: 13px; color: var(--success-text);">
+            Add a new custom checklist to the system
+          </p>
+        </div>
+      </div>
+
       <div style="display: grid; gap: 16px; margin-bottom: 24px;">
     `;
 
@@ -2276,17 +2567,56 @@
   }
 
   /**
-   * Edit Checklist - Show detailed editor for specific checklist
+   * Create New Checklist - Show empty form for creating custom checklist
    */
-  async function editChecklist(checklistType) {
-    showLoading('Loading Checklist', 'Fetching checklist data...');
+  function createNewChecklist() {
+    // Generate new checklist type ID
+    const customNumber = Math.floor(Date.now() / 1000); // Unix timestamp
+    const newChecklistType = `custom_${customNumber}`;
 
-    // Load checklist from database (with fallback to FOH_CHECKLISTS)
-    const checklist = await loadChecklistFromDatabase(checklistType);
+    // Create empty checklist object
+    const newChecklist = {
+      type: newChecklistType,
+      title: 'New Custom Checklist',
+      timeRange: '9:00 AM - 5:00 PM',
+      description: 'Enter description here',
+      staffCount: 1,
+      hasRatings: false,
+      hasNotes: true,
+      ratingScale: '',
+      sections: [
+        {
+          name: 'Section 1',
+          description: '',
+          type: 'checkbox',
+          tasks: ['Task 1']
+        }
+      ]
+    };
 
-    hideLoading();
+    // Call editChecklist with the new checklist
+    editChecklist(newChecklistType, newChecklist);
+  }
 
-    if (!checklist) return;
+  /**
+   * Edit Checklist - Show detailed editor for specific checklist
+   * @param {string} checklistType - The checklist type ID
+   * @param {object} providedChecklist - Optional: Pre-loaded checklist (for new checklists)
+   */
+  async function editChecklist(checklistType, providedChecklist = null) {
+    let checklist;
+
+    if (providedChecklist) {
+      // Use provided checklist (for new checklists)
+      checklist = providedChecklist;
+    } else {
+      // Load from database
+      showLoading('Loading Checklist', 'Fetching checklist data...');
+      checklist = await loadChecklistFromDatabase(checklistType);
+      hideLoading();
+
+      if (!checklist) return;
+    }
 
     const container = document.getElementById('fohEditContent');
 
