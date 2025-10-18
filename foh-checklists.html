@@ -475,6 +475,10 @@
         hasRatings: definition.has_ratings,
         hasNotes: definition.has_notes,
         ratingScale: definition.rating_scale,
+        start_hour: definition.start_hour,
+        start_minute: definition.start_minute,
+        end_hour: definition.end_hour,
+        end_minute: definition.end_minute,
         sections: []
       };
 
@@ -548,6 +552,10 @@
           has_ratings: checklistData.hasRatings,
           has_notes: checklistData.hasNotes,
           rating_scale: checklistData.ratingScale || null,
+          start_hour: checklistData.start_hour,
+          start_minute: checklistData.start_minute,
+          end_hour: checklistData.end_hour,
+          end_minute: checklistData.end_minute,
           updated_at: new Date().toISOString(),
           updated_by: managerName
         }, {
@@ -926,8 +934,57 @@
     setTimeout(() => messageArea.innerHTML = '', 5000);
   }
 
+  // ============================================
+  // SESSION MANAGEMENT (60-minute manager access)
+  // ============================================
+
+  function setManagerSession() {
+    const now = new Date().getTime();
+    const expiryTime = now + (60 * 60 * 1000); // 60 minutes from now
+    localStorage.setItem('managerSession', expiryTime.toString());
+    console.log('✓ Manager session set (60 minutes)');
+  }
+
+  function isManagerSessionValid() {
+    const sessionExpiry = localStorage.getItem('managerSession');
+    if (!sessionExpiry) return false;
+
+    const now = new Date().getTime();
+    const expiryTime = parseInt(sessionExpiry);
+
+    if (now > expiryTime) {
+      // Session expired, clean up
+      localStorage.removeItem('managerSession');
+      return false;
+    }
+
+    return true;
+  }
+
+  function clearManagerSession() {
+    localStorage.removeItem('managerSession');
+    console.log('✓ Manager session cleared');
+  }
+
+  function getRemainingSessionMinutes() {
+    if (!isManagerSessionValid()) return 0;
+
+    const sessionExpiry = localStorage.getItem('managerSession');
+    const expiryTime = parseInt(sessionExpiry);
+    const now = new Date().getTime();
+    return Math.ceil((expiryTime - now) / (60 * 1000));
+  }
+
   // Password requirement - Using inline modal instead of prompt() (blocked in sandboxed iframe)
+  // Now with persistent 60-minute session support
   function requirePasswordFor(featureName, callback) {
+    // Check if manager session is still valid
+    if (isManagerSessionValid()) {
+      const remainingMinutes = getRemainingSessionMinutes();
+      console.log(`✓ Manager session valid (${remainingMinutes} min remaining)`);
+      callback();
+      return;
+    }
     // Create password modal overlay
     const modal = document.createElement('div');
     modal.id = 'passwordModal';
@@ -1030,7 +1087,9 @@
 
       // Check hardcoded ADMIN_PASSWORD first (fallback)
       if (enteredPassword === ADMIN_PASSWORD) {
+        setManagerSession(); // Set 60-minute session
         document.body.removeChild(modal);
+        showMessage('✅ Manager session active (60 minutes)', 'success');
         callback();
         return;
       }
@@ -1053,7 +1112,9 @@
 
         if (passwords && passwords.length > 0) {
           // Valid password found in database
+          setManagerSession(); // Set 60-minute session
           document.body.removeChild(modal);
+          showMessage(`✅ Manager session active (60 minutes) - ${passwords[0].username}`, 'success');
           callback();
           return;
         }
@@ -2584,6 +2645,10 @@
       hasRatings: false,
       hasNotes: true,
       ratingScale: '',
+      start_hour: 9,
+      start_minute: 0,
+      end_hour: 17,
+      end_minute: 0,
       sections: [
         {
           name: 'Section 1',
@@ -2697,16 +2762,122 @@
             >${checklist.description}</textarea>
           </div>
 
+          <!-- Time Range Settings -->
+          <div style="margin-bottom: 20px; padding: 16px; background: var(--gray-100); border-left: 3px solid var(--gray-700); border-radius: 0;">
+            <h5 style="margin: 0 0 12px 0; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              ⏰ AVAILABILITY TIME RANGE
+            </h5>
+            <p style="margin: 0 0 12px 0; font-size: 11px; color: var(--gray-600);">
+              Controls when staff can access this checklist
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <!-- Start Time -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+                  Start Time
+                </label>
+                <div style="display: flex; gap: 8px;">
+                  <input
+                    type="number"
+                    id="edit_startHour"
+                    value="${checklist.start_hour !== undefined ? checklist.start_hour : 9}"
+                    min="0"
+                    max="23"
+                    placeholder="Hour"
+                    style="
+                      flex: 1;
+                      padding: 12px;
+                      border: 2px solid var(--gray-300);
+                      border-radius: 0;
+                      font-size: 14px;
+                      box-sizing: border-box;
+                    "
+                    onfocus="this.style.borderColor='var(--gray-700)'"
+                    onblur="this.style.borderColor='var(--gray-300)'"
+                  />
+                  <span style="padding: 12px 8px; font-size: 14px; font-weight: 700;">:</span>
+                  <input
+                    type="number"
+                    id="edit_startMinute"
+                    value="${checklist.start_minute !== undefined ? checklist.start_minute : 0}"
+                    min="0"
+                    max="59"
+                    placeholder="Min"
+                    style="
+                      flex: 1;
+                      padding: 12px;
+                      border: 2px solid var(--gray-300);
+                      border-radius: 0;
+                      font-size: 14px;
+                      box-sizing: border-box;
+                    "
+                    onfocus="this.style.borderColor='var(--gray-700)'"
+                    onblur="this.style.borderColor='var(--gray-300)'"
+                  />
+                </div>
+                <p style="margin: 4px 0 0 0; font-size: 10px; color: var(--gray-500);">24-hour format (e.g., 9:00)</p>
+              </div>
+
+              <!-- End Time -->
+              <div>
+                <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+                  End Time
+                </label>
+                <div style="display: flex; gap: 8px;">
+                  <input
+                    type="number"
+                    id="edit_endHour"
+                    value="${checklist.end_hour !== undefined ? checklist.end_hour : 17}"
+                    min="0"
+                    max="24"
+                    placeholder="Hour"
+                    style="
+                      flex: 1;
+                      padding: 12px;
+                      border: 2px solid var(--gray-300);
+                      border-radius: 0;
+                      font-size: 14px;
+                      box-sizing: border-box;
+                    "
+                    onfocus="this.style.borderColor='var(--gray-700)'"
+                    onblur="this.style.borderColor='var(--gray-300)'"
+                  />
+                  <span style="padding: 12px 8px; font-size: 14px; font-weight: 700;">:</span>
+                  <input
+                    type="number"
+                    id="edit_endMinute"
+                    value="${checklist.end_minute !== undefined ? checklist.end_minute : 0}"
+                    min="0"
+                    max="59"
+                    placeholder="Min"
+                    style="
+                      flex: 1;
+                      padding: 12px;
+                      border: 2px solid var(--gray-300);
+                      border-radius: 0;
+                      font-size: 14px;
+                      box-sizing: border-box;
+                    "
+                    onfocus="this.style.borderColor='var(--gray-700)'"
+                    onblur="this.style.borderColor='var(--gray-300)'"
+                  />
+                </div>
+                <p style="margin: 4px 0 0 0; font-size: 10px; color: var(--gray-500);">24-hour format (e.g., 17:00)</p>
+              </div>
+            </div>
+          </div>
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
             <div>
               <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
-                Time Range Display
+                Time Range Display (for staff)
               </label>
               <input
                 type="text"
                 id="edit_timeRange"
                 value="${checklist.timeRange}"
-                placeholder="e.g., 9:00 AM - 4:00 PM"
+                placeholder="e.g., 9:00 AM - 5:00 PM"
                 style="
                   width: 100%;
                   padding: 12px;
@@ -2718,6 +2889,7 @@
                 onfocus="this.style.borderColor='var(--gray-700)'"
                 onblur="this.style.borderColor='var(--gray-300)'"
               />
+              <p style="margin: 4px 0 0 0; font-size: 10px; color: var(--gray-500);">Display text only, not actual time logic</p>
             </div>
             <div>
               <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
@@ -3102,6 +3274,12 @@
       const hasNotes = document.getElementById('edit_hasNotes')?.checked || false;
       const ratingScale = document.getElementById('edit_ratingScale')?.value.trim() || null;
 
+      // Collect time range values (actual availability logic)
+      const startHour = parseInt(document.getElementById('edit_startHour')?.value);
+      const startMinute = parseInt(document.getElementById('edit_startMinute')?.value) || 0;
+      const endHour = parseInt(document.getElementById('edit_endHour')?.value);
+      const endMinute = parseInt(document.getElementById('edit_endMinute')?.value) || 0;
+
       // Validate required fields
       if (!title || !description || !timeRange) {
         showMessage('Please fill in all required fields (Title, Description, Time Range)', 'error');
@@ -3169,6 +3347,10 @@
         hasRatings,
         hasNotes,
         ratingScale,
+        start_hour: startHour,
+        start_minute: startMinute,
+        end_hour: endHour,
+        end_minute: endMinute,
         sections
       };
 
