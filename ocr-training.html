@@ -567,7 +567,8 @@ async function loadVendors() {
     vendorSelect.appendChild(option);
   });
 
-  console.log(`Loaded ${state.vendors.length} vendors`);
+  console.log(`Loaded ${state.vendors.length} vendors (ALL vendors selectable)`);
+  console.log(`Auto-detection limited to: Greenleaf, Mani Imports, Performance`);
 }
 
 async function loadStats() {
@@ -977,8 +978,17 @@ function extractItemsFromOCR(ocrText, avgConfidence) {
 async function autoMatchItems(items) {
   console.log('Starting auto-match process...');
 
+  // RESTRICT AUTO-MATCHING TO KEY VENDORS ONLY (Greenleaf, Mani Imports, Performance)
+  const KEY_VENDORS = ['Greenleaf', 'Mani Imports', 'Performance'];
+  const filteredInventory = state.inventoryItems.filter(item =>
+    KEY_VENDORS.includes(item.vendor)
+  );
+
+  console.log(`Auto-matching against ${filteredInventory.length} items from ${KEY_VENDORS.join(', ')}`);
+  console.log(`(All ${state.inventoryItems.length} items still selectable manually)`);
+
   for (const item of items) {
-    const bestMatch = findBestMatch(item.detectedName, state.inventoryItems);
+    const bestMatch = findBestMatch(item.detectedName, filteredInventory);
 
     if (bestMatch && bestMatch.confidence >= 0.4) {
       item.matchedInventoryId = bestMatch.id;
@@ -1057,13 +1067,15 @@ function findBestMatch(detectedName, inventoryItems) {
 }
 
 // ============================================
-// VENDOR DETECTION
+// VENDOR DETECTION (RESTRICTED TO KEY VENDORS)
 // ============================================
 function detectVendor(items) {
+  const KEY_VENDORS = ['Greenleaf', 'Mani Imports', 'Performance'];
   const vendorCounts = {};
 
   items.forEach(item => {
-    if (item.matchedVendor) {
+    // ONLY count vendors from the KEY_VENDORS list
+    if (item.matchedVendor && KEY_VENDORS.includes(item.matchedVendor)) {
       vendorCounts[item.matchedVendor] = (vendorCounts[item.matchedVendor] || 0) + 1;
     }
   });
@@ -1080,7 +1092,10 @@ function detectVendor(items) {
 
   if (determinedVendor) {
     console.log(`🏢 Vendor auto-detected: ${determinedVendor} (${maxCount}/${items.length} items matched)`);
+    console.log(`✅ Only Greenleaf, Mani Imports, Performance considered for auto-detection`);
     document.getElementById('vendorSelect').value = determinedVendor;
+  } else {
+    console.log(`⚠️ No vendor auto-detected (only Greenleaf, Mani Imports, Performance considered)`);
   }
 }
 
@@ -1429,13 +1444,19 @@ async function saveTrainingData() {
       const correction = {
         session_id: state.currentSession.id,
         detected_name: item.detectedName,
+        // OLD fields (keep for backward compatibility)
         detected_quantity: item.detectedQuantity,
+        corrected_quantity: item.correctedQuantity !== null ? item.correctedQuantity : item.detectedQuantity,
+        // NEW fields (QTY ORDERED vs QTY RECEIVED)
+        detected_quantity_ordered: item.detectedQuantity,
+        detected_quantity_received: item.detectedQuantityShipped || item.detectedQuantity,
+        corrected_quantity_ordered: item.correctedQuantity !== null ? item.correctedQuantity : item.detectedQuantity,
+        corrected_quantity_received: item.correctedQuantityShipped !== null ? item.correctedQuantityShipped : (item.detectedQuantityShipped || item.detectedQuantity),
         detected_price: item.detectedPrice,
         detected_unit: item.detectedUnit,
         detected_line_number: item.detectedLineNumber,
         detected_confidence: item.detectedConfidence,
         corrected_name: item.correctedName || item.detectedName,
-        corrected_quantity: item.correctedQuantity !== null ? item.correctedQuantity : item.detectedQuantity,
         corrected_price: item.correctedPrice !== null ? item.correctedPrice : item.detectedPrice,
         corrected_unit: item.correctedUnit || item.detectedUnit,
         matched_inventory_id: item.matchedInventoryId,
@@ -1448,12 +1469,11 @@ async function saveTrainingData() {
         was_auto_matched: item.matchConfidence > 0,
         user_time_spent_ms: Date.now() - state.sessionStartTime,
         metadata: {
-          // POSITION LEARNING DATA (NEW!)
+          // POSITION LEARNING DATA
           namePosition: item.namePosition || null,
           qtyPosition: item.qtyPosition || null,
           unitPosition: item.unitPosition || null,
           pricePosition: item.pricePosition || null,
-          qtyShipped: item.correctedQuantityShipped || item.detectedQuantityShipped || null,
           // Additional context for learning
           rawLineLength: item.rawOcrLine.length,
           lineIndex: lineNum,
@@ -1464,26 +1484,43 @@ async function saveTrainingData() {
       corrections.push(correction);
 
       // LEARNING: Extract patterns from corrections
-      if (item.matchedInventoryId && item.detectedName !== item.matchedItemName) {
-        // This is a name alias pattern!
-        const pattern = {
-          vendor: vendor,
-          pattern_type: 'item_alias',
-          pattern_text: `"${item.detectedName}" should be "${item.matchedItemName}"`,
-          ocr_variation: item.detectedName,
-          canonical_name: item.matchedItemName,
-          inventory_item_id: item.matchedInventoryId,
-          times_seen: 1,
-          times_successful: 1,
-          times_failed: 0,
-          metadata: {
-            first_seen: new Date().toISOString(),
-            context: item.rawOcrLine
-          }
-        };
+      // Learn from BOTH auto-matches AND manual name edits
+      if (item.matchedInventoryId) {
+        let ocrVariation = null;
+        let learnedFrom = null;
 
-        learnedPatterns.push(pattern);
-        console.log(`📚 Learned pattern: "${item.detectedName}" → "${item.matchedItemName}"`);
+        // Case 1: Auto-matched with different detected name (existing logic)
+        if (item.detectedName !== item.matchedItemName) {
+          ocrVariation = item.detectedName;
+          learnedFrom = 'auto-match';
+        }
+        // Case 2: User manually edited the name field (NEW!)
+        else if (item.correctedName && item.correctedName !== item.detectedName) {
+          ocrVariation = item.detectedName; // Original OCR text
+          learnedFrom = 'manual-edit';
+        }
+
+        if (ocrVariation) {
+          const pattern = {
+            vendor: vendor,
+            pattern_type: 'item_alias',
+            pattern_text: `"${ocrVariation}" should be "${item.matchedItemName}"`,
+            ocr_variation: ocrVariation,
+            canonical_name: item.matchedItemName,
+            inventory_item_id: item.matchedInventoryId,
+            times_seen: 1,
+            times_successful: 1,
+            times_failed: 0,
+            metadata: {
+              first_seen: new Date().toISOString(),
+              context: item.rawOcrLine,
+              learned_from: learnedFrom // Track how this was learned
+            }
+          };
+
+          learnedPatterns.push(pattern);
+          console.log(`📚 Learned pattern (${learnedFrom}): "${ocrVariation}" → "${item.matchedItemName}"`);
+        }
       }
     }
 
