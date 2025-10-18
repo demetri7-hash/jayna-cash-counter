@@ -1,31 +1,93 @@
-# FOH Checklists Database Migration
+# FOH Checklists & Password Management - Database Setup
 
 ## Overview
 
-This directory contains SQL scripts to migrate the FOH Checklist system from static JavaScript definitions (`foh-checklists-data.js`) to a fully editable database-driven system.
+This directory contains SQL scripts for two systems:
+1. **Checklist Definitions** - Editable checklist system (EDIT tab)
+2. **Manager Passwords** - Password management for EDIT tab access (WATCHDOG tab)
 
 ## Files
 
-1. **foh_checklists_schema.sql** - Database schema creation (tables, indexes, constraints)
-2. **foh_checklists_migration.sql** - Data migration script (partial - shows pattern)
+1. **foh_checklists_schema.sql** - Checklist database schema (4 tables)
+2. **foh_checklists_migration.sql** - Checklist data migration (partial pattern)
+3. **manager_passwords_schema.sql** - Password management table ⚠️ **RUN THIS FIRST**
+
+## 🔐 MANAGER PASSWORD SYSTEM
+
+### How It Works
+
+1. **WATCHDOG Tab** → 🔐 PASSWORDS section
+   - Create manager passwords
+   - Set username, full name, role
+   - Password strength validation
+   - Activate/deactivate passwords
+   - Delete passwords
+
+2. **EDIT Tab** → Requires password to access
+   - Uses passwords created in WATCHDOG
+   - Checks database + fallback to hardcoded password
+   - No password management UI in EDIT tab
+
+### Password Flow
+
+```
+Manager creates password in WATCHDOG → Password saved to database
+↓
+Manager tries to access EDIT tab → Enter password
+↓
+System checks:
+  1. Hardcoded ADMIN_PASSWORD (JaynaGyro2025!) - fallback
+  2. Database passwords (active only)
+↓
+If match found → Access granted → Load EDIT tab
+```
+
+### ⚠️ CRITICAL: Run Password Schema First
+
+Before using password management, run this in **Supabase SQL Editor**:
+
+```bash
+File: manager_passwords_schema.sql
+```
+
+This creates the `manager_passwords` table. Without it, you'll see:
+- Error: "Could not find the table 'public.manager_passwords' in the schema cache"
+
+After running the SQL:
+1. Go to WATCHDOG tab (password: `JaynaGyro2025!`)
+2. Click 🔐 PASSWORDS tab
+3. Click ➕ ADD NEW PASSWORD
+4. Fill in username, password, role
+5. Click SAVE
+6. Use that password to access EDIT tab!
+
+---
 
 ## Setup Instructions
 
-### Step 1: Create Database Tables
+### Step 1: Create Password Table (REQUIRED FIRST)
 
-Run this script first in **Supabase SQL Editor**:
+Run this script FIRST in **Supabase SQL Editor**:
+
+```bash
+File: manager_passwords_schema.sql
+```
+
+### Step 2: Create Checklist Tables
+
+Run this script in **Supabase SQL Editor**:
 
 ```bash
 File: foh_checklists_schema.sql
 ```
 
-This creates 4 tables:
+This creates 4 tables for editable checklists:
 - `checklist_definitions` - Main checklist info (title, description, time range, etc.)
 - `checklist_sections` - Sections within each checklist
 - `checklist_section_tasks` - Individual tasks for checkbox sections
 - `checklist_section_categories` - Categories for rating sections
 
-### Step 2: Migrate Existing Data (Optional)
+### Step 3: Migrate Checklist Data (Optional)
 
 You have TWO options for populating the database:
 

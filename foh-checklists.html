@@ -773,14 +773,48 @@
     // Focus password input
     setTimeout(() => passwordInput.focus(), 100);
 
-    // Handle submit
-    const handleSubmit = () => {
+    // Handle submit - Check against hardcoded password AND database
+    const handleSubmit = async () => {
       const enteredPassword = passwordInput.value;
+
+      // Check hardcoded ADMIN_PASSWORD first (fallback)
       if (enteredPassword === ADMIN_PASSWORD) {
         document.body.removeChild(modal);
         callback();
-      } else {
+        return;
+      }
+
+      // Check against database passwords
+      try {
+        const passwordHash = simpleHash(enteredPassword);
+
+        const { data: passwords, error } = await supabase
+          .from('manager_passwords')
+          .select('*')
+          .eq('password_hash', passwordHash)
+          .eq('is_active', true)
+          .limit(1);
+
+        if (error) {
+          console.error('Error checking password:', error);
+          // Fall through to incorrect password message
+        }
+
+        if (passwords && passwords.length > 0) {
+          // Valid password found in database
+          document.body.removeChild(modal);
+          callback();
+          return;
+        }
+
+        // No match found
         showMessage('Incorrect password!', 'error');
+        passwordInput.value = '';
+        passwordInput.focus();
+
+      } catch (error) {
+        console.error('Error verifying password:', error);
+        showMessage('Error verifying password!', 'error');
         passwordInput.value = '';
         passwordInput.focus();
       }
