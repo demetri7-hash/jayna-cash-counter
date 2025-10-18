@@ -40,12 +40,12 @@ const FOH_CHECKLISTS = {
   },
 
   // ============================================
-  // FOH OPENING CHECKLIST (9am-3pm)
+  // FOH OPENING CHECKLIST (9am-4pm)
   // ============================================
   foh_opening: {
     type: 'foh_opening',
     title: 'FOH OPENING CHECKLIST',
-    timeRange: '9:00 AM - 3:00 PM',
+    timeRange: '9:00 AM - 4:00 PM',
     description: 'Complete opening procedures for dining room, bar, and guest areas',
     staffCount: 2, // Two staff members
     hasRatings: true,
@@ -182,12 +182,12 @@ const FOH_CHECKLISTS = {
   },
 
   // ============================================
-  // FOH TRANSITION CHECKLIST (2pm-4pm)
+  // FOH TRANSITION CHECKLIST (3pm-4pm)
   // ============================================
   foh_transition: {
     type: 'foh_transition',
     title: 'FOH TRANSITION DUTIES',
-    timeRange: '2:00 PM - 4:00 PM',
+    timeRange: '3:00 PM - 4:00 PM',
     description: 'YOU MAY START TRANSITION 1 HOUR BEFORE YOUR SHIFT ENDS. GUESTS ALWAYS COME BEFORE SIDEWORK.',
     staffCount: 2,
     hasRatings: true,
@@ -264,12 +264,12 @@ const FOH_CHECKLISTS = {
   },
 
   // ============================================
-  // FOH CLOSING CHECKLIST (4pm-11pm)
+  // FOH CLOSING CHECKLIST (8:30pm-11pm)
   // ============================================
   foh_closing: {
     type: 'foh_closing',
     title: 'FOH CLOSING DUTIES',
-    timeRange: '4:00 PM - 11:00 PM',
+    timeRange: '8:30 PM - 11:00 PM',
     description: 'DO NOT START CLOSING THE DINING ROOM BEFORE 9:45PM UNLESS GIVEN EXPLICIT PERMISSION BY THE MANAGER ON DUTY.',
     staffCount: 2,
     hasRatings: false,
@@ -363,12 +363,12 @@ const FOH_CHECKLISTS = {
   },
 
   // ============================================
-  // BAR CLOSING CHECKLIST (4pm-11pm)
+  // BAR CLOSING CHECKLIST (8:30pm-11pm)
   // ============================================
   bar_closing: {
     type: 'bar_closing',
     title: 'BAR CLOSING DUTIES',
-    timeRange: '4:00 PM - 11:00 PM',
+    timeRange: '8:30 PM - 11:00 PM',
     description: 'DESIGNATE 1 PERSON WHO WILL CLOSE THE BAR AND BE RESPONSIBLE FOR EVERYTHING ON THIS LIST. YOU MAY START AS EARLY AS 9PM, AS LONG AS IT DOES NOT DISTURB OR MAKE THE GUESTS FEEL UNCOMFORTABLE, AND YOU CAN STILL MAKE EVERYTHING ON THE MENUS AND TAKE ORDERS UNTIL CLOSING TIME',
     staffCount: 1,
     hasRatings: false,
@@ -456,20 +456,21 @@ const FOH_CHECKLISTS = {
 // Time-based workflow availability
 const FOH_WORKFLOW_SCHEDULE = [
   {
-    name: 'AM Shift (9am-3pm)',
+    name: 'AM Shift (9am-4pm)',
     startHour: 9,
-    endHour: 15,
+    endHour: 16,
     checklists: ['am_cleaning', 'foh_opening']
   },
   {
-    name: 'Transition (2pm-4pm)',
-    startHour: 14,
+    name: 'Transition (3pm-4pm)',
+    startHour: 15,
     endHour: 16,
     checklists: ['foh_transition']
   },
   {
-    name: 'PM Shift (4pm-11pm)',
-    startHour: 16,
+    name: 'PM Shift (8:30pm-11pm)',
+    startHour: 20,
+    startMinute: 30, // 8:30 PM
     endHour: 24,
     checklists: ['foh_closing', 'bar_closing']
   }
@@ -480,12 +481,28 @@ const FOH_WORKFLOW_SCHEDULE = [
  */
 function getAvailableChecklists() {
   const now = new Date();
-  const hour = getPacificHour(now);
+  const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  const hour = pacificTime.getHours();
+  const minute = pacificTime.getMinutes();
 
   const available = [];
 
   FOH_WORKFLOW_SCHEDULE.forEach(schedule => {
-    if (hour >= schedule.startHour && hour < schedule.endHour) {
+    let isInTimeRange = false;
+
+    if (schedule.startMinute !== undefined) {
+      // Handle schedules with specific start minute (like 8:30 PM)
+      const startTotalMinutes = schedule.startHour * 60 + schedule.startMinute;
+      const endTotalMinutes = schedule.endHour * 60;
+      const currentTotalMinutes = hour * 60 + minute;
+
+      isInTimeRange = currentTotalMinutes >= startTotalMinutes && currentTotalMinutes < endTotalMinutes;
+    } else {
+      // Regular hour-based check
+      isInTimeRange = hour >= schedule.startHour && hour < schedule.endHour;
+    }
+
+    if (isInTimeRange) {
       schedule.checklists.forEach(checklistType => {
         if (FOH_CHECKLISTS[checklistType]) {
           available.push(FOH_CHECKLISTS[checklistType]);

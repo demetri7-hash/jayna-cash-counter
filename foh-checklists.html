@@ -726,7 +726,7 @@
   }
 
   /**
-   * Select Checklist and show staff name input
+   * Select Checklist - Check for existing session or create new one
    */
   async function selectChecklist(checklistType) {
     const checklist = getChecklistByType(checklistType);
@@ -737,16 +737,89 @@
 
     fohSystemState.currentChecklist = checklist;
 
-    // Render staff name input screen
-    renderStaffNameInput();
+    showLoading('Checking...', 'Looking for active checklist session...');
+
+    try {
+      // Check for existing incomplete session for this checklist type today
+      const { data: existingSessions, error } = await supabase
+        .from('foh_checklist_sessions')
+        .select('*')
+        .eq('checklist_type', checklistType)
+        .eq('session_date', getPacificDate())
+        .eq('is_complete', false)
+        .order('started_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      hideLoading();
+
+      if (existingSessions && existingSessions.length > 0) {
+        // Found existing session - join it!
+        await joinExistingSession(existingSessions[0]);
+      } else {
+        // No existing session - show name input to create new one
+        renderStaffNameInput();
+      }
+    } catch (error) {
+      hideLoading();
+      console.error('Error checking for existing session:', error);
+      showMessage(`Error: ${error.message}`, 'error');
+    }
   }
 
   /**
-   * Render Staff Name Input Screen
+   * Join Existing Session - Load tasks/ratings from existing incomplete session
+   */
+  async function joinExistingSession(session) {
+    showLoading('Joining Session', 'Loading checklist data...');
+
+    try {
+      // Get stored username from localStorage
+      const savedUsername = localStorage.getItem('foh_username') || '';
+
+      fohSystemState.currentSession = session;
+      fohSystemState.staffName = savedUsername;
+
+      // Load existing tasks
+      const { data: tasks, error: tasksError } = await supabase
+        .from('foh_checklist_tasks')
+        .select('*')
+        .eq('session_id', session.id)
+        .order('task_order');
+
+      if (tasksError) throw tasksError;
+      fohSystemState.tasks = tasks || [];
+
+      // Load existing ratings
+      const { data: ratings, error: ratingsError } = await supabase
+        .from('foh_checklist_ratings')
+        .select('*')
+        .eq('session_id', session.id);
+
+      if (ratingsError) throw ratingsError;
+      fohSystemState.ratings = ratings || [];
+
+      hideLoading();
+
+      // Render checklist with option to set/change username
+      renderChecklist(true); // Pass true to show username prompt if not set
+    } catch (error) {
+      hideLoading();
+      console.error('Error joining session:', error);
+      showMessage(`Error joining session: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Render Staff Name Input Screen (for new sessions)
    */
   function renderStaffNameInput() {
     const container = document.getElementById('fohWorkflowContent');
     const checklist = fohSystemState.currentChecklist;
+
+    // Get saved username from localStorage
+    const savedUsername = localStorage.getItem('foh_username') || '';
 
     const html = `
       <div style="max-width: 600px; margin: 0 auto;">
@@ -759,13 +832,14 @@
           </p>
         </div>
 
-        <div style="margin-bottom: 20px;">
+        <div style="margin-bottom: 24px;">
           <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
             Your Name *
           </label>
           <input
             type="text"
-            id="fohStaffName1"
+            id="fohStaffName"
+            value="${savedUsername}"
             placeholder="Enter your name"
             style="
               width: 100%;
@@ -778,30 +852,10 @@
             onfocus="this.style.borderColor='var(--gray-700)'"
             onblur="this.style.borderColor='var(--gray-300)'"
           />
+          <p style="margin: 8px 0 0 0; font-size: 11px; color: var(--gray-500);">
+            Your name will be saved and used for all your actions in this checklist
+          </p>
         </div>
-
-        ${checklist.staffCount > 1 ? `
-          <div style="margin-bottom: 24px;">
-            <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
-              Second Staff Member ${checklist.staffCount === 2 ? '*' : '(Optional)'}
-            </label>
-            <input
-              type="text"
-              id="fohStaffName2"
-              placeholder="Enter second staff member name"
-              style="
-                width: 100%;
-                padding: 14px;
-                border: 2px solid var(--gray-300);
-                border-radius: 0;
-                font-size: 14px;
-                box-sizing: border-box;
-              "
-              onfocus="this.style.borderColor='var(--gray-700)'"
-              onblur="this.style.borderColor='var(--gray-300)'"
-            />
-          </div>
-        ` : ''}
 
         <div style="display: flex; gap: 12px;">
           <button
@@ -827,7 +881,7 @@
           <button
             onclick="startChecklistSession()"
             style="
-              flex: 1;
+              flex: 2;
               padding: 14px 24px;
               background: var(--gray-900);
               color: white;
@@ -848,30 +902,32 @@
     `;
 
     container.innerHTML = html;
+
+    // Auto-focus name input
+    setTimeout(() => {
+      const nameInput = document.getElementById('fohStaffName');
+      if (nameInput && !savedUsername) {
+        nameInput.focus();
+      }
+    }, 100);
   }
 
   /**
    * Start Checklist Session - Create session in database
    */
   async function startChecklistSession() {
-    const staffName1 = document.getElementById('fohStaffName1').value.trim();
-    const staffName2Input = document.getElementById('fohStaffName2');
-    const staffName2 = staffName2Input ? staffName2Input.value.trim() : '';
+    const staffName = document.getElementById('fohStaffName').value.trim();
 
-    if (!staffName1) {
+    if (!staffName) {
       showMessage('Please enter your name!', 'error');
-      document.getElementById('fohStaffName1').focus();
+      document.getElementById('fohStaffName').focus();
       return;
     }
+
+    // Save username to localStorage for future use
+    localStorage.setItem('foh_username', staffName);
 
     const checklist = fohSystemState.currentChecklist;
-
-    // Validate second staff member if required
-    if (checklist.staffCount === 2 && !staffName2) {
-      showMessage('Please enter second staff member name!', 'error');
-      document.getElementById('fohStaffName2').focus();
-      return;
-    }
 
     showLoading('Starting Checklist', 'Creating session...');
 
@@ -879,8 +935,8 @@
       // Create session in database
       const sessionData = {
         checklist_type: checklist.type,
-        staff_name: staffName1,
-        staff_name_2: staffName2 || null,
+        staff_name: staffName,
+        staff_name_2: null, // No longer using second name
         session_date: getPacificDate(),
         session_time: new Date().toLocaleTimeString('en-US', {
           timeZone: 'America/Los_Angeles',
@@ -899,8 +955,7 @@
       if (error) throw error;
 
       fohSystemState.currentSession = data;
-      fohSystemState.staffName = staffName1;
-      fohSystemState.staffName2 = staffName2;
+      fohSystemState.staffName = staffName;
 
       // Create initial task records
       await createInitialTasks();
