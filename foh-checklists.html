@@ -1991,6 +1991,14 @@
 
       if (tasksError) throw tasksError;
 
+      // Debug: Log task data to verify completed_by is saved
+      console.log('📊 Watchdog Tasks Loaded:', tasks.length, 'tasks');
+      const completedTasksWithUser = tasks.filter(t => t.is_completed && t.completed_by);
+      console.log('✅ Completed tasks with username:', completedTasksWithUser.length);
+      if (completedTasksWithUser.length > 0) {
+        console.log('Sample completed task:', completedTasksWithUser[0]);
+      }
+
       const { data: ratings, error: ratingsError } = await supabase
         .from('foh_checklist_ratings')
         .select('*')
@@ -2043,7 +2051,7 @@
       html += `
         <div style="margin-bottom: 24px; background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
           <div style="background: ${session.is_complete ? 'var(--success-bg)' : 'var(--warning-bg)'}; padding: 16px; border-bottom: 2px solid var(--gray-300);">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
               <div>
                 <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: ${session.is_complete ? 'var(--success-text)' : 'var(--warning-text)'}; text-transform: uppercase; letter-spacing: 1px;">
                   ${checklistTitle}
@@ -2072,6 +2080,28 @@
                   ${completedTasks} / ${totalTasks} tasks
                 </div>
               </div>
+            </div>
+
+            <!-- Delete Session Button -->
+            <div style="text-align: right;">
+              <button
+                onclick="confirmDeleteSession('${session.id}', '${session.session_date}')"
+                style="
+                  padding: 8px 16px;
+                  background: #dc2626;
+                  color: white;
+                  border: 2px solid #dc2626;
+                  border-radius: 0;
+                  font-size: 11px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  cursor: pointer;
+                  transition: all 0.15s ease;
+                "
+                onmouseover="this.style.background='#b91c1c'"
+                onmouseout="this.style.background='#dc2626'"
+              >🗑️ DELETE SESSION</button>
             </div>
           </div>
 
@@ -2106,13 +2136,57 @@
 
         sectionTasks.forEach(task => {
           html += `
-            <div style="display: flex; align-items: flex-start; gap: 8px; padding: 8px; margin-bottom: 4px; background: ${task.is_completed ? 'var(--success-bg)' : 'var(--gray-100)'}; border-radius: 0; font-size: 12px;">
-              <span style="flex-shrink: 0;">${task.is_completed ? '✅' : '⬜'}</span>
-              <div style="flex: 1; ${task.is_completed ? 'text-decoration: line-through; opacity: 0.7;' : ''}">
-                ${task.task_text}
-                ${task.is_completed && task.completed_by ? `
-                  <div style="font-size: 11px; color: var(--gray-600); margin-top: 4px; font-style: italic;">
-                    Completed by ${task.completed_by} at ${formatPacificDateDisplay(new Date(task.completed_at), {
+            <div style="margin-bottom: 12px; padding: 8px; background: ${task.is_completed ? 'var(--success-bg)' : 'var(--gray-100)'}; border-radius: 0; border-left: 3px solid ${task.is_completed ? 'var(--success-border)' : 'var(--gray-300)'};">
+              <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+                <span style="flex-shrink: 0; font-size: 14px;">${task.is_completed ? '✅' : '⬜'}</span>
+                <div style="flex: 1; ${task.is_completed ? 'text-decoration: line-through; opacity: 0.8;' : ''}">
+                  <div style="font-size: 13px; font-weight: 600; color: var(--gray-900);">
+                    ${task.task_text}
+                  </div>
+                  ${task.is_completed && task.completed_by ? `
+                    <div style="font-size: 11px; color: var(--success-text); margin-top: 4px; font-weight: 600;">
+                      ✓ Completed by ${task.completed_by} • ${formatPacificDateDisplay(new Date(task.completed_at), {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
+                    </div>
+                  ` : ''}
+                  ${!task.is_completed ? `
+                    <div style="font-size: 11px; color: var(--error-text); margin-top: 4px; font-weight: 600;">
+                      ⚠️ NOT COMPLETED
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+
+              <!-- Manager Notes Section -->
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--gray-300);">
+                <label style="display: block; margin-bottom: 4px; font-size: 10px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">
+                  📝 Manager Notes
+                </label>
+                <textarea
+                  id="managerNote_${task.id}"
+                  placeholder="Add manager notes or observations..."
+                  style="
+                    width: 100%;
+                    min-height: 60px;
+                    padding: 8px;
+                    border: 2px solid var(--gray-300);
+                    border-radius: 0;
+                    font-size: 12px;
+                    font-family: inherit;
+                    box-sizing: border-box;
+                    resize: vertical;
+                  "
+                  onfocus="this.style.borderColor='var(--gray-700)'"
+                  onblur="this.style.borderColor='var(--gray-300)'; saveManagerNote('${task.id}', this.value);"
+                >${task.manager_note || ''}</textarea>
+                ${task.manager_note_by ? `
+                  <div style="font-size: 10px; color: var(--gray-500); margin-top: 4px; font-style: italic;">
+                    Last edited by ${task.manager_note_by} • ${formatPacificDateDisplay(new Date(task.manager_note_at), {
+                      month: 'short',
+                      day: 'numeric',
                       hour: 'numeric',
                       minute: '2-digit',
                       hour12: true
@@ -2192,6 +2266,206 @@
     });
 
     container.innerHTML = html;
+  }
+
+  /**
+   * Save Manager Note - With username + timestamp tracking
+   */
+  async function saveManagerNote(taskId, noteText) {
+    const note = noteText.trim();
+
+    // Get manager username from localStorage
+    const managerName = localStorage.getItem('foh_username') || 'Manager';
+
+    try {
+      const updateData = {
+        manager_note: note || null,
+        manager_note_by: note ? managerName : null,
+        manager_note_at: note ? new Date().toISOString() : null
+      };
+
+      const { error } = await supabase
+        .from('foh_checklist_tasks')
+        .update(updateData)
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      console.log(`✓ Manager note saved for task ${taskId}`);
+
+      // Show brief success indicator
+      const textarea = document.getElementById(`managerNote_${taskId}`);
+      if (textarea) {
+        const originalBorder = textarea.style.borderColor;
+        textarea.style.borderColor = 'var(--success-border)';
+        setTimeout(() => {
+          textarea.style.borderColor = originalBorder;
+        }, 1000);
+      }
+
+    } catch (error) {
+      console.error('Error saving manager note:', error);
+      showMessage(`Error saving note: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Confirm Delete Session - Show confirmation modal
+   */
+  function confirmDeleteSession(sessionId, sessionDate) {
+    requirePasswordFor('Delete Session', () => {
+      // Show confirmation modal
+      const modal = document.createElement('div');
+      modal.id = 'confirmDeleteModal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        padding: 20px;
+      `;
+
+      const modalContent = document.createElement('div');
+      modalContent.style.cssText = `
+        background: white;
+        padding: 32px;
+        max-width: 500px;
+        width: 100%;
+        border: 3px solid #dc2626;
+        border-radius: 0;
+      `;
+
+      modalContent.innerHTML = `
+        <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #dc2626; text-transform: uppercase; letter-spacing: 1px;">
+          ⚠️ DELETE SESSION
+        </h3>
+        <p style="margin: 0 0 20px 0; font-size: 14px; color: var(--gray-700); line-height: 1.6;">
+          Are you sure you want to delete this entire checklist session?
+          <br><br>
+          <strong>This action cannot be undone!</strong>
+          <br><br>
+          All tasks, ratings, and notes for this session will be permanently removed.
+        </p>
+        <div style="display: flex; gap: 12px;">
+          <button
+            id="deleteSessionCancelBtn"
+            style="
+              flex: 1;
+              padding: 14px 24px;
+              background: var(--gray-100);
+              color: var(--gray-900);
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+          >CANCEL</button>
+          <button
+            id="deleteSessionConfirmBtn"
+            style="
+              flex: 1;
+              padding: 14px 24px;
+              background: #dc2626;
+              color: white;
+              border: 2px solid #dc2626;
+              border-radius: 0;
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+          >DELETE SESSION</button>
+        </div>
+      `;
+
+      modal.appendChild(modalContent);
+      document.body.appendChild(modal);
+
+      const confirmBtn = document.getElementById('deleteSessionConfirmBtn');
+      const cancelBtn = document.getElementById('deleteSessionCancelBtn');
+
+      // Handle confirm
+      const handleConfirm = () => {
+        document.body.removeChild(modal);
+        deleteSession(sessionId, sessionDate);
+      };
+
+      // Handle cancel
+      const handleCancel = () => {
+        document.body.removeChild(modal);
+      };
+
+      confirmBtn.onclick = handleConfirm;
+      cancelBtn.onclick = handleCancel;
+
+      // Click outside to close
+      modal.onclick = (e) => {
+        if (e.target === modal) {
+          handleCancel();
+        }
+      };
+    });
+  }
+
+  /**
+   * Delete Session - Remove session, tasks, and ratings from database
+   */
+  async function deleteSession(sessionId, sessionDate) {
+    showLoading('Deleting Session', 'Removing all data...');
+
+    try {
+      // Delete in reverse order of foreign key dependencies
+
+      // 1. Delete all ratings for this session
+      const { error: ratingsError } = await supabase
+        .from('foh_checklist_ratings')
+        .delete()
+        .eq('session_id', sessionId);
+
+      if (ratingsError) throw ratingsError;
+
+      // 2. Delete all tasks for this session
+      const { error: tasksError } = await supabase
+        .from('foh_checklist_tasks')
+        .delete()
+        .eq('session_id', sessionId);
+
+      if (tasksError) throw tasksError;
+
+      // 3. Delete the session itself
+      const { error: sessionError } = await supabase
+        .from('foh_checklist_sessions')
+        .delete()
+        .eq('id', sessionId);
+
+      if (sessionError) throw sessionError;
+
+      hideLoading();
+
+      showMessage('✅ Session deleted successfully!', 'success');
+
+      // Reload the watchdog data for this date
+      setTimeout(() => {
+        loadWatchdogData(sessionDate);
+      }, 1000);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error deleting session:', error);
+      showMessage(`Error deleting session: ${error.message}`, 'error');
+    }
   }
 
   // ====================================
