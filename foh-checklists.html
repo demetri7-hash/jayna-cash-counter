@@ -631,29 +631,14 @@
   }
 
   /**
-   * Load all checklist types from database (for editor list view)
+   * Load all checklist types (ALWAYS returns all 5 from FOH_CHECKLISTS)
+   * Individual checklists load from database with fallback to static data
    */
   async function loadAllChecklistsFromDatabase() {
-    try {
-      const { data: definitions, error } = await supabase
-        .from('checklist_definitions')
-        .select('*')
-        .order('type', { ascending: true });
-
-      if (error) throw error;
-
-      if (!definitions || definitions.length === 0) {
-        // Fallback to FOH_CHECKLISTS if database is empty
-        return Object.keys(FOH_CHECKLISTS);
-      }
-
-      return definitions.map(d => d.type);
-
-    } catch (error) {
-      console.error('Error loading checklist types:', error);
-      // Fallback to FOH_CHECKLISTS
-      return Object.keys(FOH_CHECKLISTS);
-    }
+    // Always return all 5 checklist types from FOH_CHECKLISTS
+    // This ensures EDIT tab shows all 5 checklists
+    // Individual checklists will load from database or fall back to static data
+    return Object.keys(FOH_CHECKLISTS);
   }
 
   // Loading functions
@@ -2284,15 +2269,6 @@
     });
 
     html += `
-      </div>
-
-      <div style="margin-top: 32px; padding: 20px; background: var(--warning-bg); border-left: 4px solid var(--warning-border); border-radius: 0;">
-        <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: var(--warning-text); text-transform: uppercase; letter-spacing: 1px;">
-          ⚠️ COMING SOON: Password Management
-        </h4>
-        <p style="margin: 0; font-size: 13px; color: var(--warning-text); line-height: 1.6;">
-          Manager password creation and management features will be added in the next update.
-        </p>
       </div>
     `;
 
