@@ -22687,12 +22687,26 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       fohForm.style.visibility = 'visible';
       fohForm.style.opacity = '1';
       fohForm.style.position = 'relative';
-      fohForm.style.zIndex = '1';
+      fohForm.style.zIndex = '999';
+      fohForm.style.background = '#ff0000'; // BRIGHT RED to see if it renders
+      fohForm.style.minHeight = '500px';
+      fohForm.style.border = '10px solid yellow';
+      fohForm.style.padding = '20px';
 
       console.log('✅ Form displayed with active class');
       console.log('Form element:', fohForm);
       console.log('Form display:', window.getComputedStyle(fohForm).display);
       console.log('Form visibility:', window.getComputedStyle(fohForm).visibility);
+      console.log('Form height:', fohForm.offsetHeight);
+      console.log('Form width:', fohForm.offsetWidth);
+      console.log('Form position:', fohForm.getBoundingClientRect());
+
+      // HIDE MAIN MENU (like other sections do)
+      const mainMenu = document.getElementById('mainMenu');
+      if (mainMenu) {
+        mainMenu.style.display = 'none';
+        console.log('✅ Main menu hidden');
+      }
 
       // Reset state
       fohSystemState.currentSession = null;
@@ -22706,6 +22720,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       renderWorkflowSelector();
 
       console.log('✅ Render complete');
+
+      // Scroll to top to ensure form is visible
+      window.scrollTo(0, 0);
+      fohForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
       console.error('❌ Error starting FOH system:', error);
       alert(`Error: ${error.message}`);
