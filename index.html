@@ -11933,7 +11933,9 @@ async function renderOrdersTab() {
         lineCooksPrep: item.line_cooks_prep || false, // Track line cooks prep items
         notMadeDaily: item.not_made_daily || false, // Track items not made daily
         batchLifespan: item.batch_lifespan_hours,
-        storageLocation: item.storage_location
+        storageLocation: item.storage_location,
+        lastInvoiceQty: item.last_invoice_qty, // Track quantity added from latest invoice
+        lastInvoiceDate: item.last_invoice_date // Track when latest invoice was received
       }));
 
       console.log('orderingSystemState.items:', orderingSystemState.items);
@@ -14000,6 +14002,31 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                     </div>
                   </div>
 
+                  ${item.lastInvoiceQty && item.lastInvoiceDate ? `
+                  <!-- Invoice Addition Info -->
+                  <div style="
+                    margin-top: 8px;
+                    margin-bottom: 12px;
+                    padding: 8px 10px;
+                    background: var(--blue-bg);
+                    border-left: 3px solid var(--blue-text);
+                    border-radius: 0;
+                    font-size: ${isCompactMode ? '11px' : '12px'};
+                    color: var(--blue-text);
+                    font-weight: 600;
+                    font-style: italic;
+                  ">
+                    ${item.lastInvoiceQty} ADDED VIA INVOICE ON ${formatPacificDateDisplay(new Date(item.lastInvoiceDate), {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
+                  </div>
+                  ` : ''}
+
                   <!-- Stock Input with Quick Adjustments (Mobile-Optimized) -->
                   <div>
                     <label style="display: block; font-size: 12px; color: #666; margin-bottom: 6px; font-weight: 500;">
@@ -14879,6 +14906,31 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                       ${lastCounted}
                     </div>
                   </div>
+
+                  ${item.lastInvoiceQty && item.lastInvoiceDate ? `
+                  <!-- Invoice Addition Info -->
+                  <div style="
+                    margin-top: 8px;
+                    margin-bottom: 12px;
+                    padding: 8px 10px;
+                    background: var(--blue-bg);
+                    border-left: 3px solid var(--blue-text);
+                    border-radius: 0;
+                    font-size: ${isCompactMode ? '11px' : '12px'};
+                    color: var(--blue-text);
+                    font-weight: 600;
+                    font-style: italic;
+                  ">
+                    ${item.lastInvoiceQty} ADDED VIA INVOICE ON ${formatPacificDateDisplay(new Date(item.lastInvoiceDate), {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
+                  </div>
+                  ` : ''}
 
                   <!-- Stock Input with Quick Adjustments (Mobile-Optimized) -->
                   <div>
@@ -21106,7 +21158,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             .from('inventory_items')
             .update({
               current_stock: newStock,
-              last_counted_date: getPacificDate()
+              last_counted_date: getPacificDate(),
+              last_invoice_qty: item.quantityReceived,
+              last_invoice_date: new Date().toISOString()
             })
             .eq('id', item.inventoryItemId);
 
