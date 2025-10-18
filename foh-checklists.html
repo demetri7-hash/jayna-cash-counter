@@ -2538,37 +2538,115 @@
   }
 
   /**
-   * Load Manager Watchdog - Historical data view
+   * Load Manager Watchdog - Historical data view + password management
    */
   async function loadManagerWatchdog() {
     const container = document.getElementById('fohWatchdogContent');
 
     container.innerHTML = `
-      <div style="margin-bottom: 20px;">
-        <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
-          Select Date
-        </label>
-        <input
-          type="date"
-          id="watchdogDate"
-          value="${getPacificDate()}"
+      <!-- Tab Selector -->
+      <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid var(--gray-300);">
+        <button
+          id="watchdogTab_history"
+          onclick="showWatchdogSection('history')"
           style="
-            padding: 12px;
-            border: 2px solid var(--gray-300);
+            padding: 12px 20px;
+            background: var(--gray-700);
+            color: white;
+            border: none;
             border-radius: 0;
-            font-size: 14px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
           "
-          onchange="loadWatchdogData(this.value)"
-        />
+        >📊 HISTORY</button>
+        <button
+          id="watchdogTab_passwords"
+          onclick="showWatchdogSection('passwords')"
+          style="
+            padding: 12px 20px;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: none;
+            border-radius: 0;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+        >🔐 PASSWORDS</button>
       </div>
 
-      <div id="watchdogDataContainer">
-        <p style="text-align: center; padding: 20px;">Loading data...</p>
+      <!-- History Section -->
+      <div id="watchdog_history" style="display: block;">
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+            Select Date
+          </label>
+          <input
+            type="date"
+            id="watchdogDate"
+            value="${getPacificDate()}"
+            style="
+              padding: 12px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 14px;
+            "
+            onchange="loadWatchdogData(this.value)"
+          />
+        </div>
+
+        <div id="watchdogDataContainer">
+          <p style="text-align: center; padding: 20px;">Loading data...</p>
+        </div>
+      </div>
+
+      <!-- Password Management Section -->
+      <div id="watchdog_passwords" style="display: none;">
+        <div id="passwordManagementContainer">
+          <p style="text-align: center; padding: 20px;">Loading password management...</p>
+        </div>
       </div>
     `;
 
     // Load today's data
     loadWatchdogData(getPacificDate());
+  }
+
+  /**
+   * Show Watchdog Section
+   */
+  function showWatchdogSection(section) {
+    // Hide all sections
+    document.getElementById('watchdog_history').style.display = 'none';
+    document.getElementById('watchdog_passwords').style.display = 'none';
+
+    // Update button styles
+    const historyBtn = document.getElementById('watchdogTab_history');
+    const passwordsBtn = document.getElementById('watchdogTab_passwords');
+
+    historyBtn.style.background = 'var(--gray-100)';
+    historyBtn.style.color = 'var(--gray-700)';
+    passwordsBtn.style.background = 'var(--gray-100)';
+    passwordsBtn.style.color = 'var(--gray-700)';
+
+    // Show selected section
+    if (section === 'history') {
+      document.getElementById('watchdog_history').style.display = 'block';
+      historyBtn.style.background = 'var(--gray-700)';
+      historyBtn.style.color = 'white';
+    } else if (section === 'passwords') {
+      document.getElementById('watchdog_passwords').style.display = 'block';
+      passwordsBtn.style.background = 'var(--gray-700)';
+      passwordsBtn.style.color = 'white';
+      loadPasswordManagement();
+    }
   }
 
   /**
@@ -3089,6 +3167,733 @@
       hideLoading();
       console.error('Error deleting session:', error);
       showMessage(`Error deleting session: ${error.message}`, 'error');
+    }
+  }
+
+  // ====================================
+  // PASSWORD MANAGEMENT SYSTEM
+  // ====================================
+
+  /**
+   * Load Password Management Interface
+   */
+  async function loadPasswordManagement() {
+    const container = document.getElementById('passwordManagementContainer');
+
+    showLoading('Loading', 'Fetching manager passwords...');
+
+    try {
+      // Fetch all manager passwords from database
+      const { data: passwords, error } = await supabase
+        .from('manager_passwords')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      hideLoading();
+
+      let html = `
+        <div style="margin-bottom: 24px; padding: 20px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--blue-text); text-transform: uppercase; letter-spacing: 1px;">
+                🔐 MANAGER PASSWORD MANAGEMENT
+              </h3>
+              <p style="margin: 0; font-size: 13px; color: var(--blue-text); line-height: 1.6;">
+                Create and manage passwords for manager access to FOH checklists.
+              </p>
+            </div>
+            <button
+              onclick="showAddPasswordForm()"
+              style="
+                padding: 12px 24px;
+                background: var(--success-border);
+                color: white;
+                border: 2px solid var(--success-border);
+                border-radius: 0;
+                font-size: 12px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#047857'"
+              onmouseout="this.style.background='var(--success-border)'"
+            >➕ ADD NEW PASSWORD</button>
+          </div>
+        </div>
+
+        <div id="addPasswordForm" style="display: none;"></div>
+
+        <div id="passwordsList">
+      `;
+
+      if (!passwords || passwords.length === 0) {
+        html += `
+          <div style="text-align: center; padding: 60px 20px; background: var(--gray-100); border: 2px solid var(--gray-300); border-radius: 0;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🔒</div>
+            <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--gray-700);">
+              NO PASSWORDS CONFIGURED
+            </h3>
+            <p style="margin: 0; font-size: 13px; color: var(--gray-500);">
+              Click "ADD NEW PASSWORD" to create your first manager password
+            </p>
+          </div>
+        `;
+      } else {
+        passwords.forEach(pwd => {
+          const statusColor = pwd.is_active ? 'var(--success-border)' : 'var(--error-border)';
+          const statusBg = pwd.is_active ? 'var(--success-bg)' : 'var(--error-bg)';
+          const statusText = pwd.is_active ? 'var(--success-text)' : 'var(--error-text)';
+
+          html += `
+            <div style="margin-bottom: 16px; background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
+              <div style="padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                  <div style="flex: 1;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--gray-900);">
+                      ${pwd.username}
+                    </h4>
+                    ${pwd.full_name ? `
+                      <p style="margin: 0 0 8px 0; font-size: 13px; color: var(--gray-600);">
+                        ${pwd.full_name}
+                      </p>
+                    ` : ''}
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--gray-500);">
+                      <span>📅 Created ${formatPacificDateDisplay(new Date(pwd.created_at), {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}</span>
+                      ${pwd.created_by ? `<span>👤 by ${pwd.created_by}</span>` : ''}
+                      ${pwd.role ? `<span>🎭 Role: ${pwd.role}</span>` : ''}
+                    </div>
+                  </div>
+                  <div>
+                    <span style="
+                      display: inline-block;
+                      padding: 6px 12px;
+                      background: ${statusBg};
+                      color: ${statusText};
+                      border-radius: 0;
+                      font-size: 11px;
+                      font-weight: 700;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                    ">${pwd.is_active ? '✅ ACTIVE' : '❌ INACTIVE'}</span>
+                  </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button
+                    onclick="editPassword('${pwd.id}')"
+                    style="
+                      padding: 10px 16px;
+                      background: var(--gray-700);
+                      color: white;
+                      border: 2px solid var(--gray-700);
+                      border-radius: 0;
+                      font-size: 11px;
+                      font-weight: 700;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                      cursor: pointer;
+                      transition: all 0.15s ease;
+                    "
+                    onmouseover="this.style.background='#000'"
+                    onmouseout="this.style.background='var(--gray-700)'"
+                  >✏️ EDIT</button>
+
+                  <button
+                    onclick="togglePasswordStatus('${pwd.id}', ${!pwd.is_active})"
+                    style="
+                      padding: 10px 16px;
+                      background: ${pwd.is_active ? 'var(--warning-border)' : 'var(--success-border)'};
+                      color: white;
+                      border: 2px solid ${pwd.is_active ? 'var(--warning-border)' : 'var(--success-border)'};
+                      border-radius: 0;
+                      font-size: 11px;
+                      font-weight: 700;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                      cursor: pointer;
+                      transition: all 0.15s ease;
+                    "
+                  >${pwd.is_active ? '🚫 DEACTIVATE' : '✅ ACTIVATE'}</button>
+
+                  <button
+                    onclick="confirmDeletePassword('${pwd.id}', '${pwd.username}')"
+                    style="
+                      padding: 10px 16px;
+                      background: #dc2626;
+                      color: white;
+                      border: 2px solid #dc2626;
+                      border-radius: 0;
+                      font-size: 11px;
+                      font-weight: 700;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                      cursor: pointer;
+                      transition: all 0.15s ease;
+                    "
+                    onmouseover="this.style.background='#b91c1c'"
+                    onmouseout="this.style.background='#dc2626'"
+                  >🗑️ DELETE</button>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      html += '</div>';
+
+      container.innerHTML = html;
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error loading passwords:', error);
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          <p style="font-size: 16px; color: var(--error-text);">
+            Error loading passwords: ${error.message}
+          </p>
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Show Add Password Form
+   */
+  function showAddPasswordForm() {
+    const formContainer = document.getElementById('addPasswordForm');
+
+    formContainer.innerHTML = `
+      <div style="margin-bottom: 24px; background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
+        <div style="background: var(--success-bg); border-bottom: 2px solid var(--success-border); padding: 14px 16px;">
+          <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--success-text); text-transform: uppercase; letter-spacing: 1px;">
+            ➕ ADD NEW MANAGER PASSWORD
+          </h4>
+        </div>
+        <div style="padding: 20px;">
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              Username (Login ID) *
+            </label>
+            <input
+              type="text"
+              id="new_username"
+              placeholder="e.g., manager1, john_doe"
+              style="
+                width: 100%;
+                padding: 12px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 14px;
+                box-sizing: border-box;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            />
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--gray-500);">
+              Must be unique. No spaces. Use lowercase and underscores.
+            </p>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              Full Name (Optional)
+            </label>
+            <input
+              type="text"
+              id="new_fullname"
+              placeholder="e.g., John Doe"
+              style="
+                width: 100%;
+                padding: 12px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 14px;
+                box-sizing: border-box;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            />
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              Password *
+            </label>
+            <div style="position: relative;">
+              <input
+                type="password"
+                id="new_password"
+                placeholder="Enter strong password"
+                style="
+                  width: 100%;
+                  padding: 12px;
+                  padding-right: 50px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+                onfocus="this.style.borderColor='var(--gray-700)'"
+                onblur="this.style.borderColor='var(--gray-300)'"
+                oninput="validatePasswordStrength(this.value, 'new_password_strength')"
+              />
+              <button
+                type="button"
+                onclick="togglePasswordVisibility('new_password')"
+                style="
+                  position: absolute;
+                  right: 8px;
+                  top: 50%;
+                  transform: translateY(-50%);
+                  background: none;
+                  border: none;
+                  cursor: pointer;
+                  font-size: 18px;
+                  padding: 4px 8px;
+                "
+              >👁️</button>
+            </div>
+            <div id="new_password_strength" style="margin-top: 8px;"></div>
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--gray-500);">
+              Minimum 8 characters. Include uppercase, lowercase, numbers, and symbols.
+            </p>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              Role (Optional)
+            </label>
+            <select
+              id="new_role"
+              style="
+                width: 100%;
+                padding: 12px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 14px;
+                box-sizing: border-box;
+              "
+            >
+              <option value="">Select role...</option>
+              <option value="Manager">Manager</option>
+              <option value="Supervisor">Supervisor</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button
+              onclick="hideAddPasswordForm()"
+              style="
+                padding: 14px 24px;
+                background: var(--gray-100);
+                color: var(--gray-900);
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 13px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='var(--gray-200)'"
+              onmouseout="this.style.background='var(--gray-100)'"
+            >CANCEL</button>
+
+            <button
+              onclick="saveNewPassword()"
+              style="
+                padding: 14px 24px;
+                background: var(--success-border);
+                color: white;
+                border: 2px solid var(--success-border);
+                border-radius: 0;
+                font-size: 13px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#047857'"
+              onmouseout="this.style.background='var(--success-border)'"
+            >💾 CREATE PASSWORD</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    formContainer.style.display = 'block';
+
+    // Focus username field
+    setTimeout(() => {
+      document.getElementById('new_username').focus();
+    }, 100);
+  }
+
+  /**
+   * Hide Add Password Form
+   */
+  function hideAddPasswordForm() {
+    document.getElementById('addPasswordForm').style.display = 'none';
+    document.getElementById('addPasswordForm').innerHTML = '';
+  }
+
+  /**
+   * Validate Password Strength
+   */
+  function validatePasswordStrength(password, elementId) {
+    const strengthDiv = document.getElementById(elementId);
+    if (!strengthDiv) return;
+
+    if (!password) {
+      strengthDiv.innerHTML = '';
+      return;
+    }
+
+    let strength = 0;
+    let feedback = [];
+
+    // Length check
+    if (password.length >= 8) strength++;
+    if (password.length >= 12) strength++;
+    else feedback.push('Use 12+ characters');
+
+    // Character type checks
+    if (/[a-z]/.test(password)) strength++;
+    else feedback.push('Add lowercase letters');
+
+    if (/[A-Z]/.test(password)) strength++;
+    else feedback.push('Add uppercase letters');
+
+    if (/[0-9]/.test(password)) strength++;
+    else feedback.push('Add numbers');
+
+    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+    else feedback.push('Add symbols (!@#$%^&*)');
+
+    let color, text, bgColor;
+    if (strength <= 2) {
+      color = 'var(--error-text)';
+      bgColor = 'var(--error-bg)';
+      text = '❌ WEAK';
+    } else if (strength <= 4) {
+      color = 'var(--warning-text)';
+      bgColor = 'var(--warning-bg)';
+      text = '⚠️ MEDIUM';
+    } else {
+      color = 'var(--success-text)';
+      bgColor = 'var(--success-bg)';
+      text = '✅ STRONG';
+    }
+
+    strengthDiv.innerHTML = `
+      <div style="padding: 8px 12px; background: ${bgColor}; border-left: 3px solid ${color}; border-radius: 0;">
+        <div style="font-size: 11px; font-weight: 700; color: ${color}; margin-bottom: 4px;">
+          ${text}
+        </div>
+        ${feedback.length > 0 ? `
+          <div style="font-size: 10px; color: ${color};">
+            ${feedback.join(' • ')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  /**
+   * Toggle Password Visibility
+   */
+  function togglePasswordVisibility(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    if (input.type === 'password') {
+      input.type = 'text';
+    } else {
+      input.type = 'password';
+    }
+  }
+
+  /**
+   * Simple Hash Function (for basic password storage)
+   * NOTE: In production, use proper bcrypt/argon2 on backend
+   */
+  function simpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return hash.toString(36);
+  }
+
+  /**
+   * Save New Password
+   */
+  async function saveNewPassword() {
+    const username = document.getElementById('new_username').value.trim();
+    const fullname = document.getElementById('new_fullname').value.trim();
+    const password = document.getElementById('new_password').value;
+    const role = document.getElementById('new_role').value;
+
+    // Validation
+    if (!username) {
+      showMessage('Username is required!', 'error');
+      document.getElementById('new_username').focus();
+      return;
+    }
+
+    // Username format validation
+    if (!/^[a-z0-9_]+$/.test(username)) {
+      showMessage('Username must be lowercase letters, numbers, and underscores only!', 'error');
+      document.getElementById('new_username').focus();
+      return;
+    }
+
+    if (!password) {
+      showMessage('Password is required!', 'error');
+      document.getElementById('new_password').focus();
+      return;
+    }
+
+    if (password.length < 8) {
+      showMessage('Password must be at least 8 characters!', 'error');
+      document.getElementById('new_password').focus();
+      return;
+    }
+
+    showLoading('Creating Password', 'Saving manager password...');
+
+    try {
+      // Get current user from localStorage
+      const createdBy = localStorage.getItem('foh_username') || 'System';
+
+      // Hash password (basic hashing - use proper backend encryption in production)
+      const passwordHash = simpleHash(password);
+
+      const passwordData = {
+        username: username,
+        full_name: fullname || null,
+        password_hash: passwordHash,
+        role: role || null,
+        is_active: true,
+        created_by: createdBy,
+        created_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('manager_passwords')
+        .insert([passwordData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      hideLoading();
+      hideAddPasswordForm();
+      showMessage(`✅ Password created for ${username}!`, 'success');
+
+      // Reload password list
+      setTimeout(() => {
+        loadPasswordManagement();
+      }, 1000);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error saving password:', error);
+
+      if (error.code === '23505') {
+        showMessage('Username already exists! Choose a different username.', 'error');
+      } else {
+        showMessage(`Error creating password: ${error.message}`, 'error');
+      }
+    }
+  }
+
+  /**
+   * Edit Password
+   */
+  function editPassword(passwordId) {
+    showMessage('Edit password feature coming soon! For now, you can delete and recreate.', 'info');
+  }
+
+  /**
+   * Toggle Password Status (Active/Inactive)
+   */
+  async function togglePasswordStatus(passwordId, newStatus) {
+    showLoading('Updating', 'Changing password status...');
+
+    try {
+      const updatedBy = localStorage.getItem('foh_username') || 'System';
+
+      const { error } = await supabase
+        .from('manager_passwords')
+        .update({
+          is_active: newStatus,
+          updated_by: updatedBy,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', passwordId);
+
+      if (error) throw error;
+
+      hideLoading();
+      showMessage(`✅ Password ${newStatus ? 'activated' : 'deactivated'}!`, 'success');
+
+      // Reload password list
+      setTimeout(() => {
+        loadPasswordManagement();
+      }, 1000);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error updating password:', error);
+      showMessage(`Error updating password: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Confirm Delete Password
+   */
+  function confirmDeletePassword(passwordId, username) {
+    const modal = document.createElement('div');
+    modal.id = 'confirmDeletePasswordModal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      padding: 20px;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+      background: white;
+      padding: 32px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid #dc2626;
+      border-radius: 0;
+    `;
+
+    modalContent.innerHTML = `
+      <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #dc2626; text-transform: uppercase; letter-spacing: 1px;">
+        ⚠️ DELETE PASSWORD
+      </h3>
+      <p style="margin: 0 0 20px 0; font-size: 14px; color: var(--gray-700); line-height: 1.6;">
+        Are you sure you want to delete the password for <strong>${username}</strong>?
+        <br><br>
+        <strong>This action cannot be undone!</strong>
+        <br><br>
+        The manager will no longer be able to access the system with this username.
+      </p>
+      <div style="display: flex; gap: 12px;">
+        <button
+          id="deletePasswordCancelBtn"
+          style="
+            flex: 1;
+            padding: 14px 24px;
+            background: var(--gray-100);
+            color: var(--gray-900);
+            border: 2px solid var(--gray-300);
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+        >CANCEL</button>
+        <button
+          id="deletePasswordConfirmBtn"
+          style="
+            flex: 1;
+            padding: 14px 24px;
+            background: #dc2626;
+            color: white;
+            border: 2px solid #dc2626;
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+        >DELETE PASSWORD</button>
+      </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    const confirmBtn = document.getElementById('deletePasswordConfirmBtn');
+    const cancelBtn = document.getElementById('deletePasswordCancelBtn');
+
+    const handleConfirm = () => {
+      document.body.removeChild(modal);
+      deletePassword(passwordId, username);
+    };
+
+    const handleCancel = () => {
+      document.body.removeChild(modal);
+    };
+
+    confirmBtn.onclick = handleConfirm;
+    cancelBtn.onclick = handleCancel;
+
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        handleCancel();
+      }
+    };
+  }
+
+  /**
+   * Delete Password
+   */
+  async function deletePassword(passwordId, username) {
+    showLoading('Deleting', 'Removing password...');
+
+    try {
+      const { error } = await supabase
+        .from('manager_passwords')
+        .delete()
+        .eq('id', passwordId);
+
+      if (error) throw error;
+
+      hideLoading();
+      showMessage(`✅ Password deleted for ${username}!`, 'success');
+
+      // Reload password list
+      setTimeout(() => {
+        loadPasswordManagement();
+      }, 1000);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error deleting password:', error);
+      showMessage(`Error deleting password: ${error.message}`, 'error');
     }
   }
 
