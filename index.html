@@ -667,6 +667,8 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
   </script>
+  <!-- FOH Checklist System Data -->
+  <script src="foh-checklists-data.js"></script>
 </head>
 <body>
   <!-- Loading Overlay (consolidated) -->
@@ -745,6 +747,7 @@
         <button class="menu-btn primary" onclick="startAMCount()">AM Count</button>
         <button class="menu-btn primary" onclick="startPMCount()">PM Close</button>
         <button class="menu-btn" onclick="startOrderingSystem()" style="background: var(--gray-700) !important; color: white !important; border-color: var(--gray-700) !important;">Orders & Prep</button>
+        <button class="menu-btn" onclick="startFOHSystem()" style="background: var(--gray-700) !important; color: white !important; border-color: var(--gray-700) !important;">FOH Checklists</button>
       </div>
 
       <!-- Secondary Links -->
@@ -2007,6 +2010,61 @@
           </div>
 
           <button class="submit-btn" onclick="saveCashboxCount()" style="margin-top: 20px;">Save Cashbox Count</button>
+        </div>
+
+        <button class="submit-btn" onclick="goHome()" style="margin-top: 20px;">Back to Menu</button>
+      </div>
+
+      <!-- FOH Checklist System Section -->
+      <div id="fohSystemForm" class="form-section">
+        <h2 style="margin-bottom: 20px; color: var(--gray-900);">FOH Checklists</h2>
+
+        <!-- Tab Navigation -->
+        <div style="position: sticky; top: 0; z-index: 100; background: var(--white); margin-bottom: 20px; padding-bottom: 10px;">
+          <div class="tabs" style="display: flex; border-bottom: 2px solid var(--gray-300); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; gap: 4px;">
+            <button class="tab-link active" onclick="openFOHTab(event, 'fohWorkflow')" style="
+              flex: 0 0 auto;
+              padding: 12px 10px;
+              min-width: 80px;
+              background: var(--gray-700);
+              color: var(--white);
+              border: none;
+              cursor: pointer;
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.8px;
+              transition: all 0.15s ease;
+            ">CHECKLISTS</button>
+            <button class="tab-link" onclick="openFOHManagerWatchdog(event)" style="
+              flex: 0 0 auto;
+              padding: 12px 10px;
+              min-width: 80px;
+              background: var(--gray-100);
+              color: var(--gray-700);
+              border: none;
+              cursor: pointer;
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.8px;
+              transition: all 0.15s ease;
+            ">WATCHDOG</button>
+          </div>
+        </div>
+
+        <!-- Tab Content: Workflow Selection / Checklist -->
+        <div id="fohWorkflow" class="tab-content" style="display: block;">
+          <div id="fohWorkflowContent">
+            <p style="text-align: center; padding: 20px;">Loading...</p>
+          </div>
+        </div>
+
+        <!-- Tab Content: Manager Watchdog -->
+        <div id="fohWatchdog" class="tab-content" style="display: none;">
+          <div id="fohWatchdogContent">
+            <p style="text-align: center; padding: 20px;">Loading historical data...</p>
+          </div>
         </div>
 
         <button class="submit-btn" onclick="goHome()" style="margin-top: 20px;">Back to Menu</button>
@@ -22575,6 +22633,1254 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
   // ====================================
   // ORDERING SYSTEM - END
+  // ====================================
+
+  // ====================================
+  // FOH CHECKLIST SYSTEM
+  // ====================================
+
+  // FOH System State
+  const fohSystemState = {
+    currentSession: null,
+    currentChecklist: null,
+    tasks: [],
+    ratings: [],
+    staffName: '',
+    staffName2: ''
+  };
+
+  /**
+   * Start FOH Checklist System
+   */
+  function startFOHSystem() {
+    console.log('Starting FOH System...');
+    document.getElementById('mainMenu').style.display = 'none';
+    document.querySelector('.secondary-links').style.display = 'none';
+    document.getElementById('fohSystemForm').style.display = 'block';
+
+    // Reset state
+    fohSystemState.currentSession = null;
+    fohSystemState.currentChecklist = null;
+    fohSystemState.tasks = [];
+    fohSystemState.ratings = [];
+
+    // Load workflow selector
+    renderWorkflowSelector();
+  }
+
+  /**
+   * Open FOH Tab
+   */
+  function openFOHTab(evt, tabName) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('#fohSystemForm .tab-content');
+    tabContents.forEach(content => {
+      content.style.display = 'none';
+    });
+
+    // Remove active class from all tabs
+    const tabLinks = document.querySelectorAll('#fohSystemForm .tab-link');
+    tabLinks.forEach(link => {
+      link.style.background = 'var(--gray-100)';
+      link.style.color = 'var(--gray-700)';
+      link.classList.remove('active');
+    });
+
+    // Show selected tab and mark as active
+    document.getElementById(tabName).style.display = 'block';
+    if (evt && evt.currentTarget) {
+      evt.currentTarget.style.background = 'var(--gray-700)';
+      evt.currentTarget.style.color = 'var(--white)';
+      evt.currentTarget.classList.add('active');
+    }
+  }
+
+  /**
+   * Render Workflow Selector - Shows available checklists based on time
+   */
+  function renderWorkflowSelector() {
+    const container = document.getElementById('fohWorkflowContent');
+
+    // Get available checklists based on current Pacific time
+    const availableChecklists = getAvailableChecklists();
+
+    if (availableChecklists.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          <p style="font-size: 16px; color: var(--gray-700); margin-bottom: 12px;">
+            ⏰ No checklists available at this time
+          </p>
+          <p style="font-size: 13px; color: var(--gray-500);">
+            Checklists are time-based. Check back during operating hours.
+          </p>
+        </div>
+      `;
+      return;
+    }
+
+    let html = `
+      <div style="margin-bottom: 20px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
+        <p style="color: var(--blue-text); font-size: 13px; font-weight: 600; margin: 0;">
+          📋 Select a checklist to begin. Available checklists update based on time of day.
+        </p>
+      </div>
+
+      <div style="display: grid; gap: 16px;">
+    `;
+
+    availableChecklists.forEach(checklist => {
+      html += `
+        <div style="
+          background: white;
+          border: 2px solid var(--gray-300);
+          padding: 20px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          border-radius: 0;
+        "
+        onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';"
+        onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';"
+        onclick="selectChecklist('${checklist.type}')">
+
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
+              ${checklist.title}
+            </h3>
+            <span style="
+              background: var(--gray-700);
+              color: white;
+              padding: 4px 10px;
+              font-size: 11px;
+              font-weight: 700;
+              letter-spacing: 0.5px;
+              border-radius: 0;
+            ">${checklist.timeRange}</span>
+          </div>
+
+          <p style="margin: 0 0 12px 0; font-size: 13px; color: var(--gray-600); line-height: 1.5;">
+            ${checklist.description}
+          </p>
+
+          <div style="display: flex; gap: 12px; font-size: 12px; color: var(--gray-500);">
+            ${checklist.staffCount > 1 ?
+              `<span>👥 ${checklist.staffCount} Staff Members</span>` :
+              `<span>👤 ${checklist.staffCount} Staff Member</span>`
+            }
+            ${checklist.hasRatings ? '<span>⭐ Includes Ratings</span>' : ''}
+            ${checklist.hasNotes ? '<span>📝 Notes for Next Shift</span>' : ''}
+          </div>
+        </div>
+      `;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  /**
+   * Select Checklist and show staff name input
+   */
+  async function selectChecklist(checklistType) {
+    const checklist = getChecklistByType(checklistType);
+    if (!checklist) {
+      showMessage('Checklist not found!', 'error');
+      return;
+    }
+
+    fohSystemState.currentChecklist = checklist;
+
+    // Render staff name input screen
+    renderStaffNameInput();
+  }
+
+  /**
+   * Render Staff Name Input Screen
+   */
+  function renderStaffNameInput() {
+    const container = document.getElementById('fohWorkflowContent');
+    const checklist = fohSystemState.currentChecklist;
+
+    const html = `
+      <div style="max-width: 600px; margin: 0 auto;">
+        <div style="margin-bottom: 24px; padding: 16px; background: var(--gray-100); border-radius: 0; border: 2px solid var(--gray-300);">
+          <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
+            ${checklist.title}
+          </h3>
+          <p style="margin: 0; font-size: 13px; color: var(--gray-600);">
+            ${checklist.description}
+          </p>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+            Your Name *
+          </label>
+          <input
+            type="text"
+            id="fohStaffName1"
+            placeholder="Enter your name"
+            style="
+              width: 100%;
+              padding: 14px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 14px;
+              box-sizing: border-box;
+            "
+            onfocus="this.style.borderColor='var(--gray-700)'"
+            onblur="this.style.borderColor='var(--gray-300)'"
+          />
+        </div>
+
+        ${checklist.staffCount > 1 ? `
+          <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              Second Staff Member ${checklist.staffCount === 2 ? '*' : '(Optional)'}
+            </label>
+            <input
+              type="text"
+              id="fohStaffName2"
+              placeholder="Enter second staff member name"
+              style="
+                width: 100%;
+                padding: 14px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 14px;
+                box-sizing: border-box;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            />
+          </div>
+        ` : ''}
+
+        <div style="display: flex; gap: 12px;">
+          <button
+            onclick="renderWorkflowSelector()"
+            style="
+              flex: 1;
+              padding: 14px 24px;
+              background: var(--gray-100);
+              color: var(--gray-900);
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.background='var(--gray-200)'"
+            onmouseout="this.style.background='var(--gray-100)'"
+          >CANCEL</button>
+
+          <button
+            onclick="startChecklistSession()"
+            style="
+              flex: 1;
+              padding: 14px 24px;
+              background: var(--gray-900);
+              color: white;
+              border: 2px solid var(--gray-900);
+              border-radius: 0;
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.background='#000'"
+            onmouseout="this.style.background='var(--gray-900)'"
+          >START CHECKLIST</button>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  /**
+   * Start Checklist Session - Create session in database
+   */
+  async function startChecklistSession() {
+    const staffName1 = document.getElementById('fohStaffName1').value.trim();
+    const staffName2Input = document.getElementById('fohStaffName2');
+    const staffName2 = staffName2Input ? staffName2Input.value.trim() : '';
+
+    if (!staffName1) {
+      showMessage('Please enter your name!', 'error');
+      document.getElementById('fohStaffName1').focus();
+      return;
+    }
+
+    const checklist = fohSystemState.currentChecklist;
+
+    // Validate second staff member if required
+    if (checklist.staffCount === 2 && !staffName2) {
+      showMessage('Please enter second staff member name!', 'error');
+      document.getElementById('fohStaffName2').focus();
+      return;
+    }
+
+    showLoading('Starting Checklist', 'Creating session...');
+
+    try {
+      // Create session in database
+      const sessionData = {
+        checklist_type: checklist.type,
+        staff_name: staffName1,
+        staff_name_2: staffName2 || null,
+        session_date: getPacificDate(),
+        session_time: new Date().toLocaleTimeString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          hour12: false
+        }),
+        started_at: new Date().toISOString(),
+        is_complete: false
+      };
+
+      const { data, error } = await supabase
+        .from('foh_checklist_sessions')
+        .insert([sessionData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      fohSystemState.currentSession = data;
+      fohSystemState.staffName = staffName1;
+      fohSystemState.staffName2 = staffName2;
+
+      // Create initial task records
+      await createInitialTasks();
+
+      hideLoading();
+
+      // Render checklist
+      renderChecklist();
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error starting checklist session:', error);
+      showMessage(`Error starting checklist: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Create Initial Task Records in Database
+   */
+  async function createInitialTasks() {
+    const checklist = fohSystemState.currentChecklist;
+    const sessionId = fohSystemState.currentSession.id;
+
+    const taskRecords = [];
+    let taskOrder = 0;
+
+    checklist.sections.forEach(section => {
+      if (section.type === 'checkbox') {
+        section.tasks.forEach(taskText => {
+          taskRecords.push({
+            session_id: sessionId,
+            checklist_type: checklist.type,
+            section_name: section.name,
+            task_text: taskText,
+            task_order: taskOrder++,
+            is_completed: false
+          });
+        });
+      }
+    });
+
+    if (taskRecords.length > 0) {
+      const { data, error } = await supabase
+        .from('foh_checklist_tasks')
+        .insert(taskRecords)
+        .select();
+
+      if (error) throw error;
+
+      fohSystemState.tasks = data;
+    }
+  }
+
+  /**
+   * Render Checklist - Main checklist view with tasks
+   */
+  function renderChecklist() {
+    const container = document.getElementById('fohWorkflowContent');
+    const checklist = fohSystemState.currentChecklist;
+    const session = fohSystemState.currentSession;
+
+    let html = `
+      <!-- Session Header -->
+      <div style="margin-bottom: 24px; padding: 20px; background: var(--success-bg); border-left: 4px solid var(--success-border); border-radius: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--success-text); text-transform: uppercase; letter-spacing: 1px;">
+              ${checklist.title}
+            </h3>
+            <div style="font-size: 13px; color: var(--success-text); line-height: 1.6;">
+              <div>👤 ${session.staff_name}${session.staff_name_2 ? ` & ${session.staff_name_2}` : ''}</div>
+              <div>📅 ${formatPacificDateDisplay(new Date(session.started_at), {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              })}</div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div id="checklistProgress" style="font-size: 14px; font-weight: 700; color: var(--success-text);">
+              0 / ${fohSystemState.tasks.length} Tasks
+            </div>
+            <div style="font-size: 12px; color: var(--success-text); margin-top: 4px;">
+              Auto-saving...
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Render each section
+    checklist.sections.forEach((section, sectionIndex) => {
+      if (section.type === 'checkbox') {
+        html += renderCheckboxSection(section, sectionIndex);
+      } else if (section.type === 'rating') {
+        html += renderRatingSection(section, sectionIndex);
+      }
+    });
+
+    // Notes section (if applicable)
+    if (checklist.hasNotes) {
+      html += `
+        <div style="margin-top: 30px; padding: 20px; background: white; border: 2px solid var(--gray-300); border-radius: 0;">
+          <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
+            NOTES FOR INCOMING CREW
+          </h4>
+          <textarea
+            id="fohSessionNotes"
+            placeholder="Leave any notes or observations for the next shift..."
+            style="
+              width: 100%;
+              min-height: 100px;
+              padding: 12px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 13px;
+              font-family: inherit;
+              box-sizing: border-box;
+              resize: vertical;
+            "
+            onfocus="this.style.borderColor='var(--gray-700)'"
+            onblur="this.style.borderColor='var(--gray-300)'; autoSaveNotes();"
+          ></textarea>
+        </div>
+      `;
+    }
+
+    // Action buttons
+    html += `
+      <div style="margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap;">
+        <button
+          onclick="confirmCancelChecklist()"
+          style="
+            flex: 1;
+            min-width: 200px;
+            padding: 14px 24px;
+            background: var(--gray-100);
+            color: var(--gray-900);
+            border: 2px solid var(--gray-300);
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+          onmouseover="this.style.background='var(--gray-200)'"
+          onmouseout="this.style.background='var(--gray-100)'"
+        >CANCEL CHECKLIST</button>
+
+        <button
+          onclick="completeChecklistSession()"
+          style="
+            flex: 2;
+            min-width: 200px;
+            padding: 14px 24px;
+            background: var(--success-border);
+            color: white;
+            border: 2px solid var(--success-border);
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+          onmouseover="this.style.background='#047857'"
+          onmouseout="this.style.background='var(--success-border)'"
+        >✓ COMPLETE & SUBMIT</button>
+      </div>
+    `;
+
+    container.innerHTML = html;
+    updateProgress();
+  }
+
+  /**
+   * Render Checkbox Section
+   */
+  function renderCheckboxSection(section, sectionIndex) {
+    let html = `
+      <div style="margin-bottom: 24px; background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
+        <div style="background: var(--gray-700); color: white; padding: 14px 16px;">
+          <h4 style="margin: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+            ${section.name}
+          </h4>
+          ${section.description ? `
+            <p style="margin: 8px 0 0 0; font-size: 12px; opacity: 0.9; line-height: 1.5;">
+              ${section.description}
+            </p>
+          ` : ''}
+        </div>
+
+        <div style="padding: 16px;">
+    `;
+
+    section.tasks.forEach((taskText, taskIndex) => {
+      const taskRecord = fohSystemState.tasks.find(t =>
+        t.section_name === section.name && t.task_text === taskText
+      );
+
+      if (!taskRecord) return;
+
+      const isChecked = taskRecord.is_completed;
+
+      html += `
+        <div style="
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 12px;
+          margin-bottom: 8px;
+          background: ${isChecked ? 'var(--success-bg)' : 'var(--gray-100)'};
+          border-left: 3px solid ${isChecked ? 'var(--success-border)' : 'var(--gray-300)'};
+          cursor: pointer;
+          transition: all 0.15s ease;
+        "
+        onclick="toggleTask('${taskRecord.id}')"
+        onmouseover="this.style.background='${isChecked ? '#d1fae5' : 'var(--gray-200)'}'"
+        onmouseout="this.style.background='${isChecked ? 'var(--success-bg)' : 'var(--gray-100)'}'">
+
+          <input
+            type="checkbox"
+            ${isChecked ? 'checked' : ''}
+            style="
+              width: 20px;
+              height: 20px;
+              margin-top: 2px;
+              cursor: pointer;
+              flex-shrink: 0;
+            "
+            onclick="event.stopPropagation(); toggleTask('${taskRecord.id}')"
+          />
+
+          <div style="flex: 1;">
+            <div style="font-size: 13px; color: var(--gray-900); line-height: 1.5; ${isChecked ? 'text-decoration: line-through; opacity: 0.7;' : ''}">
+              ${taskText}
+            </div>
+            ${isChecked && taskRecord.completed_by ? `
+              <div style="font-size: 11px; color: var(--gray-600); margin-top: 4px; font-style: italic;">
+                ✓ ${taskRecord.completed_by} • ${formatPacificDateDisplay(new Date(taskRecord.completed_at), {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                })}
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    });
+
+    html += '</div></div>';
+    return html;
+  }
+
+  /**
+   * Render Rating Section
+   */
+  function renderRatingSection(section, sectionIndex) {
+    const checklist = fohSystemState.currentChecklist;
+
+    let html = `
+      <div style="margin-bottom: 24px; background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
+        <div style="background: var(--gray-700); color: white; padding: 14px 16px;">
+          <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+            ${section.name}
+          </h4>
+          ${checklist.ratingScale ? `
+            <p style="margin: 0; font-size: 11px; opacity: 0.9;">
+              ${checklist.ratingScale}
+            </p>
+          ` : ''}
+        </div>
+
+        <div style="padding: 16px;">
+    `;
+
+    section.categories.forEach((category, catIndex) => {
+      const existingRating = fohSystemState.ratings.find(r => r.category_name === category.name);
+      const currentRating = existingRating ? existingRating.rating : 3;
+
+      html += `
+        <div style="margin-bottom: 20px; padding: 16px; background: var(--gray-100); border-radius: 0;">
+          <div style="margin-bottom: 12px;">
+            <div style="font-size: 13px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px;">
+              ${category.name}
+            </div>
+            ${category.description ? `
+              <div style="font-size: 12px; color: var(--gray-600);">
+                ${category.description}
+              </div>
+            ` : ''}
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="flex: 1;">
+              <input
+                type="range"
+                min="1"
+                max="5"
+                value="${currentRating}"
+                id="rating_${sectionIndex}_${catIndex}"
+                style="width: 100%; height: 8px; cursor: pointer;"
+                oninput="updateRatingDisplay('${sectionIndex}_${catIndex}', this.value)"
+                onchange="autoSaveRating('${category.name}', this.value)"
+              />
+            </div>
+            <div
+              id="ratingValue_${sectionIndex}_${catIndex}"
+              style="
+                min-width: 60px;
+                text-align: center;
+                font-size: 24px;
+                font-weight: 700;
+                color: ${getRatingColor(currentRating)};
+              "
+            >${currentRating}</div>
+          </div>
+
+          <textarea
+            id="ratingNotes_${sectionIndex}_${catIndex}"
+            placeholder="Optional notes..."
+            style="
+              width: 100%;
+              margin-top: 12px;
+              padding: 10px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 12px;
+              font-family: inherit;
+              box-sizing: border-box;
+              resize: vertical;
+              min-height: 60px;
+            "
+            onfocus="this.style.borderColor='var(--gray-700)'"
+            onblur="this.style.borderColor='var(--gray-300)'; autoSaveRatingNotes('${category.name}', this.value);"
+          >${existingRating ? (existingRating.notes || '') : ''}</textarea>
+        </div>
+      `;
+    });
+
+    html += '</div></div>';
+    return html;
+  }
+
+  /**
+   * Get Rating Color
+   */
+  function getRatingColor(rating) {
+    if (rating <= 2) return '#dc2626'; // Red
+    if (rating === 3) return '#f59e0b'; // Orange
+    return '#059669'; // Green
+  }
+
+  /**
+   * Update Rating Display
+   */
+  function updateRatingDisplay(id, value) {
+    const display = document.getElementById(`ratingValue_${id}`);
+    if (display) {
+      display.textContent = value;
+      display.style.color = getRatingColor(parseInt(value));
+    }
+  }
+
+  /**
+   * Toggle Task Completion - Auto-save to database
+   */
+  async function toggleTask(taskId) {
+    const taskRecord = fohSystemState.tasks.find(t => t.id === taskId);
+    if (!taskRecord) return;
+
+    const newStatus = !taskRecord.is_completed;
+    const staffName = fohSystemState.staffName;
+
+    try {
+      const updateData = {
+        is_completed: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      if (newStatus) {
+        updateData.completed_by = staffName;
+        updateData.completed_at = new Date().toISOString();
+      } else {
+        updateData.unchecked_by = staffName;
+        updateData.unchecked_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('foh_checklist_tasks')
+        .update(updateData)
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      // Update local state
+      taskRecord.is_completed = newStatus;
+      if (newStatus) {
+        taskRecord.completed_by = staffName;
+        taskRecord.completed_at = updateData.completed_at;
+      }
+
+      // Re-render checklist
+      renderChecklist();
+
+    } catch (error) {
+      console.error('Error toggling task:', error);
+      showMessage(`Error updating task: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Auto-save Rating
+   */
+  async function autoSaveRating(categoryName, ratingValue) {
+    const sessionId = fohSystemState.currentSession.id;
+    const checklistType = fohSystemState.currentChecklist.type;
+    const staffName = fohSystemState.staffName;
+
+    try {
+      // Check if rating exists
+      const existing = fohSystemState.ratings.find(r => r.category_name === categoryName);
+
+      if (existing) {
+        // Update existing rating
+        const { error } = await supabase
+          .from('foh_checklist_ratings')
+          .update({
+            rating: parseInt(ratingValue),
+            rated_by: staffName,
+            rated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+
+        if (error) throw error;
+
+        existing.rating = parseInt(ratingValue);
+        existing.rated_by = staffName;
+      } else {
+        // Create new rating
+        const ratingData = {
+          session_id: sessionId,
+          checklist_type: checklistType,
+          category_name: categoryName,
+          rating: parseInt(ratingValue),
+          rated_by: staffName,
+          rated_at: new Date().toISOString()
+        };
+
+        const { data, error } = await supabase
+          .from('foh_checklist_ratings')
+          .insert([ratingData])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        fohSystemState.ratings.push(data);
+      }
+
+      console.log(`✓ Rating saved: ${categoryName} = ${ratingValue}`);
+
+    } catch (error) {
+      console.error('Error saving rating:', error);
+      showMessage(`Error saving rating: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Auto-save Rating Notes
+   */
+  async function autoSaveRatingNotes(categoryName, notes) {
+    const existing = fohSystemState.ratings.find(r => r.category_name === categoryName);
+
+    if (!existing) {
+      console.log('Rating not yet created, notes will be saved when rating is set');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('foh_checklist_ratings')
+        .update({
+          notes: notes.trim() || null
+        })
+        .eq('id', existing.id);
+
+      if (error) throw error;
+
+      existing.notes = notes.trim();
+      console.log(`✓ Rating notes saved for: ${categoryName}`);
+
+    } catch (error) {
+      console.error('Error saving rating notes:', error);
+    }
+  }
+
+  /**
+   * Auto-save Session Notes
+   */
+  async function autoSaveNotes() {
+    const notesInput = document.getElementById('fohSessionNotes');
+    if (!notesInput) return;
+
+    const notes = notesInput.value.trim();
+    const sessionId = fohSystemState.currentSession.id;
+
+    try {
+      const { error } = await supabase
+        .from('foh_checklist_sessions')
+        .update({
+          notes: notes || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      fohSystemState.currentSession.notes = notes;
+      console.log('✓ Session notes saved');
+
+    } catch (error) {
+      console.error('Error saving session notes:', error);
+    }
+  }
+
+  /**
+   * Update Progress Counter
+   */
+  function updateProgress() {
+    const progressDiv = document.getElementById('checklistProgress');
+    if (!progressDiv) return;
+
+    const completed = fohSystemState.tasks.filter(t => t.is_completed).length;
+    const total = fohSystemState.tasks.length;
+
+    progressDiv.textContent = `${completed} / ${total} Tasks`;
+  }
+
+  /**
+   * Complete Checklist Session
+   */
+  async function completeChecklistSession() {
+    const completed = fohSystemState.tasks.filter(t => t.is_completed).length;
+    const total = fohSystemState.tasks.length;
+    const percentComplete = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    // Confirm if not 100% complete
+    if (percentComplete < 100) {
+      const proceed = confirm(`Only ${percentComplete}% of tasks are completed. Are you sure you want to submit?`);
+      if (!proceed) return;
+    }
+
+    showLoading('Completing Checklist', 'Saving final data...');
+
+    try {
+      const sessionId = fohSystemState.currentSession.id;
+
+      // Mark session as complete
+      const { error } = await supabase
+        .from('foh_checklist_sessions')
+        .update({
+          is_complete: true,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      hideLoading();
+
+      // Show success message
+      const container = document.getElementById('fohWorkflowContent');
+      container.innerHTML = `
+        <div style="text-align: center; padding: 60px 20px;">
+          <div style="font-size: 72px; margin-bottom: 24px;">✅</div>
+          <h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
+            Checklist Complete!
+          </h2>
+          <p style="margin: 0 0 32px 0; font-size: 16px; color: var(--gray-600);">
+            ${fohSystemState.currentChecklist.title} completed by ${fohSystemState.staffName}${fohSystemState.staffName2 ? ` & ${fohSystemState.staffName2}` : ''}
+          </p>
+          <div style="display: inline-block; padding: 12px 24px; background: var(--success-bg); border-radius: 0; margin-bottom: 32px;">
+            <div style="font-size: 14px; color: var(--success-text); font-weight: 700;">
+              ${completed} / ${total} Tasks Completed (${percentComplete}%)
+            </div>
+          </div>
+          <div>
+            <button
+              onclick="renderWorkflowSelector()"
+              style="
+                padding: 14px 32px;
+                background: var(--gray-900);
+                color: white;
+                border: 2px solid var(--gray-900);
+                border-radius: 0;
+                font-size: 13px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#000'"
+              onmouseout="this.style.background='var(--gray-900)'"
+            >START NEW CHECKLIST</button>
+          </div>
+        </div>
+      `;
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error completing checklist:', error);
+      showMessage(`Error completing checklist: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Confirm Cancel Checklist
+   */
+  function confirmCancelChecklist() {
+    const confirmed = confirm('Are you sure you want to cancel this checklist? All progress will be saved but marked as incomplete.');
+    if (confirmed) {
+      renderWorkflowSelector();
+    }
+  }
+
+  /**
+   * Open Manager Watchdog - Requires password
+   */
+  function openFOHManagerWatchdog(evt) {
+    requirePasswordFor('FOH Manager Watchdog', () => {
+      openFOHTab(evt, 'fohWatchdog');
+      loadManagerWatchdog();
+    });
+  }
+
+  /**
+   * Load Manager Watchdog - Historical data view
+   */
+  async function loadManagerWatchdog() {
+    const container = document.getElementById('fohWatchdogContent');
+
+    container.innerHTML = `
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+          Select Date
+        </label>
+        <input
+          type="date"
+          id="watchdogDate"
+          value="${getPacificDate()}"
+          style="
+            padding: 12px;
+            border: 2px solid var(--gray-300);
+            border-radius: 0;
+            font-size: 14px;
+          "
+          onchange="loadWatchdogData(this.value)"
+        />
+      </div>
+
+      <div id="watchdogDataContainer">
+        <p style="text-align: center; padding: 20px;">Loading data...</p>
+      </div>
+    `;
+
+    // Load today's data
+    loadWatchdogData(getPacificDate());
+  }
+
+  /**
+   * Load Watchdog Data for specific date
+   */
+  async function loadWatchdogData(date) {
+    const container = document.getElementById('watchdogDataContainer');
+
+    try {
+      showLoading('Loading Data', 'Fetching checklist history...');
+
+      // Fetch sessions for the selected date
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('foh_checklist_sessions')
+        .select('*')
+        .eq('session_date', date)
+        .order('started_at', { ascending: false });
+
+      if (sessionsError) throw sessionsError;
+
+      if (!sessions || sessions.length === 0) {
+        hideLoading();
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px;">
+            <p style="font-size: 16px; color: var(--gray-600);">
+              No checklists found for ${formatPacificDateDisplay(new Date(date + 'T12:00:00'), {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              })}
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      // Fetch tasks and ratings for each session
+      const sessionIds = sessions.map(s => s.id);
+
+      const { data: tasks, error: tasksError } = await supabase
+        .from('foh_checklist_tasks')
+        .select('*')
+        .in('session_id', sessionIds);
+
+      if (tasksError) throw tasksError;
+
+      const { data: ratings, error: ratingsError } = await supabase
+        .from('foh_checklist_ratings')
+        .select('*')
+        .in('session_id', sessionIds);
+
+      if (ratingsError) throw ratingsError;
+
+      hideLoading();
+
+      // Render watchdog view
+      renderWatchdogData(sessions, tasks, ratings);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error loading watchdog data:', error);
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          <p style="font-size: 16px; color: var(--error-text);">
+            Error loading data: ${error.message}
+          </p>
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Render Watchdog Data
+   */
+  function renderWatchdogData(sessions, tasks, ratings) {
+    const container = document.getElementById('watchdogDataContainer');
+
+    let html = `
+      <div style="margin-bottom: 20px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
+        <p style="color: var(--blue-text); font-size: 13px; font-weight: 600; margin: 0;">
+          📊 ${sessions.length} checklist session${sessions.length !== 1 ? 's' : ''} found
+        </p>
+      </div>
+    `;
+
+    sessions.forEach(session => {
+      const sessionTasks = tasks.filter(t => t.session_id === session.id);
+      const sessionRatings = ratings.filter(r => r.session_id === session.id);
+      const completedTasks = sessionTasks.filter(t => t.is_completed).length;
+      const totalTasks = sessionTasks.length;
+      const percentComplete = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      const checklist = getChecklistByType(session.checklist_type);
+      const checklistTitle = checklist ? checklist.title : session.checklist_type;
+
+      html += `
+        <div style="margin-bottom: 24px; background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
+          <div style="background: ${session.is_complete ? 'var(--success-bg)' : 'var(--warning-bg)'}; padding: 16px; border-bottom: 2px solid var(--gray-300);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: ${session.is_complete ? 'var(--success-text)' : 'var(--warning-text)'}; text-transform: uppercase; letter-spacing: 1px;">
+                  ${checklistTitle}
+                </h3>
+                <div style="font-size: 13px; color: ${session.is_complete ? 'var(--success-text)' : 'var(--warning-text)'}; line-height: 1.6;">
+                  <div>👤 ${session.staff_name}${session.staff_name_2 ? ` & ${session.staff_name_2}` : ''}</div>
+                  <div>🕒 Started: ${formatPacificDateDisplay(new Date(session.started_at), {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  })}</div>
+                  ${session.completed_at ? `
+                    <div>✅ Completed: ${formatPacificDateDisplay(new Date(session.completed_at), {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    })}</div>
+                  ` : '<div>⚠️ Not completed</div>'}
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 24px; font-weight: 700; color: ${session.is_complete ? 'var(--success-text)' : 'var(--warning-text)'};">
+                  ${percentComplete}%
+                </div>
+                <div style="font-size: 12px; color: ${session.is_complete ? 'var(--success-text)' : 'var(--warning-text)'};">
+                  ${completedTasks} / ${totalTasks} tasks
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 16px;">
+            <!-- Task Breakdown -->
+            <details style="margin-bottom: 16px;">
+              <summary style="cursor: pointer; font-size: 14px; font-weight: 700; color: var(--gray-900); padding: 8px; background: var(--gray-100); border-radius: 0;">
+                📋 Task Details (${completedTasks} / ${totalTasks})
+              </summary>
+              <div style="margin-top: 12px; padding-left: 12px;">
+      `;
+
+      // Group tasks by section
+      const tasksBySection = {};
+      sessionTasks.forEach(task => {
+        if (!tasksBySection[task.section_name]) {
+          tasksBySection[task.section_name] = [];
+        }
+        tasksBySection[task.section_name].push(task);
+      });
+
+      Object.keys(tasksBySection).forEach(sectionName => {
+        const sectionTasks = tasksBySection[sectionName];
+        const sectionCompleted = sectionTasks.filter(t => t.is_completed).length;
+
+        html += `
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 13px; font-weight: 700; color: var(--gray-700); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+              ${sectionName} (${sectionCompleted} / ${sectionTasks.length})
+            </div>
+        `;
+
+        sectionTasks.forEach(task => {
+          html += `
+            <div style="display: flex; align-items: flex-start; gap: 8px; padding: 8px; margin-bottom: 4px; background: ${task.is_completed ? 'var(--success-bg)' : 'var(--gray-100)'}; border-radius: 0; font-size: 12px;">
+              <span style="flex-shrink: 0;">${task.is_completed ? '✅' : '⬜'}</span>
+              <div style="flex: 1; ${task.is_completed ? 'text-decoration: line-through; opacity: 0.7;' : ''}">
+                ${task.task_text}
+                ${task.is_completed && task.completed_by ? `
+                  <div style="font-size: 11px; color: var(--gray-600); margin-top: 4px; font-style: italic;">
+                    Completed by ${task.completed_by} at ${formatPacificDateDisplay(new Date(task.completed_at), {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        });
+
+        html += '</div>';
+      });
+
+      html += `
+              </div>
+            </details>
+      `;
+
+      // Ratings
+      if (sessionRatings.length > 0) {
+        html += `
+          <details style="margin-bottom: 16px;">
+            <summary style="cursor: pointer; font-size: 14px; font-weight: 700; color: var(--gray-900); padding: 8px; background: var(--gray-100); border-radius: 0;">
+              ⭐ Quality Ratings (${sessionRatings.length})
+            </summary>
+            <div style="margin-top: 12px; padding-left: 12px;">
+        `;
+
+        sessionRatings.forEach(rating => {
+          html += `
+            <div style="margin-bottom: 12px; padding: 12px; background: var(--gray-100); border-left: 3px solid ${getRatingColor(rating.rating)}; border-radius: 0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span style="font-size: 13px; font-weight: 700; color: var(--gray-900);">
+                  ${rating.category_name}
+                </span>
+                <span style="font-size: 20px; font-weight: 700; color: ${getRatingColor(rating.rating)};">
+                  ${rating.rating} / 5
+                </span>
+              </div>
+              ${rating.notes ? `
+                <div style="font-size: 12px; color: var(--gray-600); margin-top: 8px; font-style: italic;">
+                  "${rating.notes}"
+                </div>
+              ` : ''}
+              <div style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">
+                Rated by ${rating.rated_by}
+              </div>
+            </div>
+          `;
+        });
+
+        html += `
+            </div>
+          </details>
+        `;
+      }
+
+      // Notes
+      if (session.notes) {
+        html += `
+          <div style="margin-top: 16px; padding: 12px; background: var(--blue-bg); border-left: 3px solid var(--blue-text); border-radius: 0;">
+            <div style="font-size: 12px; font-weight: 700; color: var(--blue-text); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+              📝 Notes for Incoming Crew
+            </div>
+            <div style="font-size: 13px; color: var(--blue-text); line-height: 1.5; white-space: pre-wrap;">
+              ${session.notes}
+            </div>
+          </div>
+        `;
+      }
+
+      html += `
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  // ====================================
+  // FOH CHECKLIST SYSTEM - END
   // ====================================
 </script>
 </body>
