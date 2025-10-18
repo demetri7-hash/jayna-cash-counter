@@ -429,6 +429,233 @@
     supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 
+  // ============================================
+  // DATABASE FUNCTIONS - Checklist Definitions
+  // ============================================
+
+  /**
+   * Load checklist from database with all sections, tasks, and categories
+   */
+  async function loadChecklistFromDatabase(checklistType) {
+    try {
+      // 1. Load checklist definition
+      const { data: definition, error: defError } = await supabase
+        .from('checklist_definitions')
+        .select('*')
+        .eq('type', checklistType)
+        .single();
+
+      if (defError) {
+        console.error('Error loading checklist definition:', defError);
+        // Fallback to FOH_CHECKLISTS if not in database yet
+        return getChecklistByType(checklistType);
+      }
+
+      if (!definition) {
+        // Fallback to FOH_CHECKLISTS if not found
+        return getChecklistByType(checklistType);
+      }
+
+      // 2. Load sections for this checklist
+      const { data: sections, error: secError } = await supabase
+        .from('checklist_sections')
+        .select('*')
+        .eq('checklist_id', definition.id)
+        .order('display_order', { ascending: true });
+
+      if (secError) throw secError;
+
+      // 3. Build checklist object
+      const checklist = {
+        type: definition.type,
+        title: definition.title,
+        timeRange: definition.time_range,
+        description: definition.description,
+        staffCount: definition.staff_count,
+        hasRatings: definition.has_ratings,
+        hasNotes: definition.has_notes,
+        ratingScale: definition.rating_scale,
+        sections: []
+      };
+
+      // 4. Load tasks/categories for each section
+      for (const section of sections) {
+        const sectionObj = {
+          name: section.name,
+          description: section.description,
+          type: section.section_type
+        };
+
+        if (section.section_type === 'checkbox') {
+          // Load tasks for checkbox sections
+          const { data: tasks, error: taskError } = await supabase
+            .from('checklist_section_tasks')
+            .select('*')
+            .eq('section_id', section.id)
+            .order('display_order', { ascending: true });
+
+          if (taskError) throw taskError;
+
+          sectionObj.tasks = tasks.map(t => t.task_text);
+
+        } else if (section.section_type === 'rating') {
+          // Load categories for rating sections
+          const { data: categories, error: catError } = await supabase
+            .from('checklist_section_categories')
+            .select('*')
+            .eq('section_id', section.id)
+            .order('display_order', { ascending: true });
+
+          if (catError) throw catError;
+
+          sectionObj.categories = categories.map(c => ({
+            name: c.name,
+            description: c.description || ''
+          }));
+        }
+
+        checklist.sections.push(sectionObj);
+      }
+
+      console.log('✓ Loaded checklist from database:', checklistType);
+      return checklist;
+
+    } catch (error) {
+      console.error('Error loading checklist from database:', error);
+      // Fallback to FOH_CHECKLISTS
+      return getChecklistByType(checklistType);
+    }
+  }
+
+  /**
+   * Save checklist definition to database
+   */
+  async function saveChecklistToDatabase(checklistType, checklistData) {
+    const managerName = localStorage.getItem('foh_username') || 'Manager';
+
+    try {
+      showLoading('Saving Checklist', 'Updating database...');
+
+      // 1. Upsert checklist definition
+      const { data: definition, error: defError } = await supabase
+        .from('checklist_definitions')
+        .upsert({
+          type: checklistType,
+          title: checklistData.title,
+          time_range: checklistData.timeRange,
+          description: checklistData.description,
+          staff_count: checklistData.staffCount,
+          has_ratings: checklistData.hasRatings,
+          has_notes: checklistData.hasNotes,
+          rating_scale: checklistData.ratingScale || null,
+          updated_at: new Date().toISOString(),
+          updated_by: managerName
+        }, {
+          onConflict: 'type'
+        })
+        .select()
+        .single();
+
+      if (defError) throw defError;
+
+      const checklistId = definition.id;
+
+      // 2. Delete all existing sections (cascade will delete tasks/categories)
+      const { error: deleteError } = await supabase
+        .from('checklist_sections')
+        .delete()
+        .eq('checklist_id', checklistId);
+
+      if (deleteError) throw deleteError;
+
+      // 3. Insert new sections with tasks/categories
+      for (let i = 0; i < checklistData.sections.length; i++) {
+        const section = checklistData.sections[i];
+
+        // Insert section
+        const { data: sectionData, error: secError } = await supabase
+          .from('checklist_sections')
+          .insert({
+            checklist_id: checklistId,
+            name: section.name,
+            description: section.description || null,
+            section_type: section.type,
+            display_order: i
+          })
+          .select()
+          .single();
+
+        if (secError) throw secError;
+
+        const sectionId = sectionData.id;
+
+        // Insert tasks or categories based on section type
+        if (section.type === 'checkbox' && section.tasks && section.tasks.length > 0) {
+          const tasks = section.tasks.map((taskText, index) => ({
+            section_id: sectionId,
+            task_text: taskText,
+            display_order: index
+          }));
+
+          const { error: taskError } = await supabase
+            .from('checklist_section_tasks')
+            .insert(tasks);
+
+          if (taskError) throw taskError;
+
+        } else if (section.type === 'rating' && section.categories && section.categories.length > 0) {
+          const categories = section.categories.map((cat, index) => ({
+            section_id: sectionId,
+            name: cat.name,
+            description: cat.description || null,
+            display_order: index
+          }));
+
+          const { error: catError } = await supabase
+            .from('checklist_section_categories')
+            .insert(categories);
+
+          if (catError) throw catError;
+        }
+      }
+
+      hideLoading();
+      console.log('✓ Checklist saved to database:', checklistType);
+      return true;
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error saving checklist to database:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load all checklist types from database (for editor list view)
+   */
+  async function loadAllChecklistsFromDatabase() {
+    try {
+      const { data: definitions, error } = await supabase
+        .from('checklist_definitions')
+        .select('*')
+        .order('type', { ascending: true });
+
+      if (error) throw error;
+
+      if (!definitions || definitions.length === 0) {
+        // Fallback to FOH_CHECKLISTS if database is empty
+        return Object.keys(FOH_CHECKLISTS);
+      }
+
+      return definitions.map(d => d.type);
+
+    } catch (error) {
+      console.error('Error loading checklist types:', error);
+      // Fallback to FOH_CHECKLISTS
+      return Object.keys(FOH_CHECKLISTS);
+    }
+  }
+
   // Loading functions
   function showLoading(title, message) {
     const overlay = document.getElementById('loadingOverlay');
@@ -1940,8 +2167,18 @@
   async function loadManagerEditor() {
     const container = document.getElementById('fohEditContent');
 
-    // Get all checklist types
-    const checklistTypes = Object.keys(FOH_CHECKLISTS);
+    showLoading('Loading Checklists', 'Fetching checklist definitions...');
+
+    // Get all checklist types from database (with fallback)
+    const checklistTypes = await loadAllChecklistsFromDatabase();
+
+    // Load basic info for each checklist
+    const checklists = {};
+    for (const type of checklistTypes) {
+      checklists[type] = await loadChecklistFromDatabase(type);
+    }
+
+    hideLoading();
 
     let html = `
       <div style="margin-bottom: 24px; padding: 20px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
@@ -1957,7 +2194,7 @@
     `;
 
     checklistTypes.forEach(type => {
-      const checklist = FOH_CHECKLISTS[type];
+      const checklist = checklists[type];
 
       html += `
         <div style="
@@ -2031,8 +2268,14 @@
   /**
    * Edit Checklist - Show detailed editor for specific checklist
    */
-  function editChecklist(checklistType) {
-    const checklist = FOH_CHECKLISTS[checklistType];
+  async function editChecklist(checklistType) {
+    showLoading('Loading Checklist', 'Fetching checklist data...');
+
+    // Load checklist from database (with fallback to FOH_CHECKLISTS)
+    const checklist = await loadChecklistFromDatabase(checklistType);
+
+    hideLoading();
+
     if (!checklist) return;
 
     const container = document.getElementById('fohEditContent');
@@ -2499,13 +2742,110 @@
   }
 
   /**
-   * Save Checklist Changes
+   * Save Checklist Changes - Persist all edits to database
    */
   async function saveChecklistChanges(checklistType) {
-    showMessage('✅ Changes saved! (Note: This currently updates in-memory only. Database storage coming soon.)', 'success');
-    setTimeout(() => {
-      loadManagerEditor();
-    }, 2000);
+    try {
+      // Load current checklist to get sections structure
+      const currentChecklist = await loadChecklistFromDatabase(checklistType);
+      if (!currentChecklist) {
+        showMessage('Error: Could not load current checklist', 'error');
+        return;
+      }
+
+      // Collect basic info from form
+      const title = document.getElementById('edit_title')?.value.trim();
+      const description = document.getElementById('edit_description')?.value.trim();
+      const timeRange = document.getElementById('edit_timeRange')?.value.trim();
+      const staffCount = parseInt(document.getElementById('edit_staffCount')?.value) || 1;
+      const hasRatings = document.getElementById('edit_hasRatings')?.checked || false;
+      const hasNotes = document.getElementById('edit_hasNotes')?.checked || false;
+      const ratingScale = document.getElementById('edit_ratingScale')?.value.trim() || null;
+
+      // Validate required fields
+      if (!title || !description || !timeRange) {
+        showMessage('Please fill in all required fields (Title, Description, Time Range)', 'error');
+        return;
+      }
+
+      // Collect all sections data
+      const sections = [];
+      currentChecklist.sections.forEach((section, sectionIndex) => {
+        const sectionName = document.getElementById(`section_name_${sectionIndex}`)?.value.trim();
+        const sectionDesc = document.getElementById(`section_desc_${sectionIndex}`)?.value.trim() || '';
+        const sectionType = document.getElementById(`section_type_${sectionIndex}`)?.value;
+
+        if (!sectionName) return; // Skip unnamed sections
+
+        const sectionObj = {
+          name: sectionName,
+          description: sectionDesc,
+          type: sectionType
+        };
+
+        if (sectionType === 'checkbox') {
+          // Collect tasks from textarea (one per line)
+          const tasksText = document.getElementById(`section_tasks_${sectionIndex}`)?.value || '';
+          sectionObj.tasks = tasksText
+            .split('\n')
+            .map(t => t.trim())
+            .filter(t => t.length > 0);
+
+        } else if (sectionType === 'rating') {
+          // Collect categories (name + description pairs)
+          const categories = [];
+          let catIndex = 0;
+          while (document.getElementById(`cat_name_${sectionIndex}_${catIndex}`)) {
+            const catName = document.getElementById(`cat_name_${sectionIndex}_${catIndex}`)?.value.trim();
+            const catDesc = document.getElementById(`cat_desc_${sectionIndex}_${catIndex}`)?.value.trim() || '';
+
+            if (catName) {
+              categories.push({
+                name: catName,
+                description: catDesc
+              });
+            }
+
+            catIndex++;
+          }
+          sectionObj.categories = categories;
+        }
+
+        sections.push(sectionObj);
+      });
+
+      // Validate at least one section
+      if (sections.length === 0) {
+        showMessage('Checklist must have at least one section!', 'error');
+        return;
+      }
+
+      // Build checklist data object
+      const checklistData = {
+        title,
+        description,
+        timeRange,
+        staffCount,
+        hasRatings,
+        hasNotes,
+        ratingScale,
+        sections
+      };
+
+      // Save to database
+      await saveChecklistToDatabase(checklistType, checklistData);
+
+      showMessage('✅ Checklist saved successfully to database!', 'success');
+
+      // Reload editor after brief delay
+      setTimeout(() => {
+        loadManagerEditor();
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error saving checklist:', error);
+      showMessage(`Error saving checklist: ${error.message}`, 'error');
+    }
   }
 
   /**
