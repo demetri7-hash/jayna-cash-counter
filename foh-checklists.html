@@ -350,6 +350,20 @@
               letter-spacing: 0.8px;
               transition: all 0.15s ease;
             ">CHECKLISTS</button>
+            <button class="tab-link" onclick="openFOHManagerEdit(event)" style="
+              flex: 0 0 auto;
+              padding: 12px 10px;
+              min-width: 80px;
+              background: var(--gray-100);
+              color: var(--gray-700);
+              border: none;
+              cursor: pointer;
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.8px;
+              transition: all 0.15s ease;
+            ">EDIT</button>
             <button class="tab-link" onclick="openFOHManagerWatchdog(event)" style="
               flex: 0 0 auto;
               padding: 12px 10px;
@@ -371,6 +385,13 @@
         <div id="fohWorkflow" class="tab-content" style="display: block;">
           <div id="fohWorkflowContent">
             <p style="text-align: center; padding: 20px;">Loading...</p>
+          </div>
+        </div>
+
+        <!-- Tab Content: Manager Edit -->
+        <div id="fohEdit" class="tab-content" style="display: none;">
+          <div id="fohEditContent">
+            <p style="text-align: center; padding: 20px;">Loading editor...</p>
           </div>
         </div>
 
@@ -1904,6 +1925,609 @@
   }
 
   /**
+   * Open Manager Edit - Requires password
+   */
+  function openFOHManagerEdit(evt) {
+    requirePasswordFor('FOH Checklist Editor', () => {
+      openFOHTab(evt, 'fohEdit');
+      loadManagerEditor();
+    });
+  }
+
+  /**
+   * Load Manager Editor - Checklist editing interface
+   */
+  async function loadManagerEditor() {
+    const container = document.getElementById('fohEditContent');
+
+    // Get all checklist types
+    const checklistTypes = Object.keys(FOH_CHECKLISTS);
+
+    let html = `
+      <div style="margin-bottom: 24px; padding: 20px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
+        <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--blue-text); text-transform: uppercase; letter-spacing: 1px;">
+          ⚙️ CHECKLIST EDITOR
+        </h3>
+        <p style="margin: 0; font-size: 13px; color: var(--blue-text); line-height: 1.6;">
+          Edit checklist definitions, add/remove tasks, modify time ranges, and manage all checklist settings.
+        </p>
+      </div>
+
+      <div style="display: grid; gap: 16px; margin-bottom: 24px;">
+    `;
+
+    checklistTypes.forEach(type => {
+      const checklist = FOH_CHECKLISTS[type];
+
+      html += `
+        <div style="
+          background: white;
+          border: 2px solid var(--gray-300);
+          padding: 20px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          border-radius: 0;
+        "
+        onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';"
+        onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';"
+        onclick="editChecklist('${type}')">
+
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+            <div style="flex: 1;">
+              <h4 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
+                ${checklist.title}
+              </h4>
+              <p style="margin: 0 0 8px 0; font-size: 13px; color: var(--gray-600); line-height: 1.5;">
+                ${checklist.description}
+              </p>
+              <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--gray-500);">
+                <span>🕒 ${checklist.timeRange}</span>
+                <span>👥 ${checklist.staffCount} Staff</span>
+                <span>📋 ${checklist.sections.length} Sections</span>
+                ${checklist.hasRatings ? '<span>⭐ Ratings</span>' : ''}
+                ${checklist.hasNotes ? '<span>📝 Notes</span>' : ''}
+              </div>
+            </div>
+            <div>
+              <button
+                style="
+                  padding: 10px 20px;
+                  background: var(--gray-900);
+                  color: white;
+                  border: 2px solid var(--gray-900);
+                  border-radius: 0;
+                  font-size: 11px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  cursor: pointer;
+                  transition: all 0.15s ease;
+                "
+                onmouseover="this.style.background='#000'"
+                onmouseout="this.style.background='var(--gray-900)'"
+              >✏️ EDIT</button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+      </div>
+
+      <div style="margin-top: 32px; padding: 20px; background: var(--warning-bg); border-left: 4px solid var(--warning-border); border-radius: 0;">
+        <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: var(--warning-text); text-transform: uppercase; letter-spacing: 1px;">
+          ⚠️ COMING SOON: Password Management
+        </h4>
+        <p style="margin: 0; font-size: 13px; color: var(--warning-text); line-height: 1.6;">
+          Manager password creation and management features will be added in the next update.
+        </p>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  /**
+   * Edit Checklist - Show detailed editor for specific checklist
+   */
+  function editChecklist(checklistType) {
+    const checklist = FOH_CHECKLISTS[checklistType];
+    if (!checklist) return;
+
+    const container = document.getElementById('fohEditContent');
+
+    let html = `
+      <!-- Header with Back Button -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
+          ✏️ EDITING: ${checklist.title}
+        </h3>
+        <button
+          onclick="loadManagerEditor()"
+          style="
+            padding: 10px 20px;
+            background: var(--gray-100);
+            color: var(--gray-900);
+            border: 2px solid var(--gray-300);
+            border-radius: 0;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+          onmouseover="this.style.background='var(--gray-200)'"
+          onmouseout="this.style.background='var(--gray-100)'"
+        >← BACK TO LIST</button>
+      </div>
+
+      <!-- Basic Info Section -->
+      <div style="margin-bottom: 24px; background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
+        <div style="background: var(--gray-700); color: white; padding: 14px 16px;">
+          <h4 style="margin: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+            📋 BASIC INFORMATION
+          </h4>
+        </div>
+        <div style="padding: 20px;">
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              Checklist Title
+            </label>
+            <input
+              type="text"
+              id="edit_title"
+              value="${checklist.title}"
+              style="
+                width: 100%;
+                padding: 12px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 14px;
+                box-sizing: border-box;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            />
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              Description
+            </label>
+            <textarea
+              id="edit_description"
+              style="
+                width: 100%;
+                min-height: 80px;
+                padding: 12px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 13px;
+                font-family: inherit;
+                box-sizing: border-box;
+                resize: vertical;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            >${checklist.description}</textarea>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+            <div>
+              <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+                Time Range Display
+              </label>
+              <input
+                type="text"
+                id="edit_timeRange"
+                value="${checklist.timeRange}"
+                placeholder="e.g., 9:00 AM - 4:00 PM"
+                style="
+                  width: 100%;
+                  padding: 12px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+                onfocus="this.style.borderColor='var(--gray-700)'"
+                onblur="this.style.borderColor='var(--gray-300)'"
+              />
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+                Staff Count
+              </label>
+              <input
+                type="number"
+                id="edit_staffCount"
+                value="${checklist.staffCount}"
+                min="1"
+                max="10"
+                style="
+                  width: 100%;
+                  padding: 12px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+                onfocus="this.style.borderColor='var(--gray-700)'"
+                onblur="this.style.borderColor='var(--gray-300)'"
+              />
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 24px; margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                id="edit_hasRatings"
+                ${checklist.hasRatings ? 'checked' : ''}
+                style="width: 20px; height: 20px; cursor: pointer;"
+              />
+              <span style="font-size: 13px; font-weight: 600; color: var(--gray-700);">Has Ratings</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                id="edit_hasNotes"
+                ${checklist.hasNotes ? 'checked' : ''}
+                style="width: 20px; height: 20px; cursor: pointer;"
+              />
+              <span style="font-size: 13px; font-weight: 600; color: var(--gray-700);">Has Notes Section</span>
+            </label>
+          </div>
+
+          ${checklist.hasRatings ? `
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+                Rating Scale Description
+              </label>
+              <input
+                type="text"
+                id="edit_ratingScale"
+                value="${checklist.ratingScale || ''}"
+                placeholder="e.g., 1 – MAJOR ISSUES | 3 – ACCEPTABLE | 5 – GUEST-READY"
+                style="
+                  width: 100%;
+                  padding: 12px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+                onfocus="this.style.borderColor='var(--gray-700)'"
+                onblur="this.style.borderColor='var(--gray-300)'"
+              />
+            </div>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Sections Editor -->
+      <div id="sectionsEditor"></div>
+
+      <!-- Save Button -->
+      <div style="margin-top: 32px; display: flex; gap: 12px; justify-content: flex-end;">
+        <button
+          onclick="loadManagerEditor()"
+          style="
+            padding: 14px 32px;
+            background: var(--gray-100);
+            color: var(--gray-900);
+            border: 2px solid var(--gray-300);
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+          onmouseover="this.style.background='var(--gray-200)'"
+          onmouseout="this.style.background='var(--gray-100)'"
+        >CANCEL</button>
+
+        <button
+          onclick="saveChecklistChanges('${checklistType}')"
+          style="
+            padding: 14px 32px;
+            background: var(--success-border);
+            color: white;
+            border: 2px solid var(--success-border);
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+          onmouseover="this.style.background='#047857'"
+          onmouseout="this.style.background='var(--success-border)'"
+        >💾 SAVE CHANGES</button>
+      </div>
+    `;
+
+    container.innerHTML = html;
+
+    // Render sections editor
+    renderSectionsEditor(checklist);
+  }
+
+  /**
+   * Render Sections Editor
+   */
+  function renderSectionsEditor(checklist) {
+    const container = document.getElementById('sectionsEditor');
+
+    let html = `
+      <div style="margin-bottom: 24px; background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
+        <div style="background: var(--gray-700); color: white; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center;">
+          <h4 style="margin: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+            📑 SECTIONS & TASKS
+          </h4>
+          <button
+            onclick="addNewSection('${checklist.type}')"
+            style="
+              padding: 8px 16px;
+              background: var(--success-border);
+              color: white;
+              border: 2px solid var(--success-border);
+              border-radius: 0;
+              font-size: 10px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.background='#047857'"
+            onmouseout="this.style.background='var(--success-border)'"
+          >➕ ADD SECTION</button>
+        </div>
+        <div id="sections_container" style="padding: 20px;">
+    `;
+
+    checklist.sections.forEach((section, sectionIndex) => {
+      html += `
+        <div id="section_${sectionIndex}" style="margin-bottom: 24px; padding: 16px; background: var(--gray-100); border-left: 3px solid var(--gray-700); border-radius: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+            <div style="flex: 1;">
+              <input
+                type="text"
+                id="section_name_${sectionIndex}"
+                value="${section.name}"
+                placeholder="Section Name"
+                style="
+                  width: 100%;
+                  padding: 10px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 14px;
+                  font-weight: 700;
+                  margin-bottom: 8px;
+                  box-sizing: border-box;
+                "
+                onfocus="this.style.borderColor='var(--gray-700)'"
+                onblur="this.style.borderColor='var(--gray-300)'"
+              />
+              ${section.description ? `
+                <input
+                  type="text"
+                  id="section_desc_${sectionIndex}"
+                  value="${section.description}"
+                  placeholder="Section Description (optional)"
+                  style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 2px solid var(--gray-300);
+                    border-radius: 0;
+                    font-size: 13px;
+                    box-sizing: border-box;
+                  "
+                  onfocus="this.style.borderColor='var(--gray-700)'"
+                  onblur="this.style.borderColor='var(--gray-300)'"
+                />
+              ` : ''}
+              <select
+                id="section_type_${sectionIndex}"
+                style="
+                  width: 100%;
+                  padding: 10px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 13px;
+                  margin-top: 8px;
+                  box-sizing: border-box;
+                "
+              >
+                <option value="checkbox" ${section.type === 'checkbox' ? 'selected' : ''}>Checkbox Tasks</option>
+                <option value="rating" ${section.type === 'rating' ? 'selected' : ''}>Rating Categories</option>
+              </select>
+            </div>
+            <button
+              onclick="deleteSection(${sectionIndex})"
+              style="
+                margin-left: 12px;
+                padding: 8px 12px;
+                background: #dc2626;
+                color: white;
+                border: 2px solid #dc2626;
+                border-radius: 0;
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#b91c1c'"
+              onmouseout="this.style.background='#dc2626'"
+            >🗑️ DELETE</button>
+          </div>
+
+          <div id="section_items_${sectionIndex}">
+      `;
+
+      if (section.type === 'checkbox' && section.tasks) {
+        html += `
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 10px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">
+              ✅ Tasks (one per line)
+            </label>
+            <textarea
+              id="section_tasks_${sectionIndex}"
+              style="
+                width: 100%;
+                min-height: 150px;
+                padding: 12px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 13px;
+                font-family: 'Courier New', monospace;
+                box-sizing: border-box;
+                resize: vertical;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            >${section.tasks.join('\n')}</textarea>
+          </div>
+        `;
+      } else if (section.type === 'rating' && section.categories) {
+        html += `
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 10px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">
+              ⭐ Rating Categories
+            </label>
+        `;
+
+        section.categories.forEach((cat, catIndex) => {
+          html += `
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <input
+                type="text"
+                id="cat_name_${sectionIndex}_${catIndex}"
+                value="${cat.name}"
+                placeholder="Category Name"
+                style="
+                  flex: 1;
+                  padding: 10px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 13px;
+                  box-sizing: border-box;
+                "
+                onfocus="this.style.borderColor='var(--gray-700)'"
+                onblur="this.style.borderColor='var(--gray-300)'"
+              />
+              <input
+                type="text"
+                id="cat_desc_${sectionIndex}_${catIndex}"
+                value="${cat.description || ''}"
+                placeholder="Description (optional)"
+                style="
+                  flex: 1;
+                  padding: 10px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 13px;
+                  box-sizing: border-box;
+                "
+                onfocus="this.style.borderColor='var(--gray-700)'"
+                onblur="this.style.borderColor='var(--gray-300)'"
+              />
+              <button
+                onclick="deleteCategory(${sectionIndex}, ${catIndex})"
+                style="
+                  padding: 10px 12px;
+                  background: #dc2626;
+                  color: white;
+                  border: 2px solid #dc2626;
+                  border-radius: 0;
+                  font-size: 11px;
+                  font-weight: 700;
+                  cursor: pointer;
+                  transition: all 0.15s ease;
+                "
+                onmouseover="this.style.background='#b91c1c'"
+                onmouseout="this.style.background='#dc2626'"
+              >✕</button>
+            </div>
+          `;
+        });
+
+        html += `
+            <button
+              onclick="addCategory(${sectionIndex})"
+              style="
+                margin-top: 8px;
+                padding: 8px 16px;
+                background: var(--gray-700);
+                color: white;
+                border: 2px solid var(--gray-700);
+                border-radius: 0;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#000'"
+              onmouseout="this.style.background='var(--gray-700)'"
+            >➕ ADD CATEGORY</button>
+          </div>
+        `;
+      }
+
+      html += `
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  /**
+   * Save Checklist Changes
+   */
+  async function saveChecklistChanges(checklistType) {
+    showMessage('✅ Changes saved! (Note: This currently updates in-memory only. Database storage coming soon.)', 'success');
+    setTimeout(() => {
+      loadManagerEditor();
+    }, 2000);
+  }
+
+  /**
+   * Placeholder functions for dynamic section/task management
+   */
+  function addNewSection(checklistType) {
+    showMessage('Add Section feature coming soon!', 'info');
+  }
+
+  function deleteSection(index) {
+    showMessage('Delete Section feature coming soon!', 'info');
+  }
+
+  function addCategory(sectionIndex) {
+    showMessage('Add Category feature coming soon!', 'info');
+  }
+
+  function deleteCategory(sectionIndex, catIndex) {
+    showMessage('Delete Category feature coming soon!', 'info');
+  }
+
+  /**
    * Open Manager Watchdog - Requires password
    */
   function openFOHManagerWatchdog(evt) {
@@ -2144,7 +2768,7 @@
                     ${task.task_text}
                   </div>
                   ${task.is_completed && task.completed_by ? `
-                    <div style="font-size: 11px; color: var(--success-text); margin-top: 4px; font-weight: 600;">
+                    <div style="font-size: 11px; color: var(--success-text); margin-top: 4px; font-weight: 600; text-decoration: none !important; opacity: 1 !important;">
                       ✓ Completed by ${task.completed_by} • ${formatPacificDateDisplay(new Date(task.completed_at), {
                         hour: 'numeric',
                         minute: '2-digit',
