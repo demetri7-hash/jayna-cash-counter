@@ -500,7 +500,10 @@
 
           if (taskError) throw taskError;
 
-          sectionObj.tasks = tasks.map(t => t.task_text);
+          sectionObj.tasks = tasks.map(t => ({
+            text: t.task_text,
+            is_required: t.is_required || false
+          }));
 
         } else if (section.section_type === 'rating') {
           // Load categories for rating sections
@@ -599,11 +602,18 @@
 
         // Insert tasks or categories based on section type
         if (section.type === 'checkbox' && section.tasks && section.tasks.length > 0) {
-          const tasks = section.tasks.map((taskText, index) => ({
-            section_id: sectionId,
-            task_text: taskText,
-            display_order: index
-          }));
+          const tasks = section.tasks.map((task, index) => {
+            // Handle both string format (legacy) and object format (new)
+            const taskText = typeof task === 'string' ? task : task.text;
+            const isRequired = typeof task === 'object' ? (task.is_required || false) : false;
+
+            return {
+              section_id: sectionId,
+              task_text: taskText,
+              is_required: isRequired,
+              display_order: index
+            };
+          });
 
           const { error: taskError } = await supabase
             .from('checklist_section_tasks')
@@ -2654,7 +2664,9 @@
           name: 'Section 1',
           description: '',
           type: 'checkbox',
-          tasks: ['Task 1']
+          tasks: [
+            { text: 'Task 1', is_required: false }
+          ]
         }
       ]
     };
@@ -3132,24 +3144,94 @@
         html += `
           <div style="margin-bottom: 12px;">
             <label style="display: block; margin-bottom: 8px; font-size: 10px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">
-              ✅ Tasks (one per line)
+              ✅ TASKS
             </label>
-            <textarea
-              id="section_tasks_${sectionIndex}"
-              style="
-                width: 100%;
-                min-height: 150px;
-                padding: 12px;
+        `;
+
+        // Display each task as a separate row with required checkbox
+        section.tasks.forEach((task, taskIndex) => {
+          // Handle both string format (legacy) and object format (new)
+          const taskText = typeof task === 'string' ? task : task.text;
+          const isRequired = typeof task === 'object' ? (task.is_required || false) : false;
+
+          html += `
+            <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+              <input
+                type="text"
+                id="task_text_${sectionIndex}_${taskIndex}"
+                value="${taskText}"
+                placeholder="Task description"
+                style="
+                  flex: 1;
+                  padding: 10px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 13px;
+                  box-sizing: border-box;
+                "
+                onfocus="this.style.borderColor='var(--gray-700)'"
+                onblur="this.style.borderColor='var(--gray-300)'"
+              />
+              <label style="
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 8px 12px;
+                background: var(--gray-100);
                 border: 2px solid var(--gray-300);
                 border-radius: 0;
-                font-size: 13px;
-                font-family: 'Courier New', monospace;
-                box-sizing: border-box;
-                resize: vertical;
+                font-size: 11px;
+                font-weight: 600;
+                white-space: nowrap;
+                cursor: pointer;
+              ">
+                <input
+                  type="checkbox"
+                  id="task_required_${sectionIndex}_${taskIndex}"
+                  ${isRequired ? 'checked' : ''}
+                  style="cursor: pointer;"
+                />
+                REQUIRED
+              </label>
+              <button
+                onclick="deleteTask(${sectionIndex}, ${taskIndex})"
+                style="
+                  padding: 10px 12px;
+                  background: #dc2626;
+                  color: white;
+                  border: 2px solid #dc2626;
+                  border-radius: 0;
+                  font-size: 11px;
+                  font-weight: 700;
+                  cursor: pointer;
+                  transition: all 0.15s ease;
+                "
+                onmouseover="this.style.background='#b91c1c'"
+                onmouseout="this.style.background='#dc2626'"
+              >✕</button>
+            </div>
+          `;
+        });
+
+        html += `
+            <button
+              onclick="addTask(${sectionIndex})"
+              style="
+                margin-top: 8px;
+                padding: 10px 16px;
+                background: var(--gray-100);
+                color: var(--gray-700);
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                cursor: pointer;
+                transition: all 0.15s ease;
               "
-              onfocus="this.style.borderColor='var(--gray-700)'"
-              onblur="this.style.borderColor='var(--gray-300)'"
-            >${section.tasks.join('\n')}</textarea>
+              onmouseover="this.style.borderColor='var(--gray-700)'"
+              onmouseout="this.style.borderColor='var(--gray-300)'"
+            >➕ ADD TASK</button>
           </div>
         `;
       } else if (section.type === 'rating' && section.categories) {
@@ -3302,12 +3384,23 @@
         };
 
         if (sectionType === 'checkbox') {
-          // Collect tasks from textarea (one per line)
-          const tasksText = document.getElementById(`section_tasks_${sectionIndex}`)?.value || '';
-          sectionObj.tasks = tasksText
-            .split('\n')
-            .map(t => t.trim())
-            .filter(t => t.length > 0);
+          // Collect tasks (text + required flag)
+          const tasks = [];
+          let taskIndex = 0;
+          while (document.getElementById(`task_text_${sectionIndex}_${taskIndex}`)) {
+            const taskText = document.getElementById(`task_text_${sectionIndex}_${taskIndex}`)?.value.trim();
+            const isRequired = document.getElementById(`task_required_${sectionIndex}_${taskIndex}`)?.checked || false;
+
+            if (taskText) {
+              tasks.push({
+                text: taskText,
+                is_required: isRequired
+              });
+            }
+
+            taskIndex++;
+          }
+          sectionObj.tasks = tasks;
 
         } else if (sectionType === 'rating') {
           // Collect categories (name + description pairs)
@@ -3387,6 +3480,37 @@
 
   function deleteCategory(sectionIndex, catIndex) {
     showMessage('Delete Category feature coming soon!', 'info');
+  }
+
+  /**
+   * Add Task - Add a new task row to a section
+   */
+  function addTask(sectionIndex) {
+    showMessage('Add Task feature coming soon! Please save and reload to see new tasks.', 'info');
+    // NOTE: For now, users should use the regular flow - edit task text and save
+    // A future enhancement could dynamically inject new task rows without reload
+  }
+
+  /**
+   * Delete Task - Remove a task from a section
+   */
+  function deleteTask(sectionIndex, taskIndex) {
+    const taskInput = document.getElementById(`task_text_${sectionIndex}_${taskIndex}`);
+    if (!taskInput) return;
+
+    // Clear the task text (will be filtered out on save)
+    taskInput.value = '';
+    taskInput.style.background = '#fee2e2'; // Red tint
+    taskInput.disabled = true;
+
+    // Mark row as deleted visually
+    const row = taskInput.closest('div');
+    if (row) {
+      row.style.opacity = '0.5';
+      row.style.textDecoration = 'line-through';
+    }
+
+    showMessage('✓ Task marked for deletion. Click SAVE CHANGES to apply.', 'success');
   }
 
   /**
