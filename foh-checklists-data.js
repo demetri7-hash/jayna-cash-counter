@@ -53,6 +53,20 @@ const FOH_CHECKLISTS = {
     ratingScale: '1 – MAJOR ISSUES | 3 – ACCEPTABLE | 5 – GUEST-READY',
     sections: [
       {
+        name: 'Closing Review From Previous Night',
+        type: 'rating',
+        categories: [
+          { name: 'Dining Rooms', description: 'Chairs clean, mirrors, windows, décor, lights' },
+          { name: 'Expo & Water Station', description: 'Stocked, clean, organized' },
+          { name: 'Sauces + Baklava Prep + Beverage Fridge', description: '' },
+          { name: 'Cashier & Retail', description: 'Baklava at POS, menus wiped, retail shelves, Turkish delights' },
+          { name: 'Silver', description: 'Rollies, prefold linens, leftover washed silver' },
+          { name: 'Fro-Yo', description: 'Backups, cleanliness, turned off?' },
+          { name: 'Office', description: 'Trash, clean and organized' },
+          { name: 'Bar', description: 'To go cups and lids, stickiness, lemonades, batch cocktails, garnishes, glassware, floors, front of fridge' }
+        ]
+      },
+      {
         name: 'Dining Room & Patio Setup',
         type: 'checkbox',
         tasks: [
@@ -162,20 +176,6 @@ const FOH_CHECKLISTS = {
           'Confirm open dates',
           'Taste if questionable – DUMP IF BAD',
           'Keep selection fresh and labeled'
-        ]
-      },
-      {
-        name: 'Opening Quality Review',
-        type: 'rating',
-        categories: [
-          { name: 'Dining Rooms', description: 'Chairs clean, mirrors, windows, décor, lights' },
-          { name: 'Expo & Water Station', description: 'Stocked, clean, organized' },
-          { name: 'Sauces + Baklava Prep + Beverage Fridge', description: '' },
-          { name: 'Cashier & Retail', description: 'Baklava at POS, menus wiped, retail shelves, Turkish delights' },
-          { name: 'Silver', description: 'Rollies, prefold linens, leftover washed silver' },
-          { name: 'Fro-Yo', description: 'Backups, cleanliness, turned off?' },
-          { name: 'Office', description: 'Trash, clean and organized' },
-          { name: 'Bar', description: 'To go cups and lids, stickiness, lemonades, batch cocktails, garnishes, glassware, floors, front of fridge' }
         ]
       }
     ]
