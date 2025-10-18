@@ -470,7 +470,7 @@ const FOH_WORKFLOW_SCHEDULE = [
   {
     name: 'PM Shift (4pm-11pm)',
     startHour: 16,
-    endHour: 23,
+    endHour: 24,
     checklists: ['foh_closing', 'bar_closing']
   }
 ];
