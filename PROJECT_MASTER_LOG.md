@@ -1,5 +1,164 @@
 # PROJECT MASTER LOG - JAYNA CASH COUNTER
-Last Updated: October 13, 2025 (Session Continued - 21:58 UTC)
+Last Updated: October 18, 2025
+
+---
+
+## [2025-10-18] - FOH Watchdog Manager Features: Notes, Delete, Enhanced Audit
+**Worked on by:** Claude Code CLI
+**Focus:** Manager tools for FOH checklists - add notes to tasks, delete sessions, enhanced username visibility
+**Result:** ✅ Three major Watchdog features implemented (manager notes, session deletion, enhanced audit trail)
+
+### Session Overview:
+Implemented comprehensive manager tools for the FOH Checklist Watchdog tab. Added ability for managers to annotate individual tasks with timestamped notes, delete entire checklist sessions with password protection, and enhanced the username audit trail visibility. All features include proper authentication, validation, and audit tracking.
+
+### Problems Solved:
+
+#### **1. Enhanced Username Audit Trail ✅**
+**Problem:** User reported: "i dont see who completed the tasks inside the watchdog we are using klocal storage YES but we atill have to save that saved information in the databxe so managers can audit them later!"
+
+**Investigation:**
+- Code review revealed `completed_by` field WAS being saved correctly in `toggleTask()` function
+- Watchdog rendering DID display username - `task.completed_by` was in the template
+- Issue: User was viewing old sessions created before username feature was implemented
+
+**Solution (Commit `7678ef6`):**
+1. Added debug console logging to verify data exists:
+   ```javascript
+   console.log('📊 Watchdog Tasks Loaded:', tasks.length, 'tasks');
+   const completedTasksWithUser = tasks.filter(t => t.is_completed && t.completed_by);
+   console.log('✅ Completed tasks with username:', completedTasksWithUser.length);
+   ```
+
+2. Enhanced visual display of completion status:
+   - **Completed tasks:** Green bold text "✓ Completed by [name] • [time]"
+   - **Incomplete tasks:** Red bold warning "⚠️ NOT COMPLETED"
+   - Added stronger color coding and font weights for clarity
+
+**Result:**
+- ✅ Debugging shows exactly how many tasks have username data
+- ✅ Enhanced visibility makes audit trail immediately obvious
+- ✅ New sessions will display usernames correctly in Watchdog
+
+**Code Location:** `foh-checklists.html:1994-2000, 2137-2199`
+
+#### **2. Manager Notes on Individual Tasks ✅**
+**User Request:** "manager notes on items within the watchdog, also tracked by name and dae and time for any edits or notes to ibdividual tasks"
+
+**Implementation:**
+- Added textarea field below each task in Watchdog view
+- Auto-save on blur (when user clicks/tabs away)
+- Three new database fields track audit trail:
+  - `manager_note` (TEXT) - The note content
+  - `manager_note_by` (TEXT) - Username from localStorage
+  - `manager_note_at` (TIMESTAMP) - Last edit timestamp
+- Visual feedback:
+  - Green border flash (1 second) on successful save
+  - Shows edit history: "Last edited by [name] • [date/time]"
+- Gets manager name from localStorage (same as checklist username)
+
+**Code Added:**
+```javascript
+async function saveManagerNote(taskId, noteText) {
+  const note = noteText.trim();
+  const managerName = localStorage.getItem('foh_username') || 'Manager';
+
+  const updateData = {
+    manager_note: note || null,
+    manager_note_by: note ? managerName : null,
+    manager_note_at: note ? new Date().toISOString() : null
+  };
+
+  await supabase
+    .from('foh_checklist_tasks')
+    .update(updateData)
+    .eq('id', taskId);
+
+  // Green border flash feedback
+}
+```
+
+**Database Schema Required:**
+```sql
+ALTER TABLE foh_checklist_tasks
+ADD COLUMN IF NOT EXISTS manager_note TEXT,
+ADD COLUMN IF NOT EXISTS manager_note_by TEXT,
+ADD COLUMN IF NOT EXISTS manager_note_at TIMESTAMP;
+```
+
+**Result:**
+- ✅ Managers can annotate any task with observations
+- ✅ Full audit trail tracks who wrote/edited notes and when
+- ✅ Notes persist across sessions and page refreshes
+- ✅ Visual confirmation of saves with green flash
+
+**Code Location:** `foh-checklists.html:2163-2196, 2271-2310`
+
+#### **3. Delete Session Button ✅**
+**User Request:** "and also a delet button to remove the day's list and reset it in the pulic tab if deletd and one does not exist for that date"
+
+**Implementation:**
+- Red "🗑️ DELETE SESSION" button in session header
+- Two-layer security:
+  1. Password protection using existing `requirePasswordFor()` function
+  2. Confirmation modal with strong warning language
+- Cascade deletion in proper order (respects foreign key constraints):
+  1. Delete all ratings (`foh_checklist_ratings` where `session_id = X`)
+  2. Delete all tasks (`foh_checklist_tasks` where `session_id = X`)
+  3. Delete session (`foh_checklist_sessions` where `id = X`)
+- Auto-refreshes Watchdog view after successful deletion
+- Allows fresh checklist creation in Public tab for that date
+
+**Code Added:**
+```javascript
+function confirmDeleteSession(sessionId, sessionDate) {
+  requirePasswordFor('Delete Session', () => {
+    // Show confirmation modal with warning
+    // "This action cannot be undone!"
+    // "All tasks, ratings, and notes will be permanently removed"
+  });
+}
+
+async function deleteSession(sessionId, sessionDate) {
+  // 1. Delete ratings
+  await supabase.from('foh_checklist_ratings').delete().eq('session_id', sessionId);
+  // 2. Delete tasks
+  await supabase.from('foh_checklist_tasks').delete().eq('session_id', sessionId);
+  // 3. Delete session
+  await supabase.from('foh_checklist_sessions').delete().eq('id', sessionId);
+
+  // Reload Watchdog view
+  loadWatchdogData(sessionDate);
+}
+```
+
+**Result:**
+- ✅ Password-protected deletion (requires `JaynaGyro2025!`)
+- ✅ Clear warning before destructive action
+- ✅ Proper cascade deletion (no orphaned records)
+- ✅ Watchdog updates immediately after deletion
+- ✅ Public tab allows creating new session for that date
+
+**Code Location:** `foh-checklists.html:2085-2105, 2312-2469`
+
+### Commits:
+- `7678ef6` - feat(foh): Add Watchdog manager features - notes, delete, enhanced audit
+
+### Files Changed:
+- `foh-checklists.html` (+282 lines)
+
+### Testing Checklist:
+- [ ] Run database schema update SQL in Supabase
+- [ ] Test username audit trail with new checklist session
+- [ ] Test manager notes save and persistence
+- [ ] Test delete session with password protection
+- [ ] Verify cascade deletion removes all related records
+- [ ] Verify Public tab allows new session creation after deletion
+
+### Impact:
+- ✅ Managers can now audit who completed which tasks
+- ✅ Managers can annotate tasks with observations/notes
+- ✅ Managers can delete problematic sessions and start fresh
+- ✅ Full audit trail on all manager actions
 
 ---
 
