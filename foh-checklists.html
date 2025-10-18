@@ -1593,12 +1593,17 @@
 
     checklist.sections.forEach(section => {
       if (section.type === 'checkbox') {
-        section.tasks.forEach(taskText => {
+        section.tasks.forEach(task => {
+          // Handle both string format (legacy) and object format (new)
+          const taskText = typeof task === 'string' ? task : task.text;
+          const isRequired = typeof task === 'object' ? (task.is_required || false) : false;
+
           taskRecords.push({
             session_id: sessionId,
             checklist_type: checklist.type,
             section_name: section.name,
             task_text: taskText,
+            is_required: isRequired,
             task_order: taskOrder++,
             is_completed: false
           });
@@ -1625,6 +1630,10 @@
     const container = document.getElementById('fohWorkflowContent');
     const checklist = fohSystemState.currentChecklist;
     const session = fohSystemState.currentSession;
+
+    // Count required tasks
+    const requiredTasksCount = fohSystemState.tasks.filter(t => t.is_required === true).length;
+    const completedRequiredCount = fohSystemState.tasks.filter(t => t.is_required === true && t.is_completed === true).length;
 
     let html = `
       <!-- Session Header -->
@@ -1670,6 +1679,11 @@
             <div id="checklistProgress" style="font-size: 14px; font-weight: 700; color: var(--success-text);">
               0 / ${fohSystemState.tasks.length} Tasks
             </div>
+            ${requiredTasksCount > 0 ? `
+              <div id="requiredTasksProgress" style="font-size: 12px; color: #92400e; margin-top: 4px; font-weight: 600;">
+                ${completedRequiredCount} / ${requiredTasksCount} Required
+              </div>
+            ` : ''}
             <div style="font-size: 12px; color: var(--success-text); margin-top: 4px;">
               Auto-saving...
             </div>
@@ -1786,7 +1800,11 @@
         <div style="padding: 16px;">
     `;
 
-    section.tasks.forEach((taskText, taskIndex) => {
+    section.tasks.forEach((task, taskIndex) => {
+      // Handle both string format (legacy) and object format (new)
+      const taskText = typeof task === 'string' ? task : task.text;
+      const isRequired = typeof task === 'object' ? (task.is_required || false) : false;
+
       const taskRecord = fohSystemState.tasks.find(t =>
         t.section_name === section.name && t.task_text === taskText
       );
@@ -1803,7 +1821,7 @@
           padding: 12px;
           margin-bottom: 8px;
           background: ${isChecked ? 'var(--success-bg)' : 'var(--gray-100)'};
-          border-left: 3px solid ${isChecked ? 'var(--success-border)' : 'var(--gray-300)'};
+          border-left: 3px solid ${isChecked ? 'var(--success-border)' : (isRequired ? '#f59e0b' : 'var(--gray-300)')};
           cursor: pointer;
           transition: all 0.15s ease;
         "
@@ -1825,8 +1843,24 @@
           />
 
           <div style="flex: 1;">
-            <div style="font-size: 13px; color: var(--gray-900); line-height: 1.5; ${isChecked ? 'text-decoration: line-through; opacity: 0.7;' : ''}">
-              ${taskText}
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span style="font-size: 13px; color: var(--gray-900); line-height: 1.5; ${isChecked ? 'text-decoration: line-through; opacity: 0.7;' : ''}">
+                ${taskText}
+              </span>
+              ${isRequired ? `
+                <span style="
+                  display: inline-block;
+                  padding: 2px 8px;
+                  background: #fef3c7;
+                  color: #92400e;
+                  border: 1px solid #f59e0b;
+                  border-radius: 0;
+                  font-size: 10px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                ">REQUIRED</span>
+              ` : ''}
             </div>
             ${isChecked && taskRecord.completed_by ? `
               <div style="font-size: 11px; color: var(--gray-600); margin-top: 4px; font-style: italic;">
@@ -2138,6 +2172,19 @@
     const completed = fohSystemState.tasks.filter(t => t.is_completed).length;
     const total = fohSystemState.tasks.length;
     const percentComplete = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    // Check required tasks
+    const requiredTasks = fohSystemState.tasks.filter(t => t.is_required === true);
+    const incompleteRequired = requiredTasks.filter(t => !t.is_completed);
+
+    if (incompleteRequired.length > 0) {
+      const taskList = incompleteRequired.map(t => `• ${t.task_text}`).join('\n');
+      showMessage(
+        `Cannot submit checklist!\n\n${incompleteRequired.length} required task(s) incomplete:\n${taskList}`,
+        'error'
+      );
+      return; // Block submission
+    }
 
     // Show warning if not 100% complete, but proceed anyway
     if (percentComplete < 100) {

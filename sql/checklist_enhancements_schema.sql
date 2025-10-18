@@ -6,10 +6,27 @@
 -- Run this in Supabase SQL Editor
 
 -- ============================================
--- ALTER TABLE: Add Required Flag to Tasks
+-- ALTER TABLE: Add Required Flag to Task Definitions
 -- ============================================
 ALTER TABLE checklist_section_tasks
 ADD COLUMN IF NOT EXISTS is_required BOOLEAN DEFAULT false;
+
+-- ============================================
+-- ALTER TABLE: Add Required Flag to Task Completions
+-- ============================================
+-- Stores is_required flag for each session task (copied from definition)
+ALTER TABLE foh_checklist_tasks
+ADD COLUMN IF NOT EXISTS is_required BOOLEAN DEFAULT false;
+
+-- ============================================
+-- ALTER TABLE: Add Time Fields to Checklist Definitions
+-- ============================================
+-- These control when checklists are available (actual time logic, not just display)
+ALTER TABLE checklist_definitions
+ADD COLUMN IF NOT EXISTS start_hour INTEGER, -- 0-23
+ADD COLUMN IF NOT EXISTS start_minute INTEGER DEFAULT 0, -- 0-59
+ADD COLUMN IF NOT EXISTS end_hour INTEGER, -- 0-23
+ADD COLUMN IF NOT EXISTS end_minute INTEGER DEFAULT 0; -- 0-59
 
 -- ============================================
 -- TABLE: Task Completion Photos
@@ -68,6 +85,8 @@ BEGIN
   RAISE NOTICE '✅ FOH Checklist enhancements schema created successfully!';
   RAISE NOTICE 'Tables created/updated:';
   RAISE NOTICE '  - checklist_section_tasks (added is_required column)';
+  RAISE NOTICE '  - foh_checklist_tasks (added is_required column)';
+  RAISE NOTICE '  - checklist_definitions (added time fields: start_hour, start_minute, end_hour, end_minute)';
   RAISE NOTICE '  - foh_checklist_task_photos (task photos with soft delete)';
   RAISE NOTICE '  - foh_checklist_session_photos (session photos with soft delete)';
   RAISE NOTICE '';
