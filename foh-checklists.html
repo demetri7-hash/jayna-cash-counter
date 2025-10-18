@@ -925,6 +925,242 @@
     }
   }
 
+  /**
+   * Handle Task Photo Upload from file input
+   */
+  async function handleTaskPhotoUpload(taskId, sessionId, event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const result = await uploadTaskPhoto(taskId, sessionId, file);
+      if (result) {
+        // Reload and display photos for this task
+        await displayTaskPhotos(taskId, sessionId);
+        // Clear file input
+        event.target.value = '';
+      }
+    } catch (error) {
+      console.error('Error handling task photo upload:', error);
+      showMessage(`Error uploading photo: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Display photos for a specific task
+   */
+  async function displayTaskPhotos(taskId, sessionId) {
+    const container = document.getElementById(`photoDisplay_${taskId}`);
+    if (!container) return;
+
+    // Load photos for this task
+    const photos = await loadTaskPhotos(taskId, sessionId);
+
+    if (photos.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    let html = '<div style="display: flex; gap: 8px; flex-wrap: wrap;">';
+
+    photos.forEach(photo => {
+      const isDeleted = photo.is_deleted;
+
+      html += `
+        <div style="position: relative; ${isDeleted ? 'opacity: 0.5;' : ''}">
+          <img
+            src="${photo.photo_url}"
+            alt="Task photo"
+            style="
+              width: 80px;
+              height: 80px;
+              object-fit: cover;
+              border: 2px solid ${isDeleted ? '#dc2626' : 'var(--gray-300)'};
+              border-radius: 0;
+              cursor: pointer;
+            "
+            onclick="window.open('${photo.photo_url}', '_blank')"
+          />
+          ${!isDeleted ? `
+            <button
+              onclick="deleteTaskPhotoUI('${photo.id}', '${taskId}', '${sessionId}')"
+              style="
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                width: 24px;
+                height: 24px;
+                background: #dc2626;
+                color: white;
+                border: 2px solid white;
+                border-radius: 50%;
+                font-size: 12px;
+                font-weight: 700;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+              "
+            >✕</button>
+          ` : `
+            <div style="
+              position: absolute;
+              bottom: 0;
+              left: 0;
+              right: 0;
+              background: rgba(220, 38, 38, 0.9);
+              color: white;
+              font-size: 9px;
+              font-weight: 700;
+              padding: 2px 4px;
+              text-align: center;
+            ">DELETED</div>
+          `}
+        </div>
+      `;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  /**
+   * Delete task photo (soft delete) with UI update
+   */
+  async function deleteTaskPhotoUI(photoId, taskId, sessionId) {
+    const success = await deletePhoto(photoId, 'task');
+    if (success) {
+      await displayTaskPhotos(taskId, sessionId);
+    }
+  }
+
+  /**
+   * Handle Session Photos Upload (multiple files, max 5)
+   */
+  async function handleSessionPhotosUpload(event) {
+    const files = Array.from(event.target.files);
+    if (files.length === 0) return;
+
+    const sessionId = fohSystemState.currentSession.id;
+
+    // Check current photo count
+    const existingPhotos = await loadSessionPhotos(sessionId);
+    const nonDeletedCount = existingPhotos.filter(p => !p.is_deleted).length;
+
+    if (nonDeletedCount + files.length > 5) {
+      showMessage(`Cannot upload ${files.length} photos. Maximum 5 photos per session (${nonDeletedCount} already uploaded).`, 'error');
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      // Upload each file
+      for (const file of files) {
+        await uploadSessionPhoto(sessionId, file);
+      }
+
+      // Reload and display photos
+      await displaySessionPhotos(sessionId);
+
+      // Clear file input
+      event.target.value = '';
+
+    } catch (error) {
+      console.error('Error handling session photos upload:', error);
+      showMessage(`Error uploading photos: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Display photos for session
+   */
+  async function displaySessionPhotos(sessionId) {
+    const container = document.getElementById('sessionPhotosDisplay');
+    if (!container) return;
+
+    // Load photos for this session
+    const photos = await loadSessionPhotos(sessionId);
+
+    if (photos.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    let html = '<div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px;">';
+
+    photos.forEach(photo => {
+      const isDeleted = photo.is_deleted;
+
+      html += `
+        <div style="position: relative; ${isDeleted ? 'opacity: 0.5;' : ''}">
+          <img
+            src="${photo.photo_url}"
+            alt="Session photo"
+            style="
+              width: 100px;
+              height: 100px;
+              object-fit: cover;
+              border: 2px solid ${isDeleted ? '#dc2626' : 'var(--gray-300)'};
+              border-radius: 0;
+              cursor: pointer;
+            "
+            onclick="window.open('${photo.photo_url}', '_blank')"
+          />
+          ${!isDeleted ? `
+            <button
+              onclick="deleteSessionPhotoUI('${photo.id}', '${sessionId}')"
+              style="
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                width: 24px;
+                height: 24px;
+                background: #dc2626;
+                color: white;
+                border: 2px solid white;
+                border-radius: 50%;
+                font-size: 12px;
+                font-weight: 700;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+              "
+            >✕</button>
+          ` : `
+            <div style="
+              position: absolute;
+              bottom: 0;
+              left: 0;
+              right: 0;
+              background: rgba(220, 38, 38, 0.9);
+              color: white;
+              font-size: 9px;
+              font-weight: 700;
+              padding: 2px 4px;
+              text-align: center;
+            ">DELETED</div>
+          `}
+        </div>
+      `;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  /**
+   * Delete session photo (soft delete) with UI update
+   */
+  async function deleteSessionPhotoUI(photoId, sessionId) {
+    const success = await deletePhoto(photoId, 'session');
+    if (success) {
+      await displaySessionPhotos(sessionId);
+    }
+  }
+
   // Loading functions
   function showLoading(title, message) {
     const overlay = document.getElementById('loadingOverlay');
@@ -1725,6 +1961,39 @@
             onfocus="this.style.borderColor='var(--gray-700)'"
             onblur="this.style.borderColor='var(--gray-300)'; autoSaveNotes();"
           ></textarea>
+
+          <!-- Photo Upload Section -->
+          <div style="margin-top: 16px;">
+            <h5 style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              📸 ATTACH PHOTOS (Max 5)
+            </h5>
+            <button
+              onclick="document.getElementById('sessionPhotoInput').click();"
+              style="
+                padding: 8px 16px;
+                background: var(--gray-100);
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--gray-700);
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.borderColor='var(--gray-700)'"
+              onmouseout="this.style.borderColor='var(--gray-300)'"
+            >➕ Add Photos</button>
+            <input
+              type="file"
+              id="sessionPhotoInput"
+              accept="image/*"
+              capture="environment"
+              multiple
+              style="display: none;"
+              onchange="handleSessionPhotosUpload(event)"
+            />
+            <div id="sessionPhotosDisplay" style="margin-top: 12px;"></div>
+          </div>
         </div>
       `;
     }
@@ -1778,6 +2047,25 @@
 
     container.innerHTML = html;
     updateProgress();
+
+    // Load photos for all tasks
+    loadAllTaskPhotos();
+  }
+
+  /**
+   * Load photos for all tasks in current session
+   */
+  async function loadAllTaskPhotos() {
+    const sessionId = fohSystemState.currentSession?.id;
+    if (!sessionId) return;
+
+    // Load photos for each task
+    for (const task of fohSystemState.tasks) {
+      await displayTaskPhotos(task.id, sessionId);
+    }
+
+    // Load session photos
+    await displaySessionPhotos(sessionId);
   }
 
   /**
@@ -1871,6 +2159,35 @@
                 })}
               </div>
             ` : ''}
+
+            <!-- Photo Upload Section -->
+            <div id="taskPhotos_${taskRecord.id}" style="margin-top: 8px;">
+              <button
+                onclick="event.stopPropagation(); document.getElementById('photoInput_${taskRecord.id}').click();"
+                style="
+                  padding: 6px 12px;
+                  background: var(--gray-100);
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 11px;
+                  font-weight: 600;
+                  color: var(--gray-700);
+                  cursor: pointer;
+                  transition: all 0.15s ease;
+                "
+                onmouseover="this.style.borderColor='var(--gray-700)'"
+                onmouseout="this.style.borderColor='var(--gray-300)'"
+              >📸 Add Photo</button>
+              <input
+                type="file"
+                id="photoInput_${taskRecord.id}"
+                accept="image/*"
+                capture="environment"
+                style="display: none;"
+                onchange="handleTaskPhotoUpload('${taskRecord.id}', '${fohSystemState.currentSession.id}', event)"
+              />
+              <div id="photoDisplay_${taskRecord.id}" style="margin-top: 8px;"></div>
+            </div>
           </div>
         </div>
       `;
