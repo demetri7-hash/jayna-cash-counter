@@ -10513,6 +10513,12 @@
         throw new Error('EmailJS library not loaded. Please refresh the page.');
       }
 
+      // Ensure inventory data is loaded
+      if (!orderingSystemState.items || orderingSystemState.items.length === 0) {
+        showMessage('Loading inventory data...', 'info');
+        await loadInventoryData();
+      }
+
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
@@ -10571,7 +10577,85 @@
         margin: { left: 40, right: 40 }
       });
 
-      // Footer
+      // PAGE 2: Complete Inventory Reference List
+      doc.addPage();
+
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${vendorName} - Complete Inventory Reference`, 40, 40);
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Quick reference list of all items in inventory', 40, 55);
+
+      // Filter inventory items by vendor
+      const vendorItems = orderingSystemState.items.filter(item => {
+        const itemVendor = (item.vendor || '').toLowerCase();
+        const targetVendor = vendor.toLowerCase();
+        return itemVendor === targetVendor || itemVendor.includes(targetVendor);
+      });
+
+      // Sort by item name
+      vendorItems.sort((a, b) => (a.itemName || '').localeCompare(b.itemName || ''));
+
+      // Prepare table data with very compact info
+      const inventoryTableData = vendorItems.map(item => {
+        const lastCounted = item.lastCountedDate
+          ? new Date(item.lastCountedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+          : 'Never';
+
+        return [
+          item.itemName || 'N/A',
+          `${item.currentStock || 0} ${item.unit || ''}`,
+          item.parLevel || 0,
+          lastCounted
+        ];
+      });
+
+      // If no items found, show message
+      if (inventoryTableData.length === 0) {
+        doc.setFontSize(10);
+        doc.text(`No inventory items found for ${vendorName}`, 40, 80);
+      } else {
+        doc.autoTable({
+          head: [['ITEM NAME', 'CURRENT STOCK', 'PAR', 'LAST COUNT']],
+          body: inventoryTableData,
+          startY: 70,
+          theme: 'grid',
+          styles: {
+            fontSize: 7,
+            cellPadding: 3,
+            lineColor: [200, 200, 200],
+            lineWidth: 0.3
+          },
+          headStyles: {
+            fillColor: [100, 100, 100],
+            textColor: 255,
+            fontStyle: 'bold',
+            fontSize: 7,
+            halign: 'center'
+          },
+          columnStyles: {
+            0: { cellWidth: 280 },                    // ITEM NAME
+            1: { cellWidth: 90, halign: 'center' },   // CURRENT STOCK
+            2: { cellWidth: 50, halign: 'center' },   // PAR
+            3: { cellWidth: 80, halign: 'center' }    // LAST COUNT
+          },
+          margin: { left: 40, right: 40, bottom: 40 }
+        });
+
+        // Add item count at bottom of page 2
+        const finalY = doc.lastAutoTable.finalY || 500;
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.text(
+          `Total: ${inventoryTableData.length} items in inventory`,
+          40,
+          finalY + 15
+        );
+      }
+
+      // Footer for all pages
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
