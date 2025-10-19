@@ -548,7 +548,7 @@
       showLoading('Saving Checklist', 'Updating database...');
 
       // 1. Upsert checklist definition
-      const { data: definition, error: defError } = await supabase
+      const { data: definitionArray, error: defError } = await supabase
         .from('checklist_definitions')
         .upsert({
           type: checklistType,
@@ -568,10 +568,16 @@
         }, {
           onConflict: 'type'
         })
-        .select()
-        .single();
+        .select();
 
       if (defError) throw defError;
+
+      // Handle upsert result (can be array or empty)
+      const definition = definitionArray && definitionArray.length > 0 ? definitionArray[0] : null;
+
+      if (!definition) {
+        throw new Error('Failed to save checklist definition - no data returned');
+      }
 
       const checklistId = definition.id;
 
@@ -588,7 +594,7 @@
         const section = checklistData.sections[i];
 
         // Insert section
-        const { data: sectionData, error: secError } = await supabase
+        const { data: sectionArray, error: secError } = await supabase
           .from('checklist_sections')
           .insert({
             checklist_id: checklistId,
@@ -597,10 +603,15 @@
             section_type: section.type,
             display_order: i
           })
-          .select()
-          .single();
+          .select();
 
         if (secError) throw secError;
+
+        const sectionData = sectionArray && sectionArray.length > 0 ? sectionArray[0] : null;
+
+        if (!sectionData) {
+          throw new Error(`Failed to insert section: ${section.name}`);
+        }
 
         const sectionId = sectionData.id;
 
@@ -3943,9 +3954,73 @@
    * Add Task - Add a new task row to a section
    */
   function addTask(sectionIndex) {
-    showMessage('Add Task feature coming soon! Please save and reload to see new tasks.', 'info');
-    // NOTE: For now, users should use the regular flow - edit task text and save
-    // A future enhancement could dynamically inject new task rows without reload
+    // Find the section container
+    const sectionContainer = document.getElementById(`section_items_${sectionIndex}`);
+    if (!sectionContainer) {
+      console.error('Section container not found:', sectionIndex);
+      return;
+    }
+
+    // Count existing tasks to get the next task index
+    let taskIndex = 0;
+    while (document.getElementById(`task_text_${sectionIndex}_${taskIndex}`)) {
+      taskIndex++;
+    }
+
+    // Create new task row
+    const taskRow = document.createElement('div');
+    taskRow.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
+    taskRow.innerHTML = `
+      <input
+        type="text"
+        id="task_text_${sectionIndex}_${taskIndex}"
+        value=""
+        placeholder="New task description"
+        style="flex: 1; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;"
+        onfocus="this.style.borderColor='var(--gray-700)'"
+        onblur="this.style.borderColor='var(--gray-300)'"
+      />
+      <label style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--gray-100); border: 2px solid var(--gray-300); border-radius: 0;">
+        <input
+          type="checkbox"
+          id="task_required_${sectionIndex}_${taskIndex}"
+        />
+        <span style="font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">REQUIRED</span>
+      </label>
+      <button
+        type="button"
+        onclick="deleteTask(${sectionIndex}, ${taskIndex})"
+        style="
+          padding: 8px 12px;
+          background: #dc2626;
+          color: white;
+          border: 2px solid #dc2626;
+          border-radius: 0;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        "
+        onmouseover="this.style.background='#b91c1c'"
+        onmouseout="this.style.background='#dc2626'"
+      >✕</button>
+    `;
+
+    // Insert before the "Add Task" button
+    const addButton = sectionContainer.querySelector('button[onclick^="addTask"]');
+    if (addButton) {
+      sectionContainer.insertBefore(taskRow, addButton);
+    } else {
+      sectionContainer.appendChild(taskRow);
+    }
+
+    // Focus the new input
+    const newInput = document.getElementById(`task_text_${sectionIndex}_${taskIndex}`);
+    if (newInput) {
+      newInput.focus();
+    }
+
+    showMessage('✓ New task added! Enter task details and click SAVE CHANGES.', 'success');
   }
 
   /**
