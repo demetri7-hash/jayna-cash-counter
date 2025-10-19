@@ -262,7 +262,6 @@
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script src="foh-checklists-data.js"></script>
 </head>
 <body>
@@ -416,20 +415,14 @@
   // Password protection
   const ADMIN_PASSWORD = 'JaynaGyro2025!';
 
-  // EmailJS Configuration (same as index.html)
-  const EMAILJS_CONFIG = {
-    PUBLIC_KEY: 'LHbq8j4mlt49O75eo',
-    SERVICE_ID: 'service_xm62z73',
-    TEMPLATE_ID: 'template_foh_report', // New template for FOH checklists
-    MANAGER_EMAIL: 'demetri7@gmail.com' // Manager email
-  };
+  // Email Configuration (uses Gmail app password via backend API)
+  const MANAGER_EMAIL = 'demetri7@gmail.com';
 
   let supabase = null;
 
   // Initialize app
   document.addEventListener('DOMContentLoaded', function() {
     initializeSupabase();
-    initializeEmailJS();
     renderWorkflowSelector();
     startDailyReportScheduler(); // Start automated 4 AM report
   });
@@ -438,16 +431,6 @@
   function initializeSupabase() {
     const { createClient } = window.supabase;
     supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
-
-  // Initialize EmailJS
-  function initializeEmailJS() {
-    if (typeof emailjs !== 'undefined') {
-      emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
-      console.log('✅ EmailJS initialized');
-    } else {
-      console.error('❌ EmailJS library not loaded');
-    }
   }
 
   // ============================================
@@ -5516,25 +5499,25 @@
       reportContent += `\n${'='.repeat(60)}\n`;
       reportContent += `END OF REPORT\n`;
 
-      // Send email via EmailJS
-      const emailParams = {
-        to_email: EMAILJS_CONFIG.MANAGER_EMAIL,
-        subject: `FOH Checklists Daily Report - ${yesterday}`,
-        report_date: yesterday,
-        total_sessions: sessions?.length || 0,
-        report_content: reportContent,
-        from_name: 'Jayna Gyro FOH System'
-      };
+      // Send email via Gmail API (using app password)
+      console.log('📧 Sending email to:', MANAGER_EMAIL);
 
-      console.log('📧 Sending email to:', EMAILJS_CONFIG.MANAGER_EMAIL);
+      const response = await fetch('/api/send-foh-report-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reportContent: reportContent,
+          reportDate: yesterday,
+          totalSessions: sessions?.length || 0,
+          toEmail: MANAGER_EMAIL
+        })
+      });
 
-      const response = await emailjs.send(
-        EMAILJS_CONFIG.SERVICE_ID,
-        EMAILJS_CONFIG.TEMPLATE_ID,
-        emailParams
-      );
+      const result = await response.json();
 
-      if (response.status === 200) {
+      if (response.ok && result.success) {
         console.log('✅ Daily FOH report sent successfully!');
 
         // Mark as sent in localStorage
@@ -5543,7 +5526,7 @@
 
         return true;
       } else {
-        throw new Error(`Email send failed with status: ${response.status}`);
+        throw new Error(`Email send failed: ${result.error || result.details || 'Unknown error'}`);
       }
 
     } catch (error) {
