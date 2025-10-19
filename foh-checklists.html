@@ -262,6 +262,7 @@
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script src="foh-checklists-data.js"></script>
 </head>
 <body>
@@ -415,18 +416,38 @@
   // Password protection
   const ADMIN_PASSWORD = 'JaynaGyro2025!';
 
+  // EmailJS Configuration (same as index.html)
+  const EMAILJS_CONFIG = {
+    PUBLIC_KEY: 'LHbq8j4mlt49O75eo',
+    SERVICE_ID: 'service_xm62z73',
+    TEMPLATE_ID: 'template_foh_report', // New template for FOH checklists
+    MANAGER_EMAIL: 'demetri7@gmail.com' // Manager email
+  };
+
   let supabase = null;
 
   // Initialize app
   document.addEventListener('DOMContentLoaded', function() {
     initializeSupabase();
+    initializeEmailJS();
     renderWorkflowSelector();
+    startDailyReportScheduler(); // Start automated 4 AM report
   });
 
   // Initialize Supabase
   function initializeSupabase() {
     const { createClient } = window.supabase;
     supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+
+  // Initialize EmailJS
+  function initializeEmailJS() {
+    if (typeof emailjs !== 'undefined') {
+      emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
+      console.log('✅ EmailJS initialized');
+    } else {
+      console.error('❌ EmailJS library not loaded');
+    }
   }
 
   // ============================================
@@ -5334,6 +5355,246 @@
       console.error('Error deleting password:', error);
       showMessage(`Error deleting password: ${error.message}`, 'error');
     }
+  }
+
+  // ====================================
+  // AUTOMATED DAILY EMAIL REPORTS
+  // ====================================
+
+  /**
+   * Get Pacific date (YYYY-MM-DD format)
+   */
+  function getPacificDate(offset = 0) {
+    const now = new Date();
+    const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    pacificTime.setDate(pacificTime.getDate() + offset);
+    const year = pacificTime.getFullYear();
+    const month = String(pacificTime.getMonth() + 1).padStart(2, '0');
+    const day = String(pacificTime.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Send daily FOH checklist report via email
+   * Includes all completed and incomplete checklists from yesterday
+   */
+  async function sendDailyFOHReport() {
+    try {
+      console.log('📧 Generating daily FOH checklist report...');
+
+      const yesterday = getPacificDate(-1); // Yesterday's date
+      const todayDate = getPacificDate(0); // Today's date for display
+
+      // Fetch all checklist sessions from yesterday
+      const { data: sessions, error } = await supabase
+        .from('foh_checklist_sessions')
+        .select(`
+          *,
+          foh_checklist_tasks (
+            id,
+            task_text,
+            is_completed,
+            is_required,
+            rating,
+            foh_checklist_task_photos (
+              id,
+              photo_url,
+              uploaded_by,
+              uploaded_at,
+              is_deleted,
+              deleted_by,
+              deleted_at
+            )
+          ),
+          foh_checklist_session_photos (
+            id,
+            photo_url,
+            caption,
+            uploaded_by,
+            uploaded_at,
+            is_deleted,
+            deleted_by,
+            deleted_at
+          )
+        `)
+        .gte('started_at', `${yesterday}T00:00:00`)
+        .lt('started_at', `${todayDate}T00:00:00`)
+        .order('started_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching checklist sessions:', error);
+        throw error;
+      }
+
+      console.log(`📋 Found ${sessions?.length || 0} checklist sessions for ${yesterday}`);
+
+      // Format report content (plain text for email)
+      let reportContent = `FOH CHECKLIST DAILY REPORT\n`;
+      reportContent += `Date: ${yesterday}\n`;
+      reportContent += `Generated: ${new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}\n`;
+      reportContent += `\n${'='.repeat(60)}\n\n`;
+
+      if (!sessions || sessions.length === 0) {
+        reportContent += `❌ NO CHECKLISTS COMPLETED\n\n`;
+        reportContent += `No FOH checklists were completed on ${yesterday}.\n`;
+      } else {
+        reportContent += `✅ TOTAL SESSIONS: ${sessions.length}\n\n`;
+
+        sessions.forEach((session, index) => {
+          reportContent += `\n${'-'.repeat(60)}\n`;
+          reportContent += `CHECKLIST #${index + 1}\n`;
+          reportContent += `${'-'.repeat(60)}\n`;
+          reportContent += `Type: ${session.checklist_type}\n`;
+          reportContent += `Started: ${new Date(session.started_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}\n`;
+          reportContent += `Completed: ${session.completed_at ? new Date(session.completed_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }) : 'INCOMPLETE'}\n`;
+          reportContent += `Staff: ${session.staff_names || 'N/A'}\n`;
+          reportContent += `Status: ${session.completed_at ? '✅ COMPLETE' : '⚠️ INCOMPLETE'}\n`;
+
+          // Tasks
+          if (session.foh_checklist_tasks && session.foh_checklist_tasks.length > 0) {
+            const completedTasks = session.foh_checklist_tasks.filter(t => t.is_completed).length;
+            const requiredTasks = session.foh_checklist_tasks.filter(t => t.is_required).length;
+            const completedRequired = session.foh_checklist_tasks.filter(t => t.is_required && t.is_completed).length;
+
+            reportContent += `\nTASKS: ${completedTasks}/${session.foh_checklist_tasks.length} completed`;
+            if (requiredTasks > 0) {
+              reportContent += ` | ${completedRequired}/${requiredTasks} required completed`;
+            }
+            reportContent += `\n\n`;
+
+            session.foh_checklist_tasks.forEach((task, taskIndex) => {
+              const status = task.is_completed ? '✅' : '❌';
+              const required = task.is_required ? ' [REQUIRED]' : '';
+              const rating = task.rating ? ` (Rating: ${task.rating}/5)` : '';
+              reportContent += `  ${status} ${task.task_text}${required}${rating}\n`;
+
+              // Task photos
+              if (task.foh_checklist_task_photos && task.foh_checklist_task_photos.length > 0) {
+                const activePhotos = task.foh_checklist_task_photos.filter(p => !p.is_deleted);
+                const deletedPhotos = task.foh_checklist_task_photos.filter(p => p.is_deleted);
+
+                if (activePhotos.length > 0) {
+                  reportContent += `     📸 ${activePhotos.length} photo(s) uploaded\n`;
+                }
+                if (deletedPhotos.length > 0) {
+                  reportContent += `     🗑️ ${deletedPhotos.length} photo(s) deleted\n`;
+                }
+              }
+            });
+          }
+
+          // Ratings
+          if (session.staff_rating || session.manager_rating) {
+            reportContent += `\nRATINGS:\n`;
+            if (session.staff_rating) reportContent += `  Staff Self-Rating: ${session.staff_rating}/5\n`;
+            if (session.manager_rating) reportContent += `  Manager Rating: ${session.manager_rating}/5\n`;
+          }
+
+          // Notes
+          if (session.notes) {
+            reportContent += `\nNOTES:\n${session.notes}\n`;
+          }
+
+          // Session photos
+          if (session.foh_checklist_session_photos && session.foh_checklist_session_photos.length > 0) {
+            const activePhotos = session.foh_checklist_session_photos.filter(p => !p.is_deleted);
+            const deletedPhotos = session.foh_checklist_session_photos.filter(p => p.is_deleted);
+
+            reportContent += `\nSESSION PHOTOS:\n`;
+            if (activePhotos.length > 0) {
+              reportContent += `  📸 ${activePhotos.length} photo(s) attached\n`;
+            }
+            if (deletedPhotos.length > 0) {
+              reportContent += `  🗑️ ${deletedPhotos.length} photo(s) deleted\n`;
+            }
+          }
+
+          reportContent += `\n`;
+        });
+      }
+
+      reportContent += `\n${'='.repeat(60)}\n`;
+      reportContent += `END OF REPORT\n`;
+
+      // Send email via EmailJS
+      const emailParams = {
+        to_email: EMAILJS_CONFIG.MANAGER_EMAIL,
+        subject: `FOH Checklists Daily Report - ${yesterday}`,
+        report_date: yesterday,
+        total_sessions: sessions?.length || 0,
+        report_content: reportContent,
+        from_name: 'Jayna Gyro FOH System'
+      };
+
+      console.log('📧 Sending email to:', EMAILJS_CONFIG.MANAGER_EMAIL);
+
+      const response = await emailjs.send(
+        EMAILJS_CONFIG.SERVICE_ID,
+        EMAILJS_CONFIG.TEMPLATE_ID,
+        emailParams
+      );
+
+      if (response.status === 200) {
+        console.log('✅ Daily FOH report sent successfully!');
+
+        // Mark as sent in localStorage
+        const reportKey = `foh_report_sent_${yesterday}`;
+        localStorage.setItem(reportKey, new Date().toISOString());
+
+        return true;
+      } else {
+        throw new Error(`Email send failed with status: ${response.status}`);
+      }
+
+    } catch (error) {
+      console.error('❌ Error sending daily FOH report:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if it's 4 AM Pacific time and send report if not sent today
+   */
+  async function checkAndSendDailyReport() {
+    try {
+      const now = new Date();
+      const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      const currentHour = pacificTime.getHours();
+      const currentMinute = pacificTime.getMinutes();
+      const yesterday = getPacificDate(-1);
+
+      // Check if it's 4:00 AM (hour 4, minute 0)
+      if (currentHour === 4 && currentMinute === 0) {
+        console.log('🕓 4:00 AM Pacific - Checking if daily report needs to be sent...');
+
+        // Check if report already sent for yesterday
+        const reportKey = `foh_report_sent_${yesterday}`;
+        const alreadySent = localStorage.getItem(reportKey);
+
+        if (!alreadySent) {
+          console.log('📧 Sending daily FOH report now...');
+          await sendDailyFOHReport();
+        } else {
+          console.log(`✅ Daily report for ${yesterday} already sent at ${alreadySent}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error in checkAndSendDailyReport:', error);
+    }
+  }
+
+  /**
+   * Start the automated daily report scheduler
+   * Checks every minute for 4:00 AM Pacific time
+   */
+  function startDailyReportScheduler() {
+    console.log('🕐 Starting automated FOH daily report scheduler (checks every minute for 4:00 AM Pacific)...');
+
+    // Check immediately on page load
+    checkAndSendDailyReport();
+
+    // Then check every minute
+    setInterval(checkAndSendDailyReport, 60000); // 60000ms = 1 minute
   }
 
   // ====================================
