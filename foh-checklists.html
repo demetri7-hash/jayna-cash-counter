@@ -3987,23 +3987,53 @@
       const sections = [];
       let sectionIndex = 0;
 
-      // Debug: Log what we're looking for
-      console.log(`🔍 Looking for sections in DOM for checklist type: ${checklistType}`);
+      // Debug: COMPREHENSIVE DOM CHECK
+      console.log('🔍 ==================== AUTOSAVE DEBUG ====================');
+      console.log(`Checklist Type: ${checklistType}`);
+      console.log(`Silent Mode: ${silent}`);
+      console.log(`Title Field Value: "${title}"`);
+      console.log(`Description Field Value: "${description}"`);
+      console.log(`---`);
+      console.log(`DOM SCAN:`);
+      console.log(`  section_0 exists: ${!!document.getElementById('section_0')}`);
+      console.log(`  section_name_0 exists: ${!!document.getElementById('section_name_0')}`);
+      if (document.getElementById('section_name_0')) {
+        console.log(`  section_name_0 value: "${document.getElementById('section_name_0').value}"`);
+      }
+      console.log(`  section_type_0 exists: ${!!document.getElementById('section_type_0')}`);
+      if (document.getElementById('section_type_0')) {
+        console.log(`  section_type_0 value: "${document.getElementById('section_type_0').value}"`);
+      }
+      console.log(`  task_text_0_0 exists: ${!!document.getElementById('task_text_0_0')}`);
+      if (document.getElementById('task_text_0_0')) {
+        console.log(`  task_text_0_0 value: "${document.getElementById('task_text_0_0').value}"`);
+      }
+      console.log(`  sections_container exists: ${!!document.getElementById('sections_container')}`);
+      console.log(`---`);
+      console.log(`COLLECTING SECTIONS:`);
 
       while (document.getElementById(`section_${sectionIndex}`)) {
-        console.log(`✓ Found section_${sectionIndex}`);
+        console.log(`  ✓ Found section_${sectionIndex}`);
         const sectionName = document.getElementById(`section_name_${sectionIndex}`)?.value.trim();
         const sectionDesc = document.getElementById(`section_desc_${sectionIndex}`)?.value.trim() || '';
         const sectionType = document.getElementById(`section_type_${sectionIndex}`)?.value;
 
+        console.log(`    - Name: "${sectionName}"`);
+        console.log(`    - Type: "${sectionType}"`);
+
         // Skip deleted sections (marked with data-deleted attribute)
         const sectionDiv = document.getElementById(`section_${sectionIndex}`);
-        if (sectionDiv?.getAttribute('data-deleted') === 'true') {
+        const isDeleted = sectionDiv?.getAttribute('data-deleted') === 'true';
+        console.log(`    - Is Deleted: ${isDeleted}`);
+
+        if (isDeleted) {
+          console.log(`    ⚠️ SKIPPED (deleted)`);
           sectionIndex++;
           continue;
         }
 
         if (!sectionName) {
+          console.log(`    ⚠️ SKIPPED (no name)`);
           sectionIndex++;
           continue; // Skip unnamed sections
         }
@@ -4054,14 +4084,18 @@
         }
 
         sections.push(sectionObj);
+        console.log(`    ✅ COLLECTED (${sectionObj.tasks ? sectionObj.tasks.length : sectionObj.categories?.length || 0} items)`);
         sectionIndex++;
       }
 
+      console.log(`---`);
+      console.log(`RESULT: ${sections.length} sections collected`);
+      console.log('🔍 ========================================================');
+
       // Validate sections
       if (sections.length === 0) {
-        console.log('❌ No sections collected!');
-        console.log('DOM check - section_0 exists:', !!document.getElementById('section_0'));
-        console.log('DOM check - sections_container exists:', !!document.getElementById('sections_container'));
+        console.log('❌ ERROR: No sections collected after scanning DOM!');
+        console.log('This should NOT happen if section_0 exists with a name.');
 
         if (silent) {
           // Autosave: Skip silently, don't bother the user
