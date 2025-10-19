@@ -2488,7 +2488,7 @@
           "
           onmouseover="this.style.background='#047857'"
           onmouseout="this.style.background='var(--success-border)'"
-        >✓ COMPLETE & SUBMIT</button>
+        >💾 SAVE PROGRESS</button>
       </div>
     `;
 
@@ -2932,7 +2932,9 @@
   }
 
   /**
-   * Complete Checklist Session
+   * Save Checklist Progress
+   * Does NOT mark session as complete - only updates timestamp
+   * Session will be marked complete when time window expires
    */
   async function completeChecklistSession() {
     // Safety checks
@@ -2963,17 +2965,16 @@
       console.log(`⚠️ Submitting incomplete checklist: ${percentComplete}% completed`);
     }
 
-    showLoading('Completing Checklist', 'Saving final data...');
+    showLoading('Saving Checklist', 'Updating database...');
 
     try {
       const sessionId = fohSystemState.currentSession.id;
 
-      // Mark session as complete
+      // DO NOT mark as complete - just update the timestamp
+      // Session will only be marked complete when time window expires
       const { error } = await supabase
         .from('foh_checklist_sessions')
         .update({
-          is_complete: true,
-          completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', sessionId);
@@ -2982,8 +2983,8 @@
 
       hideLoading();
 
-      // Show success message but KEEP checklist open for editing
-      showSuccess(`✅ Checklist saved successfully!\n\n${completed} / ${total} tasks completed (${percentComplete}%)\n\nChecklist remains open for continued editing by you or other staff.`);
+      // Show success message and keep checklist open for editing
+      showSuccess(`✅ Checklist saved successfully!\n\n${completed} / ${total} tasks completed (${percentComplete}%)\n\nChecklist remains open until ${checklist.end_hour !== undefined ? `${checklist.end_hour}:${String(checklist.end_minute || 0).padStart(2, '0')}` : 'end of availability window'}.`);
 
       // Re-render checklist to show updated state (keeps it open)
       renderChecklist();
