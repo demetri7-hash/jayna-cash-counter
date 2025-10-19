@@ -4857,6 +4857,23 @@
           "
         >📊 HISTORY</button>
         <button
+          id="watchdogTab_amcash"
+          onclick="showWatchdogSection('amcash')"
+          style="
+            padding: 12px 20px;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: none;
+            border-radius: 0;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+        >💵 AM CASH</button>
+        <button
           id="watchdogTab_passwords"
           onclick="showWatchdogSection('passwords')"
           style="
@@ -4900,6 +4917,31 @@
         </div>
       </div>
 
+      <!-- AM Cash Section -->
+      <div id="watchdog_amcash" style="display: none;">
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+            Select Date
+          </label>
+          <input
+            type="date"
+            id="amCashDate"
+            value="${getPacificDate()}"
+            style="
+              padding: 12px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 14px;
+            "
+            onchange="loadAMCashData(this.value)"
+          />
+        </div>
+
+        <div id="amCashDataContainer">
+          <p style="text-align: center; padding: 20px;">Loading AM cash count...</p>
+        </div>
+      </div>
+
       <!-- Password Management Section -->
       <div id="watchdog_passwords" style="display: none;">
         <div id="passwordManagementContainer">
@@ -4918,14 +4960,18 @@
   function showWatchdogSection(section) {
     // Hide all sections
     document.getElementById('watchdog_history').style.display = 'none';
+    document.getElementById('watchdog_amcash').style.display = 'none';
     document.getElementById('watchdog_passwords').style.display = 'none';
 
     // Update button styles
     const historyBtn = document.getElementById('watchdogTab_history');
+    const amCashBtn = document.getElementById('watchdogTab_amcash');
     const passwordsBtn = document.getElementById('watchdogTab_passwords');
 
     historyBtn.style.background = 'var(--gray-100)';
     historyBtn.style.color = 'var(--gray-700)';
+    amCashBtn.style.background = 'var(--gray-100)';
+    amCashBtn.style.color = 'var(--gray-700)';
     passwordsBtn.style.background = 'var(--gray-100)';
     passwordsBtn.style.color = 'var(--gray-700)';
 
@@ -4934,11 +4980,165 @@
       document.getElementById('watchdog_history').style.display = 'block';
       historyBtn.style.background = 'var(--gray-700)';
       historyBtn.style.color = 'white';
+    } else if (section === 'amcash') {
+      document.getElementById('watchdog_amcash').style.display = 'block';
+      amCashBtn.style.background = 'var(--gray-700)';
+      amCashBtn.style.color = 'white';
+      loadAMCashData(getPacificDate());
     } else if (section === 'passwords') {
       document.getElementById('watchdog_passwords').style.display = 'block';
       passwordsBtn.style.background = 'var(--gray-700)';
       passwordsBtn.style.color = 'white';
       loadPasswordManagement();
+    }
+  }
+
+  /**
+   * Load AM Cash Count Data for specific date
+   */
+  async function loadAMCashData(date) {
+    const container = document.getElementById('amCashDataContainer');
+
+    try {
+      showLoading('Loading AM Count', 'Fetching cash count data...');
+
+      // Fetch AM cash count from database
+      const { data, error } = await supabase
+        .from('cash_counts')
+        .select('*')
+        .eq('date', date)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 is "no rows returned" - not a real error
+        throw error;
+      }
+
+      hideLoading();
+
+      if (!data || !data.am_total) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px;">
+            <p style="font-size: 16px; color: var(--gray-600);">
+              No AM count found for ${formatPacificDateDisplay(new Date(date + 'T12:00:00'), {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              })}
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      // Format the display
+      const amTotal = data.am_total || 0;
+      const drawer1Total = data.am_drawer1_total || 0;
+      const drawer2Total = data.am_drawer2_total || 0;
+      const counter = data.am_counter || 'Unknown';
+      const timestamp = data.am_timestamp ? new Date(data.am_timestamp).toLocaleString() : 'N/A';
+      const notes = data.am_notes || '';
+
+      // Build drawer details
+      let drawer1HTML = '';
+      let drawer2HTML = '';
+
+      if (data.am_drawer1_skip) {
+        drawer1HTML = `
+          <div style="background: var(--gray-100); padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; text-align: center;">
+            <span style="color: var(--gray-600); font-style: italic;">Skipped: ${data.am_drawer1_skip_reason || 'No reason provided'}</span>
+          </div>
+        `;
+      } else if (data.am_drawer1_data) {
+        const d1 = data.am_drawer1_data;
+        drawer1HTML = `
+          <div style="background: white; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+              ${d1.hundreds ? `<div>$100 × ${d1.hundreds}</div><div style="text-align: right;">$${(d1.hundreds * 100).toFixed(2)}</div>` : ''}
+              ${d1.fifties ? `<div>$50 × ${d1.fifties}</div><div style="text-align: right;">$${(d1.fifties * 50).toFixed(2)}</div>` : ''}
+              ${d1.twenties ? `<div>$20 × ${d1.twenties}</div><div style="text-align: right;">$${(d1.twenties * 20).toFixed(2)}</div>` : ''}
+              ${d1.tens ? `<div>$10 × ${d1.tens}</div><div style="text-align: right;">$${(d1.tens * 10).toFixed(2)}</div>` : ''}
+              ${d1.fives ? `<div>$5 × ${d1.fives}</div><div style="text-align: right;">$${(d1.fives * 5).toFixed(2)}</div>` : ''}
+              ${d1.ones ? `<div>$1 × ${d1.ones}</div><div style="text-align: right;">$${(d1.ones * 1).toFixed(2)}</div>` : ''}
+              ${d1.quarters ? `<div>$0.25 × ${d1.quarters}</div><div style="text-align: right;">$${(d1.quarters * 0.25).toFixed(2)}</div>` : ''}
+              ${d1.dimes ? `<div>$0.10 × ${d1.dimes}</div><div style="text-align: right;">$${(d1.dimes * 0.10).toFixed(2)}</div>` : ''}
+              ${d1.nickels ? `<div>$0.05 × ${d1.nickels}</div><div style="text-align: right;">$${(d1.nickels * 0.05).toFixed(2)}</div>` : ''}
+              ${d1.pennies ? `<div>$0.01 × ${d1.pennies}</div><div style="text-align: right;">$${(d1.pennies * 0.01).toFixed(2)}</div>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      if (data.am_drawer2_skip) {
+        drawer2HTML = `
+          <div style="background: var(--gray-100); padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; text-align: center;">
+            <span style="color: var(--gray-600); font-style: italic;">Skipped: ${data.am_drawer2_skip_reason || 'No reason provided'}</span>
+          </div>
+        `;
+      } else if (data.am_drawer2_data) {
+        const d2 = data.am_drawer2_data;
+        drawer2HTML = `
+          <div style="background: white; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+              ${d2.hundreds ? `<div>$100 × ${d2.hundreds}</div><div style="text-align: right;">$${(d2.hundreds * 100).toFixed(2)}</div>` : ''}
+              ${d2.fifties ? `<div>$50 × ${d2.fifties}</div><div style="text-align: right;">$${(d2.fifties * 50).toFixed(2)}</div>` : ''}
+              ${d2.twenties ? `<div>$20 × ${d2.twenties}</div><div style="text-align: right;">$${(d2.twenties * 20).toFixed(2)}</div>` : ''}
+              ${d2.tens ? `<div>$10 × ${d2.tens}</div><div style="text-align: right;">$${(d2.tens * 10).toFixed(2)}</div>` : ''}
+              ${d2.fives ? `<div>$5 × ${d2.fives}</div><div style="text-align: right;">$${(d2.fives * 5).toFixed(2)}</div>` : ''}
+              ${d2.ones ? `<div>$1 × ${d2.ones}</div><div style="text-align: right;">$${(d2.ones * 1).toFixed(2)}</div>` : ''}
+              ${d2.quarters ? `<div>$0.25 × ${d2.quarters}</div><div style="text-align: right;">$${(d2.quarters * 0.25).toFixed(2)}</div>` : ''}
+              ${d2.dimes ? `<div>$0.10 × ${d2.dimes}</div><div style="text-align: right;">$${(d2.dimes * 0.10).toFixed(2)}</div>` : ''}
+              ${d2.nickels ? `<div>$0.05 × ${d2.nickels}</div><div style="text-align: right;">$${(d2.nickels * 0.05).toFixed(2)}</div>` : ''}
+              ${d2.pennies ? `<div>$0.01 × ${d2.pennies}</div><div style="text-align: right;">$${(d2.pennies * 0.01).toFixed(2)}</div>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      // Display the data
+      container.innerHTML = `
+        <div style="background: white; border: 2px solid var(--gray-300); padding: 20px; border-radius: 0;">
+          <h4 style="margin: 0 0 20px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Morning Count Information</h4>
+
+          <div style="display: flex; justify-content: space-between; margin: 10px 0 20px 0; font-size: 14px;">
+            <span><strong>Counted by:</strong> ${counter}</span>
+            <span><strong>Time:</strong> ${timestamp}</span>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0; padding: 20px; background: var(--gray-100); border: 2px solid var(--gray-300); border-radius: 0;">
+            <strong style="font-size: 14px;">Total Amount:</strong>
+            <div style="font-size: 32px; font-weight: 700; margin: 10px 0; color: var(--gray-900);">$${amTotal.toFixed(2)}</div>
+          </div>
+
+          <div style="margin-top: 30px;">
+            <h5 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Drawer 1 - $${drawer1Total.toFixed(2)}</h5>
+            ${drawer1HTML}
+          </div>
+
+          <div style="margin-top: 30px;">
+            <h5 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Drawer 2 - $${drawer2Total.toFixed(2)}</h5>
+            ${drawer2HTML}
+          </div>
+
+          ${notes ? `
+            <div style="background: #fff3cd; padding: 12px; border-radius: 0; margin-top: 20px; border-left: 4px solid #ffc107;">
+              <strong style="color: #856404;">Notes:</strong>
+              <div style="margin-top: 5px; color: #856404;">${notes}</div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error loading AM cash data:', error);
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          <p style="font-size: 16px; color: #dc2626;">
+            Error loading data: ${error.message}
+          </p>
+        </div>
+      `;
     }
   }
 
