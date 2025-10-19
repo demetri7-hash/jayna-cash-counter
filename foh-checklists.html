@@ -1769,6 +1769,78 @@
   }
 
   /**
+   * Load completed checklists from today and yesterday for review
+   */
+  async function loadCompletedChecklistsForReview() {
+    try {
+      const today = getPacificDate();
+      const yesterday = getPacificDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+
+      const { data: sessions, error } = await supabase
+        .from('foh_checklist_sessions')
+        .select('*')
+        .in('session_date', [today, yesterday])
+        .eq('is_complete', true)
+        .order('completed_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading completed checklists:', error);
+        return [];
+      }
+
+      console.log('✅ Loaded completed checklists for review:', sessions?.length || 0);
+      return sessions || [];
+    } catch (error) {
+      console.error('Error loading completed checklists:', error);
+      return [];
+    }
+  }
+
+  /**
+   * View a completed checklist session in read-only mode
+   */
+  async function viewCompletedChecklistSession(sessionId) {
+    showLoading('Loading...', 'Loading completed checklist...');
+
+    try {
+      const { data: session, error } = await supabase
+        .from('foh_checklist_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+
+      if (error) throw error;
+      if (!session) throw new Error('Session not found');
+
+      // Load the checklist definition
+      const checklistDef = await loadChecklistFromDatabase(session.checklist_type);
+      fohSystemState.currentChecklist = checklistDef;
+      fohSystemState.currentSession = session;
+
+      // Load staff name from session
+      fohSystemState.staffName = session.staff_name;
+
+      // Load tasks from session
+      if (session.tasks && Array.isArray(session.tasks)) {
+        fohSystemState.tasks = session.tasks;
+      } else {
+        // No tasks saved - initialize empty
+        fohSystemState.tasks = [];
+      }
+
+      hideLoading();
+
+      // Render in read-only mode (function checks session.is_complete)
+      renderChecklist();
+
+    } catch (error) {
+      console.error('Error loading completed session:', error);
+      hideLoading();
+      showMessage('Error loading checklist: ' + error.message, 'error');
+    }
+  }
+
+  /**
    * Render Workflow Selector - Shows available checklists based on time
    */
   async function renderWorkflowSelector() {
@@ -1812,7 +1884,60 @@
       return;
     }
 
-    let html = `
+    // Load completed checklists from today and yesterday
+    const completedSessions = await loadCompletedChecklistsForReview();
+
+    let html = '';
+
+    // Show completed checklists for review at the top (if any)
+    if (completedSessions && completedSessions.length > 0) {
+      html += `
+        <div style="margin-bottom: 20px; padding: 16px; background: var(--success-bg); border-left: 4px solid var(--success-border); border-radius: 0;">
+          <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: var(--success-text); text-transform: uppercase; letter-spacing: 1px;">
+            ✅ COMPLETED CHECKLISTS - REVIEW
+          </h3>
+          <p style="color: var(--success-text); font-size: 12px; margin: 0 0 12px 0;">
+            Review previous checklists for accountability and continuity. Click to view photos, notes, and ratings.
+          </p>
+          <div style="display: grid; gap: 8px;">
+      `;
+
+      completedSessions.forEach(session => {
+        const completedTime = new Date(session.completed_at).toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        const sessionDate = session.session_date === getPacificDate() ? 'Today' : 'Yesterday';
+        const checklistName = session.checklist_name || session.checklist_type.replace(/_/g, ' ').toUpperCase();
+
+        html += `
+          <a onclick="viewCompletedChecklistSession(${session.id})" style="
+            display: block;
+            padding: 10px 12px;
+            background: white;
+            border: 1px solid var(--gray-300);
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--gray-900);
+            font-size: 12px;
+            transition: all 0.15s ease;
+          "
+          onmouseover="this.style.background='var(--gray-100)'; this.style.borderColor='var(--gray-700)';"
+          onmouseout="this.style.background='white'; this.style.borderColor='var(--gray-300)';">
+            <strong>${checklistName}</strong> - ${sessionDate} at ${completedTime}
+          </a>
+        `;
+      });
+
+      html += `
+          </div>
+        </div>
+      `;
+    }
+
+    html += `
       <div style="margin-bottom: 20px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
         <p style="color: var(--blue-text); font-size: 13px; font-weight: 600; margin: 0;">
           📋 Select a checklist to begin. Available checklists update based on time of day.
