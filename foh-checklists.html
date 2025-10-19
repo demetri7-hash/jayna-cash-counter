@@ -303,6 +303,102 @@
     </div>
   </div>
 
+  <!-- Success Overlay -->
+  <div id="successOverlay" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+  ">
+    <div style="
+      text-align: center;
+      background: white;
+      padding: 40px;
+      border-radius: 0;
+      border: 3px solid #059669;
+      max-width: 400px;
+    ">
+      <div style="
+        font-size: 60px;
+        color: #059669;
+        margin-bottom: 20px;
+      ">✓</div>
+      <h3 id="successTitle" style="
+        font-size: 18px;
+        font-weight: 700;
+        color: #065f46;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      ">Success!</h3>
+      <p id="successMessage" style="
+        font-size: 14px;
+        color: #424242;
+      "></p>
+    </div>
+  </div>
+
+  <!-- Error Overlay -->
+  <div id="errorOverlay" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+  " onclick="hideError()">
+    <div style="
+      text-align: center;
+      background: white;
+      padding: 40px;
+      border-radius: 0;
+      border: 3px solid #dc2626;
+      max-width: 500px;
+      margin: 20px;
+    " onclick="event.stopPropagation()">
+      <div style="
+        font-size: 60px;
+        color: #dc2626;
+        margin-bottom: 20px;
+      ">✕</div>
+      <h3 id="errorTitle" style="
+        font-size: 18px;
+        font-weight: 700;
+        color: #991b1b;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      ">Error</h3>
+      <p id="errorMessage" style="
+        font-size: 14px;
+        color: #424242;
+        margin-bottom: 20px;
+        line-height: 1.6;
+      "></p>
+      <button onclick="hideError()" style="
+        padding: 12px 24px;
+        background: #dc2626;
+        color: white;
+        border: 2px solid #dc2626;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        cursor: pointer;
+        letter-spacing: 0.5px;
+      ">OK</button>
+    </div>
+  </div>
+
   <style>
     @keyframes spin {
       0% { transform: rotate(0deg); }
@@ -1188,11 +1284,40 @@
     document.getElementById('loadingOverlay').style.display = 'none';
   }
 
-  // Message display
+  // Success overlay (auto-hides after 1.5 seconds)
+  function showSuccess(message) {
+    hideLoading(); // Hide loading first if it's showing
+    const overlay = document.getElementById('successOverlay');
+    document.getElementById('successMessage').textContent = message;
+    overlay.style.display = 'flex';
+
+    // Auto-hide after 1.5 seconds
+    setTimeout(() => {
+      overlay.style.display = 'none';
+    }, 1500);
+  }
+
+  // Error overlay (user must click OK)
+  function showError(message) {
+    hideLoading(); // Hide loading first if it's showing
+    const overlay = document.getElementById('errorOverlay');
+    document.getElementById('errorMessage').textContent = message;
+    overlay.style.display = 'flex';
+  }
+
+  function hideError() {
+    document.getElementById('errorOverlay').style.display = 'none';
+  }
+
+  // Legacy function for backwards compatibility - redirects to new overlays
   function showMessage(text, type) {
-    const messageArea = document.getElementById('messageArea');
-    messageArea.innerHTML = `<div class="message ${type}">${text}</div>`;
-    setTimeout(() => messageArea.innerHTML = '', 5000);
+    if (type === 'success') {
+      showSuccess(text);
+    } else if (type === 'error') {
+      showError(text);
+    } else {
+      showSuccess(text); // Default to success for 'info' type
+    }
   }
 
   // ============================================
@@ -3808,10 +3933,12 @@
    */
   async function saveChecklistChanges(checklistType) {
     try {
+      showLoading('Saving Checklist', 'Updating database...');
+
       // Load current checklist to get sections structure
       const currentChecklist = await loadChecklistFromDatabase(checklistType);
       if (!currentChecklist) {
-        showMessage('Error: Could not load current checklist', 'error');
+        showError('Could not load current checklist');
         return;
       }
 
@@ -3832,7 +3959,7 @@
 
       // Validate required fields
       if (!title || !description || !timeRange) {
-        showMessage('Please fill in all required fields (Title, Description, Time Range)', 'error');
+        showError('Please fill in all required fields (Title, Description, Time Range)');
         return;
       }
 
@@ -3908,7 +4035,7 @@
 
       // Validate at least one section
       if (sections.length === 0) {
-        showMessage('Checklist must have at least one section!', 'error');
+        showError('Checklist must have at least one section!');
         return;
       }
 
@@ -3931,7 +4058,8 @@
       // Save to database
       await saveChecklistToDatabase(checklistType, checklistData);
 
-      showMessage('✅ Checklist saved successfully to database!', 'success');
+      // Show success overlay (auto-hides after 1.5 seconds)
+      showSuccess('Checklist saved successfully to database!');
 
       // Reload editor after brief delay
       setTimeout(() => {
@@ -3940,7 +4068,7 @@
 
     } catch (error) {
       console.error('Error saving checklist:', error);
-      showMessage(`Error saving checklist: ${error.message}`, 'error');
+      showError(`Error saving checklist: ${error.message}`);
     }
   }
 
