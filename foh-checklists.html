@@ -3313,29 +3313,49 @@
     const currentChecklistType = checklistType;
 
     let html = `
-      <!-- Header with Back Button -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <!-- Header with Back and Delete Buttons -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 12px;">
         <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
           ✏️ EDITING: ${checklist.title}
         </h3>
-        <button
-          onclick="loadManagerEditor()"
-          style="
-            padding: 10px 20px;
-            background: var(--gray-100);
-            color: var(--gray-900);
-            border: 2px solid var(--gray-300);
-            border-radius: 0;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-          "
-          onmouseover="this.style.background='var(--gray-200)'"
-          onmouseout="this.style.background='var(--gray-100)'"
-        >← BACK TO LIST</button>
+        <div style="display: flex; gap: 12px;">
+          <button
+            onclick="deleteChecklist('${currentChecklistType}')"
+            style="
+              padding: 10px 20px;
+              background: #dc2626;
+              color: white;
+              border: 2px solid #dc2626;
+              border-radius: 0;
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.background='#b91c1c'"
+            onmouseout="this.style.background='#dc2626'"
+          >🗑️ DELETE CHECKLIST</button>
+          <button
+            onclick="loadManagerEditor()"
+            style="
+              padding: 10px 20px;
+              background: var(--gray-100);
+              color: var(--gray-900);
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.background='var(--gray-200)'"
+            onmouseout="this.style.background='var(--gray-100)'"
+          >← BACK TO LIST</button>
+        </div>
       </div>
 
       <!-- Basic Info Section -->
@@ -4383,6 +4403,88 @@
     });
 
     showMessage('✓ Section marked for deletion. Click SAVE CHANGES to apply.', 'success');
+  }
+
+  /**
+   * Delete Checklist - Permanently delete from database
+   */
+  async function deleteChecklist(checklistType) {
+    // Get checklist info for confirmation
+    const checklist = await loadChecklistFromDatabase(checklistType);
+    if (!checklist) {
+      showError('Checklist not found!');
+      return;
+    }
+
+    // Show confirmation overlay
+    const confirmOverlay = document.createElement('div');
+    confirmOverlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 9999; display: flex; justify-content: center; align-items: center;';
+    confirmOverlay.innerHTML = `
+      <div style="background: white; padding: 40px; border-radius: 0; border: 3px solid #dc2626; max-width: 500px; margin: 20px;" onclick="event.stopPropagation()">
+        <div style="font-size: 60px; color: #dc2626; text-align: center; margin-bottom: 20px;">⚠️</div>
+        <h3 style="font-size: 18px; font-weight: 700; color: #991b1b; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; text-align: center;">DELETE CHECKLIST?</h3>
+        <p style="font-size: 14px; color: #424242; margin-bottom: 20px; line-height: 1.6; text-align: center;">
+          Are you sure you want to delete:<br>
+          <strong>"${checklist.title}"</strong><br><br>
+          This will permanently delete the checklist definition and ALL associated data. This cannot be undone!
+        </p>
+        <div style="display: flex; gap: 12px;">
+          <button
+            onclick="document.body.removeChild(this.closest('div').parentElement)"
+            style="flex: 1; padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;"
+          >CANCEL</button>
+          <button
+            onclick="confirmDeleteChecklist('${checklistType}')"
+            style="flex: 1; padding: 12px 24px; background: #dc2626; border: 2px solid #dc2626; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;"
+          >DELETE FOREVER</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(confirmOverlay);
+  }
+
+  /**
+   * Confirm and execute checklist deletion
+   */
+  async function confirmDeleteChecklist(checklistType) {
+    // Remove confirmation overlay
+    const overlay = document.querySelector('div[style*="position: fixed"]');
+    if (overlay) document.body.removeChild(overlay);
+
+    showLoading('Deleting Checklist', 'Removing from database...');
+
+    try {
+      // Get checklist ID first
+      const { data: definition, error: fetchError } = await supabase
+        .from('checklist_definitions')
+        .select('id')
+        .eq('type', checklistType)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!definition) throw new Error('Checklist not found');
+
+      // Delete from database (cascade will delete sections/tasks/categories)
+      const { error: deleteError } = await supabase
+        .from('checklist_definitions')
+        .delete()
+        .eq('id', definition.id);
+
+      if (deleteError) throw deleteError;
+
+      hideLoading();
+      showSuccess('Checklist deleted successfully!');
+
+      // Wait 1 second then reload the editor list
+      setTimeout(() => {
+        loadManagerEditor();
+      }, 1000);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error deleting checklist:', error);
+      showError(`Failed to delete checklist: ${error.message}`);
+    }
   }
 
   /**
