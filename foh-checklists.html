@@ -1509,6 +1509,8 @@
     const allChecklistTypes = Object.keys(FOH_CHECKLISTS);
     const availableChecklists = [];
 
+    console.log(`⏰ Time check: ${currentHour}:${String(currentMinute).padStart(2, '0')} (${currentTimeMinutes} minutes since midnight)`);
+
     allChecklistTypes.forEach(checklistType => {
       const checklist = fohSystemState.allChecklists?.[checklistType];
 
@@ -1522,17 +1524,23 @@
         const startTimeMinutes = (checklist.start_hour * 60) + (checklist.start_minute || 0);
         const endTimeMinutes = (checklist.end_hour * 60) + (checklist.end_minute || 0);
 
+        console.log(`  📋 ${checklistType}:`, {
+          start: `${checklist.start_hour}:${String(checklist.start_minute || 0).padStart(2, '0')} (${startTimeMinutes} min)`,
+          end: `${checklist.end_hour}:${String(checklist.end_minute || 0).padStart(2, '0')} (${endTimeMinutes} min)`,
+          inRange: currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes
+        });
+
         // Check if current time is within range
         if (currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes) {
           availableChecklists.push(checklist);
         }
       } else {
+        console.log(`  ⚠️ ${checklistType}: No time range defined (showing by default)`);
         // If no time range defined, always show (fallback for checklists without time data)
         availableChecklists.push(checklist);
       }
     });
 
-    console.log(`⏰ Time check: ${currentHour}:${currentMinute} (${currentTimeMinutes} minutes)`);
     console.log(`✅ Available checklists: ${availableChecklists.length}/${allChecklistTypes.length}`);
 
     return availableChecklists;
@@ -1541,7 +1549,7 @@
   /**
    * Render Workflow Selector - Shows available checklists based on time
    */
-  function renderWorkflowSelector() {
+  async function renderWorkflowSelector() {
     console.log('renderWorkflowSelector() called');
 
     const container = document.getElementById('fohWorkflowContent');
@@ -1553,6 +1561,10 @@
     }
 
     console.log('✅ Container found:', container);
+
+    // RELOAD checklists from database to get latest time values
+    console.log('🔄 Reloading checklists from database...');
+    await initializeFOHSystem();
 
     // Get available checklists based on current Pacific time
     const availableChecklists = getAvailableChecklists();
