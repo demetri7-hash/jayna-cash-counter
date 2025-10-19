@@ -10676,21 +10676,21 @@
       // Show loading message
       showMessage('Sending to printer...', 'info');
 
-      // Send email to printer using EmailJS
-      const emailParams = {
-        to_email: 'GSS4168CTJJA73@print.epsonconnect.com',
-        from_name: 'Jayna Gyro Orders',
-        subject: `${vendorName} Ordering Guide - ${today}`,
-        message: `${vendorName} ordering guide generated on ${today}`,
-        attachment: pdfBase64,
-        filename: filename
-      };
+      // Send to printer via backend API (nodemailer + Gmail)
+      const response = await fetch('/api/send-ordering-guide-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pdfBase64: pdfBase64,
+          filename: filename
+        })
+      });
 
-      await emailjs.send(
-        'service_3hgxezm',
-        'template_9lxqeqc',
-        emailParams
-      );
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send to printer');
+      }
 
       showMessage(`✅ ${vendorName} ordering guide sent to printer!`, 'success');
       console.log(`✓ Sent ${vendorName} ordering guide to printer`);
