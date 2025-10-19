@@ -764,10 +764,33 @@
    * Individual checklists load from database with fallback to static data
    */
   async function loadAllChecklistsFromDatabase() {
-    // Always return all 5 checklist types from FOH_CHECKLISTS
-    // This ensures EDIT tab shows all 5 checklists
-    // Individual checklists will load from database or fall back to static data
-    return Object.keys(FOH_CHECKLISTS);
+    try {
+      // Query database for ALL checklist types
+      const { data, error } = await supabase
+        .from('checklist_definitions')
+        .select('checklist_type')
+        .order('checklist_type');
+
+      if (error) {
+        console.error('Error loading checklist types:', error);
+        // Fallback to static checklists
+        return Object.keys(FOH_CHECKLISTS);
+      }
+
+      if (!data || data.length === 0) {
+        console.log('⚠️ No checklists in database, using defaults');
+        return Object.keys(FOH_CHECKLISTS);
+      }
+
+      // Extract unique checklist types
+      const types = [...new Set(data.map(row => row.checklist_type))];
+      console.log(`✅ Loaded ${types.length} checklist types from database:`, types);
+      return types;
+
+    } catch (error) {
+      console.error('Error in loadAllChecklistsFromDatabase:', error);
+      return Object.keys(FOH_CHECKLISTS);
+    }
   }
 
   // ============================================
