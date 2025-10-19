@@ -764,33 +764,26 @@
    * Individual checklists load from database with fallback to static data
    */
   async function loadAllChecklistsFromDatabase() {
-    try {
-      // Query database for ALL checklist types
-      const { data, error } = await supabase
-        .from('checklist_definitions')
-        .select('checklist_type')
-        .order('checklist_type');
+    // Query database for ALL checklist types - NO FALLBACK, FAIL LOUD IF BROKEN
+    const { data, error } = await supabase
+      .from('checklist_definitions')
+      .select('type')
+      .order('type');
 
-      if (error) {
-        console.error('Error loading checklist types:', error);
-        // Fallback to static checklists
-        return Object.keys(FOH_CHECKLISTS);
-      }
-
-      if (!data || data.length === 0) {
-        console.log('⚠️ No checklists in database, using defaults');
-        return Object.keys(FOH_CHECKLISTS);
-      }
-
-      // Extract unique checklist types
-      const types = [...new Set(data.map(row => row.checklist_type))];
-      console.log(`✅ Loaded ${types.length} checklist types from database:`, types);
-      return types;
-
-    } catch (error) {
-      console.error('Error in loadAllChecklistsFromDatabase:', error);
-      return Object.keys(FOH_CHECKLISTS);
+    if (error) {
+      console.error('❌ Database error loading checklist types:', error);
+      throw new Error(`Database error: ${error.message}`);
     }
+
+    if (!data || data.length === 0) {
+      console.error('❌ No checklists found in database!');
+      throw new Error('No checklists found in database. Run migrations first!');
+    }
+
+    // Extract unique checklist types
+    const types = [...new Set(data.map(row => row.type))];
+    console.log(`✅ Loaded ${types.length} checklist types from database:`, types);
+    return types;
   }
 
   // ============================================
