@@ -1347,12 +1347,12 @@
       <div id="orderingSystemForm" class="form-section">
         <h2 style="margin-bottom: 20px; color: var(--gray-900);">Orders & Prep System</h2>
 
-        <!-- Ordering Guide Downloads -->
+        <!-- Ordering Guide Print -->
         <div style="margin-bottom: 16px; padding: 12px; background: var(--gray-100); border-left: 3px solid var(--gray-700); border-radius: 0;">
-          <span style="font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 12px;">Download Ordering Guides:</span>
-          <a href="#" onclick="downloadOrderingGuide('greenleaf'); return false;" style="font-size: 12px; color: #059669; text-decoration: underline; margin-right: 16px; cursor: pointer;">📄 Greenleaf</a>
-          <a href="#" onclick="downloadOrderingGuide('performance'); return false;" style="font-size: 12px; color: #059669; text-decoration: underline; margin-right: 16px; cursor: pointer;">📄 Performance</a>
-          <a href="#" onclick="downloadOrderingGuide('mani'); return false;" style="font-size: 12px; color: #059669; text-decoration: underline; cursor: pointer;">📄 Mani</a>
+          <span style="font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 12px;">Print Ordering Guides:</span>
+          <a href="#" onclick="downloadOrderingGuide('greenleaf'); return false;" style="font-size: 12px; color: #059669; text-decoration: underline; margin-right: 16px; cursor: pointer;">🖨️ Greenleaf</a>
+          <a href="#" onclick="downloadOrderingGuide('performance'); return false;" style="font-size: 12px; color: #059669; text-decoration: underline; margin-right: 16px; cursor: pointer;">🖨️ Performance</a>
+          <a href="#" onclick="downloadOrderingGuide('mani'); return false;" style="font-size: 12px; color: #059669; text-decoration: underline; cursor: pointer;">🖨️ Mani</a>
         </div>
 
         <!-- Tab Navigation -->
@@ -10504,10 +10504,15 @@
   };
 
   /**
-   * Download Ordering Guide PDF for vendors
+   * Print Ordering Guide PDF for vendors (sends to printer via email)
    */
-  function downloadOrderingGuide(vendor) {
+  async function downloadOrderingGuide(vendor) {
     try {
+      // Check if EmailJS is loaded
+      if (typeof emailjs === 'undefined') {
+        throw new Error('EmailJS library not loaded. Please refresh the page.');
+      }
+
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
@@ -10580,15 +10585,35 @@
         );
       }
 
-      // Download
+      // Convert PDF to base64 for email attachment
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
       const filename = `${vendorName}_Ordering_Guide_${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(filename);
 
-      console.log(`✓ Downloaded ${vendorName} ordering guide`);
+      // Show loading message
+      showMessage('Sending to printer...', 'info');
+
+      // Send email to printer using EmailJS
+      const emailParams = {
+        to_email: 'GSS4168CTJJA73@print.epsonconnect.com',
+        from_name: 'Jayna Gyro Orders',
+        subject: `${vendorName} Ordering Guide - ${today}`,
+        message: `${vendorName} ordering guide generated on ${today}`,
+        attachment: pdfBase64,
+        filename: filename
+      };
+
+      await emailjs.send(
+        'service_3hgxezm',
+        'template_9lxqeqc',
+        emailParams
+      );
+
+      showMessage(`✅ ${vendorName} ordering guide sent to printer!`, 'success');
+      console.log(`✓ Sent ${vendorName} ordering guide to printer`);
 
     } catch (error) {
-      console.error('Error generating ordering guide:', error);
-      alert(`Error generating PDF: ${error.message}`);
+      console.error('Error sending ordering guide to printer:', error);
+      showMessage(`Error sending to printer: ${error.message}`, 'error');
     }
   }
 
