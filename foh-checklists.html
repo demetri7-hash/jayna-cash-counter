@@ -1291,20 +1291,38 @@
   // Loading functions
   function showLoading(title, message) {
     const overlay = document.getElementById('loadingOverlay');
-    document.getElementById('loadingTitle').textContent = title;
-    document.getElementById('loadingMessage').textContent = message;
+    const titleEl = document.getElementById('loadingTitle');
+    const messageEl = document.getElementById('loadingMessage');
+
+    if (!overlay || !titleEl || !messageEl) {
+      console.error('Loading overlay elements not found in DOM');
+      return;
+    }
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
     overlay.style.display = 'flex';
   }
 
   function hideLoading() {
-    document.getElementById('loadingOverlay').style.display = 'none';
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
   }
 
   // Success overlay (auto-hides after 1.5 seconds)
   function showSuccess(message) {
     hideLoading(); // Hide loading first if it's showing
     const overlay = document.getElementById('successOverlay');
-    document.getElementById('successMessage').textContent = message;
+    const messageEl = document.getElementById('successMessage');
+
+    if (!overlay || !messageEl) {
+      console.error('Success overlay elements not found in DOM');
+      return;
+    }
+
+    messageEl.textContent = message;
     overlay.style.display = 'flex';
 
     // Auto-hide after 1.5 seconds
@@ -1317,12 +1335,23 @@
   function showError(message) {
     hideLoading(); // Hide loading first if it's showing
     const overlay = document.getElementById('errorOverlay');
-    document.getElementById('errorMessage').textContent = message;
+    const messageEl = document.getElementById('errorMessage');
+
+    if (!overlay || !messageEl) {
+      console.error('Error overlay elements not found in DOM');
+      alert(message); // Fallback to alert
+      return;
+    }
+
+    messageEl.textContent = message;
     overlay.style.display = 'flex';
   }
 
   function hideError() {
-    document.getElementById('errorOverlay').style.display = 'none';
+    const overlay = document.getElementById('errorOverlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
   }
 
   // Legacy function for backwards compatibility - redirects to new overlays
@@ -4431,7 +4460,7 @@
         </p>
         <div style="display: flex; gap: 12px;">
           <button
-            onclick="document.body.removeChild(this.closest('div').parentElement)"
+            onclick="cancelDeleteChecklist()"
             style="flex: 1; padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;"
           >CANCEL</button>
           <button
@@ -4445,12 +4474,24 @@
   }
 
   /**
+   * Cancel checklist deletion
+   */
+  function cancelDeleteChecklist() {
+    const overlay = document.getElementById('deleteConfirmOverlay');
+    if (overlay && overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
+  }
+
+  /**
    * Confirm and execute checklist deletion
    */
   async function confirmDeleteChecklist(checklistType) {
     // Remove confirmation overlay by specific ID
     const overlay = document.getElementById('deleteConfirmOverlay');
-    if (overlay) document.body.removeChild(overlay);
+    if (overlay && overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
 
     showLoading('Deleting Checklist', 'Removing from database...');
 
