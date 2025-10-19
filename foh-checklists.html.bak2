@@ -1892,9 +1892,6 @@
     const container = document.getElementById('fohWorkflowContent');
     const checklist = fohSystemState.currentChecklist;
 
-    // Capture checklist.type for autosave functionality
-    const currentChecklistType = checklist.type;
-
     // Get saved username from localStorage
     const savedUsername = localStorage.getItem('foh_username') || '';
 
@@ -1927,7 +1924,7 @@
               box-sizing: border-box;
             "
             onfocus="this.style.borderColor='var(--gray-700)'"
-            onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
+            onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
           />
           <p style="margin: 8px 0 0 0; font-size: 11px; color: var(--gray-500);">
             Your name will be saved and used for all your actions in this checklist
@@ -3658,7 +3655,7 @@
             onmouseout="this.style.background='var(--success-border)'"
           >➕ ADD SECTION</button>
         </div>
-        <div id="sections_container" data-checklist-type="${currentChecklistType}" style="padding: 20px;">
+        <div id="sections_container" style="padding: 20px;">
     `;
 
     checklist.sections.forEach((section, sectionIndex) => {
@@ -3817,7 +3814,7 @@
 
         html += `
             <button
-              onclick="addTask(${sectionIndex}, '${currentChecklistType}')"
+              onclick="addTask(${sectionIndex})"
               style="
                 margin-top: 8px;
                 padding: 10px 16px;
@@ -4153,9 +4150,6 @@
    * Add New Section - Dynamically add a section to the checklist
    */
   function addNewSection(checklistType) {
-    // Capture checklistType for template literals
-    const currentChecklistType = checklistType;
-
     // Find the sections container
     const sectionsContainer = document.getElementById('sections_container');
     if (!sectionsContainer) {
@@ -4193,7 +4187,7 @@
               box-sizing: border-box;
             "
             onfocus="this.style.borderColor='var(--gray-700)'"
-            onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
+            onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
           />
           <input
             type="text"
@@ -4210,7 +4204,7 @@
               margin-bottom: 8px;
             "
             onfocus="this.style.borderColor='var(--gray-700)'"
-            onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
+            onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
           />
           <select
             id="section_type_${sectionIndex}"
@@ -4269,7 +4263,7 @@
                 box-sizing: border-box;
               "
               onfocus="this.style.borderColor='var(--gray-700)'"
-              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
+              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
             />
             <label style="
               display: flex;
@@ -4312,7 +4306,7 @@
       </div>
 
       <button
-        onclick="addTask(${sectionIndex}, '${currentChecklistType}')"
+        onclick="addTask(${sectionIndex})"
         style="
           margin-top: 8px;
           padding: 10px 16px;
@@ -4378,10 +4372,6 @@
 
     if (!itemsContainer) return;
 
-    // Get checklist type from container data attribute
-    const sectionsContainer = document.getElementById('sections_container');
-    const checklistType = sectionsContainer?.getAttribute('data-checklist-type') || '';
-
     if (sectionType === 'checkbox') {
       // Show checkbox tasks interface
       itemsContainer.innerHTML = `
@@ -4404,7 +4394,7 @@
                 box-sizing: border-box;
               "
               onfocus="this.style.borderColor='var(--gray-700)'"
-              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
+              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
             />
             <label style="
               display: flex;
@@ -4450,7 +4440,7 @@
       const addButton = itemsContainer.nextElementSibling;
       if (addButton && addButton.tagName === 'BUTTON') {
         addButton.textContent = '➕ ADD TASK';
-        addButton.onclick = () => addTask(sectionIndex, checklistType);
+        addButton.onclick = () => addTask(sectionIndex);
       }
 
     } else if (sectionType === 'rating') {
@@ -4475,7 +4465,7 @@
                 box-sizing: border-box;
               "
               onfocus="this.style.borderColor='var(--gray-700)'"
-              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
+              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
             />
             <input
               type="text"
@@ -4491,7 +4481,7 @@
                 box-sizing: border-box;
               "
               onfocus="this.style.borderColor='var(--gray-700)'"
-              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
+              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
             />
             <button
               onclick="deleteCategory(${sectionIndex}, 0)"
@@ -4535,10 +4525,7 @@
   /**
    * Add Task - Add a new task row to a section
    */
-  function addTask(sectionIndex, checklistType) {
-    // Capture checklistType for template literals
-    const currentChecklistType = checklistType;
-
+  function addTask(sectionIndex) {
     // Find the section container
     const sectionContainer = document.getElementById(`section_items_${sectionIndex}`);
     if (!sectionContainer) {
@@ -4563,7 +4550,7 @@
         placeholder="New task description"
         style="flex: 1; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;"
         onfocus="this.style.borderColor='var(--gray-700)'"
-        onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
+        onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
       />
       <label style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--gray-100); border: 2px solid var(--gray-300); border-radius: 0;">
         <input
@@ -5494,7 +5481,7 @@
                 box-sizing: border-box;
               "
               onfocus="this.style.borderColor='var(--gray-700)'"
-              onblur="this.style.borderColor='var(--gray-300)'"
+              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
             />
             <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--gray-500);">
               Must be unique. No spaces. Use lowercase and underscores.
@@ -5518,7 +5505,7 @@
                 box-sizing: border-box;
               "
               onfocus="this.style.borderColor='var(--gray-700)'"
-              onblur="this.style.borderColor='var(--gray-300)'"
+              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
             />
           </div>
 
@@ -5541,7 +5528,7 @@
                   box-sizing: border-box;
                 "
                 onfocus="this.style.borderColor='var(--gray-700)'"
-                onblur="this.style.borderColor='var(--gray-300)'"
+                onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${checklistType}')"
                 oninput="validatePasswordStrength(this.value, 'new_password_strength')"
               />
               <button

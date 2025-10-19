@@ -3658,7 +3658,7 @@
             onmouseout="this.style.background='var(--success-border)'"
           >➕ ADD SECTION</button>
         </div>
-        <div id="sections_container" data-checklist-type="${currentChecklistType}" style="padding: 20px;">
+        <div id="sections_container" style="padding: 20px;">
     `;
 
     checklist.sections.forEach((section, sectionIndex) => {
@@ -3817,7 +3817,7 @@
 
         html += `
             <button
-              onclick="addTask(${sectionIndex}, '${currentChecklistType}')"
+              onclick="addTask(${sectionIndex})"
               style="
                 margin-top: 8px;
                 padding: 10px 16px;
@@ -4312,7 +4312,7 @@
       </div>
 
       <button
-        onclick="addTask(${sectionIndex}, '${currentChecklistType}')"
+        onclick="addTask(${sectionIndex})"
         style="
           margin-top: 8px;
           padding: 10px 16px;
@@ -4377,10 +4377,6 @@
     const itemsContainer = document.getElementById(`section_items_${sectionIndex}`);
 
     if (!itemsContainer) return;
-
-    // Get checklist type from container data attribute
-    const sectionsContainer = document.getElementById('sections_container');
-    const checklistType = sectionsContainer?.getAttribute('data-checklist-type') || '';
 
     if (sectionType === 'checkbox') {
       // Show checkbox tasks interface
@@ -4450,7 +4446,7 @@
       const addButton = itemsContainer.nextElementSibling;
       if (addButton && addButton.tagName === 'BUTTON') {
         addButton.textContent = '➕ ADD TASK';
-        addButton.onclick = () => addTask(sectionIndex, checklistType);
+        addButton.onclick = () => addTask(sectionIndex);
       }
 
     } else if (sectionType === 'rating') {
@@ -4535,10 +4531,7 @@
   /**
    * Add Task - Add a new task row to a section
    */
-  function addTask(sectionIndex, checklistType) {
-    // Capture checklistType for template literals
-    const currentChecklistType = checklistType;
-
+  function addTask(sectionIndex) {
     // Find the section container
     const sectionContainer = document.getElementById(`section_items_${sectionIndex}`);
     if (!sectionContainer) {
@@ -5494,7 +5487,7 @@
                 box-sizing: border-box;
               "
               onfocus="this.style.borderColor='var(--gray-700)'"
-              onblur="this.style.borderColor='var(--gray-300)'"
+              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
             />
             <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--gray-500);">
               Must be unique. No spaces. Use lowercase and underscores.
@@ -5518,7 +5511,7 @@
                 box-sizing: border-box;
               "
               onfocus="this.style.borderColor='var(--gray-700)'"
-              onblur="this.style.borderColor='var(--gray-300)'"
+              onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
             />
           </div>
 
@@ -5541,7 +5534,7 @@
                   box-sizing: border-box;
                 "
                 onfocus="this.style.borderColor='var(--gray-700)'"
-                onblur="this.style.borderColor='var(--gray-300)'"
+                onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
                 oninput="validatePasswordStrength(this.value, 'new_password_strength')"
               />
               <button
