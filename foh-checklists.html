@@ -3987,7 +3987,11 @@
       const sections = [];
       let sectionIndex = 0;
 
+      // Debug: Log what we're looking for
+      console.log(`🔍 Looking for sections in DOM for checklist type: ${checklistType}`);
+
       while (document.getElementById(`section_${sectionIndex}`)) {
+        console.log(`✓ Found section_${sectionIndex}`);
         const sectionName = document.getElementById(`section_name_${sectionIndex}`)?.value.trim();
         const sectionDesc = document.getElementById(`section_desc_${sectionIndex}`)?.value.trim() || '';
         const sectionType = document.getElementById(`section_type_${sectionIndex}`)?.value;
@@ -4053,10 +4057,21 @@
         sectionIndex++;
       }
 
-      // Validate at least one section
+      // Validate sections
       if (sections.length === 0) {
-        showError('Checklist must have at least one section!');
-        return;
+        console.log('❌ No sections collected!');
+        console.log('DOM check - section_0 exists:', !!document.getElementById('section_0'));
+        console.log('DOM check - sections_container exists:', !!document.getElementById('sections_container'));
+
+        if (silent) {
+          // Autosave: Skip silently, don't bother the user
+          console.log('⚠️ Auto-save skipped: No sections found in DOM yet');
+          return;
+        } else {
+          // Manual save: Show error
+          showError('Checklist must have at least one section!');
+          return;
+        }
       }
 
       // Build checklist data object
