@@ -1888,16 +1888,15 @@
 
     fohSystemState.currentChecklist = checklist;
 
-    showLoading('Checking...', 'Looking for active checklist session...');
+    showLoading('Checking...', 'Looking for checklist session...');
 
     try {
-      // Check for existing incomplete session for this checklist type today
+      // Check for ANY session for this checklist type today (complete OR incomplete)
       const { data: existingSessions, error } = await supabase
         .from('foh_checklist_sessions')
         .select('*')
         .eq('checklist_type', checklistType)
         .eq('session_date', getPacificDate())
-        .eq('is_complete', false)
         .order('started_at', { ascending: false })
         .limit(1);
 
@@ -1906,7 +1905,7 @@
       hideLoading();
 
       if (existingSessions && existingSessions.length > 0) {
-        // Found existing session - join it!
+        // Found existing session - join it (can be complete or incomplete)
         await joinExistingSession(existingSessions[0]);
       } else {
         // No existing session - show name input to create new one
@@ -2284,8 +2283,8 @@
     const checklist = fohSystemState.currentChecklist;
     const session = fohSystemState.currentSession;
 
-    // Check if checklist time window has expired
-    if (checklist.end_hour !== undefined && checklist.end_minute !== undefined) {
+    // Check if checklist time window has expired (only for incomplete sessions)
+    if (!session.is_complete && checklist.end_hour !== undefined && checklist.end_minute !== undefined) {
       const now = new Date();
       const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
       const currentHour = pacificTime.getHours();
@@ -2317,6 +2316,27 @@
     const completedRequiredCount = fohSystemState.tasks.filter(t => t.is_required === true && t.is_completed === true).length;
 
     let html = `
+      ${session.is_complete ? `
+      <!-- Completed Session Banner -->
+      <div style="margin-bottom: 16px; padding: 16px; background: var(--gray-100); border-left: 4px solid var(--gray-700); border-radius: 0;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 24px;">✓</div>
+          <div>
+            <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">
+              Completed Checklist (Read-Only)
+            </h4>
+            <p style="margin: 0; font-size: 12px; color: var(--gray-600);">
+              This checklist was marked complete at ${session.completed_at ? formatPacificDateDisplay(new Date(session.completed_at), {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              }) : 'unknown time'}. You can view but not edit.
+            </p>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- Session Header -->
       <div style="margin-bottom: 24px; padding: 20px; background: var(--success-bg); border-left: 4px solid var(--success-border); border-radius: 0;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
@@ -2445,52 +2465,78 @@
       `;
     }
 
-    // Action buttons
-    html += `
-      <div style="margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap;">
-        <button
-          onclick="confirmCancelChecklist()"
-          style="
-            flex: 1;
-            min-width: 200px;
-            padding: 14px 24px;
-            background: var(--gray-100);
-            color: var(--gray-900);
-            border: 2px solid var(--gray-300);
-            border-radius: 0;
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-          "
-          onmouseover="this.style.background='var(--gray-200)'"
-          onmouseout="this.style.background='var(--gray-100)'"
-        >CANCEL CHECKLIST</button>
+    // Action buttons (only show for incomplete sessions)
+    if (!session.is_complete) {
+      html += `
+        <div style="margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap;">
+          <button
+            onclick="confirmCancelChecklist()"
+            style="
+              flex: 1;
+              min-width: 200px;
+              padding: 14px 24px;
+              background: var(--gray-100);
+              color: var(--gray-900);
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.background='var(--gray-200)'"
+            onmouseout="this.style.background='var(--gray-100)'"
+          >CANCEL CHECKLIST</button>
 
-        <button
-          onclick="completeChecklistSession()"
-          style="
-            flex: 2;
-            min-width: 200px;
-            padding: 14px 24px;
-            background: var(--success-border);
-            color: white;
-            border: 2px solid var(--success-border);
-            border-radius: 0;
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-          "
-          onmouseover="this.style.background='#047857'"
-          onmouseout="this.style.background='var(--success-border)'"
-        >💾 SAVE PROGRESS</button>
-      </div>
-    `;
+          <button
+            onclick="completeChecklistSession()"
+            style="
+              flex: 2;
+              min-width: 200px;
+              padding: 14px 24px;
+              background: var(--success-border);
+              color: white;
+              border: 2px solid var(--success-border);
+              border-radius: 0;
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.background='#047857'"
+            onmouseout="this.style.background='var(--success-border)'"
+          >💾 SAVE PROGRESS</button>
+        </div>
+      `;
+    } else {
+      // Show back button for completed sessions
+      html += `
+        <div style="margin-top: 30px; text-align: center;">
+          <button
+            onclick="renderWorkflowSelector()"
+            style="
+              padding: 14px 32px;
+              background: var(--gray-900);
+              color: white;
+              border: 2px solid var(--gray-900);
+              border-radius: 0;
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.background='#000'"
+            onmouseout="this.style.background='var(--gray-900)'"
+          >← BACK TO CHECKLISTS</button>
+        </div>
+      `;
+    }
 
     container.innerHTML = html;
     updateProgress();
