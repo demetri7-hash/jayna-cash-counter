@@ -12,9 +12,12 @@
   
   <!-- Chart.js for SalesChart component -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  
+
+  <!-- Supabase for prep production data -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <!-- API Integration - Uses Vercel endpoints like index.html -->
-  
+
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { 
@@ -980,6 +983,34 @@
 
         </div>
       </div>
+
+      <!-- Prep Production Report -->
+      <div class="component-card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Prep Production Report</h2>
+            <p class="card-subtitle">Morning prep cook production tracking</p>
+          </div>
+          <div class="prep-date-selector">
+            <label style="font-size: 12px; margin-right: 8px; color: #666;">Date Range:</label>
+            <select id="prep-days-selector" onchange="loadPrepProductionReport()" style="padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;">
+              <option value="1">Today</option>
+              <option value="3">Last 3 Days</option>
+              <option value="7" selected>Last 7 Days</option>
+              <option value="14">Last 14 Days</option>
+              <option value="30">Last 30 Days</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="prep-production-report">
+            <div class="loading">
+              <div class="loading-spinner"></div>
+              Loading prep production data...
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -997,6 +1028,7 @@
     let laborChart = null;
     let currentPeriod = 'day';
     let currentLaborPeriod = 'today';
+    let supabase = null;
 
     // Pacific timezone date helper (same as working index.html)
     function getPacificDate() {
@@ -1015,35 +1047,54 @@
       return pacific.toISOString().split('T')[0] + 'T00:00:00Z';
     }
 
+    // Initialize Supabase
+    function initSupabase() {
+      const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
+
+      const { createClient } = window.supabase;
+      supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log('✅ Supabase initialized for prep production tracking');
+    }
+
     // Initialize the manager portal
     async function initManagerPortal() {
       console.log('🚀 Initializing Manager Portal with real-time data...');
-      
+
       try {
+        // Initialize Supabase for prep data
+        initSupabase();
+
         // Get Toast authentication token
         await getToastToken();
-        
+
         // Load components with staggered timing, focus on working endpoints
         console.log('📊 Loading Live Metrics first...');
         await loadLiveMetrics();
-        
+
         // Only load components that work reliably
         setTimeout(() => {
           console.log('🏠 Loading Labor Analytics...');
           loadLaborAnalytics();
         }, 3000);
-        
+
         // Disable broken components temporarily
         setTimeout(() => {
           console.log('📈 Re-enabling Stats Cards with pageSize fix...');
           loadStatsCards(); // Removed pageSize limit to fetch ALL orders
         }, 5000);
-        
+
+        // Load prep production report
+        setTimeout(() => {
+          console.log('🥗 Loading Prep Production Report...');
+          loadPrepProductionReport();
+        }, 6000);
+
         console.log('✅ Manager Portal initialized successfully');
-        
+
         // Set up auto-refresh every 2 minutes (120 seconds) to respect API limits
         setInterval(refreshLiveData, 120000);
-        
+
       } catch (error) {
         console.error('❌ Error initializing Manager Portal:', error);
         showError('Failed to initialize Manager Portal. Please refresh the page.');
@@ -3000,6 +3051,203 @@
     }
 
     // ==================== END LABOR ANALYTICS ====================
+
+    // ==================== PREP PRODUCTION REPORT ====================
+
+    /**
+     * Load prep production report showing what morning prep cook made
+     * Compares morning prep counts to closing counts to show production
+     */
+    async function loadPrepProductionReport() {
+      const container = document.getElementById('prep-production-report');
+      if (!container) return;
+
+      try {
+        const daysSelector = document.getElementById('prep-days-selector');
+        const days = parseInt(daysSelector?.value || 7);
+        const startDate = getPacificDateOffset(-days);
+        const endDate = getPacificDate();
+
+        console.log(`📊 Fetching prep production data from ${startDate} to ${endDate}`);
+
+        // Fetch all prep items
+        const { data: items, error: itemsError } = await supabase
+          .from('inventory_items')
+          .select('id, item_name, unit')
+          .or('vendor.eq.PREP,item_type.eq.prep')
+          .order('item_name');
+
+        if (itemsError) throw itemsError;
+
+        if (!items || items.length === 0) {
+          container.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">No prep items found.</p>';
+          return;
+        }
+
+        // Fetch prep consumption log for the date range
+        const { data: consumption, error: consumptionError } = await supabase
+          .from('prep_consumption_log')
+          .select('*')
+          .gte('count_date', startDate)
+          .lte('count_date', endDate)
+          .order('count_date', { ascending: false });
+
+        if (consumptionError) throw consumptionError;
+
+        // Group consumption data by item and date
+        const consumptionByItem = {};
+        (consumption || []).forEach(record => {
+          if (!consumptionByItem[record.item_id]) {
+            consumptionByItem[record.item_id] = [];
+          }
+          consumptionByItem[record.item_id].push(record);
+        });
+
+        // Calculate production/consumption summary per item
+        const reportData = items.map(item => {
+          const itemConsumption = consumptionByItem[item.id] || [];
+
+          // Total production (negative consumption = items made)
+          const totalProduction = itemConsumption.reduce((sum, rec) => sum + (rec.waste_amount || 0), 0);
+
+          // Total consumption (positive consumption = items used)
+          const totalConsumption = itemConsumption.reduce((sum, rec) => sum + (rec.consumption_amount || 0), 0);
+
+          // Net change
+          const netChange = totalProduction - totalConsumption;
+
+          // Average per day
+          const avgProductionPerDay = itemConsumption.length > 0 ? totalProduction / days : 0;
+          const avgConsumptionPerDay = itemConsumption.length > 0 ? totalConsumption / days : 0;
+
+          return {
+            item,
+            totalProduction,
+            totalConsumption,
+            netChange,
+            avgProductionPerDay,
+            avgConsumptionPerDay,
+            records: itemConsumption
+          };
+        });
+
+        // Filter to items with activity
+        const activeItems = reportData.filter(d => d.records.length > 0);
+
+        // Sort by total production (descending)
+        activeItems.sort((a, b) => b.totalProduction - a.totalProduction);
+
+        // Render the report
+        renderPrepProductionReport(activeItems, days, startDate, endDate);
+
+      } catch (error) {
+        console.error('Error loading prep production report:', error);
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: #ef4444;">
+            <p style="font-weight: 600; margin-bottom: 8px;">Error loading prep production data</p>
+            <p style="font-size: 13px;">${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    /**
+     * Render prep production report table
+     */
+    function renderPrepProductionReport(data, days, startDate, endDate) {
+      const container = document.getElementById('prep-production-report');
+      if (!container) return;
+
+      if (data.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: #666;">
+            <p>No prep activity found for the selected period.</p>
+            <p style="font-size: 13px; margin-top: 8px;">${startDate} to ${endDate}</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = `
+        <div style="margin-bottom: 16px; padding: 12px; background: #f0f9ff; border-left: 4px solid #0ea5e9;">
+          <p style="margin: 0; font-size: 13px; color: #0c4a6e;">
+            <strong>Report Period:</strong> ${formatDateDisplay(startDate)} to ${formatDateDisplay(endDate)} (${days} days)
+          </p>
+          <p style="margin: 4px 0 0 0; font-size: 13px; color: #0c4a6e;">
+            <strong>${data.length}</strong> prep items with activity
+          </p>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background: #1e3a8a; color: white;">
+                <th style="padding: 12px 8px; text-align: left; border: 1px solid #ddd; font-weight: 600;">Item</th>
+                <th style="padding: 12px 8px; text-align: center; border: 1px solid #ddd; font-weight: 600;">Unit</th>
+                <th style="padding: 12px 8px; text-align: center; border: 1px solid #ddd; font-weight: 600;">Total Produced</th>
+                <th style="padding: 12px 8px; text-align: center; border: 1px solid #ddd; font-weight: 600;">Total Consumed</th>
+                <th style="padding: 12px 8px; text-align: center; border: 1px solid #ddd; font-weight: 600;">Net Change</th>
+                <th style="padding: 12px 8px; text-align: center; border: 1px solid #ddd; font-weight: 600;">Avg/Day Produced</th>
+                <th style="padding: 12px 8px; text-align: center; border: 1px solid #ddd; font-weight: 600;">Avg/Day Consumed</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map((row, index) => {
+                const bgColor = index % 2 === 0 ? '#ffffff' : '#f9fafb';
+                const netChangeColor = row.netChange > 0 ? '#059669' : row.netChange < 0 ? '#dc2626' : '#6b7280';
+
+                return `
+                  <tr style="background: ${bgColor};">
+                    <td style="padding: 10px 8px; border: 1px solid #e5e7eb; font-weight: 600;">${row.item.item_name}</td>
+                    <td style="padding: 10px 8px; border: 1px solid #e5e7eb; text-align: center;">${row.item.unit}</td>
+                    <td style="padding: 10px 8px; border: 1px solid #e5e7eb; text-align: center; color: #059669; font-weight: 600;">+${row.totalProduction.toFixed(2)}</td>
+                    <td style="padding: 10px 8px; border: 1px solid #e5e7eb; text-align: center; color: #dc2626; font-weight: 600;">-${row.totalConsumption.toFixed(2)}</td>
+                    <td style="padding: 10px 8px; border: 1px solid #e5e7eb; text-align: center; color: ${netChangeColor}; font-weight: 700;">${row.netChange > 0 ? '+' : ''}${row.netChange.toFixed(2)}</td>
+                    <td style="padding: 10px 8px; border: 1px solid #e5e7eb; text-align: center;">${row.avgProductionPerDay.toFixed(2)}</td>
+                    <td style="padding: 10px 8px; border: 1px solid #e5e7eb; text-align: center;">${row.avgConsumptionPerDay.toFixed(2)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 20px; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 12px;">
+          <p style="margin: 0; font-weight: 600; color: #92400e; margin-bottom: 4px;">💡 How to read this report:</p>
+          <ul style="margin: 8px 0 0 20px; color: #92400e;">
+            <li><strong>Total Produced:</strong> Green = Items made by morning prep cook (count went UP)</li>
+            <li><strong>Total Consumed:</strong> Red = Items used during service (count went DOWN)</li>
+            <li><strong>Net Change:</strong> Overall inventory change (positive = more produced than consumed)</li>
+            <li><strong>Avg/Day:</strong> Daily average for the selected period</li>
+          </ul>
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    /**
+     * Get Pacific date with offset
+     */
+    function getPacificDateOffset(days) {
+      const now = new Date();
+      const pacific = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
+      pacific.setDate(pacific.getDate() + days);
+      const year = pacific.getFullYear();
+      const month = String(pacific.getMonth() + 1).padStart(2, '0');
+      const day = String(pacific.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    /**
+     * Format date for display
+     */
+    function formatDateDisplay(dateStr) {
+      const date = new Date(dateStr + 'T00:00:00');
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    // ==================== END PREP PRODUCTION REPORT ====================
   </script>
 </body>
 </html>
