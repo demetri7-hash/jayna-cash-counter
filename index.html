@@ -753,10 +753,9 @@
       
       <!-- Main Menu -->
       <div id="mainMenu" class="main-menu">
-        <button class="menu-btn primary" onclick="startAMCount()">AM Count</button>
-        <button class="menu-btn primary" onclick="startPMCount()">PM Close</button>
+        <button class="menu-btn primary" onclick="startSmartCashFlow()">Cash</button>
         <button class="menu-btn" onclick="startOrderingSystem()" style="background: var(--gray-700) !important; color: white !important; border-color: var(--gray-700) !important;">Orders & Prep</button>
-        <a href="foh-checklists.html" class="menu-btn" style="background: var(--gray-700) !important; color: white !important; border-color: var(--gray-700) !important; text-decoration: none;">FOH Checklists</a>
+        <a href="foh-checklists.html" class="menu-btn" style="background: var(--gray-700) !important; color: white !important; border-color: var(--gray-700) !important; text-decoration: none; font-size: 11px;">FOH</a>
       </div>
 
       <!-- Secondary Links -->
@@ -2106,32 +2105,60 @@
   
   // Password protection for date changes (only Demetri knows this)
   const ADMIN_PASSWORD = 'JaynaGyro2025!';
-  
-  // Session management for manager access
+  const CASH_PASSWORD = 'jaynacash'; // Cash flow access password
+
+  // Session management for manager access (60 minutes)
   function setManagerSession() {
     const now = new Date().getTime();
     const expiryTime = now + (60 * 60 * 1000); // 1 hour from now
     localStorage.setItem('managerSession', expiryTime.toString());
   }
-  
+
   function isManagerSessionValid() {
     const sessionExpiry = localStorage.getItem('managerSession');
     if (!sessionExpiry) return false;
-    
+
     const now = new Date().getTime();
     const expiryTime = parseInt(sessionExpiry);
-    
+
     if (now > expiryTime) {
       // Session expired, clean up
       localStorage.removeItem('managerSession');
       return false;
     }
-    
+
     return true;
   }
-  
+
   function clearManagerSession() {
     localStorage.removeItem('managerSession');
+  }
+
+  // Session management for cash flow access (30 minutes)
+  function setCashSession() {
+    const now = new Date().getTime();
+    const expiryTime = now + (30 * 60 * 1000); // 30 minutes from now
+    localStorage.setItem('cashSession', expiryTime.toString());
+  }
+
+  function isCashSessionValid() {
+    const sessionExpiry = localStorage.getItem('cashSession');
+    if (!sessionExpiry) return false;
+
+    const now = new Date().getTime();
+    const expiryTime = parseInt(sessionExpiry);
+
+    if (now > expiryTime) {
+      // Session expired, clean up
+      localStorage.removeItem('cashSession');
+      return false;
+    }
+
+    return true;
+  }
+
+  function clearCashSession() {
+    localStorage.removeItem('cashSession');
   }
   
   let supabase = null;
@@ -2878,9 +2905,9 @@
     hideAllSections();
     document.getElementById('pmForm').classList.add('active');
     setupDenominations('pm');
-    
+
     await loadAMData();
-    
+
     // Automatically fetch Toast cash sales when PM section loads
     console.log('PM Count started - automatically fetching Toast cash sales...');
     try {
@@ -2888,6 +2915,101 @@
     } catch (error) {
       console.error('Auto-fetch Toast sales failed:', error);
       // Don't block the UI - user can still proceed manually if needed
+    }
+  }
+
+  /**
+   * Smart Cash Button - Time-based AM/PM flow with password protection
+   * 7AM-7PM PT: AM Count
+   * 7PM-2AM PT: PM Close
+   * 2AM-7AM PT: No flow available
+   */
+  function startSmartCashFlow() {
+    // Check if session is valid
+    if (isCashSessionValid()) {
+      // Session valid, proceed directly
+      loadCashFlowByTime();
+      return;
+    }
+
+    // No valid session, show password modal
+    showCashPasswordModal();
+  }
+
+  function showCashPasswordModal() {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+    modal.innerHTML = `
+      <div style="background: white; padding: 40px; border-radius: 0; border: 3px solid var(--gray-700); max-width: 400px; width: 90%;">
+        <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Cash Flow Access</h3>
+        <p style="margin-bottom: 20px; color: var(--gray-700); font-size: 13px;">Enter password to access cash counting:</p>
+        <input type="password" id="cashPasswordInput" placeholder="Enter password" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; margin-bottom: 20px; box-sizing: border-box;" />
+        <div style="display: flex; gap: 12px;">
+          <button onclick="document.body.removeChild(this.closest('div').parentElement.parentElement)" style="flex: 1; padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">Cancel</button>
+          <button onclick="verifyCashPassword()" style="flex: 1; padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">Submit</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Focus password input
+    setTimeout(() => {
+      document.getElementById('cashPasswordInput').focus();
+    }, 100);
+
+    // Add enter key support
+    document.getElementById('cashPasswordInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        verifyCashPassword();
+      }
+    });
+  }
+
+  function verifyCashPassword() {
+    const input = document.getElementById('cashPasswordInput');
+    const password = input.value;
+
+    if (password === CASH_PASSWORD) {
+      // Set 30-minute session
+      setCashSession();
+
+      // Remove modal
+      const modal = input.closest('div').parentElement.parentElement;
+      document.body.removeChild(modal);
+
+      // Load appropriate flow
+      loadCashFlowByTime();
+    } else {
+      showMessage('Incorrect password. Access denied.', 'error');
+      const modal = input.closest('div').parentElement.parentElement;
+      document.body.removeChild(modal);
+    }
+  }
+
+  function loadCashFlowByTime() {
+    // Get Pacific time
+    const now = new Date();
+    const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    const hour = pacificTime.getHours();
+
+    console.log(`Smart Cash Flow: Pacific hour is ${hour}`);
+
+    // 7AM-7PM (07:00-19:00): AM Count
+    if (hour >= 7 && hour < 19) {
+      console.log('Loading AM Count (7AM-7PM)');
+      startAMCount();
+    }
+    // 7PM-2AM (19:00-02:00): PM Close
+    else if (hour >= 19 || hour < 2) {
+      console.log('Loading PM Close (7PM-2AM)');
+      startPMCount();
+    }
+    // 2AM-7AM: No flow available
+    else {
+      console.log('No cash flow available (2AM-7AM)');
+      showMessage('Cash counting is not available at this time. Please try between 7:00 AM and 2:00 AM Pacific Time.', 'error');
     }
   }
   
