@@ -2088,6 +2088,34 @@
 
     const checklist = fohSystemState.currentChecklist;
 
+    // Check if checklist time window has expired BEFORE starting
+    if (checklist.end_hour !== undefined && checklist.end_minute !== undefined) {
+      const now = new Date();
+      const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      const currentHour = pacificTime.getHours();
+      const currentMinute = pacificTime.getMinutes();
+
+      const currentTimeInMinutes = (currentHour * 60) + currentMinute;
+      const endTimeInMinutes = (checklist.end_hour * 60) + checklist.end_minute;
+
+      let timeExpired = false;
+      if (checklist.end_hour < checklist.start_hour) {
+        // Overnight range
+        timeExpired = currentTimeInMinutes >= endTimeInMinutes && currentTimeInMinutes < (checklist.start_hour * 60);
+      } else {
+        // Same-day range
+        timeExpired = currentTimeInMinutes >= endTimeInMinutes;
+      }
+
+      if (timeExpired) {
+        showMessage(
+          `Cannot start checklist - time window has expired.\n\n${checklist.title} is only available until ${checklist.end_hour}:${String(checklist.end_minute).padStart(2, '0')}.`,
+          'error'
+        );
+        return;
+      }
+    }
+
     showLoading('Starting Checklist', 'Creating session...');
 
     try {
@@ -2174,12 +2202,115 @@
   }
 
   /**
+   * Auto-close checklist when time window expires
+   */
+  async function autoCloseExpiredChecklist() {
+    const container = document.getElementById('fohWorkflowContent');
+    const checklist = fohSystemState.currentChecklist;
+    const session = fohSystemState.currentSession;
+
+    try {
+      showLoading('Time Expired', 'Auto-saving checklist...');
+
+      // Mark session as complete if not already
+      if (session && session.id && !session.is_complete) {
+        await supabase
+          .from('foh_checklist_sessions')
+          .update({
+            is_complete: true,
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', session.id);
+      }
+
+      hideLoading();
+
+      // Show expiration message
+      const completed = fohSystemState.tasks.filter(t => t.is_completed).length;
+      const total = fohSystemState.tasks.length;
+      const percentComplete = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      container.innerHTML = `
+        <div style="text-align: center; padding: 60px 20px;">
+          <div style="font-size: 72px; margin-bottom: 24px;">⏰</div>
+          <h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
+            Time Window Expired
+          </h2>
+          <p style="margin: 0 0 32px 0; font-size: 16px; color: var(--gray-600); line-height: 1.6;">
+            ${checklist.title} is no longer available.<br>
+            The checklist time window has ended and the final version has been saved.
+          </p>
+          <div style="display: inline-block; padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); border-radius: 0; margin-bottom: 32px;">
+            <div style="font-size: 14px; color: var(--gray-700); font-weight: 700;">
+              Final Status: ${completed} / ${total} Tasks Completed (${percentComplete}%)
+            </div>
+          </div>
+          <div>
+            <button
+              onclick="renderWorkflowSelector()"
+              style="
+                padding: 14px 32px;
+                background: var(--gray-900);
+                color: white;
+                border: 2px solid var(--gray-900);
+                border-radius: 0;
+                font-size: 13px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#000'"
+              onmouseout="this.style.background='var(--gray-900)'"
+            >BACK TO CHECKLISTS</button>
+          </div>
+        </div>
+      `;
+
+    } catch (error) {
+      console.error('Error auto-closing expired checklist:', error);
+      hideLoading();
+      showMessage(`Error saving final checklist: ${error.message}`, 'error');
+    }
+  }
+
+  /**
    * Render Checklist - Main checklist view with tasks
    */
   function renderChecklist() {
     const container = document.getElementById('fohWorkflowContent');
     const checklist = fohSystemState.currentChecklist;
     const session = fohSystemState.currentSession;
+
+    // Check if checklist time window has expired
+    if (checklist.end_hour !== undefined && checklist.end_minute !== undefined) {
+      const now = new Date();
+      const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      const currentHour = pacificTime.getHours();
+      const currentMinute = pacificTime.getMinutes();
+
+      // Calculate current time in minutes since midnight
+      const currentTimeInMinutes = (currentHour * 60) + currentMinute;
+      const endTimeInMinutes = (checklist.end_hour * 60) + checklist.end_minute;
+
+      // Handle overnight time ranges (e.g., 22:00 to 02:00)
+      let timeExpired = false;
+      if (checklist.end_hour < checklist.start_hour) {
+        // Overnight range
+        timeExpired = currentTimeInMinutes >= endTimeInMinutes && currentTimeInMinutes < (checklist.start_hour * 60);
+      } else {
+        // Same-day range
+        timeExpired = currentTimeInMinutes >= endTimeInMinutes;
+      }
+
+      if (timeExpired) {
+        // Time window expired - auto-save and close
+        autoCloseExpiredChecklist();
+        return; // Stop rendering
+      }
+    }
 
     // Count required tasks
     const requiredTasksCount = fohSystemState.tasks.filter(t => t.is_required === true).length;
