@@ -3836,14 +3836,26 @@
         return;
       }
 
-      // Collect all sections data
+      // Collect all sections data from DOM (find ALL sections, not just original ones)
       const sections = [];
-      currentChecklist.sections.forEach((section, sectionIndex) => {
+      let sectionIndex = 0;
+
+      while (document.getElementById(`section_${sectionIndex}`)) {
         const sectionName = document.getElementById(`section_name_${sectionIndex}`)?.value.trim();
         const sectionDesc = document.getElementById(`section_desc_${sectionIndex}`)?.value.trim() || '';
         const sectionType = document.getElementById(`section_type_${sectionIndex}`)?.value;
 
-        if (!sectionName) return; // Skip unnamed sections
+        // Skip deleted sections (marked with data-deleted attribute)
+        const sectionDiv = document.getElementById(`section_${sectionIndex}`);
+        if (sectionDiv?.getAttribute('data-deleted') === 'true') {
+          sectionIndex++;
+          continue;
+        }
+
+        if (!sectionName) {
+          sectionIndex++;
+          continue; // Skip unnamed sections
+        }
 
         const sectionObj = {
           name: sectionName,
@@ -3891,7 +3903,8 @@
         }
 
         sections.push(sectionObj);
-      });
+        sectionIndex++;
+      }
 
       // Validate at least one section
       if (sections.length === 0) {
@@ -3932,14 +3945,371 @@
   }
 
   /**
-   * Placeholder functions for dynamic section/task management
+   * Add New Section - Dynamically add a section to the checklist
    */
   function addNewSection(checklistType) {
-    showMessage('Add Section feature coming soon!', 'info');
+    // Find the sections container
+    const sectionsContainer = document.getElementById('sections_container');
+    if (!sectionsContainer) {
+      console.error('Sections container not found');
+      return;
+    }
+
+    // Find the next section index (count existing sections)
+    let sectionIndex = 0;
+    while (document.getElementById(`section_${sectionIndex}`)) {
+      sectionIndex++;
+    }
+
+    // Create new section element
+    const sectionDiv = document.createElement('div');
+    sectionDiv.id = `section_${sectionIndex}`;
+    sectionDiv.style.cssText = 'margin-bottom: 24px; padding: 16px; background: var(--gray-100); border-left: 3px solid var(--gray-700); border-radius: 0;';
+
+    sectionDiv.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+        <div style="flex: 1;">
+          <input
+            type="text"
+            id="section_name_${sectionIndex}"
+            value="New Section ${sectionIndex + 1}"
+            placeholder="Section Name"
+            style="
+              width: 100%;
+              padding: 10px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 14px;
+              font-weight: 700;
+              margin-bottom: 8px;
+              box-sizing: border-box;
+            "
+            onfocus="this.style.borderColor='var(--gray-700)'"
+            onblur="this.style.borderColor='var(--gray-300)'"
+          />
+          <input
+            type="text"
+            id="section_desc_${sectionIndex}"
+            value=""
+            placeholder="Section Description (optional)"
+            style="
+              width: 100%;
+              padding: 10px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 13px;
+              box-sizing: border-box;
+              margin-bottom: 8px;
+            "
+            onfocus="this.style.borderColor='var(--gray-700)'"
+            onblur="this.style.borderColor='var(--gray-300)'"
+          />
+          <select
+            id="section_type_${sectionIndex}"
+            style="
+              width: 100%;
+              padding: 10px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 13px;
+              box-sizing: border-box;
+            "
+            onchange="toggleSectionType(${sectionIndex})"
+          >
+            <option value="checkbox" selected>Checkbox Tasks</option>
+            <option value="rating">Rating Categories</option>
+          </select>
+        </div>
+        <button
+          onclick="deleteSection(${sectionIndex})"
+          style="
+            margin-left: 12px;
+            padding: 8px 12px;
+            background: #dc2626;
+            color: white;
+            border: 2px solid #dc2626;
+            border-radius: 0;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+          onmouseover="this.style.background='#b91c1c'"
+          onmouseout="this.style.background='#dc2626'"
+        >🗑️ DELETE</button>
+      </div>
+
+      <div id="section_items_${sectionIndex}">
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; margin-bottom: 8px; font-size: 10px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">
+            ✅ TASKS
+          </label>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+            <input
+              type="text"
+              id="task_text_${sectionIndex}_0"
+              value=""
+              placeholder="Task description"
+              style="
+                flex: 1;
+                padding: 10px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 13px;
+                box-sizing: border-box;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            />
+            <label style="
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              padding: 8px 12px;
+              background: var(--gray-100);
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 11px;
+              font-weight: 600;
+              white-space: nowrap;
+              cursor: pointer;
+            ">
+              <input
+                type="checkbox"
+                id="task_required_${sectionIndex}_0"
+                style="cursor: pointer;"
+              />
+              REQUIRED
+            </label>
+            <button
+              onclick="deleteTask(${sectionIndex}, 0)"
+              style="
+                padding: 10px 12px;
+                background: #dc2626;
+                color: white;
+                border: 2px solid #dc2626;
+                border-radius: 0;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#b91c1c'"
+              onmouseout="this.style.background='#dc2626'"
+            >✕</button>
+          </div>
+        </div>
+      </div>
+
+      <button
+        onclick="addTask(${sectionIndex})"
+        style="
+          margin-top: 8px;
+          padding: 10px 16px;
+          background: var(--gray-100);
+          color: var(--gray-700);
+          border: 2px solid var(--gray-300);
+          border-radius: 0;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        "
+        onmouseover="this.style.borderColor='var(--gray-700)'"
+        onmouseout="this.style.borderColor='var(--gray-300)'"
+      >➕ ADD TASK</button>
+    `;
+
+    // Append to sections container
+    sectionsContainer.appendChild(sectionDiv);
+
+    // Focus on section name input
+    const nameInput = document.getElementById(`section_name_${sectionIndex}`);
+    if (nameInput) {
+      nameInput.select(); // Select the default text so user can type over it
+    }
+
+    showMessage('✓ New section added! Fill in details and click SAVE CHANGES.', 'success');
   }
 
+  /**
+   * Delete Section - Mark section for deletion
+   */
   function deleteSection(index) {
-    showMessage('Delete Section feature coming soon!', 'info');
+    const sectionDiv = document.getElementById(`section_${index}`);
+    if (!sectionDiv) return;
+
+    // Mark as deleted (will be skipped during save)
+    sectionDiv.setAttribute('data-deleted', 'true');
+
+    // Visual feedback
+    sectionDiv.style.opacity = '0.4';
+    sectionDiv.style.background = '#fee2e2'; // Red tint
+    sectionDiv.style.borderLeft = '3px solid #dc2626';
+
+    // Disable all inputs
+    const inputs = sectionDiv.querySelectorAll('input, select, button');
+    inputs.forEach(input => {
+      if (input.getAttribute('onclick') !== `deleteSection(${index})`) {
+        input.disabled = true;
+      }
+    });
+
+    showMessage('✓ Section marked for deletion. Click SAVE CHANGES to apply.', 'success');
+  }
+
+  /**
+   * Toggle Section Type - Switch between checkbox and rating type
+   */
+  function toggleSectionType(sectionIndex) {
+    const sectionType = document.getElementById(`section_type_${sectionIndex}`)?.value;
+    const itemsContainer = document.getElementById(`section_items_${sectionIndex}`);
+
+    if (!itemsContainer) return;
+
+    if (sectionType === 'checkbox') {
+      // Show checkbox tasks interface
+      itemsContainer.innerHTML = `
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; margin-bottom: 8px; font-size: 10px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">
+            ✅ TASKS
+          </label>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+            <input
+              type="text"
+              id="task_text_${sectionIndex}_0"
+              value=""
+              placeholder="Task description"
+              style="
+                flex: 1;
+                padding: 10px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 13px;
+                box-sizing: border-box;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            />
+            <label style="
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              padding: 8px 12px;
+              background: var(--gray-100);
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 11px;
+              font-weight: 600;
+              white-space: nowrap;
+              cursor: pointer;
+            ">
+              <input
+                type="checkbox"
+                id="task_required_${sectionIndex}_0"
+                style="cursor: pointer;"
+              />
+              REQUIRED
+            </label>
+            <button
+              onclick="deleteTask(${sectionIndex}, 0)"
+              style="
+                padding: 10px 12px;
+                background: #dc2626;
+                color: white;
+                border: 2px solid #dc2626;
+                border-radius: 0;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#b91c1c'"
+              onmouseout="this.style.background='#dc2626'"
+            >✕</button>
+          </div>
+        </div>
+      `;
+
+      // Update Add button
+      const addButton = itemsContainer.nextElementSibling;
+      if (addButton && addButton.tagName === 'BUTTON') {
+        addButton.textContent = '➕ ADD TASK';
+        addButton.onclick = () => addTask(sectionIndex);
+      }
+
+    } else if (sectionType === 'rating') {
+      // Show rating categories interface
+      itemsContainer.innerHTML = `
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; margin-bottom: 8px; font-size: 10px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">
+            ⭐ Rating Categories
+          </label>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input
+              type="text"
+              id="cat_name_${sectionIndex}_0"
+              value=""
+              placeholder="Category Name"
+              style="
+                flex: 1;
+                padding: 10px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 13px;
+                box-sizing: border-box;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            />
+            <input
+              type="text"
+              id="cat_desc_${sectionIndex}_0"
+              value=""
+              placeholder="Description (optional)"
+              style="
+                flex: 1;
+                padding: 10px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 13px;
+                box-sizing: border-box;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            />
+            <button
+              onclick="deleteCategory(${sectionIndex}, 0)"
+              style="
+                padding: 10px 12px;
+                background: #dc2626;
+                color: white;
+                border: 2px solid #dc2626;
+                border-radius: 0;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#b91c1c'"
+              onmouseout="this.style.background='#dc2626'"
+            >✕</button>
+          </div>
+        </div>
+      `;
+
+      // Update Add button
+      const addButton = itemsContainer.nextElementSibling;
+      if (addButton && addButton.tagName === 'BUTTON') {
+        addButton.textContent = '➕ ADD CATEGORY';
+        addButton.onclick = () => addCategory(sectionIndex);
+      }
+    }
+
+    showMessage(`✓ Section type changed to ${sectionType}`, 'success');
   }
 
   function addCategory(sectionIndex) {
