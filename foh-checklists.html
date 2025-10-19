@@ -1431,8 +1431,40 @@
     tasks: [],
     ratings: [],
     staffName: '',
-    staffName2: ''
+    staffName2: '',
+    allChecklists: {} // Will be populated on page load
   };
+
+  /**
+   * Initialize FOH System - Load all checklists from database
+   */
+  async function initializeFOHSystem() {
+    try {
+      // Load all checklist types from database
+      const checklistTypes = Object.keys(FOH_CHECKLISTS);
+
+      for (const checklistType of checklistTypes) {
+        const checklist = await loadChecklistFromDatabase(checklistType);
+        if (checklist) {
+          fohSystemState.allChecklists[checklistType] = checklist;
+          console.log(`✓ Loaded checklist: ${checklistType}`);
+        }
+      }
+
+      console.log(`✅ FOH System initialized. ${Object.keys(fohSystemState.allChecklists).length} checklists loaded.`);
+
+    } catch (error) {
+      console.error('Error initializing FOH system:', error);
+      // Fallback to static data if database fails
+      Object.keys(FOH_CHECKLISTS).forEach(type => {
+        fohSystemState.allChecklists[type] = FOH_CHECKLISTS[type];
+      });
+      console.log('⚠️ Using fallback static checklist data');
+    }
+  }
+
+  // Initialize system on page load
+  initializeFOHSystem();
 
   /**
    * Open FOH Tab - Using EXACT pattern from working openOrderTab
@@ -1459,6 +1491,51 @@
     }
 
     console.log('✅ Tab switched to:', tabName);
+  }
+
+  /**
+   * Get Available Checklists - Filter by current Pacific time
+   */
+  function getAvailableChecklists() {
+    const now = new Date();
+    const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    const currentHour = pacificTime.getHours();
+    const currentMinute = pacificTime.getMinutes();
+
+    // Convert current time to minutes since midnight for easier comparison
+    const currentTimeMinutes = (currentHour * 60) + currentMinute;
+
+    // Get all checklist types
+    const allChecklistTypes = Object.keys(FOH_CHECKLISTS);
+    const availableChecklists = [];
+
+    allChecklistTypes.forEach(checklistType => {
+      const checklist = fohSystemState.allChecklists?.[checklistType];
+
+      if (!checklist) {
+        console.log(`⚠️ Checklist not loaded: ${checklistType}`);
+        return;
+      }
+
+      // If checklist has time range defined, check if current time is within range
+      if (checklist.start_hour !== undefined && checklist.end_hour !== undefined) {
+        const startTimeMinutes = (checklist.start_hour * 60) + (checklist.start_minute || 0);
+        const endTimeMinutes = (checklist.end_hour * 60) + (checklist.end_minute || 0);
+
+        // Check if current time is within range
+        if (currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes) {
+          availableChecklists.push(checklist);
+        }
+      } else {
+        // If no time range defined, always show (fallback for checklists without time data)
+        availableChecklists.push(checklist);
+      }
+    });
+
+    console.log(`⏰ Time check: ${currentHour}:${currentMinute} (${currentTimeMinutes} minutes)`);
+    console.log(`✅ Available checklists: ${availableChecklists.length}/${allChecklistTypes.length}`);
+
+    return availableChecklists;
   }
 
   /**
