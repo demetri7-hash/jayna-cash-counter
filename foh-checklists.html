@@ -2804,6 +2804,12 @@
    * Complete Checklist Session
    */
   async function completeChecklistSession() {
+    // Safety checks
+    if (!fohSystemState.currentSession || !fohSystemState.currentSession.id) {
+      showMessage('Error: No active session found', 'error');
+      return;
+    }
+
     const completed = fohSystemState.tasks.filter(t => t.is_completed).length;
     const total = fohSystemState.tasks.length;
     const percentComplete = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -2845,44 +2851,11 @@
 
       hideLoading();
 
-      // Show success message
-      const container = document.getElementById('fohWorkflowContent');
-      container.innerHTML = `
-        <div style="text-align: center; padding: 60px 20px;">
-          <div style="font-size: 72px; margin-bottom: 24px;">✅</div>
-          <h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
-            Checklist Complete!
-          </h2>
-          <p style="margin: 0 0 32px 0; font-size: 16px; color: var(--gray-600);">
-            ${fohSystemState.currentChecklist.title} completed by ${fohSystemState.staffName}${fohSystemState.staffName2 ? ` & ${fohSystemState.staffName2}` : ''}
-          </p>
-          <div style="display: inline-block; padding: 12px 24px; background: var(--success-bg); border-radius: 0; margin-bottom: 32px;">
-            <div style="font-size: 14px; color: var(--success-text); font-weight: 700;">
-              ${completed} / ${total} Tasks Completed (${percentComplete}%)
-            </div>
-          </div>
-          <div>
-            <button
-              onclick="renderWorkflowSelector()"
-              style="
-                padding: 14px 32px;
-                background: var(--gray-900);
-                color: white;
-                border: 2px solid var(--gray-900);
-                border-radius: 0;
-                font-size: 13px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                cursor: pointer;
-                transition: all 0.15s ease;
-              "
-              onmouseover="this.style.background='#000'"
-              onmouseout="this.style.background='var(--gray-900)'"
-            >START NEW CHECKLIST</button>
-          </div>
-        </div>
-      `;
+      // Show success message but KEEP checklist open for editing
+      showSuccess(`✅ Checklist saved successfully!\n\n${completed} / ${total} tasks completed (${percentComplete}%)\n\nChecklist remains open for continued editing by you or other staff.`);
+
+      // Re-render checklist to show updated state (keeps it open)
+      renderChecklist();
 
     } catch (error) {
       hideLoading();
