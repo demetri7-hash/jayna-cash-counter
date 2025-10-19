@@ -1,0 +1,99 @@
+{
+  "domains": {
+    "restaurant_management": {
+      "concepts_learned": [
+        "AM/PM cash counting workflows",
+        "Dual drawer systems",
+        "Whole-dollar deposit rounding",
+        "Tip pool equity distribution",
+        "FOH checklist management",
+        "Toast POS integration patterns"
+      ],
+      "tools_used": ["Toast POS API", "Supabase", "EmailJS", "Homebase API"],
+      "patterns_identified": [
+        "Smart time-based routing (7AM-7PM = AM, 7PM-2AM = PM)",
+        "Session-based password protection (30-min cash, 60-min manager)",
+        "Pacific timezone handling for all time calculations",
+        "Database-driven dynamic loading (no hardcoded filters)",
+        "Safe DOM manipulation with unique IDs",
+        "Pure createElement() pattern instead of innerHTML"
+      ],
+      "resources": [
+        "CLAUDE.md - Project guidelines",
+        "CURRENT_STATUS.md - Current work state",
+        "PROJECT_MASTER_LOG.md - Session history",
+        "AI_PROJECT_INSTRUCTIONS.md - Complete project context"
+      ],
+      "notes": [
+        "User prefers autonomous execution without asking",
+        "Always use existing patterns before creating new ones",
+        "Never remove code to fix errors - fix the root cause",
+        "No popup windows (alert/confirm/prompt) - use inline feedback",
+        "Document all changes in CURRENT_STATUS.md at session end"
+      ]
+    },
+    "toast_pos_api": {
+      "concepts_learned": [
+        "Void detection at 4 levels (order, check, selection, payment)",
+        "Net sales calculation using check.amount",
+        "Full pagination required (100 orders per page)",
+        "Partial refunds vs full voids",
+        "Gratuity vs non-gratuity service charges"
+      ],
+      "tools_used": ["Toast Orders API v2", "Toast Payments API"],
+      "patterns_identified": [
+        "Always check both order.voided AND check.voided",
+        "Use check.amount for net sales (not sum of payments)",
+        "Paginate with while loop until orders.length < 100",
+        "Rate limit: 300ms delay between requests"
+      ],
+      "resources": ["toast-orders-testing.html", "comprehensive-analysis.html"],
+      "notes": [
+        "TDS Driver GUID: 5ffaae6f-4238-477d-979b-3da88d45b8e2",
+        "Restaurant GUID: d3efae34-7c2e-4107-a442-49081e624706 (env var)"
+      ]
+    },
+    "supabase_database": {
+      "concepts_learned": [
+        "JSONB storage for denomination counts",
+        "RLS policies for storage buckets",
+        "Single record per date pattern (cash_counts)",
+        "Session-based data (foh_checklist_sessions)",
+        "Photo storage with public bucket"
+      ],
+      "tools_used": ["Supabase JS Client", "PostgreSQL"],
+      "patterns_identified": [
+        "Use .single() for unique date records",
+        "Handle PGRST116 error (no rows) gracefully",
+        "Store complex data as JSONB (drawer counts, checklist tasks)",
+        "Use storage.objects for file uploads"
+      ],
+      "resources": ["sql/storage_policies.sql"],
+      "notes": [
+        "cash_counts table: single record per date with am_* and pm_* columns",
+        "foh_checklist_sessions: tracks checklist completion",
+        "Storage bucket: foh-checklist-photos (public, 5MB limit)"
+      ]
+    },
+    "vercel_deployment": {
+      "concepts_learned": [
+        "Auto-deploy from main branch",
+        "Serverless functions in /api folder",
+        "Environment variables via dashboard",
+        "1-2 minute deploy time"
+      ],
+      "tools_used": ["Vercel CLI", "Git"],
+      "patterns_identified": [
+        "Commit → push → auto-deploy",
+        "Test locally with python3 -m http.server 8000",
+        "Always verify after deploy at production URL"
+      ],
+      "resources": [],
+      "notes": [
+        "Production URL: https://jayna-cash-counter-git-main-demetri-gregorakis-projects.vercel.app",
+        "NEVER commit .env files",
+        "Create ARCHIVE backup before major changes"
+      ]
+    }
+  }
+}

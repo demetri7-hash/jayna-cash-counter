@@ -1,7 +1,185 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Claude External Memory System
 
+## Core Instructions
+You have access to a local file system for persistent memory storage. Maintain an external "brain" using structured JSON files to remember context across conversations.
+
+## Memory Architecture
+
+### Directory Structure
+```
+/memory/
+├── index.json              # Master index of all memory files
+├── context/
+│   ├── user_profile.json   # User preferences, background, goals
+│   ├── ongoing_projects.json
+│   └── conversation_history.json
+├── knowledge/
+│   ├── domain_expertise.json  # Technical knowledge by domain
+│   └── learned_facts.json     # New information learned
+├── tasks/
+│   ├── active_tasks.json
+│   ├── completed_tasks.json
+│   └── future_tasks.json
+└── preferences/
+    ├── communication_style.json
+    └── tool_usage_patterns.json
+```
+
+## Memory Operations Protocol
+
+### 1. Session Start (ALWAYS DO THIS FIRST)
+- Read `/memory/index.json` to understand available memory
+- Read `/memory/context/user_profile.json` for user context
+- Read `/memory/tasks/active_tasks.json` for pending work
+- Quickly scan `/memory/context/conversation_history.json` for recent context
+
+### 2. During Conversation
+- **Capture Important Information**: Names, preferences, project details, technical decisions
+- **Track Tasks**: Any commitments, to-dos, or follow-ups
+- **Learn Patterns**: User's communication style, preferred approaches
+- **Document Solutions**: Successfully solved problems for future reference
+
+### 3. Session End or Major Updates
+- Update relevant JSON files with new information
+- Add entry to conversation_history.json with key takeaways
+- Update task statuses
+- Refresh index.json if structure changed
+
+## JSON File Schemas
+
+### index.json
+```json
+{
+  "last_updated": "ISO_8601_timestamp",
+  "memory_version": "1.0",
+  "files": {
+    "user_profile": {"path": "context/user_profile.json", "priority": "high"},
+    "active_tasks": {"path": "tasks/active_tasks.json", "priority": "high"},
+    "conversation_history": {"path": "context/conversation_history.json", "priority": "medium"}
+  },
+  "stats": {
+    "total_conversations": 0,
+    "total_tasks_completed": 0
+  }
+}
+```
+
+### context/user_profile.json
+```json
+{
+  "name": "",
+  "role": "",
+  "expertise_areas": [],
+  "current_focus": "",
+  "working_style": "",
+  "communication_preferences": {
+    "detail_level": "balanced",
+    "format_preference": "",
+    "avoid": []
+  },
+  "active_projects": [],
+  "goals": {
+    "short_term": [],
+    "long_term": []
+  },
+  "context_notes": []
+}
+```
+
+### tasks/active_tasks.json
+```json
+{
+  "tasks": [
+    {
+      "id": "unique_id",
+      "title": "",
+      "description": "",
+      "status": "not_started|in_progress|blocked|completed",
+      "priority": "low|medium|high|urgent",
+      "created": "ISO_8601_timestamp",
+      "due_date": "",
+      "related_files": [],
+      "dependencies": [],
+      "notes": []
+    }
+  ]
+}
+```
+
+### context/conversation_history.json
+```json
+{
+  "conversations": [
+    {
+      "date": "ISO_8601_timestamp",
+      "summary": "",
+      "key_decisions": [],
+      "action_items": [],
+      "topics": [],
+      "important_details": []
+    }
+  ],
+  "max_entries": 50
+}
+```
+
+### knowledge/domain_expertise.json
+```json
+{
+  "domains": {
+    "domain_name": {
+      "concepts_learned": [],
+      "tools_used": [],
+      "patterns_identified": [],
+      "resources": [],
+      "notes": []
+    }
+  }
+}
+```
+
+## Behavioral Rules
+
+1. **Always Initialize**: Check for memory files at conversation start
+2. **Create if Missing**: If memory directory doesn't exist, create it with base structure
+3. **Incremental Updates**: Update files as information comes in, don't wait
+4. **Relevance Filter**: Only store information that's likely to be useful in future conversations
+5. **Avoid Redundancy**: Check existing memory before adding duplicate information
+6. **Timestamp Everything**: Use ISO 8601 format for all timestamps
+7. **Compression**: Keep conversation_history.json to last 50 entries max (oldest get archived)
+8. **Smart Loading**: Only load files relevant to current conversation context
+
+## Optimization Guidelines
+
+- **Read**: Load only what's needed (index → profile → task-specific files)
+- **Write**: Batch updates when possible, write after significant new information
+- **Size Management**: Keep individual JSON files under 100KB for performance
+- **Archive Old Data**: Move completed tasks/old conversations to archive files monthly
+- **Index Efficiency**: Keep index.json lightweight as it's loaded every session
+
+## Example Workflow
+
+**User**: "I'm working on a React project with authentication"
+
+**Claude Actions**:
+1. Check `/memory/context/ongoing_projects.json` for existing React projects
+2. Create/update project entry with authentication requirement
+3. Reference any previous React + auth solutions from `/memory/knowledge/domain_expertise.json`
+4. Add task to implement authentication in `/memory/tasks/active_tasks.json`
+
+## Error Handling
+
+- If a memory file is corrupted, log error but continue
+- Create backup before major structural changes
+- Validate JSON before writing
+- Gracefully handle missing files by creating defaults
+
+---
+
+**REMEMBER**: This memory system makes you more helpful by maintaining context. Use it proactively, not just when asked. The goal is seamless continuity across all our interactions.
 ---
 
 ## 🔴 CRITICAL RULE #0: USE EXISTING PATTERNS FIRST

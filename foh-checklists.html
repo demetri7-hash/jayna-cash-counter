@@ -594,6 +594,7 @@
         staffCount: definition.staff_count,
         hasRatings: definition.has_ratings,
         hasNotes: definition.has_notes,
+        hasPhotos: definition.has_photos !== false, // Default true
         ratingScale: definition.rating_scale,
         start_hour: definition.start_hour,
         start_minute: definition.start_minute,
@@ -674,6 +675,7 @@
           staff_count: checklistData.staffCount,
           has_ratings: checklistData.hasRatings,
           has_notes: checklistData.hasNotes,
+          has_photos: checklistData.hasPhotos !== false, // Default true
           rating_scale: checklistData.ratingScale || null,
           start_hour: checklistData.start_hour,
           start_minute: checklistData.start_minute,
@@ -2274,7 +2276,8 @@
             onblur="this.style.borderColor='var(--gray-300)'; autoSaveNotes();"
           ></textarea>
 
-          <!-- Photo Upload Section -->
+          <!-- Photo Upload Section (conditional) -->
+          ${checklist.hasPhotos !== false ? `
           <div style="margin-top: 16px;">
             <h5 style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
               📸 ATTACH PHOTOS (Max 5)
@@ -2306,6 +2309,7 @@
             />
             <div id="sessionPhotosDisplay" style="margin-top: 12px;"></div>
           </div>
+          ` : ''}
         </div>
       `;
     }
@@ -2472,7 +2476,8 @@
               </div>
             ` : ''}
 
-            <!-- Photo Upload Section -->
+            <!-- Photo Upload Section (conditional) -->
+            ${checklist.hasPhotos !== false ? `
             <div id="taskPhotos_${taskRecord.id}" style="margin-top: 8px;">
               <button
                 onclick="event.stopPropagation(); document.getElementById('photoInput_${taskRecord.id}').click();"
@@ -2500,6 +2505,7 @@
               />
               <div id="photoDisplay_${taskRecord.id}" style="margin-top: 8px;"></div>
             </div>
+            ` : ''}
           </div>
         </div>
       `;
@@ -3626,15 +3632,16 @@
             </div>
           </div>
 
-          <div style="display: flex; gap: 24px; margin-bottom: 20px;">
+          <div style="display: flex; gap: 24px; margin-bottom: 20px; flex-wrap: wrap;">
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
               <input
                 type="checkbox"
                 id="edit_hasRatings"
                 ${checklist.hasRatings ? 'checked' : ''}
                 style="width: 20px; height: 20px; cursor: pointer;"
+                onchange="autoSaveChecklist('${currentChecklistType}')"
               />
-              <span style="font-size: 13px; font-weight: 600; color: var(--gray-700);">Has Ratings</span>
+              <span style="font-size: 13px; font-weight: 600; color: var(--gray-700);">☑️ Has Ratings</span>
             </label>
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
               <input
@@ -3642,8 +3649,19 @@
                 id="edit_hasNotes"
                 ${checklist.hasNotes ? 'checked' : ''}
                 style="width: 20px; height: 20px; cursor: pointer;"
+                onchange="autoSaveChecklist('${currentChecklistType}')"
               />
-              <span style="font-size: 13px; font-weight: 600; color: var(--gray-700);">Has Notes Section</span>
+              <span style="font-size: 13px; font-weight: 600; color: var(--gray-700);">📝 Has Notes Section</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                id="edit_hasPhotos"
+                ${checklist.hasPhotos !== false ? 'checked' : ''}
+                style="width: 20px; height: 20px; cursor: pointer;"
+                onchange="autoSaveChecklist('${currentChecklistType}')"
+              />
+              <span style="font-size: 13px; font-weight: 600; color: var(--gray-700);">📸 Has Photo Upload</span>
             </label>
           </div>
 
@@ -4078,6 +4096,7 @@
       const staffCount = parseInt(document.getElementById('edit_staffCount')?.value) || 1;
       const hasRatings = document.getElementById('edit_hasRatings')?.checked || false;
       const hasNotes = document.getElementById('edit_hasNotes')?.checked || false;
+      const hasPhotos = document.getElementById('edit_hasPhotos')?.checked !== false; // Default true
       const ratingScale = document.getElementById('edit_ratingScale')?.value.trim() || null;
 
       // Collect time range values (actual availability logic)
@@ -4225,6 +4244,7 @@
         staffCount,
         hasRatings,
         hasNotes,
+        hasPhotos,
         ratingScale,
         start_hour: startHour,
         start_minute: startMinute,
