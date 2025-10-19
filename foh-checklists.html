@@ -1621,22 +1621,37 @@
   };
 
   /**
-   * Initialize FOH System - Load all checklists from database
+   * Initialize FOH System - Load ALL checklists from database (including custom ones)
    */
   async function initializeFOHSystem() {
     try {
-      // Load all checklist types from database
-      const checklistTypes = Object.keys(FOH_CHECKLISTS);
+      console.log('🔄 Loading ALL checklists from database...');
 
-      for (const checklistType of checklistTypes) {
-        const checklist = await loadChecklistFromDatabase(checklistType);
+      // Load ALL checklists from database (not just hardcoded ones!)
+      const { data: allChecklists, error } = await supabase
+        .from('checklist_definitions')
+        .select('type, title, time_range, start_hour, start_minute, end_hour, end_minute');
+
+      if (error) throw error;
+
+      if (!allChecklists || allChecklists.length === 0) {
+        console.warn('⚠️ No checklists found in database, using static fallback');
+        Object.keys(FOH_CHECKLISTS).forEach(type => {
+          fohSystemState.allChecklists[type] = FOH_CHECKLISTS[type];
+        });
+        return;
+      }
+
+      // Load each checklist's full data from database
+      for (const checklistDef of allChecklists) {
+        const checklist = await loadChecklistFromDatabase(checklistDef.type);
         if (checklist) {
-          fohSystemState.allChecklists[checklistType] = checklist;
-          console.log(`✓ Loaded checklist: ${checklistType}`);
+          fohSystemState.allChecklists[checklistDef.type] = checklist;
+          console.log(`✓ Loaded checklist: ${checklistDef.type} (${checklistDef.title})`);
         }
       }
 
-      console.log(`✅ FOH System initialized. ${Object.keys(fohSystemState.allChecklists).length} checklists loaded.`);
+      console.log(`✅ FOH System initialized. ${Object.keys(fohSystemState.allChecklists).length} checklists loaded from database.`);
 
     } catch (error) {
       console.error('Error initializing FOH system:', error);
@@ -1690,8 +1705,8 @@
     // Convert current time to minutes since midnight for easier comparison
     const currentTimeMinutes = (currentHour * 60) + currentMinute;
 
-    // Get all checklist types
-    const allChecklistTypes = Object.keys(FOH_CHECKLISTS);
+    // Get all checklist types from loaded checklists (including custom ones!)
+    const allChecklistTypes = Object.keys(fohSystemState.allChecklists || {});
     const availableChecklists = [];
 
     console.log(`⏰ Time check: ${currentHour}:${String(currentMinute).padStart(2, '0')} (${currentTimeMinutes} minutes since midnight)`);
