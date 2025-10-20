@@ -7770,11 +7770,21 @@
 
       // Fetch labor and sales data from API
       document.getElementById('loadingTitle').textContent = 'Fetching labor and payment data...';
-      document.getElementById('loadingMessage').textContent = 'Processing hundreds of payments - this takes 1-2 minutes';
+      document.getElementById('loadingMessage').textContent = 'Processing hundreds of payments - this may take 2-3 minutes. Please be patient!';
+
+      // Create fetch with 5-minute timeout (Toast API is slow with rate limiting)
+      const fetchWithTimeout = (url, timeout = 300000) => { // 5 minutes
+        return Promise.race([
+          fetch(url),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Request timeout - Toast API took too long')), timeout)
+          )
+        ]);
+      };
 
       const [laborResponse, salesResponse] = await Promise.all([
-        fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`),
-        fetch(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`)
+        fetchWithTimeout(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`),
+        fetchWithTimeout(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`)
       ]);
 
       if (!laborResponse.ok || !salesResponse.ok) throw new Error('Failed to fetch data');
