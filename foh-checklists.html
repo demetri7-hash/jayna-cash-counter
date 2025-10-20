@@ -1848,13 +1848,24 @@
       // Load staff name from session
       fohSystemState.staffName = session.staff_name;
 
-      // Load tasks from session
-      if (session.tasks && Array.isArray(session.tasks)) {
-        fohSystemState.tasks = session.tasks;
-      } else {
-        // No tasks saved - initialize empty
-        fohSystemState.tasks = [];
-      }
+      // Load tasks from foh_checklist_tasks table (NOT from session.tasks JSONB)
+      const { data: tasks, error: tasksError } = await supabase
+        .from('foh_checklist_tasks')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('task_order');
+
+      if (tasksError) throw tasksError;
+      fohSystemState.tasks = tasks || [];
+
+      // Load ratings from foh_checklist_ratings table
+      const { data: ratings, error: ratingsError } = await supabase
+        .from('foh_checklist_ratings')
+        .select('*')
+        .eq('session_id', sessionId);
+
+      if (ratingsError) throw ratingsError;
+      fohSystemState.ratings = ratings || [];
 
       // Enable review mode (skips time window checks)
       fohSystemState.reviewMode = true;
