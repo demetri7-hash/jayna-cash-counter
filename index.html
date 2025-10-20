@@ -22414,14 +22414,28 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             confidence: item.matchConfidence
           });
 
+          const quantity = parseFloat(item.detectedQuantity) || 0;
+          const unitPrice = parseFloat(item.detectedPrice) || 0;
+          const totalPrice = quantity * unitPrice;
+
           const { error: itemError } = await supabase
             .from('invoice_items')
             .insert({
               invoice_id: invoiceId,
               inventory_item_id: item.matchedInventoryId,
+
+              // Required fields from invoice_items schema
+              item_description: item.detectedName,
+              quantity: quantity,
+              unit: 'case', // Default for PFG items
+              unit_price: unitPrice,
+              total_price: totalPrice,
+              matched: true,
+
+              // Learning/tracking fields
               detected_item_name: item.detectedName,
-              detected_quantity: item.detectedQuantity,
-              detected_price: item.detectedPrice || 0,
+              detected_quantity: quantity,
+              detected_price: unitPrice,
               match_confidence: item.matchConfidence,
               matched_at: new Date().toISOString(),
               checked_in: true,
