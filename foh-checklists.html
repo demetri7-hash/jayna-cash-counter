@@ -591,10 +591,17 @@
   /**
    * Load checklist from database with all sections, tasks, and categories
    */
+  /**
+   * Get checklist by type from already-loaded state
+   */
+  function getChecklistByType(checklistType) {
+    return fohSystemState.allChecklists?.[checklistType] || null;
+  }
+
   async function loadChecklistFromDatabase(checklistType) {
     try {
       // 1. Load checklist definition
-      const { data: definition, error: defError } = await supabase
+      const { data: definition, error: defError} = await supabase
         .from('checklist_definitions')
         .select('*')
         .eq('type', checklistType)
@@ -602,13 +609,12 @@
 
       if (defError) {
         console.error('Error loading checklist definition:', defError);
-        // Fallback to FOH_CHECKLISTS if not in database yet
-        return getChecklistByType(checklistType);
+        return null;
       }
 
       if (!definition) {
-        // Fallback to FOH_CHECKLISTS if not found
-        return getChecklistByType(checklistType);
+        console.warn(`Checklist definition "${checklistType}" not found in database`);
+        return null;
       }
 
       // 2. Load sections for this checklist
@@ -637,6 +643,12 @@
         end_minute: definition.end_minute,
         sections: []
       };
+
+      // VALIDATION: Check if we have enough sections (database might be incomplete)
+      if (!sections || sections.length < 2) {
+        console.warn(`⚠️ Database checklist definition for "${checklistType}" only has ${sections?.length || 0} sections. This seems incomplete. Falling back to hardcoded definition.`);
+        return getChecklistByType(checklistType);
+      }
 
       // 4. Load tasks/categories for each section
       for (const section of sections) {
@@ -680,7 +692,7 @@
         checklist.sections.push(sectionObj);
       }
 
-      console.log('✓ Loaded checklist from database:', checklistType);
+      console.log(`✓ Loaded checklist from database: "${checklistType}" with ${checklist.sections.length} sections`);
       return checklist;
 
     } catch (error) {
