@@ -2914,6 +2914,7 @@
     section.categories.forEach((category, catIndex) => {
       const existingRating = fohSystemState.ratings.find(r => r.category_name === category.name);
       const currentRating = existingRating ? existingRating.rating : 3;
+      const hasRating = !!existingRating;
 
       html += `
         <div style="margin-bottom: 20px; padding: 16px; background: var(--gray-100); border-radius: 0;">
@@ -2928,52 +2929,62 @@
             ` : ''}
           </div>
 
-          <div style="display: flex; align-items: center; gap: 16px;">
-            <div style="flex: 1;">
-              <input
-                type="range"
-                min="1"
-                max="5"
-                value="${currentRating}"
-                id="rating_${sectionIndex}_${catIndex}"
-                ${fohSystemState.reviewMode ? 'disabled' : ''}
-                style="width: 100%; height: 8px; ${!fohSystemState.reviewMode ? 'cursor: pointer;' : 'cursor: not-allowed; opacity: 0.6;'}"
-                ${!fohSystemState.reviewMode ? `oninput="updateRatingDisplay('${sectionIndex}_${catIndex}', this.value)"` : ''}
-                ${!fohSystemState.reviewMode ? `onchange="autoSaveRating('${category.name}', this.value)"` : ''}
-              />
+          ${!hasRating && (fohSystemState.reviewMode || fohSystemState.currentSession?.is_complete) ? `
+            <!-- No rating saved - show blank state -->
+            <div style="padding: 20px; text-align: center; background: white; border: 2px dashed var(--gray-300); border-radius: 0;">
+              <div style="font-size: 11px; color: var(--gray-500); font-style: italic; text-transform: uppercase; letter-spacing: 0.5px;">
+                ⚠️ Staff did not rate this item
+              </div>
             </div>
-            <div
-              id="ratingValue_${sectionIndex}_${catIndex}"
-              style="
-                min-width: 60px;
-                text-align: center;
-                font-size: 24px;
-                font-weight: 700;
-                color: ${getRatingColor(currentRating)};
-              "
-            >${currentRating}</div>
-          </div>
+          ` : `
+            <!-- Rating exists or active editing -->
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <div style="flex: 1;">
+                <input
+                  type="range"
+                  min="1"
+                  max="5"
+                  value="${currentRating}"
+                  id="rating_${sectionIndex}_${catIndex}"
+                  ${fohSystemState.reviewMode ? 'disabled' : ''}
+                  style="width: 100%; height: 8px; ${!fohSystemState.reviewMode ? 'cursor: pointer;' : 'cursor: not-allowed; opacity: 0.6;'}"
+                  ${!fohSystemState.reviewMode ? `oninput="updateRatingDisplay('${sectionIndex}_${catIndex}', this.value)"` : ''}
+                  ${!fohSystemState.reviewMode ? `onchange="autoSaveRating('${category.name}', this.value)"` : ''}
+                />
+              </div>
+              <div
+                id="ratingValue_${sectionIndex}_${catIndex}"
+                style="
+                  min-width: 60px;
+                  text-align: center;
+                  font-size: 24px;
+                  font-weight: 700;
+                  color: ${getRatingColor(currentRating)};
+                "
+              >${currentRating}</div>
+            </div>
 
-          <textarea
-            id="ratingNotes_${sectionIndex}_${catIndex}"
-            placeholder="Optional notes..."
-            ${fohSystemState.reviewMode ? 'readonly' : ''}
-            style="
-              width: 100%;
-              margin-top: 12px;
-              padding: 10px;
-              border: 2px solid var(--gray-300);
-              border-radius: 0;
-              font-size: 12px;
-              font-family: inherit;
-              box-sizing: border-box;
-              resize: vertical;
-              min-height: 60px;
-              ${fohSystemState.reviewMode ? 'background: var(--gray-100); cursor: not-allowed; opacity: 0.8;' : ''}
-            "
-            ${!fohSystemState.reviewMode ? `onfocus="this.style.borderColor='var(--gray-700)'"` : ''}
-            ${!fohSystemState.reviewMode ? `onblur="this.style.borderColor='var(--gray-300)'; autoSaveRatingNotes('${category.name}', this.value);"` : ''}
-          >${existingRating ? (existingRating.notes || '') : ''}</textarea>
+            <textarea
+              id="ratingNotes_${sectionIndex}_${catIndex}"
+              placeholder="Optional notes..."
+              ${fohSystemState.reviewMode ? 'readonly' : ''}
+              style="
+                width: 100%;
+                margin-top: 12px;
+                padding: 10px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 12px;
+                font-family: inherit;
+                box-sizing: border-box;
+                resize: vertical;
+                min-height: 60px;
+                ${fohSystemState.reviewMode ? 'background: var(--gray-100); cursor: not-allowed; opacity: 0.8;' : ''}
+              "
+              ${!fohSystemState.reviewMode ? `onfocus="this.style.borderColor='var(--gray-700)'"` : ''}
+              ${!fohSystemState.reviewMode ? `onblur="this.style.borderColor='var(--gray-300)'; autoSaveRatingNotes('${category.name}', this.value);"` : ''}
+            >${existingRating ? (existingRating.notes || '') : ''}</textarea>
+          `}
         </div>
       `;
     });
@@ -6216,43 +6227,82 @@
             </details>
       `;
 
-      // Ratings
-      if (sessionRatings.length > 0) {
-        html += `
-          <details style="margin-bottom: 16px;">
-            <summary style="cursor: pointer; font-size: 14px; font-weight: 700; color: var(--gray-900); padding: 8px; background: var(--gray-100); border-radius: 0;">
-              ⭐ Quality Ratings (${sessionRatings.length})
-            </summary>
-            <div style="margin-top: 12px; padding-left: 12px;">
-        `;
+      // Ratings - Show ALL categories from checklist definition
+      if (checklist && checklist.sections) {
+        const ratingSections = checklist.sections.filter(s => s.type === 'rating');
 
-        sessionRatings.forEach(rating => {
+        if (ratingSections.length > 0) {
+          // Collect all rating categories from definition
+          const allRatingCategories = [];
+          ratingSections.forEach(section => {
+            if (section.categories) {
+              section.categories.forEach(cat => {
+                allRatingCategories.push({
+                  sectionName: section.name,
+                  categoryName: cat.name,
+                  categoryDescription: cat.description
+                });
+              });
+            }
+          });
+
           html += `
-            <div style="margin-bottom: 12px; padding: 12px; background: var(--gray-100); border-left: 3px solid ${getRatingColor(rating.rating)}; border-radius: 0;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <span style="font-size: 13px; font-weight: 700; color: var(--gray-900);">
-                  ${rating.category_name}
-                </span>
-                <span style="font-size: 20px; font-weight: 700; color: ${getRatingColor(rating.rating)};">
-                  ${rating.rating} / 5
-                </span>
-              </div>
-              ${rating.notes ? `
-                <div style="font-size: 12px; color: var(--gray-600); margin-top: 8px; font-style: italic;">
-                  "${rating.notes}"
-                </div>
-              ` : ''}
-              <div style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">
-                Rated by ${rating.rated_by}
-              </div>
-            </div>
+            <details style="margin-bottom: 16px;">
+              <summary style="cursor: pointer; font-size: 14px; font-weight: 700; color: var(--gray-900); padding: 8px; background: var(--gray-100); border-radius: 0;">
+                ⭐ Quality Ratings (${sessionRatings.length} / ${allRatingCategories.length})
+              </summary>
+              <div style="margin-top: 12px; padding-left: 12px;">
           `;
-        });
 
-        html += `
-            </div>
-          </details>
-        `;
+          allRatingCategories.forEach(category => {
+            const rating = sessionRatings.find(r => r.category_name === category.categoryName);
+
+            if (rating) {
+              // Rating exists - show normally
+              html += `
+                <div style="margin-bottom: 12px; padding: 12px; background: var(--gray-100); border-left: 3px solid ${getRatingColor(rating.rating)}; border-radius: 0;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 13px; font-weight: 700; color: var(--gray-900);">
+                      ${rating.category_name}
+                    </span>
+                    <span style="font-size: 20px; font-weight: 700; color: ${getRatingColor(rating.rating)};">
+                      ${rating.rating} / 5
+                    </span>
+                  </div>
+                  ${rating.notes ? `
+                    <div style="font-size: 12px; color: var(--gray-600); margin-top: 8px; font-style: italic;">
+                      "${rating.notes}"
+                    </div>
+                  ` : ''}
+                  <div style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">
+                    Rated by ${rating.rated_by}
+                  </div>
+                </div>
+              `;
+            } else {
+              // Rating missing - show blank state
+              html += `
+                <div style="margin-bottom: 12px; padding: 12px; background: white; border: 2px dashed var(--gray-300); border-radius: 0;">
+                  <div style="margin-bottom: 8px;">
+                    <span style="font-size: 13px; font-weight: 700; color: var(--gray-700);">
+                      ${category.categoryName}
+                    </span>
+                  </div>
+                  <div style="padding: 12px; text-align: center; background: var(--gray-100); border-radius: 0;">
+                    <div style="font-size: 11px; color: var(--gray-500); font-style: italic; text-transform: uppercase; letter-spacing: 0.5px;">
+                      ⚠️ Staff did not rate this item
+                    </div>
+                  </div>
+                </div>
+              `;
+            }
+          });
+
+          html += `
+              </div>
+            </details>
+          `;
+        }
       }
 
       // Notes
