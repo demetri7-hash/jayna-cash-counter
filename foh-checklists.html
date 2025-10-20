@@ -466,6 +466,20 @@
               letter-spacing: 0.8px;
               transition: all 0.15s ease;
             ">CHECKLISTS</button>
+            <button class="tab-link" onclick="openFOHReview(event)" style="
+              flex: 0 0 auto;
+              padding: 12px 10px;
+              min-width: 80px;
+              background: var(--gray-100);
+              color: var(--gray-700);
+              border: none;
+              cursor: pointer;
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.8px;
+              transition: all 0.15s ease;
+            ">REVIEW</button>
             <button class="tab-link" onclick="openFOHManagerEdit(event)" style="
               flex: 0 0 auto;
               padding: 12px 10px;
@@ -501,6 +515,13 @@
         <div id="fohWorkflow" class="tab-content" style="display: block;">
           <div id="fohWorkflowContent">
             <p style="text-align: center; padding: 20px;">Loading...</p>
+          </div>
+        </div>
+
+        <!-- Tab Content: Review Completed Checklists -->
+        <div id="fohReview" class="tab-content" style="display: none;">
+          <div id="fohReviewContent">
+            <p style="text-align: center; padding: 20px;">Loading completed checklists...</p>
           </div>
         </div>
 
@@ -1830,6 +1851,22 @@
 
       hideLoading();
 
+      // Switch to CHECKLISTS tab before rendering
+      const checklistsTab = document.querySelector('[onclick*="fohWorkflow"]');
+      if (checklistsTab) {
+        // Update tab styles
+        document.querySelectorAll('#fohSystemForm .tab-link').forEach(link => {
+          link.style.background = 'var(--gray-100)';
+          link.style.color = 'var(--gray-700)';
+        });
+        checklistsTab.style.background = 'var(--gray-700)';
+        checklistsTab.style.color = 'white';
+
+        // Show workflow tab, hide others
+        document.querySelectorAll('#fohSystemForm .tab-content').forEach(content => content.style.display = 'none');
+        document.getElementById('fohWorkflow').style.display = 'block';
+      }
+
       // Render in read-only mode (function checks session.is_complete)
       renderChecklist();
 
@@ -1884,60 +1921,7 @@
       return;
     }
 
-    // Load completed checklists from today and yesterday
-    const completedSessions = await loadCompletedChecklistsForReview();
-
-    let html = '';
-
-    // Show completed checklists for review at the top (if any)
-    if (completedSessions && completedSessions.length > 0) {
-      html += `
-        <div style="margin-bottom: 20px; padding: 16px; background: var(--success-bg); border-left: 4px solid var(--success-border); border-radius: 0;">
-          <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: var(--success-text); text-transform: uppercase; letter-spacing: 1px;">
-            ✅ COMPLETED CHECKLISTS - REVIEW
-          </h3>
-          <p style="color: var(--success-text); font-size: 12px; margin: 0 0 12px 0;">
-            Review previous checklists for accountability and continuity. Click to view photos, notes, and ratings.
-          </p>
-          <div style="display: grid; gap: 8px;">
-      `;
-
-      completedSessions.forEach(session => {
-        const completedTime = new Date(session.completed_at).toLocaleString('en-US', {
-          timeZone: 'America/Los_Angeles',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        });
-        const sessionDate = session.session_date === getPacificDate() ? 'Today' : 'Yesterday';
-        const checklistName = session.checklist_name || session.checklist_type.replace(/_/g, ' ').toUpperCase();
-
-        html += `
-          <a onclick="viewCompletedChecklistSession(${session.id})" style="
-            display: block;
-            padding: 10px 12px;
-            background: white;
-            border: 1px solid var(--gray-300);
-            cursor: pointer;
-            text-decoration: none;
-            color: var(--gray-900);
-            font-size: 12px;
-            transition: all 0.15s ease;
-          "
-          onmouseover="this.style.background='var(--gray-100)'; this.style.borderColor='var(--gray-700)';"
-          onmouseout="this.style.background='white'; this.style.borderColor='var(--gray-300)';">
-            <strong>${checklistName}</strong> - ${sessionDate} at ${completedTime}
-          </a>
-        `;
-      });
-
-      html += `
-          </div>
-        </div>
-      `;
-    }
-
-    html += `
+    let html = `
       <div style="margin-bottom: 20px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
         <p style="color: var(--blue-text); font-size: 13px; font-weight: 600; margin: 0;">
           📋 Select a checklist to begin. Available checklists update based on time of day.
@@ -3463,6 +3447,100 @@
         handleCancel();
       }
     };
+  }
+
+  /**
+   * Open Review Tab - View completed checklists
+   */
+  async function openFOHReview(evt) {
+    openFOHTab(evt, 'fohReview');
+    await renderReviewTab();
+  }
+
+  /**
+   * Render Review Tab - Show completed checklists from today and yesterday
+   */
+  async function renderReviewTab() {
+    const container = document.getElementById('fohReviewContent');
+
+    showLoading('Loading...', 'Loading completed checklists...');
+
+    const completedSessions = await loadCompletedChecklistsForReview();
+
+    hideLoading();
+
+    if (!completedSessions || completedSessions.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          <p style="font-size: 16px; color: var(--gray-700); margin-bottom: 12px;">
+            📋 No completed checklists found
+          </p>
+          <p style="font-size: 13px; color: var(--gray-500);">
+            Completed checklists from today and yesterday will appear here for review.
+          </p>
+        </div>
+      `;
+      return;
+    }
+
+    let html = `
+      <div style="margin-bottom: 20px; padding: 16px; background: var(--success-bg); border-left: 4px solid var(--success-border); border-radius: 0;">
+        <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: var(--success-text); text-transform: uppercase; letter-spacing: 1px;">
+          ✅ COMPLETED CHECKLISTS
+        </h3>
+        <p style="color: var(--success-text); font-size: 12px; margin: 0;">
+          Review previous checklists for accountability and continuity. Click to view photos, notes, and ratings.
+        </p>
+      </div>
+
+      <div style="display: grid; gap: 12px;">
+    `;
+
+    completedSessions.forEach(session => {
+      const completedTime = new Date(session.completed_at).toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      const sessionDate = session.session_date === getPacificDate() ? 'Today' : 'Yesterday';
+      const checklistName = session.checklist_name || session.checklist_type.replace(/_/g, ' ').toUpperCase();
+
+      html += `
+        <div style="
+          background: white;
+          border: 2px solid var(--gray-300);
+          padding: 16px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        "
+        onclick="viewCompletedChecklistSession(${session.id})"
+        onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';"
+        onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">
+              ${checklistName}
+            </h4>
+            <span style="
+              background: var(--success-bg);
+              color: var(--success-text);
+              padding: 4px 10px;
+              font-size: 11px;
+              font-weight: 700;
+              border-radius: 0;
+            ">✓ COMPLETE</span>
+          </div>
+          <div style="font-size: 12px; color: var(--gray-600);">
+            <div>👤 ${session.staff_name || 'Unknown'}</div>
+            <div>📅 ${sessionDate} at ${completedTime}</div>
+          </div>
+        </div>
+      `;
+    });
+
+    html += '</div>';
+
+    container.innerHTML = html;
   }
 
   /**
