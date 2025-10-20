@@ -3822,8 +3822,28 @@
       if (error) throw error;
       if (!session) throw new Error('Session not found');
 
-      // Load checklist definition
-      const checklistDef = await loadChecklistFromDatabase(session.checklist_type);
+      // Load checklist definition from ALREADY-LOADED state (same as REVIEW tab)
+      const checklistDef = getChecklistByType(session.checklist_type);
+      if (!checklistDef) {
+        throw new Error(`Checklist type "${session.checklist_type}" not found`);
+      }
+
+      // Load tasks from database table (NOT session.tasks JSONB)
+      const { data: tasks, error: tasksError } = await supabase
+        .from('foh_checklist_tasks')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('task_order');
+
+      if (tasksError) throw tasksError;
+
+      // Load ratings from database table
+      const { data: ratings, error: ratingsError } = await supabase
+        .from('foh_checklist_ratings')
+        .select('*')
+        .eq('session_id', sessionId);
+
+      if (ratingsError) throw ratingsError;
 
       // Load photos
       const { data: photos } = await supabase
@@ -3858,53 +3878,99 @@
       doc.text(`Status: ${session.is_complete ? 'COMPLETE' : 'IN PROGRESS'}`, margin, y);
       y += 20;
 
-      // Tasks
-      if (session.tasks && session.tasks.length > 0) {
+      // Render each section from checklist definition
+      checklistDef.sections.forEach(section => {
+        if (y > doc.internal.pageSize.height - 100) {
+          doc.addPage();
+          y = margin;
+        }
+
+        // Section header
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.text('TASKS', margin, y);
+        doc.text(section.name.toUpperCase(), margin, y);
         y += 15;
 
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
+        if (section.type === 'checkbox') {
+          // Checkbox tasks section
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
 
-        session.tasks.forEach((task, idx) => {
-          if (y > doc.internal.pageSize.height - 60) {
-            doc.addPage();
-            y = margin;
-          }
+          section.tasks.forEach(taskDef => {
+            const taskText = typeof taskDef === 'string' ? taskDef : taskDef.text;
+            const taskRecord = tasks.find(t => t.section_name === section.name && t.task_text === taskText);
 
-          const checkbox = task.is_completed ? '☑' : '☐';
-          const taskText = `${checkbox} ${task.text}`;
+            if (y > doc.internal.pageSize.height - 60) {
+              doc.addPage();
+              y = margin;
+            }
 
-          doc.text(taskText, margin, y);
-          y += 12;
+            const isCompleted = taskRecord?.is_completed || false;
+            const checkbox = isCompleted ? '☑' : '☐';
+            const displayText = `${checkbox} ${taskText}`;
 
-          // Show notes if present
-          if (task.notes && task.notes.trim()) {
-            doc.setFont('helvetica', 'italic');
-            doc.setTextColor(100, 100, 100);
-            const noteLines = doc.splitTextToSize(`   Note: ${task.notes}`, pageWidth - margin * 2 - 20);
-            noteLines.forEach(line => {
-              doc.text(line, margin + 10, y);
-              y += 10;
-            });
-            doc.setTextColor(0, 0, 0);
-            doc.setFont('helvetica', 'normal');
-          }
-
-          // Show rating if present
-          if (task.rating) {
-            doc.text(`   Rating: ${'⭐'.repeat(task.rating)}`, margin + 10, y);
+            doc.text(displayText, margin, y);
             y += 12;
-          }
-        });
 
-        y += 10;
-      }
+            // Show who completed it
+            if (isCompleted && taskRecord?.completed_by) {
+              doc.setFont('helvetica', 'italic');
+              doc.setTextColor(80, 80, 80);
+              doc.text(`   ✓ ${taskRecord.completed_by}`, margin + 10, y);
+              y += 10;
+              doc.setTextColor(0, 0, 0);
+              doc.setFont('helvetica', 'normal');
+            }
+          });
+
+          y += 10;
+
+        } else if (section.type === 'rating') {
+          // Rating section
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+
+          section.categories.forEach(category => {
+            const ratingRecord = ratings.find(r => r.category_name === category.name);
+
+            if (y > doc.internal.pageSize.height - 60) {
+              doc.addPage();
+              y = margin;
+            }
+
+            if (ratingRecord) {
+              // Rating exists
+              const stars = '⭐'.repeat(ratingRecord.rating);
+              doc.text(`${category.name}: ${stars} (${ratingRecord.rating}/5)`, margin, y);
+              y += 12;
+
+              if (ratingRecord.notes && ratingRecord.notes.trim()) {
+                doc.setFont('helvetica', 'italic');
+                doc.setTextColor(100, 100, 100);
+                const noteLines = doc.splitTextToSize(`   "${ratingRecord.notes}"`, pageWidth - margin * 2 - 20);
+                noteLines.forEach(line => {
+                  doc.text(line, margin + 10, y);
+                  y += 10;
+                });
+                doc.setTextColor(0, 0, 0);
+                doc.setFont('helvetica', 'normal');
+              }
+            } else {
+              // No rating - show that staff skipped it
+              doc.setTextColor(150, 150, 150);
+              doc.text(`${category.name}: (not rated)`, margin, y);
+              y += 12;
+              doc.setTextColor(0, 0, 0);
+            }
+          });
+
+          y += 10;
+        }
+      });
 
       // Notes for next shift
-      if (session.notes_for_next_shift && session.notes_for_next_shift.trim()) {
+      const sessionNotes = session.notes_for_next_shift || session.notes || '';
+      if (sessionNotes.trim()) {
         if (y > doc.internal.pageSize.height - 100) {
           doc.addPage();
           y = margin;
@@ -3912,12 +3978,12 @@
 
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.text('NOTES FOR NEXT SHIFT', margin, y);
+        doc.text('NOTES FOR INCOMING CREW', margin, y);
         y += 15;
 
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
-        const noteLines = doc.splitTextToSize(session.notes_for_next_shift, pageWidth - margin * 2);
+        const noteLines = doc.splitTextToSize(sessionNotes, pageWidth - margin * 2);
         noteLines.forEach(line => {
           doc.text(line, margin, y);
           y += 10;
