@@ -7703,60 +7703,13 @@
 
     // Update status indicator
     const statusDiv = document.getElementById('autoFetchStatus');
-    statusDiv.innerHTML = '<span style="color: #666;">Checking for data...</span>';
+    statusDiv.innerHTML = '<span style="color: #666;">Fetching data from Toast API...</span>';
 
     try {
-      // STEP 1: Try database first (instant if data exists)
-      console.log('Checking database for sales data...');
-      document.getElementById('loadingTitle').textContent = 'Checking database...';
-      document.getElementById('loadingMessage').textContent = 'Looking for automatically imported Toast data';
-
-      const dbResponse = await fetch(`/api/get-daily-sales?startDate=${startDate}&endDate=${endDate}`);
-      const dbResult = await dbResponse.json();
-
-      if (dbResult.success && dbResult.hasData) {
-        // Found data in database! Use it.
-        console.log('Found data in database:', dbResult);
-        statusDiv.innerHTML = `<span style="color: #28a745;">Data loaded from database (${dbResult.daysFound} days, automated import)</span>`;
-
-        // Still need labor data from API
-        document.getElementById('loadingTitle').textContent = 'Fetching labor data from Toast...';
-        document.getElementById('loadingMessage').textContent = 'Getting employee hours...';
-
-        const authResponse = await fetch('/api/toast-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-        const authData = await authResponse.json();
-        const token = authData.data.accessToken;
-
-        const laborResponse = await fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`);
-        const laborResult = await laborResponse.json();
-
-        // Store data globally
-        apiFetchedData.laborData = laborResult.employees;
-        apiFetchedData.laborData.totalLaborCost = laborResult.totalLaborCost;
-        apiFetchedData.salesData = {
-          creditTips: dbResult.data.creditTips,
-          creditTipsGross: dbResult.data.creditTips,
-          voidedTips: 0,
-          discounts: 0,
-          tipsOnDiscountedChecks: 0,
-          cashSales: dbResult.data.cashSales,
-          netSales: dbResult.data.netSales
-        };
-
-        // Auto-fetch TDS Driver tips
-        await autoFetchTdsDriverTips(startDate, endDate);
-
-        console.log('Auto-fetch complete (database + API labor):', { laborResult, salesData: dbResult.data });
-        loadingOverlay.style.display = 'none';
-        return;
-      }
-
-      // STEP 2: No database data - fall back to Toast API
-      console.log('No database data found, fetching from Toast API...');
-      statusDiv.innerHTML = '<span style="color: #ffc107;">No database data - fetching from Toast API (slower)...</span>';
-
+      // Authenticate with Toast API
+      console.log('Fetching from Toast API...');
       document.getElementById('loadingTitle').textContent = 'Authenticating with Toast API...';
-      document.getElementById('loadingMessage').textContent = 'No automated data available for this date range';
+      document.getElementById('loadingMessage').textContent = 'Please wait...';
 
       const authResponse = await fetch('/api/toast-auth', {
         method: 'POST',
@@ -7772,19 +7725,9 @@
       document.getElementById('loadingTitle').textContent = 'Fetching labor and payment data...';
       document.getElementById('loadingMessage').textContent = 'Processing hundreds of payments - this may take 2-3 minutes. Please be patient!';
 
-      // Create fetch with 5-minute timeout (Toast API is slow with rate limiting)
-      const fetchWithTimeout = (url, timeout = 300000) => { // 5 minutes
-        return Promise.race([
-          fetch(url),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Request timeout - Toast API took too long')), timeout)
-          )
-        ]);
-      };
-
       const [laborResponse, salesResponse] = await Promise.all([
-        fetchWithTimeout(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`),
-        fetchWithTimeout(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`)
+        fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`),
+        fetch(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`)
       ]);
 
       if (!laborResponse.ok || !salesResponse.ok) throw new Error('Failed to fetch data');
@@ -7808,9 +7751,9 @@
       };
 
       // Show subtle success indicator
-      statusDiv.innerHTML = `<span style="color: #28a745;">Data loaded from API: ${laborResult.employeesCount} employees, $${salesResult.creditTips.toFixed(2)} credit tips</span>`;
+      statusDiv.innerHTML = `<span style="color: #28a745;">✓ Data loaded from Toast API: ${laborResult.employeesCount} employees, $${salesResult.creditTips.toFixed(2)} credit tips</span>`;
 
-      console.log('Auto-fetch complete (API fallback):', { laborResult, salesResult });
+      console.log('Auto-fetch complete:', { laborResult, salesResult });
 
       // Display enhanced sales summary
       console.log(`\n=== SALES SUMMARY ===`);
