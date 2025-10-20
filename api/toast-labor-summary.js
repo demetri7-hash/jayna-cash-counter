@@ -53,12 +53,21 @@ export default async function handler(req, res) {
     const employees = await employeesResponse.json();
     console.log(`Found ${employees.length} employees`);
 
+    // Validate employees response
+    if (!Array.isArray(employees)) {
+      console.error('employees is not an array:', typeof employees, employees);
+      return res.status(500).json({
+        error: 'Invalid response from Toast API',
+        details: 'Employees response is not an array'
+      });
+    }
+
     // Step 2: Fetch time entries for date range
     console.log('Fetching time entries...');
 
-    // Convert dates to ISO 8601 format with time
-    const startDateTime = `${startDate}T00:00:00.000-0000`;
-    const endDateTime = `${endDate}T23:59:59.999-0000`;
+    // Convert dates to ISO 8601 format with time (Pacific timezone -0800)
+    const startDateTime = `${startDate}T00:00:00.000-0800`;
+    const endDateTime = `${endDate}T23:59:59.999-0800`;
 
     const timeEntriesUrl = `${toastApiUrl}/labor/v1/timeEntries?startDate=${encodeURIComponent(startDateTime)}&endDate=${encodeURIComponent(endDateTime)}`;
 
@@ -82,6 +91,15 @@ export default async function handler(req, res) {
 
     const timeEntries = await timeEntriesResponse.json();
     console.log(`Found ${timeEntries.length} time entries`);
+
+    // Validate response structure
+    if (!Array.isArray(timeEntries)) {
+      console.error('timeEntries is not an array:', typeof timeEntries, timeEntries);
+      return res.status(500).json({
+        error: 'Invalid response from Toast API',
+        details: 'Time entries response is not an array'
+      });
+    }
 
     // Step 3: Aggregate labor by employee
     const laborMap = {};
@@ -192,9 +210,11 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Toast labor summary API error:', error);
+    console.error('Error stack:', error.stack);
     return res.status(500).json({
       error: 'Internal server error',
-      details: error.message
+      details: error.message,
+      stack: error.stack
     });
   }
 }
