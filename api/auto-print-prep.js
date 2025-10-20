@@ -52,8 +52,8 @@ export default async function handler(req, res) {
       .from('inventory_items')
       .select('*')
       .eq('is_prep', true)
-      .gte('last_counted_at', ninePmYesterday.toISOString())
-      .lte('last_counted_at', fourAmToday.toISOString());
+      .gte('last_counted_date', ninePmYesterday.toISOString())
+      .lte('last_counted_date', fourAmToday.toISOString());
 
     if (countError) {
       throw new Error(`Failed to check prep counts: ${countError.message}`);
