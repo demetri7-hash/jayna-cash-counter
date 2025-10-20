@@ -474,13 +474,42 @@ async function sendOrderEmail(order, orderDate) {
   // Generate HTML email
   const html = generateOrderEmailHTML(order, orderDate);
 
-  // Send email
+  // Check if this vendor gets PDF attachments and printer CC
+  const vendorsWithPDF = ['Mani Imports', 'Performance', 'Greenleaf'];
+  const includePDF = vendorsWithPDF.includes(order.vendor);
+  const PRINTER_EMAIL = 'GSS4168CTJJA73@print.epsonconnect.com';
+
+  // Base mail options
   const mailOptions = {
     from: `Jayna Gyro Orders <${GMAIL_USER}>`,
     to: ORDER_EMAIL,
     subject: `Daily Order - ${order.vendor}`,
     html: html
   };
+
+  // Add CC to printer for specific vendors
+  if (includePDF) {
+    mailOptions.cc = PRINTER_EMAIL;
+  }
+
+  // Generate and attach PDF for specific vendors
+  if (includePDF) {
+    try {
+      const pdfBase64 = await generateOrderingGuidePDF(order.vendor, order.items);
+      const filename = `${order.vendor.replace(/\s+/g, '_')}_Ordering_Guide_${orderDate.toISOString().split('T')[0]}.pdf`;
+
+      mailOptions.attachments = [{
+        filename: filename,
+        content: Buffer.from(pdfBase64, 'base64'),
+        contentType: 'application/pdf'
+      }];
+
+      console.log(`📎 PDF attachment added for ${order.vendor}`);
+    } catch (pdfError) {
+      console.warn(`⚠️ Failed to generate PDF for ${order.vendor}:`, pdfError.message);
+      // Continue sending email without PDF
+    }
+  }
 
   console.log('📧 Sending email via Gmail for', order.vendor);
 
@@ -734,4 +763,152 @@ async function logOrderToDatabase(order, orderDate, status, errorMessage = null)
       console.error('⚠️ Failed to log item order history:', historyError);
     }
   }
+}
+
+/**
+ * Generate ordering guide PDF (2 pages: blank guide + inventory reference)
+ */
+async function generateOrderingGuidePDF(vendorName, orderItems) {
+  const { jsPDF } = await import('jspdf');
+  await import('jspdf-autotable');
+  
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+  
+  const today = new Date().toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  // PAGE 1: Blank ordering guide with 35 rows
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${vendorName} Ordering Guide`, 40, 40);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Date: ${today}`, 40, 60);
+  doc.text('Jayna Gyro - Internal Use Only', 40, 75);
+
+  const tableData = [];
+  for (let i = 0; i < 35; i++) {
+    tableData.push(['', '', '', '']); // Empty rows for manual filling
+  }
+
+  doc.autoTable({
+    head: [['QTY NEEDED', 'QTY ON HAND', 'ITEM NAME', 'ITEM #']],
+    body: tableData,
+    startY: 95,
+    theme: 'grid',
+    styles: {
+      fontSize: 10,
+      cellPadding: 8,
+      lineColor: [200, 200, 200],
+      lineWidth: 0.5
+    },
+    headStyles: {
+      fillColor: [74, 74, 74],
+      textColor: 255,
+      fontStyle: 'bold',
+      halign: 'center'
+    },
+    columnStyles: {
+      0: { cellWidth: 80, halign: 'center' },  // QTY NEEDED
+      1: { cellWidth: 80, halign: 'center' },  // QTY ON HAND
+      2: { cellWidth: 280 },                   // ITEM NAME
+      3: { cellWidth: 80, halign: 'center' }   // ITEM #
+    },
+    margin: { left: 40, right: 40 }
+  });
+
+  // PAGE 2: Complete inventory list from database
+  doc.addPage();
+
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${vendorName} - Complete Inventory Reference`, 40, 40);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Full list of all inventory items for this vendor', 40, 55);
+
+  // Load ALL inventory items for this vendor from database
+  const { data: vendorItems, error: inventoryError } = await supabase
+    .from('inventory_items')
+    .select('*')
+    .eq('vendor', vendorName)
+    .order('item_name');
+
+  if (inventoryError || !vendorItems || vendorItems.length === 0) {
+    doc.setFontSize(10);
+    doc.text(`No inventory items found for ${vendorName}`, 40, 80);
+  } else {
+    // Prepare table data
+    const inventoryTableData = vendorItems.map(item => {
+      const lastCounted = item.last_counted_at
+        ? new Date(item.last_counted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+        : 'Never';
+
+      return [
+        item.item_name || 'N/A',
+        `${item.current_stock || 0} ${item.unit || ''}`,
+        item.par_level || 0,
+        lastCounted
+      ];
+    });
+
+    doc.autoTable({
+      head: [['ITEM NAME', 'CURRENT STOCK', 'PAR', 'LAST COUNT']],
+      body: inventoryTableData,
+      startY: 70,
+      theme: 'grid',
+      styles: {
+        fontSize: 7,
+        cellPadding: 3,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.3
+      },
+      headStyles: {
+        fillColor: [100, 100, 100],
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 7,
+        halign: 'center'
+      },
+      columnStyles: {
+        0: { cellWidth: 280 },                    // ITEM NAME
+        1: { cellWidth: 90, halign: 'center' },   // CURRENT STOCK
+        2: { cellWidth: 50, halign: 'center' },   // PAR
+        3: { cellWidth: 80, halign: 'center' }    // LAST COUNT
+      },
+      margin: { left: 40, right: 40, bottom: 40 }
+    });
+
+    // Add item count at bottom
+    const finalY = doc.lastAutoTable.finalY || 500;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text(
+      `Total: ${inventoryTableData.length} items in inventory`,
+      40,
+      finalY + 15
+    );
+  }
+
+  // Footer for all pages
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(
+      `Page ${i} of ${pageCount}`,
+      doc.internal.pageSize.width / 2,
+      doc.internal.pageSize.height - 20,
+      { align: 'center' }
+    );
+  }
+
+  // Convert to base64
+  return doc.output('datauristring').split(',')[1];
 }
