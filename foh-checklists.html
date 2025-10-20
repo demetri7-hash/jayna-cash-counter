@@ -1852,8 +1852,12 @@
       if (error) throw error;
       if (!session) throw new Error('Session not found');
 
-      // Load the checklist definition
-      const checklistDef = await loadChecklistFromDatabase(session.checklist_type);
+      // Load the checklist definition from ALREADY-LOADED state (not fresh from database)
+      // This ensures we use the complete checklist that was loaded during initialization
+      const checklistDef = getChecklistByType(session.checklist_type);
+      if (!checklistDef) {
+        throw new Error(`Checklist type "${session.checklist_type}" not found in loaded checklists`);
+      }
       fohSystemState.currentChecklist = checklistDef;
       fohSystemState.currentSession = session;
 
