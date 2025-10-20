@@ -17515,7 +17515,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const { data: recentCounts, error } = await supabase
         .from('inventory_items')
         .select('item_name, last_counted_date')
-        .eq('is_prep', true)
+        .or('vendor.eq.PREP,item_type.eq.prep')
         .gte('last_counted_date', ninePmYesterday.toISOString())
         .lte('last_counted_date', fourAmToday.toISOString())
         .limit(5); // Get up to 5 items for display

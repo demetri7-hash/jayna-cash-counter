@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     const { data: recentCounts, error: countError } = await supabase
       .from('inventory_items')
       .select('*')
-      .eq('is_prep', true)
+      .or('vendor.eq.PREP,item_type.eq.prep')
       .gte('last_counted_date', ninePmYesterday.toISOString())
       .lte('last_counted_date', fourAmToday.toISOString());
 
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
     const { data: allPrepItems, error: prepError } = await supabase
       .from('inventory_items')
       .select('*')
-      .eq('is_prep', true)
+      .or('vendor.eq.PREP,item_type.eq.prep')
       .order('item_name');
 
     if (prepError || !allPrepItems) {
@@ -154,8 +154,8 @@ async function generatePrepListPDF(prepItems) {
 
   // Prep table data
   const tableData = prepItems.map(item => {
-    const lastCounted = item.last_counted_at
-      ? new Date(item.last_counted_at).toLocaleString('en-US', {
+    const lastCounted = item.last_counted_date
+      ? new Date(item.last_counted_date).toLocaleString('en-US', {
           month: 'short',
           day: 'numeric',
           hour: 'numeric',
