@@ -8,7 +8,8 @@ ADD COLUMN IF NOT EXISTS manufacturer_item_number TEXT,
 ADD COLUMN IF NOT EXISTS gtin TEXT,
 ADD COLUMN IF NOT EXISTS category TEXT,
 ADD COLUMN IF NOT EXISTS brand TEXT,
-ADD COLUMN IF NOT EXISTS manufacturer_name TEXT;
+ADD COLUMN IF NOT EXISTS manufacturer_name TEXT,
+ADD COLUMN IF NOT EXISTS last_price NUMERIC(10, 2);
 
 -- Create price_history table
 CREATE TABLE IF NOT EXISTS price_history (
@@ -41,6 +42,7 @@ COMMENT ON COLUMN inventory_items.gtin IS 'Global Trade Item Number (barcode)';
 COMMENT ON COLUMN inventory_items.category IS 'PFG Category (e.g., BEVERAGE, GROCERY DRY)';
 COMMENT ON COLUMN inventory_items.brand IS 'Brand name (e.g., SPRITE, KRONOS)';
 COMMENT ON COLUMN inventory_items.manufacturer_name IS 'Manufacturer name (e.g., COCA COLA NORTH AMERICA)';
+COMMENT ON COLUMN inventory_items.last_price IS 'Last recorded price from invoice (for price change tracking)';
 
 COMMENT ON TABLE price_history IS 'Tracks all price changes for inventory items';
 COMMENT ON COLUMN price_history.price_change IS 'Difference: new_price - old_price';
