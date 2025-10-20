@@ -1,51 +1,127 @@
 -- ============================================
--- RESTORE FOH OPENING CHECKLIST - ALL 11 SECTIONS
+-- INSERT MISSING CHECKLISTS: AM CLEANING + FOH OPENING
 -- ============================================
 -- Created: 2025-10-19
--- Purpose: Restore complete FOH OPENING checklist with all sections and tasks
--- Current state: Only has 1 section (rating) - missing 10 checkbox sections
+-- Purpose: Add AM CLEANING and FOH OPENING checklists to database
+-- They were only in hardcoded data, never saved to database!
 -- Run this in Supabase SQL Editor
 
 -- ============================================
--- STEP 1: Delete existing incomplete sections
+-- STEP 1: Insert AM CLEANING CHECKLIST REVIEW
 -- ============================================
 
--- Get the checklist_id for foh_opening
-DO $$
-DECLARE
-  checklist_uuid UUID;
-BEGIN
-  -- Find foh_opening checklist
-  SELECT id INTO checklist_uuid
-  FROM checklist_definitions
-  WHERE type = 'foh_opening';
-
-  IF checklist_uuid IS NULL THEN
-    RAISE EXCEPTION 'FOH OPENING checklist not found! Cannot proceed.';
-  END IF;
-
-  -- Delete all existing sections (will cascade delete tasks/categories)
-  DELETE FROM checklist_sections
-  WHERE checklist_id = checklist_uuid;
-
-  RAISE NOTICE '✅ Deleted old sections for FOH OPENING';
-  RAISE NOTICE 'Checklist ID: %', checklist_uuid;
-END $$;
-
--- ============================================
--- STEP 2: Insert all 11 sections with tasks
--- ============================================
-
--- Temporary variable to hold checklist_id and section_ids
 DO $$
 DECLARE
   checklist_uuid UUID;
   section_uuid UUID;
 BEGIN
-  -- Get checklist_id
-  SELECT id INTO checklist_uuid
-  FROM checklist_definitions
-  WHERE type = 'foh_opening';
+  -- Insert checklist definition
+  INSERT INTO checklist_definitions (
+    type,
+    title,
+    time_range,
+    description,
+    staff_count,
+    has_ratings,
+    has_notes,
+    has_photos,
+    rating_scale,
+    start_hour,
+    start_minute,
+    end_hour,
+    end_minute,
+    created_at,
+    updated_at,
+    updated_by
+  ) VALUES (
+    'am_cleaning',
+    'AM CLEANING CHECKLIST REVIEW',
+    '9:00 AM - 3:00 PM',
+    'Review of overnight cleaning completed by BOH staff',
+    1,
+    true,
+    true,
+    true,
+    '1 – MAJOR ISSUES | 3 – ACCEPTABLE | 5 – GUEST-READY',
+    9,
+    0,
+    15,
+    0,
+    NOW(),
+    NOW(),
+    'System Migration'
+  )
+  RETURNING id INTO checklist_uuid;
+
+  RAISE NOTICE '✅ Created AM CLEANING checklist (ID: %)', checklist_uuid;
+
+  -- Insert the single rating section
+  INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
+  VALUES (checklist_uuid, 'Quality Review', NULL, 'rating', 0)
+  RETURNING id INTO section_uuid;
+
+  -- Insert 8 rating categories
+  INSERT INTO checklist_section_categories (section_id, name, description, display_order) VALUES
+  (section_uuid, 'Sweeping', 'Crumbs, litter, spiderwebs, trash', 0),
+  (section_uuid, 'Chairs', 'Put down and neatly tucked in to each table', 1),
+  (section_uuid, 'Exterior of Building and Parking Lot', 'Clear of debris and trash', 2),
+  (section_uuid, 'Dumpster Area', 'Kept locked, clean, nothing overflowing in the bins', 3),
+  (section_uuid, 'Bathrooms', 'Sinks, mirrors, soap, dryer, towels, perimeter lip dusted?', 4),
+  (section_uuid, 'Toilets', 'Specifically the entire white porcelain, top to bottom- wiped? clean? sanitized?', 5),
+  (section_uuid, 'Floors in Bathroom', 'Swept, mopped, area behind and around toilets', 6),
+  (section_uuid, 'Container Status', 'Clean, tidy, organized, no unopened boxes on the ground', 7);
+
+  RAISE NOTICE '✅ Created Quality Review section with 8 categories';
+END $$;
+
+-- ============================================
+-- STEP 2: Insert FOH OPENING CHECKLIST
+-- ============================================
+
+DO $$
+DECLARE
+  checklist_uuid UUID;
+  section_uuid UUID;
+BEGIN
+  -- Insert checklist definition
+  INSERT INTO checklist_definitions (
+    type,
+    title,
+    time_range,
+    description,
+    staff_count,
+    has_ratings,
+    has_notes,
+    has_photos,
+    rating_scale,
+    start_hour,
+    start_minute,
+    end_hour,
+    end_minute,
+    created_at,
+    updated_at,
+    updated_by
+  ) VALUES (
+    'foh_opening',
+    'FOH OPENING CHECKLIST',
+    '9:00 AM - 4:00 PM',
+    'Complete opening procedures for dining room, bar, and guest areas',
+    2,
+    true,
+    false,
+    true,
+    '1 – MAJOR ISSUES | 3 – ACCEPTABLE | 5 – GUEST-READY',
+    9,
+    0,
+    16,
+    0,
+    NOW(),
+    NOW(),
+    'System Migration'
+  )
+  RETURNING id INTO checklist_uuid;
+
+  RAISE NOTICE '✅ Created FOH OPENING checklist (ID: %)', checklist_uuid;
 
   -- ==========================================
   -- SECTION 0: Closing Review From Previous Night (RATING)
@@ -65,7 +141,7 @@ BEGIN
   (section_uuid, 'Bar', 'To go cups and lids, stickiness, lemonades, batch cocktails, garnishes, glassware, floors, front of fridge', 7);
 
   -- ==========================================
-  -- SECTION 1: Dining Room & Patio Setup (CHECKBOX)
+  -- SECTION 1: Dining Room & Patio Setup
   -- ==========================================
   INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
   VALUES (checklist_uuid, 'Dining Room & Patio Setup', NULL, 'checkbox', 1)
@@ -88,7 +164,7 @@ BEGIN
   (section_uuid, 'Wipe down front of registers', 13);
 
   -- ==========================================
-  -- SECTION 2: Cleanliness & Walkthrough (CHECKBOX)
+  -- SECTION 2: Cleanliness & Walkthrough
   -- ==========================================
   INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
   VALUES (checklist_uuid, 'Cleanliness & Walkthrough', NULL, 'checkbox', 2)
@@ -99,7 +175,7 @@ BEGIN
   (section_uuid, 'Review previous night''s closing checklist for any notes', 1);
 
   -- ==========================================
-  -- SECTION 3: Bathroom Checks (CHECKBOX)
+  -- SECTION 3: Bathroom Checks
   -- ==========================================
   INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
   VALUES (checklist_uuid, 'Bathroom Checks', 'EVERY MORNING DAILY! BOH CLEANER WILL CLEAN BUT YOU MUST VERIFY IF NOT OK, CLEAN YOURSELF AND NOTIFY DEMETRI IMMEDIATELY', 'checkbox', 3)
@@ -114,7 +190,7 @@ BEGIN
   (section_uuid, 'Restock: Toilet paper, Paper towels, Toilet seat covers', 5);
 
   -- ==========================================
-  -- SECTION 4: Expo Station & Sauce Prep (CHECKBOX)
+  -- SECTION 4: Expo Station & Sauce Prep
   -- ==========================================
   INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
   VALUES (checklist_uuid, 'Expo Station & Sauce Prep', NULL, 'checkbox', 4)
@@ -127,7 +203,7 @@ BEGIN
   (section_uuid, 'Squeeze bottles for ramekin plating: 1 full each of: Tzatziki, Spicy Aioli, Lemon Dressing', 3);
 
   -- ==========================================
-  -- SECTION 5: Kitchen Support & Restock (CHECKBOX)
+  -- SECTION 5: Kitchen Support & Restock
   -- ==========================================
   INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
   VALUES (checklist_uuid, 'Kitchen Support & Restock', NULL, 'checkbox', 5)
@@ -140,7 +216,7 @@ BEGIN
   (section_uuid, 'Restock baklava at: Retail shelves, POS', 3);
 
   -- ==========================================
-  -- SECTION 6: Water Station (CHECKBOX)
+  -- SECTION 6: Water Station
   -- ==========================================
   INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
   VALUES (checklist_uuid, 'Water Station', '"ABUNDANT" SPA VIBE', 'checkbox', 6)
@@ -152,7 +228,7 @@ BEGIN
   (section_uuid, 'Fill both dispensers with ice, fruit, and water — should look luxurious and inviting', 2);
 
   -- ==========================================
-  -- SECTION 7: Bar Fruit Prep (CHECKBOX)
+  -- SECTION 7: Bar Fruit Prep
   -- ==========================================
   INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
   VALUES (checklist_uuid, 'Bar Fruit Prep', NULL, 'checkbox', 7)
@@ -166,7 +242,7 @@ BEGIN
   (section_uuid, '1 orange – thick slices (sangria, orange soda, cocktails)', 4);
 
   -- ==========================================
-  -- SECTION 8: Bar Setup & Stock (CHECKBOX)
+  -- SECTION 8: Bar Setup & Stock
   -- ==========================================
   INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
   VALUES (checklist_uuid, 'Bar Setup & Stock', NULL, 'checkbox', 8)
@@ -179,7 +255,7 @@ BEGIN
   (section_uuid, 'Stock all 3 bar caddies with: Straws, Beverage napkins, Black plastic spoons for froyo', 3);
 
   -- ==========================================
-  -- SECTION 9: Froyo Machines (CHECKBOX)
+  -- SECTION 9: Froyo Machines
   -- ==========================================
   INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
   VALUES (checklist_uuid, 'Froyo Machines', NULL, 'checkbox', 9)
@@ -192,7 +268,7 @@ BEGIN
   (section_uuid, '1 labeled backup in wine fridge (prep if missing)', 3);
 
   -- ==========================================
-  -- SECTION 10: Wines by the Glass (CHECKBOX)
+  -- SECTION 10: Wines by the Glass
   -- ==========================================
   INSERT INTO checklist_sections (checklist_id, name, description, section_type, display_order)
   VALUES (checklist_uuid, 'Wines by the Glass', NULL, 'checkbox', 10)
@@ -204,19 +280,7 @@ BEGIN
   (section_uuid, 'Taste if questionable – DUMP IF BAD', 2),
   (section_uuid, 'Keep selection fresh and labeled', 3);
 
-  RAISE NOTICE '✅ FOH OPENING restored with all 11 sections!';
-  RAISE NOTICE 'Section 0: Closing Review (rating - 8 categories)';
-  RAISE NOTICE 'Section 1: Dining Room & Patio (checkbox - 14 tasks)';
-  RAISE NOTICE 'Section 2: Cleanliness & Walkthrough (checkbox - 2 tasks)';
-  RAISE NOTICE 'Section 3: Bathroom Checks (checkbox - 6 tasks)';
-  RAISE NOTICE 'Section 4: Expo Station & Sauce Prep (checkbox - 4 tasks)';
-  RAISE NOTICE 'Section 5: Kitchen Support & Restock (checkbox - 4 tasks)';
-  RAISE NOTICE 'Section 6: Water Station (checkbox - 3 tasks)';
-  RAISE NOTICE 'Section 7: Bar Fruit Prep (checkbox - 5 tasks)';
-  RAISE NOTICE 'Section 8: Bar Setup & Stock (checkbox - 4 tasks)';
-  RAISE NOTICE 'Section 9: Froyo Machines (checkbox - 4 tasks)';
-  RAISE NOTICE 'Section 10: Wines by the Glass (checkbox - 4 tasks)';
-  RAISE NOTICE 'Total: 1 rating section + 10 checkbox sections = 11 sections';
+  RAISE NOTICE '✅ Created FOH OPENING with all 11 sections!';
 END $$;
 
 -- ============================================
@@ -224,20 +288,39 @@ END $$;
 -- ============================================
 DO $$
 DECLARE
-  section_count INTEGER;
-  checklist_uuid UUID;
+  am_cleaning_count INTEGER;
+  foh_opening_count INTEGER;
 BEGIN
-  SELECT id INTO checklist_uuid
-  FROM checklist_definitions
-  WHERE type = 'foh_opening';
+  -- Count sections for AM CLEANING
+  SELECT COUNT(*) INTO am_cleaning_count
+  FROM checklist_sections cs
+  JOIN checklist_definitions cd ON cd.id = cs.checklist_id
+  WHERE cd.type = 'am_cleaning';
 
-  SELECT COUNT(*) INTO section_count
-  FROM checklist_sections
-  WHERE checklist_id = checklist_uuid;
+  -- Count sections for FOH OPENING
+  SELECT COUNT(*) INTO foh_opening_count
+  FROM checklist_sections cs
+  JOIN checklist_definitions cd ON cd.id = cs.checklist_id
+  WHERE cd.type = 'foh_opening';
 
-  IF section_count = 11 THEN
-    RAISE NOTICE '✅ VERIFICATION PASSED: FOH OPENING has 11 sections';
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================';
+  RAISE NOTICE 'VERIFICATION RESULTS';
+  RAISE NOTICE '========================================';
+
+  IF am_cleaning_count = 1 THEN
+    RAISE NOTICE '✅ AM CLEANING: 1 section (CORRECT)';
   ELSE
-    RAISE WARNING '⚠️ VERIFICATION FAILED: FOH OPENING has % sections (expected 11)', section_count;
+    RAISE WARNING '⚠️ AM CLEANING: % sections (expected 1)', am_cleaning_count;
   END IF;
+
+  IF foh_opening_count = 11 THEN
+    RAISE NOTICE '✅ FOH OPENING: 11 sections (CORRECT)';
+  ELSE
+    RAISE WARNING '⚠️ FOH OPENING: % sections (expected 11)', foh_opening_count;
+  END IF;
+
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '';
+  RAISE NOTICE 'Refresh the EDIT tab to see both checklists!';
 END $$;
