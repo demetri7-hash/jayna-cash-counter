@@ -1147,14 +1147,14 @@
    */
   async function displayTaskPhotos(taskId, sessionId) {
     const container = document.getElementById(`photoDisplay_${taskId}`);
-    if (!container) return;
+    if (!container) return 0;
 
     // Load photos for this task
     const photos = await loadTaskPhotos(taskId, sessionId);
 
     if (photos.length === 0) {
       container.innerHTML = '';
-      return;
+      return 0;
     }
 
     let html = '<div style="display: flex; gap: 8px; flex-wrap: wrap;">';
@@ -1219,6 +1219,9 @@
 
     html += '</div>';
     container.innerHTML = html;
+
+    // Return count of non-deleted photos
+    return photos.filter(p => !p.is_deleted).length;
   }
 
   /**
@@ -1273,14 +1276,14 @@
    */
   async function displaySessionPhotos(sessionId) {
     const container = document.getElementById('sessionPhotosDisplay');
-    if (!container) return;
+    if (!container) return 0;
 
     // Load photos for this session
     const photos = await loadSessionPhotos(sessionId);
 
     if (photos.length === 0) {
       container.innerHTML = '';
-      return;
+      return 0;
     }
 
     let html = '<div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px;">';
@@ -1345,6 +1348,9 @@
 
     html += '</div>';
     container.innerHTML = html;
+
+    // Return count of non-deleted photos
+    return photos.filter(p => !p.is_deleted).length;
   }
 
   /**
@@ -2610,7 +2616,7 @@
             "
             ${!fohSystemState.reviewMode ? `onfocus="this.style.borderColor='var(--gray-700)'"` : ''}
             ${!fohSystemState.reviewMode ? `onblur="this.style.borderColor='var(--gray-300)'; autoSaveNotes();"` : ''}
-          ></textarea>
+          >${session.notes_for_next_shift || session.notes || ''}</textarea>
 
           <!-- Photo Upload Section (conditional) - Hidden in review mode -->
           ${fohSystemState.currentChecklist && fohSystemState.currentChecklist.hasPhotos !== false && !fohSystemState.reviewMode ? `
@@ -2650,6 +2656,28 @@
           ${fohSystemState.reviewMode ? `
           <div id="sessionPhotosDisplay" style="margin-top: 16px;"></div>
           ` : ''}
+        </div>
+      `;
+    }
+
+    // Summary section for notes and photos (only in review mode or completed sessions)
+    if (fohSystemState.reviewMode || session.is_complete) {
+      const hasNotes = !!(session.notes_for_next_shift || session.notes);
+      const sessionId = session.id;
+
+      html += `
+        <div id="notesPhotosSummary" style="margin-top: 30px; padding: 16px; background: var(--gray-100); border: 2px solid var(--gray-300); border-radius: 0;">
+          <h4 style="margin: 0 0 12px 0; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+            📎 Attachments Summary
+          </h4>
+          <div style="font-size: 13px; color: var(--gray-700); line-height: 1.8;">
+            <div style="margin-bottom: 8px;">
+              <strong>Notes:</strong> ${hasNotes ? '✅ Notes provided for incoming crew' : '⚠️ No notes attached to this checklist'}
+            </div>
+            <div id="photosSummary_${sessionId}">
+              <strong>Photos:</strong> <span style="color: var(--gray-500); font-style: italic;">Checking...</span>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -2766,13 +2794,27 @@
     const sessionId = fohSystemState.currentSession?.id;
     if (!sessionId) return;
 
+    let totalPhotos = 0;
+
     // Load photos for each task
     for (const task of fohSystemState.tasks) {
-      await displayTaskPhotos(task.id, sessionId);
+      const taskPhotoCount = await displayTaskPhotos(task.id, sessionId);
+      totalPhotos += (taskPhotoCount || 0);
     }
 
     // Load session photos
-    await displaySessionPhotos(sessionId);
+    const sessionPhotoCount = await displaySessionPhotos(sessionId);
+    totalPhotos += (sessionPhotoCount || 0);
+
+    // Update photos summary if it exists (review mode or completed session)
+    const summaryDiv = document.getElementById(`photosSummary_${sessionId}`);
+    if (summaryDiv) {
+      if (totalPhotos > 0) {
+        summaryDiv.innerHTML = `<strong>Photos:</strong> ✅ ${totalPhotos} photo${totalPhotos !== 1 ? 's' : ''} attached to this checklist`;
+      } else {
+        summaryDiv.innerHTML = `<strong>Photos:</strong> ⚠️ No photos attached to this checklist`;
+      }
+    }
   }
 
   /**
