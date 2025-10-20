@@ -2452,7 +2452,26 @@
     const completedRequiredCount = fohSystemState.tasks.filter(t => t.is_required === true && t.is_completed === true).length;
 
     let html = `
-      ${session.is_complete ? `
+      ${fohSystemState.reviewMode ? `
+      <!-- Review Mode Banner -->
+      <div style="margin-bottom: 16px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 24px;">👁️</div>
+          <div>
+            <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: var(--blue-text); text-transform: uppercase; letter-spacing: 0.5px;">
+              📋 REVIEW MODE (READ-ONLY)
+            </h4>
+            <p style="margin: 0; font-size: 12px; color: var(--blue-text);">
+              You are viewing this checklist for review purposes. All editing is disabled. ${session.is_complete ? `Completed at ${session.completed_at ? formatPacificDateDisplay(new Date(session.completed_at), {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              }) : 'unknown time'}.` : 'This checklist is still in progress.'}
+            </p>
+          </div>
+        </div>
+      </div>
+      ` : session.is_complete ? `
       <!-- Completed Session Banner -->
       <div style="margin-bottom: 16px; padding: 16px; background: var(--gray-100); border-left: 4px solid var(--gray-700); border-radius: 0;">
         <div style="display: flex; align-items: center; gap: 12px;">
@@ -2483,6 +2502,7 @@
             <div style="font-size: 13px; color: var(--success-text); line-height: 1.6;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span>👤 ${fohSystemState.staffName || 'Not set'}</span>
+                ${!fohSystemState.reviewMode ? `
                 <button
                   onclick="changeUsername()"
                   style="
@@ -2501,6 +2521,7 @@
                   onmouseover="this.style.background='#047857'"
                   onmouseout="this.style.background='var(--success-border)'"
                 >Change Name</button>
+                ` : ''}
               </div>
               <div>📅 ${formatPacificDateDisplay(new Date(session.started_at), {
                 month: 'short',
@@ -2521,9 +2542,11 @@
                 ${completedRequiredCount} / ${requiredTasksCount} Required
               </div>
             ` : ''}
+            ${!fohSystemState.reviewMode ? `
             <div style="font-size: 12px; color: var(--success-text); margin-top: 4px;">
               Auto-saving...
             </div>
+            ` : ''}
           </div>
         </div>
       </div>
@@ -2548,6 +2571,7 @@
           <textarea
             id="fohSessionNotes"
             placeholder="Leave any notes or observations for the next shift..."
+            ${fohSystemState.reviewMode ? 'readonly' : ''}
             style="
               width: 100%;
               min-height: 100px;
@@ -2558,13 +2582,14 @@
               font-family: inherit;
               box-sizing: border-box;
               resize: vertical;
+              ${fohSystemState.reviewMode ? 'background: var(--gray-100); cursor: not-allowed; opacity: 0.8;' : ''}
             "
-            onfocus="this.style.borderColor='var(--gray-700)'"
-            onblur="this.style.borderColor='var(--gray-300)'; autoSaveNotes();"
+            ${!fohSystemState.reviewMode ? `onfocus="this.style.borderColor='var(--gray-700)'"` : ''}
+            ${!fohSystemState.reviewMode ? `onblur="this.style.borderColor='var(--gray-300)'; autoSaveNotes();"` : ''}
           ></textarea>
 
-          <!-- Photo Upload Section (conditional) -->
-          ${fohSystemState.currentChecklist && fohSystemState.currentChecklist.hasPhotos !== false ? `
+          <!-- Photo Upload Section (conditional) - Hidden in review mode -->
+          ${fohSystemState.currentChecklist && fohSystemState.currentChecklist.hasPhotos !== false && !fohSystemState.reviewMode ? `
           <div style="margin-top: 16px;">
             <h5 style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
               📸 ATTACH PHOTOS (Max 5)
@@ -2597,12 +2622,41 @@
             <div id="sessionPhotosDisplay" style="margin-top: 12px;"></div>
           </div>
           ` : ''}
+          <!-- Show session photos in review mode (read-only) -->
+          ${fohSystemState.reviewMode ? `
+          <div id="sessionPhotosDisplay" style="margin-top: 16px;"></div>
+          ` : ''}
         </div>
       `;
     }
 
-    // Action buttons (only show for incomplete sessions)
-    if (!session.is_complete) {
+    // Action buttons
+    if (fohSystemState.reviewMode) {
+      // Review mode - always show back button regardless of completion status
+      html += `
+        <div style="margin-top: 30px; text-align: center;">
+          <button
+            onclick="openFOHTab(event, 'fohReview')"
+            style="
+              padding: 14px 32px;
+              background: var(--blue-text);
+              color: white;
+              border: 2px solid var(--blue-text);
+              border-radius: 0;
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.background='#1e3a8a'"
+            onmouseout="this.style.background='var(--blue-text)'"
+          >← BACK TO REVIEW</button>
+        </div>
+      `;
+    } else if (!session.is_complete) {
+      // Active session - show cancel and save buttons
       html += `
         <div style="margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap;">
           <button
@@ -2649,7 +2703,7 @@
         </div>
       `;
     } else {
-      // Show back button for completed sessions
+      // Completed session (not review mode) - show back button
       html += `
         <div style="margin-top: 30px; text-align: center;">
           <button
@@ -2739,24 +2793,25 @@
           margin-bottom: 8px;
           background: ${isChecked ? 'var(--success-bg)' : 'var(--gray-100)'};
           border-left: 3px solid ${isChecked ? 'var(--success-border)' : (isRequired ? '#f59e0b' : 'var(--gray-300)')};
-          cursor: pointer;
+          ${!fohSystemState.reviewMode ? `cursor: pointer;` : ''}
           transition: all 0.15s ease;
         "
-        onclick="toggleTask('${taskRecord.id}')"
-        onmouseover="this.style.background='${isChecked ? '#d1fae5' : 'var(--gray-200)'}'"
-        onmouseout="this.style.background='${isChecked ? 'var(--success-bg)' : 'var(--gray-100)'}'">
+        ${!fohSystemState.reviewMode ? `onclick="toggleTask('${taskRecord.id}')"` : ''}
+        ${!fohSystemState.reviewMode ? `onmouseover="this.style.background='${isChecked ? '#d1fae5' : 'var(--gray-200)'}'"` : ''}
+        ${!fohSystemState.reviewMode ? `onmouseout="this.style.background='${isChecked ? 'var(--success-bg)' : 'var(--gray-100)'}'"` : ''}>
 
           <input
             type="checkbox"
             ${isChecked ? 'checked' : ''}
+            ${fohSystemState.reviewMode ? 'disabled' : ''}
             style="
               width: 20px;
               height: 20px;
               margin-top: 2px;
-              cursor: pointer;
+              ${!fohSystemState.reviewMode ? 'cursor: pointer;' : 'cursor: not-allowed; opacity: 0.6;'}
               flex-shrink: 0;
             "
-            onclick="event.stopPropagation(); toggleTask('${taskRecord.id}')"
+            ${!fohSystemState.reviewMode ? `onclick="event.stopPropagation(); toggleTask('${taskRecord.id}')"` : ''}
           />
 
           <div style="flex: 1;">
@@ -2789,8 +2844,8 @@
               </div>
             ` : ''}
 
-            <!-- Photo Upload Section (conditional) -->
-            ${fohSystemState.currentChecklist && fohSystemState.currentChecklist.hasPhotos !== false ? `
+            <!-- Photo Upload Section (conditional) - Hidden in review mode -->
+            ${fohSystemState.currentChecklist && fohSystemState.currentChecklist.hasPhotos !== false && !fohSystemState.reviewMode ? `
             <div id="taskPhotos_${taskRecord.id}" style="margin-top: 8px;">
               <button
                 onclick="event.stopPropagation(); document.getElementById('photoInput_${taskRecord.id}').click();"
@@ -2818,6 +2873,10 @@
               />
               <div id="photoDisplay_${taskRecord.id}" style="margin-top: 8px;"></div>
             </div>
+            ` : ''}
+            <!-- Show photos in review mode (read-only) -->
+            ${fohSystemState.reviewMode ? `
+            <div id="photoDisplay_${taskRecord.id}" style="margin-top: 8px;"></div>
             ` : ''}
           </div>
         </div>
@@ -2875,9 +2934,10 @@
                 max="5"
                 value="${currentRating}"
                 id="rating_${sectionIndex}_${catIndex}"
-                style="width: 100%; height: 8px; cursor: pointer;"
-                oninput="updateRatingDisplay('${sectionIndex}_${catIndex}', this.value)"
-                onchange="autoSaveRating('${category.name}', this.value)"
+                ${fohSystemState.reviewMode ? 'disabled' : ''}
+                style="width: 100%; height: 8px; ${!fohSystemState.reviewMode ? 'cursor: pointer;' : 'cursor: not-allowed; opacity: 0.6;'}"
+                ${!fohSystemState.reviewMode ? `oninput="updateRatingDisplay('${sectionIndex}_${catIndex}', this.value)"` : ''}
+                ${!fohSystemState.reviewMode ? `onchange="autoSaveRating('${category.name}', this.value)"` : ''}
               />
             </div>
             <div
@@ -2895,6 +2955,7 @@
           <textarea
             id="ratingNotes_${sectionIndex}_${catIndex}"
             placeholder="Optional notes..."
+            ${fohSystemState.reviewMode ? 'readonly' : ''}
             style="
               width: 100%;
               margin-top: 12px;
@@ -2906,9 +2967,10 @@
               box-sizing: border-box;
               resize: vertical;
               min-height: 60px;
+              ${fohSystemState.reviewMode ? 'background: var(--gray-100); cursor: not-allowed; opacity: 0.8;' : ''}
             "
-            onfocus="this.style.borderColor='var(--gray-700)'"
-            onblur="this.style.borderColor='var(--gray-300)'; autoSaveRatingNotes('${category.name}', this.value);"
+            ${!fohSystemState.reviewMode ? `onfocus="this.style.borderColor='var(--gray-700)'"` : ''}
+            ${!fohSystemState.reviewMode ? `onblur="this.style.borderColor='var(--gray-300)'; autoSaveRatingNotes('${category.name}', this.value);"` : ''}
           >${existingRating ? (existingRating.notes || '') : ''}</textarea>
         </div>
       `;
