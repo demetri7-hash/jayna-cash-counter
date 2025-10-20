@@ -644,12 +644,6 @@
         sections: []
       };
 
-      // VALIDATION: Check if we have enough sections (database might be incomplete)
-      if (!sections || sections.length < 2) {
-        console.warn(`⚠️ Database checklist definition for "${checklistType}" only has ${sections?.length || 0} sections. This seems incomplete. Falling back to hardcoded definition.`);
-        return getChecklistByType(checklistType);
-      }
-
       // 4. Load tasks/categories for each section
       for (const section of sections) {
         const sectionObj = {
@@ -697,8 +691,7 @@
 
     } catch (error) {
       console.error('Error loading checklist from database:', error);
-      // Fallback to FOH_CHECKLISTS
-      return getChecklistByType(checklistType);
+      return null;
     }
   }
 
@@ -1702,10 +1695,7 @@
       if (error) throw error;
 
       if (!allChecklists || allChecklists.length === 0) {
-        console.warn('⚠️ No checklists found in database, using static fallback');
-        Object.keys(FOH_CHECKLISTS).forEach(type => {
-          fohSystemState.allChecklists[type] = FOH_CHECKLISTS[type];
-        });
+        console.warn('⚠️ No checklists found in database');
         return;
       }
 
@@ -1722,11 +1712,7 @@
 
     } catch (error) {
       console.error('Error initializing FOH system:', error);
-      // Fallback to static data if database fails
-      Object.keys(FOH_CHECKLISTS).forEach(type => {
-        fohSystemState.allChecklists[type] = FOH_CHECKLISTS[type];
-      });
-      console.log('⚠️ Using fallback static checklist data');
+      console.error('⚠️ Database initialization failed. No checklists will be available.');
     }
   }
 
