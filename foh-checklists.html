@@ -1811,6 +1811,8 @@
       const today = getPacificDate();
       const yesterday = getPacificDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
+      console.log('🔍 Loading checklists for review. Today:', today, 'Yesterday:', yesterday);
+
       const { data: sessions, error } = await supabase
         .from('foh_checklist_sessions')
         .select('*')
@@ -1818,14 +1820,14 @@
         .order('started_at', { ascending: false });
 
       if (error) {
-        console.error('Error loading checklists for review:', error);
+        console.error('❌ Error loading checklists for review:', error);
         return [];
       }
 
-      console.log('✅ Loaded checklists for review:', sessions?.length || 0);
+      console.log('✅ Loaded checklists for review:', sessions?.length || 0, sessions);
       return sessions || [];
     } catch (error) {
-      console.error('Error loading checklists for review:', error);
+      console.error('❌ Exception loading checklists for review:', error);
       return [];
     }
   }
@@ -1905,6 +1907,9 @@
     }
 
     console.log('✅ Container found:', container);
+
+    // Show loading
+    container.innerHTML = '<p style="text-align: center; padding: 40px; color: var(--gray-600); font-size: 14px;">Loading checklists...</p>';
 
     // RELOAD checklists from database to get latest time values
     console.log('🔄 Reloading checklists from database...');
