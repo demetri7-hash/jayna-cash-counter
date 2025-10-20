@@ -1858,6 +1858,12 @@
       if (tasksError) throw tasksError;
       fohSystemState.tasks = tasks || [];
 
+      console.log('📋 REVIEW MODE - Loaded tasks from database:', fohSystemState.tasks.length, 'tasks');
+      console.log('📋 Checklist definition has', checklistDef.sections?.length || 0, 'sections');
+      checklistDef.sections?.forEach(section => {
+        console.log(`  Section: ${section.name} (type: ${section.type}), ${section.type === 'checkbox' ? section.tasks?.length || 0 : section.categories?.length || 0} items`);
+      });
+
       // Load ratings from foh_checklist_ratings table
       const { data: ratings, error: ratingsError } = await supabase
         .from('foh_checklist_ratings')
@@ -1866,6 +1872,8 @@
 
       if (ratingsError) throw ratingsError;
       fohSystemState.ratings = ratings || [];
+
+      console.log('⭐ REVIEW MODE - Loaded ratings from database:', fohSystemState.ratings.length, 'ratings');
 
       // Enable review mode (skips time window checks)
       fohSystemState.reviewMode = true;
@@ -2755,6 +2763,8 @@
    * Render Checkbox Section
    */
   function renderCheckboxSection(section, sectionIndex) {
+    console.log(`🔍 Rendering checkbox section: ${section.name}, has ${section.tasks?.length || 0} tasks in definition, reviewMode: ${fohSystemState.reviewMode}`);
+
     let html = `
       <div style="margin-bottom: 24px; background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
         <div style="background: var(--gray-700); color: white; padding: 14px 16px;">
@@ -2771,6 +2781,7 @@
         <div style="padding: 16px;">
     `;
 
+    let renderedCount = 0;
     section.tasks.forEach((task, taskIndex) => {
       // Handle both string format (legacy) and object format (new)
       const taskText = typeof task === 'string' ? task : task.text;
@@ -2782,8 +2793,12 @@
 
       // In active mode, skip if task doesn't exist (shouldn't happen)
       // In review mode, show all tasks even if not in database
-      if (!taskRecord && !fohSystemState.reviewMode) return;
+      if (!taskRecord && !fohSystemState.reviewMode) {
+        console.log(`  ⏭️ SKIPPING task "${taskText}" (no record, not in review mode)`);
+        return;
+      }
 
+      renderedCount++;
       const isChecked = taskRecord ? taskRecord.is_completed : false;
 
       html += `
@@ -2884,6 +2899,8 @@
         </div>
       `;
     });
+
+    console.log(`✅ Rendered ${renderedCount} tasks for section "${section.name}"`);
 
     html += '</div></div>';
     return html;
