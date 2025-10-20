@@ -65,13 +65,14 @@ export default async function handler(req, res) {
     // Step 2: Fetch time entries for date range
     console.log('Fetching time entries...');
 
-    // Convert dates to ISO 8601 format with UTC time (Toast API requires Z suffix for UTC)
-    const startDateTime = `${startDate}T00:00:00.000Z`;
-    const endDateTime = `${endDate}T23:59:59.999Z`;
+    // Convert dates to Toast API format: yyyy-MM-dd'T'HH:mm:ss.SSS-0000
+    // Example from Toast docs: 2018-11-14T01:00:00.000-0000
+    const startDateTime = `${startDate}T00:00:00.000-0000`;
+    const endDateTime = `${endDate}T23:59:59.999-0000`;
 
     console.log(`Requesting time entries from ${startDateTime} to ${endDateTime}`);
 
-    const timeEntriesUrl = `${toastApiUrl}/labor/v1/timeEntries?startDate=${encodeURIComponent(startDateTime)}&endDate=${encodeURIComponent(endDateTime)}`;
+    const timeEntriesUrl = `${toastApiUrl}/labor/v1/timeEntries?startDate=${startDateTime}&endDate=${endDateTime}`;
 
     const timeEntriesResponse = await fetch(timeEntriesUrl, {
       method: 'GET',
