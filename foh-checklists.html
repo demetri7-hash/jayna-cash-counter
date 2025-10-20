@@ -1665,7 +1665,8 @@
     ratings: [],
     staffName: '',
     staffName2: '',
-    allChecklists: {} // Will be populated on page load
+    allChecklists: {}, // Will be populated on page load
+    reviewMode: false // Set to true when viewing from REVIEW tab (skips time window check)
   };
 
   /**
@@ -1855,6 +1856,9 @@
         fohSystemState.tasks = [];
       }
 
+      // Enable review mode (skips time window checks)
+      fohSystemState.reviewMode = true;
+
       hideLoading();
 
       // Switch to CHECKLISTS tab before rendering
@@ -2005,6 +2009,9 @@
     }
 
     fohSystemState.currentChecklist = checklist;
+
+    // Disable review mode (this is normal checklist selection, not viewing from REVIEW tab)
+    fohSystemState.reviewMode = false;
 
     showLoading('Checking...', 'Looking for checklist session...');
 
@@ -2401,8 +2408,8 @@
     const checklist = fohSystemState.currentChecklist;
     const session = fohSystemState.currentSession;
 
-    // Check if checklist time window has expired (only for incomplete sessions)
-    if (!session.is_complete && checklist.end_hour !== undefined && checklist.end_minute !== undefined) {
+    // Check if checklist time window has expired (only for incomplete sessions, skip in review mode)
+    if (!fohSystemState.reviewMode && !session.is_complete && checklist.end_hour !== undefined && checklist.end_minute !== undefined) {
       const now = new Date();
       const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
       const currentHour = pacificTime.getHours();
