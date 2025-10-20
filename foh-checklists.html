@@ -5639,8 +5639,8 @@
       </div>
     `;
 
-    // Load today's data
-    loadWatchdogData(getPacificDate());
+    // Load last 2 days by default
+    loadWatchdogData();
   }
 
   /**
@@ -5931,7 +5931,42 @@
       </div>
     `;
 
+    // Group sessions by date
+    const sessionsByDate = {};
     sessions.forEach(session => {
+      const date = session.session_date;
+      if (!sessionsByDate[date]) {
+        sessionsByDate[date] = [];
+      }
+      sessionsByDate[date].push(session);
+    });
+
+    // Sort dates (newest first)
+    const sortedDates = Object.keys(sessionsByDate).sort((a, b) => b.localeCompare(a));
+
+    // Render each date group
+    sortedDates.forEach(date => {
+      const dateSessions = sessionsByDate[date];
+
+      // Sort sessions within date (newest first)
+      dateSessions.sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
+
+      // Get day of week and formatted date
+      const dateObj = new Date(date + 'T12:00:00');
+      const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Los_Angeles' });
+      const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
+      const isToday = date === getPacificDate(0);
+      const dateLabel = isToday ? 'Today' : (date === getPacificDate(-1) ? 'Yesterday' : formattedDate);
+
+      html += `
+        <div style="margin-bottom: 32px;">
+          <h3 style="margin: 0 0 16px 0; padding: 12px; background: var(--gray-900); color: white; border-left: 4px solid var(--gray-700); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+            📅 ${dateLabel} - ${dayOfWeek}
+          </h3>
+          <div style="display: grid; gap: 16px;">
+      `;
+
+      dateSessions.forEach(session => {
       const sessionTasks = tasks.filter(t => t.session_id === session.id);
       const sessionRatings = ratings.filter(r => r.session_id === session.id);
       const completedTasks = sessionTasks.filter(t => t.is_completed).length;
@@ -6156,7 +6191,13 @@
           </div>
         </div>
       `;
-    });
+      }); // End dateSessions.forEach
+
+      html += `
+          </div>
+        </div>
+      `;
+    }); // End sortedDates.forEach
 
     container.innerHTML = html;
   }
