@@ -1,3 +1,4 @@
+// Toast Labor Summary API - Fetches employee time entries and calculates labor costs
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
