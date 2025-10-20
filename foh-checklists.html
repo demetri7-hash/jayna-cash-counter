@@ -3501,102 +3501,138 @@
           All checklists from the last 2 days. Click to view, print, or download as PDF.
         </p>
       </div>
-
-      <div style="display: grid; gap: 12px;">
     `;
 
+    // Group sessions by date
+    const sessionsByDate = {};
     completedSessions.forEach(session => {
-      const startedTime = new Date(session.started_at).toLocaleString('en-US', {
-        timeZone: 'America/Los_Angeles',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      });
-      const sessionDate = session.session_date === getPacificDate() ? 'Today' : 'Yesterday';
-      const checklistName = session.checklist_name || session.checklist_type.replace(/_/g, ' ').toUpperCase();
+      const date = session.session_date;
+      if (!sessionsByDate[date]) {
+        sessionsByDate[date] = [];
+      }
+      sessionsByDate[date].push(session);
+    });
 
-      const isComplete = session.is_complete === true;
-      const statusBadge = isComplete
-        ? `<span style="background: var(--success-bg); color: var(--success-text); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">✓ COMPLETE</span>`
-        : `<span style="background: var(--warning-bg); color: var(--warning-text); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">⏳ IN PROGRESS</span>`;
+    // Sort dates (newest first)
+    const sortedDates = Object.keys(sessionsByDate).sort((a, b) => b.localeCompare(a));
+
+    // Render each date group
+    sortedDates.forEach(date => {
+      const sessions = sessionsByDate[date];
+
+      // Sort sessions within date (newest first)
+      sessions.sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
+
+      // Get day of week
+      const dateObj = new Date(date + 'T12:00:00');
+      const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Los_Angeles' });
+      const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
+      const isToday = date === getPacificDate(0);
+      const dateLabel = isToday ? 'Today' : (date === getPacificDate(-1) ? 'Yesterday' : formattedDate);
 
       html += `
-        <div style="
-          background: white;
-          border: 2px solid var(--gray-300);
-          padding: 16px;
-          transition: all 0.15s ease;
-        "
-        onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';"
-        onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">
-              ${checklistName}
-            </h4>
-            ${statusBadge}
+        <div style="margin-bottom: 24px;">
+          <h3 style="margin: 0 0 12px 0; padding: 12px; background: var(--gray-100); border-left: 4px solid var(--gray-700); font-size: 13px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">
+            ${dateLabel} - ${dayOfWeek}
+          </h3>
+          <div style="display: grid; gap: 12px;">
+      `;
+
+      sessions.forEach(session => {
+        const startedTime = new Date(session.started_at).toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        const checklistName = session.checklist_name || session.checklist_type.replace(/_/g, ' ').toUpperCase();
+
+        const isComplete = session.is_complete === true;
+        const statusBadge = isComplete
+          ? `<span style="background: var(--success-bg); color: var(--success-text); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">✓ COMPLETE</span>`
+          : `<span style="background: var(--warning-bg); color: var(--warning-text); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">⏳ IN PROGRESS</span>`;
+
+        html += `
+          <div style="
+            background: white;
+            border: 2px solid var(--gray-300);
+            padding: 16px;
+            transition: all 0.15s ease;
+          "
+          onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';"
+          onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">
+                ${checklistName}
+              </h4>
+              ${statusBadge}
+            </div>
+            <div style="font-size: 12px; color: var(--gray-600); margin-bottom: 12px;">
+              <div>👤 ${session.staff_name || 'Unknown'}</div>
+              <div>🕐 ${startedTime}</div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button onclick="viewCompletedChecklistSession('${session.id}')" style="
+                flex: 1;
+                min-width: 100px;
+                padding: 8px 12px;
+                background: var(--gray-900);
+                color: white;
+                border: 2px solid var(--gray-900);
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#000'"
+              onmouseout="this.style.background='var(--gray-900)'"
+              >👁️ VIEW</button>
+              <button onclick="downloadChecklistPDF('${session.id}')" style="
+                flex: 1;
+                min-width: 100px;
+                padding: 8px 12px;
+                background: var(--gray-100);
+                color: var(--gray-900);
+                border: 2px solid var(--gray-300);
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.borderColor='var(--gray-700)'"
+              onmouseout="this.style.borderColor='var(--gray-300)'"
+              >📄 DOWNLOAD PDF</button>
+              <button onclick="printChecklistPDF('${session.id}')" style="
+                flex: 1;
+                min-width: 100px;
+                padding: 8px 12px;
+                background: var(--gray-100);
+                color: var(--gray-900);
+                border: 2px solid var(--gray-300);
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.borderColor='var(--gray-700)'"
+              onmouseout="this.style.borderColor='var(--gray-300)'"
+              >🖨️ PRINT</button>
+            </div>
           </div>
-          <div style="font-size: 12px; color: var(--gray-600); margin-bottom: 12px;">
-            <div>👤 ${session.staff_name || 'Unknown'}</div>
-            <div>📅 ${sessionDate} at ${startedTime}</div>
-          </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button onclick="viewCompletedChecklistSession(${session.id})" style="
-              flex: 1;
-              min-width: 100px;
-              padding: 8px 12px;
-              background: var(--gray-900);
-              color: white;
-              border: 2px solid var(--gray-900);
-              font-size: 11px;
-              font-weight: 700;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              cursor: pointer;
-              transition: all 0.15s ease;
-            "
-            onmouseover="this.style.background='#000'"
-            onmouseout="this.style.background='var(--gray-900)'"
-            >👁️ VIEW</button>
-            <button onclick="downloadChecklistPDF(${session.id})" style="
-              flex: 1;
-              min-width: 100px;
-              padding: 8px 12px;
-              background: var(--gray-100);
-              color: var(--gray-900);
-              border: 2px solid var(--gray-300);
-              font-size: 11px;
-              font-weight: 700;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              cursor: pointer;
-              transition: all 0.15s ease;
-            "
-            onmouseover="this.style.borderColor='var(--gray-700)'"
-            onmouseout="this.style.borderColor='var(--gray-300)'"
-            >📄 DOWNLOAD PDF</button>
-            <button onclick="printChecklistPDF(${session.id})" style="
-              flex: 1;
-              min-width: 100px;
-              padding: 8px 12px;
-              background: var(--gray-100);
-              color: var(--gray-900);
-              border: 2px solid var(--gray-300);
-              font-size: 11px;
-              font-weight: 700;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              cursor: pointer;
-              transition: all 0.15s ease;
-            "
-            onmouseover="this.style.borderColor='var(--gray-700)'"
-            onmouseout="this.style.borderColor='var(--gray-300)'"
-            >🖨️ PRINT</button>
+        `;
+      });
+
+      html += `
           </div>
         </div>
       `;
     });
-
-    html += '</div>';
 
     container.innerHTML = html;
   }
@@ -5796,20 +5832,29 @@
   }
 
   /**
-   * Load Watchdog Data for specific date
+   * Load Watchdog Data for specific date OR last 2 days
    */
-  async function loadWatchdogData(date) {
+  async function loadWatchdogData(date = null) {
     const container = document.getElementById('watchdogDataContainer');
 
     try {
       showLoading('Loading Data', 'Fetching checklist history...');
 
-      // Fetch sessions for the selected date
-      const { data: sessions, error: sessionsError } = await supabase
+      let query = supabase
         .from('foh_checklist_sessions')
         .select('*')
-        .eq('session_date', date)
         .order('started_at', { ascending: false });
+
+      // If date provided, filter by that date, otherwise get last 2 days
+      if (date) {
+        query = query.eq('session_date', date);
+      } else {
+        const today = getPacificDate(0);
+        const yesterday = getPacificDate(-1);
+        query = query.in('session_date', [today, yesterday]);
+      }
+
+      const { data: sessions, error: sessionsError } = await query;
 
       if (sessionsError) throw sessionsError;
 
