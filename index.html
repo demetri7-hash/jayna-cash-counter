@@ -14599,6 +14599,23 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       return;
     }
 
+    // Group items by storage location
+    const groupedItems = {};
+    prepItems.forEach(item => {
+      const area = item.storageLocation || 'No Defined Area';
+      if (!groupedItems[area]) {
+        groupedItems[area] = [];
+      }
+      groupedItems[area].push(item);
+    });
+
+    // Sort areas alphabetically, but put "No Defined Area" last
+    const sortedAreas = Object.keys(groupedItems).sort((a, b) => {
+      if (a === 'No Defined Area') return 1;
+      if (b === 'No Defined Area') return -1;
+      return a.localeCompare(b);
+    });
+
     // Helper functions
     function getStockStatus(currentStock, parLevel) {
       if (parLevel === 0) return { label: 'N/A', color: '#999', bg: '#f5f5f5' };
@@ -14649,15 +14666,21 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
     }
 
-    let html = `
-      <div style="margin-bottom: 20px;">
-        <h4 style="background: var(--gray-700); color: var(--white); padding: 12px 16px; border-radius: 0; margin-bottom: 12px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-          PREP ITEMS <span style="opacity: 0.85; font-weight: 400; font-size: 12px;">(${prepItems.length})</span>
-        </h4>
+    let html = '';
 
-        <!-- Single column layout for all screens -->
-        <div style="display: flex; flex-direction: column; gap: ${isCompactMode ? '8px' : '10px'};">
-          ${prepItems.map((item) => {
+    // Render each area group
+    sortedAreas.forEach((area, areaIndex) => {
+      const areaItems = groupedItems[area];
+
+      html += `
+        <div style="margin-bottom: ${areaIndex < sortedAreas.length - 1 ? '32px' : '20px'};">
+          <h4 style="background: var(--gray-700); color: var(--white); padding: 12px 16px; border-radius: 0; margin-bottom: 12px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+            ${area.toUpperCase()} <span style="opacity: 0.85; font-weight: 400; font-size: 12px;">(${areaItems.length})</span>
+          </h4>
+
+          <!-- Single column layout for all screens -->
+          <div style="display: flex; flex-direction: column; gap: ${isCompactMode ? '8px' : '10px'};">
+            ${areaItems.map((item) => {
             const status = getStockStatus(item.currentStock, item.parLevel);
             const lastCounted = formatLastCounted(item.lastCountedDate);
 
@@ -14674,9 +14697,27 @@ async function refreshUpcomingOrdersUI(targetContainer) {
               onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'">
 
                 <!-- Header: Item Name + Status Badge -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: ${isCompactMode ? '8px' : '12px'}; gap: 8px;">
-                  <div style="flex: 1; font-weight: 700; font-size: ${isCompactMode ? '14px' : '15px'}; line-height: 1.3; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">
-                    ${item.itemName}
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: ${isCompactMode ? '4px' : '6px'}; gap: 8px;">
+                  <div style="flex: 1;">
+                    <div style="font-weight: 700; font-size: ${isCompactMode ? '14px' : '15px'}; line-height: 1.3; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">
+                      ${item.itemName}
+                    </div>
+                    <div style="margin-top: 4px;">
+                      <a href="javascript:void(0)"
+                         onclick="showAreaSelector(${item.id}, '${(item.storageLocation || '').replace(/'/g, "\\'")}', event)"
+                         style="
+                           color: #1976d2;
+                           font-size: 10px;
+                           font-style: italic;
+                           text-decoration: none;
+                           cursor: pointer;
+                           opacity: 0.85;
+                         "
+                         onmouseover="this.style.opacity='1'; this.style.textDecoration='underline'"
+                         onmouseout="this.style.opacity='0.85'; this.style.textDecoration='none'">
+                        ${item.storageLocation || 'No defined area'}
+                      </a>
+                    </div>
                   </div>
                   <div style="
                     background: ${status.bg};
@@ -14977,10 +15018,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                 </div>
               </div>
             `;
-          }).join('')}
+            }).join('')}
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    });
 
     container.innerHTML = html;
   }
@@ -16163,6 +16205,361 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       inputElement.style.borderColor = originalBorder;
       inputElement.style.background = originalBg;
     }, 2500);
+  }
+
+  /**
+   * Show area selector popup for a prep item
+   */
+  async function showAreaSelector(itemId, currentArea, event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Get all unique storage locations from prep items
+    const prepItems = orderingSystemState.items.filter(item =>
+      item.vendor === 'PREP' || item.itemType === 'prep'
+    );
+
+    const uniqueAreas = [...new Set(prepItems
+      .map(item => item.storageLocation)
+      .filter(loc => loc && loc.trim() !== '')
+    )].sort();
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'areaSelectorModal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      padding: 20px;
+    `;
+
+    const content = document.createElement('div');
+    content.style.cssText = `
+      background: white;
+      padding: 24px;
+      max-width: 400px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 3px solid var(--gray-700);
+    `;
+
+    const title = document.createElement('h3');
+    title.textContent = 'SELECT STORAGE AREA';
+    title.style.cssText = `
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gray-900);
+    `;
+
+    const areaList = document.createElement('div');
+    areaList.style.cssText = 'margin-bottom: 16px;';
+
+    // Add existing areas
+    uniqueAreas.forEach(area => {
+      const areaBtn = document.createElement('button');
+      areaBtn.textContent = area;
+      areaBtn.style.cssText = `
+        display: block;
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 8px;
+        background: ${area === currentArea ? '#e3f2fd' : 'var(--gray-100)'};
+        border: 2px solid ${area === currentArea ? '#1976d2' : 'var(--gray-300)'};
+        color: var(--gray-900);
+        font-size: 13px;
+        font-weight: ${area === currentArea ? '700' : '400'};
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.15s;
+      `;
+      areaBtn.onmouseover = () => {
+        if (area !== currentArea) {
+          areaBtn.style.background = '#f5f5f5';
+          areaBtn.style.borderColor = 'var(--gray-400)';
+        }
+      };
+      areaBtn.onmouseout = () => {
+        if (area !== currentArea) {
+          areaBtn.style.background = 'var(--gray-100)';
+          areaBtn.style.borderColor = 'var(--gray-300)';
+        }
+      };
+      areaBtn.onclick = () => {
+        saveItemArea(itemId, area);
+        document.body.removeChild(modal);
+      };
+      areaList.appendChild(areaBtn);
+    });
+
+    content.appendChild(title);
+    content.appendChild(areaList);
+
+    // Add "Add New Area" section
+    const addNewContainer = document.createElement('div');
+    addNewContainer.id = 'addNewAreaContainer';
+    addNewContainer.style.cssText = 'margin-top: 16px; padding-top: 16px; border-top: 2px solid var(--gray-300);';
+
+    const addNewBtn = document.createElement('button');
+    addNewBtn.textContent = '+ ADD NEW AREA';
+    addNewBtn.style.cssText = `
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: var(--gray-700);
+      border: 2px solid var(--gray-700);
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.15s;
+    `;
+    addNewBtn.onmouseover = () => {
+      addNewBtn.style.background = 'var(--gray-900)';
+      addNewBtn.style.borderColor = 'var(--gray-900)';
+    };
+    addNewBtn.onmouseout = () => {
+      addNewBtn.style.background = 'var(--gray-700)';
+      addNewBtn.style.borderColor = 'var(--gray-700)';
+    };
+    addNewBtn.onclick = () => {
+      showAddNewAreaInput(itemId, addNewContainer);
+    };
+
+    addNewContainer.appendChild(addNewBtn);
+    content.appendChild(addNewContainer);
+
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'CANCEL';
+    closeBtn.style.cssText = `
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin-top: 16px;
+      background: var(--gray-100);
+      border: 2px solid var(--gray-300);
+      color: var(--gray-900);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    `;
+    closeBtn.onclick = () => document.body.removeChild(modal);
+
+    content.appendChild(closeBtn);
+    modal.appendChild(content);
+
+    // Close on backdrop click
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    };
+
+    document.body.appendChild(modal);
+  }
+
+  /**
+   * Show input for adding new area
+   */
+  function showAddNewAreaInput(itemId, container) {
+    container.innerHTML = '';
+
+    const inputGroup = document.createElement('div');
+
+    const label = document.createElement('label');
+    label.textContent = 'NEW AREA NAME';
+    label.style.cssText = `
+      display: block;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-700);
+    `;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'e.g., Walk-in Cooler';
+    input.style.cssText = `
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--gray-300);
+      font-size: 14px;
+      margin-bottom: 12px;
+      box-sizing: border-box;
+    `;
+
+    const saveStatus = document.createElement('div');
+    saveStatus.id = 'newAreaSaveStatus';
+    saveStatus.style.cssText = `
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    `;
+
+    // Auto-capitalize first letter
+    input.oninput = (e) => {
+      const value = e.target.value;
+      if (value.length > 0) {
+        e.target.value = value.charAt(0).toUpperCase() + value.slice(1);
+      }
+    };
+
+    // Save on Enter key
+    input.onkeypress = (e) => {
+      if (e.key === 'Enter') {
+        saveNewArea(itemId, input.value.trim(), saveStatus);
+      }
+    };
+
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'SAVE NEW AREA';
+    saveBtn.style.cssText = `
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: #2e7d32;
+      border: 2px solid #2e7d32;
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    `;
+    saveBtn.onclick = () => {
+      saveNewArea(itemId, input.value.trim(), saveStatus);
+    };
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = `
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: var(--gray-100);
+      border: 2px solid var(--gray-300);
+      color: var(--gray-900);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    `;
+    cancelBtn.onclick = () => {
+      const modal = document.getElementById('areaSelectorModal');
+      if (modal) document.body.removeChild(modal);
+    };
+
+    inputGroup.appendChild(label);
+    inputGroup.appendChild(input);
+    inputGroup.appendChild(saveStatus);
+    inputGroup.appendChild(saveBtn);
+    inputGroup.appendChild(cancelBtn);
+    container.appendChild(inputGroup);
+
+    // Focus input
+    setTimeout(() => input.focus(), 100);
+  }
+
+  /**
+   * Save new area and assign to item
+   */
+  async function saveNewArea(itemId, areaName, statusDiv) {
+    if (!areaName) {
+      alert('Please enter an area name');
+      return;
+    }
+
+    // Show saving status
+    statusDiv.textContent = '💾 Saving...';
+    statusDiv.style.color = '#ff9800';
+    statusDiv.style.opacity = '1';
+
+    try {
+      // Save to database
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ storage_location: areaName })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.storageLocation = areaName;
+      }
+
+      // Success feedback
+      statusDiv.textContent = '✅ Saved!';
+      statusDiv.style.color = '#2e7d32';
+
+      // Close modal after delay
+      setTimeout(() => {
+        const modal = document.getElementById('areaSelectorModal');
+        if (modal) document.body.removeChild(modal);
+
+        // Re-render prep list to show updated area
+        renderPrepCountList();
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error saving area:', error);
+      statusDiv.textContent = '❌ Failed to save';
+      statusDiv.style.color = '#d32f2f';
+      setTimeout(() => {
+        statusDiv.style.opacity = '0';
+      }, 3000);
+    }
+  }
+
+  /**
+   * Save item area selection
+   */
+  async function saveItemArea(itemId, areaName) {
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ storage_location: areaName })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (item) {
+        item.storageLocation = areaName;
+      }
+
+      // Re-render prep list to show updated area
+      renderPrepCountList();
+
+    } catch (error) {
+      console.error('Error saving area:', error);
+      alert('Failed to save area. Please try again.');
+    }
   }
 
   /**
