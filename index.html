@@ -7730,7 +7730,20 @@
         fetch(`/api/toast-sales-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`)
       ]);
 
-      if (!laborResponse.ok || !salesResponse.ok) throw new Error('Failed to fetch data');
+      console.log('Labor response:', laborResponse.status, laborResponse.statusText);
+      console.log('Sales response:', salesResponse.status, salesResponse.statusText);
+
+      if (!laborResponse.ok) {
+        const laborError = await laborResponse.text();
+        console.error('Labor API error response:', laborError);
+        throw new Error(`Labor API failed: ${laborResponse.status} - ${laborError}`);
+      }
+
+      if (!salesResponse.ok) {
+        const salesError = await salesResponse.text();
+        console.error('Sales API error response:', salesError);
+        throw new Error(`Sales API failed: ${salesResponse.status} - ${salesError}`);
+      }
 
       const [laborResult, salesResult] = await Promise.all([
         laborResponse.json(),
