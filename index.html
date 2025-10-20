@@ -22438,7 +22438,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           // Get current item data
           const { data: currentItem, error: fetchError } = await supabase
             .from('inventory_items')
-            .select('current_stock, item_name, item_number, manufacturer_item_number, gtin, category, brand, manufacturer_name')
+            .select('current_stock, item_name, last_price, item_number, manufacturer_item_number, gtin, category, brand, manufacturer_name')
             .eq('id', item.matchedInventoryId)
             .single();
 
@@ -22476,8 +22476,42 @@ async function refreshUpcomingOrdersUI(targetContainer) {
               updateData.manufacturer_name = item.pfgData.manufacturerName;
             }
 
-            // TODO: Price tracking will be enabled when last_price column is added to database
-            // For now, price data is captured in invoice_items table (detected_price field)
+            // Track price changes if price is provided
+            if (item.detectedPrice && item.detectedPrice > 0) {
+              const oldPrice = parseFloat(currentItem.last_price) || 0;
+              const newPrice = parseFloat(item.detectedPrice);
+
+              if (oldPrice !== newPrice && oldPrice > 0) {
+                const priceChange = newPrice - oldPrice;
+                const priceChangePercent = ((priceChange / oldPrice) * 100).toFixed(2);
+
+                console.log(`  💰 Price change: $${oldPrice} → $${newPrice} (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent}%)`);
+
+                // Save to price_history table
+                const { error: priceHistoryError } = await supabase
+                  .from('price_history')
+                  .insert({
+                    inventory_item_id: item.matchedInventoryId,
+                    item_number: item.pfgData.itemNumber,
+                    old_price: oldPrice,
+                    new_price: newPrice,
+                    price_change: priceChange,
+                    price_change_percent: parseFloat(priceChangePercent),
+                    invoice_number: item.pfgData.invoiceNumber,
+                    invoice_date: item.pfgData.invoiceDate,
+                    vendor: item.pfgData.vendor
+                  });
+
+                if (priceHistoryError) {
+                  console.error('Failed to save price history:', priceHistoryError);
+                } else {
+                  console.log('  ✅ Price history saved!');
+                }
+              }
+
+              // Update last_price regardless
+              updateData.last_price = newPrice;
+            }
           }
 
           // Update the inventory item
@@ -22542,6 +22576,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                 unit: item.detectedUnit || 'case',
                 par_level: item.detectedQuantity || 1,
                 current_stock: item.detectedQuantity || 0,
+                last_price: item.detectedPrice || 0,
                 item_number: item.pfgData.itemNumber,
                 manufacturer_item_number: item.pfgData.manufacturerItemNumber,
                 gtin: item.pfgData.gtin,
