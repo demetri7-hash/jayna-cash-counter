@@ -668,6 +668,7 @@
   <!-- Tip Pool Calculator Dependencies -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
   <!-- OCR Dependencies -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
@@ -1804,7 +1805,7 @@
               <input
                 type="file"
                 id="invoiceFileInput"
-                accept="image/*,application/pdf"
+                accept="image/*,application/pdf,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 style="display: none;"
                 onchange="handleInvoiceUpload(event)"
               />
@@ -19740,13 +19741,270 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate file type (accept images AND PDFs)
+    // Validate file type (accept images, PDFs, CSV, and Excel)
     const isImage = file.type.startsWith('image/');
     const isPDF = file.type === 'application/pdf';
+    const isCSV = file.name.endsWith('.csv') || file.type === 'text/csv';
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ||
+                    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                    file.type === 'application/vnd.ms-excel';
 
-    if (!isImage && !isPDF) {
-      showMessage('Please upload an image file (JPG, PNG) or PDF', 'error');
+    if (!isImage && !isPDF && !isCSV && !isExcel) {
+      showMessage('Please upload an image, PDF, CSV, or Excel file', 'error');
       return;
+    }
+
+    // Handle CSV files (PFG Invoice Export)
+    if (isCSV) {
+      handlePFGInvoiceCSV(file);
+      return;
+    }
+
+    // Handle Excel files (Invoice Insights)
+    if (isExcel) {
+      handlePFGInsightsExcel(file);
+      return;
+    }
+
+    /**
+     * Handle PFG Invoice CSV Upload
+     * Parses PFG Customer First Invoice Export CSV format
+     * Auto-creates missing items with full PFG data tracking
+     */
+    async function handlePFGInvoiceCSV(file) {
+      console.log('📋 Handling PFG Invoice CSV:', file.name);
+      showMessage('Processing PFG Invoice CSV...', 'success');
+
+      // Set invoice type to 'receive'
+      orderingSystemState.invoiceType = 'receive';
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const csvText = e.target.result;
+
+        // Parse CSV with PapaParse
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: async function(results) {
+            console.log('✅ CSV parsed:', results.data.length, 'rows');
+
+            if (results.errors.length > 0) {
+              console.warn('CSV parsing errors:', results.errors);
+            }
+
+            // Clear existing extracted items
+            orderingSystemState.extractedInvoiceItems = [];
+
+            // Load ALL inventory items if not loaded
+            if (orderingSystemState.items.length === 0) {
+              console.log('Loading inventory items...');
+              await loadInventoryItemsForOrdering();
+            }
+
+            // Extract items from CSV
+            let itemsCreated = 0;
+            let itemsMatched = 0;
+
+            for (const row of results.data) {
+              // Skip rows with no quantity shipped
+              const qtyShipped = parseFloat(row['Qty Shipped']) || 0;
+              if (qtyShipped === 0) {
+                console.log('Skipping item with 0 qty shipped:', row['Product Description']);
+                continue;
+              }
+
+              const itemName = row['Product Description']?.trim();
+              const pfgItemNumber = row['Product #']?.trim();
+              const manufacturerItemNumber = row['Manufacturer Product #']?.trim();
+              const gtin = row['GTIN']?.trim();
+              const category = row['Category/Class']?.trim();
+              const brand = row['Brand']?.trim();
+              const manufacturerName = row['Manufacturer Name']?.trim();
+              const packSize = row['Pack Size']?.trim();
+              const uom = row['UOM']?.trim();
+              const unitPrice = parseFloat(row['Unit Price']) || 0;
+
+              if (!itemName) {
+                console.warn('Skipping row with no product description');
+                continue;
+              }
+
+              console.log(`\n📦 Processing: ${itemName} (PFG #${pfgItemNumber})`);
+
+              // Try to match with existing inventory
+              // PRIORITY 1: Match by item_number (PFG Product #)
+              let matchedItem = null;
+              let matchConfidence = 0;
+
+              if (pfgItemNumber) {
+                matchedItem = orderingSystemState.items.find(item => item.item_number === pfgItemNumber);
+                if (matchedItem) {
+                  matchConfidence = 1.0;
+                  console.log(`✅ Matched by item_number: ${matchedItem.itemName}`);
+                }
+              }
+
+              // PRIORITY 2: Fuzzy match by name if no item_number match
+              if (!matchedItem) {
+                const fuzzyMatch = fuzzyMatchInventoryItem(itemName, null);
+                if (fuzzyMatch && fuzzyMatch.confidence >= 0.7) {
+                  const item = orderingSystemState.items.find(i => i.id === fuzzyMatch.id);
+                  if (item) {
+                    matchedItem = item;
+                    matchConfidence = fuzzyMatch.confidence;
+                    console.log(`🔍 Fuzzy matched: ${matchedItem.itemName} (${Math.round(matchConfidence * 100)}%)`);
+                  }
+                }
+              }
+
+              // Create extracted item object
+              const extractedItem = {
+                id: Date.now() + Math.random(),
+                detectedName: itemName,
+                detectedQuantity: qtyShipped,
+                detectedQuantityShipped: qtyShipped,
+                detectedUnit: uom === 'CS' ? 'case' : uom?.toLowerCase(),
+                detectedPrice: unitPrice,
+                matchedInventoryId: matchedItem ? matchedItem.id : null,
+                matchConfidence: matchConfidence,
+                matchedItemName: matchedItem ? matchedItem.itemName : null,
+                matchedVendor: matchedItem ? matchedItem.vendor : null,
+                skipped: false,
+                flaggedAsNew: !matchedItem, // Flag as new if no match found
+
+                // Store PFG data for auto-create and price tracking
+                pfgData: {
+                  itemNumber: pfgItemNumber,
+                  manufacturerItemNumber: manufacturerItemNumber,
+                  gtin: gtin,
+                  category: category,
+                  brand: brand,
+                  manufacturerName: manufacturerName,
+                  packSize: packSize,
+                  invoiceNumber: row['Invoice Number']?.trim(),
+                  invoiceDate: row['Invoice Date']?.trim(),
+                  vendor: 'PFG' // Always PFG for these invoices
+                }
+              };
+
+              orderingSystemState.extractedInvoiceItems.push(extractedItem);
+
+              if (matchedItem) {
+                itemsMatched++;
+              } else {
+                itemsCreated++;
+                console.log(`🆕 Will auto-create: ${itemName}`);
+              }
+            }
+
+            console.log(`\n📊 PFG CSV Processing Complete:`);
+            console.log(`   - Total items: ${orderingSystemState.extractedInvoiceItems.length}`);
+            console.log(`   - Matched: ${itemsMatched}`);
+            console.log(`   - New items to create: ${itemsCreated}`);
+
+            // Show extracted items section
+            document.getElementById('extractedItemsSection').style.display = 'block';
+            renderExtractedItems();
+
+            showMessage(`✅ Processed ${orderingSystemState.extractedInvoiceItems.length} items! ${itemsMatched} matched, ${itemsCreated} new.`, 'success');
+          },
+          error: function(error) {
+            console.error('CSV parsing error:', error);
+            showMessage('Failed to parse CSV: ' + error.message, 'error');
+          }
+        });
+      };
+
+      reader.readAsText(file);
+    }
+
+    /**
+     * Handle PFG Invoice Insights Excel Upload (ONE-TIME IMPORT)
+     * This is for initial data seeding, not ongoing system feature
+     */
+    async function handlePFGInsightsExcel(file) {
+      console.log('📊 Handling PFG Invoice Insights Excel (one-time import):', file.name);
+      showMessage('Processing Invoice Insights Excel (this may take a moment)...', 'success');
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+
+          // Read first sheet
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet);
+
+          console.log('✅ Excel parsed:', rows.length, 'rows');
+
+          // Process rows and update existing inventory items with item numbers and price history
+          let itemsUpdated = 0;
+          let itemsNotFound = 0;
+
+          for (const row of rows) {
+            const itemName = row['Product Description']?.trim();
+            const pfgItemNumber = row['Product #']?.toString()?.trim();
+            const manufacturerItemNumber = row['Manufacturer Product #']?.trim();
+            const gtin = row['GTIN']?.toString()?.trim();
+            const category = row['Category/Class']?.trim();
+            const brand = row['Brand']?.trim();
+            const manufacturerName = row['Manufacturer Name']?.trim();
+            const unitPrice = parseFloat(row['Unit Price']) || 0;
+
+            if (!itemName || !pfgItemNumber) {
+              continue;
+            }
+
+            // Find matching inventory item by fuzzy name match
+            const fuzzyMatch = fuzzyMatchInventoryItem(itemName, null);
+            if (fuzzyMatch && fuzzyMatch.confidence >= 0.7) {
+              const inventoryItem = orderingSystemState.items.find(i => i.id === fuzzyMatch.id);
+              if (inventoryItem) {
+                // Update item in database with PFG tracking data
+                const { error } = await supabase
+                  .from('inventory_items')
+                  .update({
+                    item_number: pfgItemNumber,
+                    manufacturer_item_number: manufacturerItemNumber,
+                    gtin: gtin,
+                    category: category,
+                    brand: brand,
+                    manufacturer_name: manufacturerName
+                  })
+                  .eq('id', inventoryItem.id);
+
+                if (error) {
+                  console.error('Failed to update item:', inventoryItem.itemName, error);
+                } else {
+                  itemsUpdated++;
+                  console.log(`✅ Updated: ${inventoryItem.itemName} → PFG #${pfgItemNumber}`);
+                }
+              }
+            } else {
+              itemsNotFound++;
+              console.log(`⚠️ No match found for: ${itemName}`);
+            }
+          }
+
+          console.log(`\n📊 Insights Excel Import Complete:`);
+          console.log(`   - Items updated: ${itemsUpdated}`);
+          console.log(`   - Items not matched: ${itemsNotFound}`);
+
+          showMessage(`✅ Imported data for ${itemsUpdated} items! ${itemsNotFound} not matched.`, 'success');
+
+          // Reload inventory to reflect changes
+          await loadInventoryItemsForOrdering();
+
+        } catch (error) {
+          console.error('Excel processing error:', error);
+          showMessage('Failed to process Excel: ' + error.message, 'error');
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
     }
 
     // Handle PDF files
@@ -22155,7 +22413,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             inventory_item_id: item.matchedInventoryId,
             confidence: item.matchConfidence
           });
-          
+
           const { error: itemError } = await supabase
             .from('invoice_items')
             .insert({
@@ -22176,11 +22434,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           }
           console.log('✅ Learning data saved successfully!');
 
-          // Update inventory stock
-          // Get current stock first
+          // Update inventory stock and PFG tracking data
+          // Get current item data
           const { data: currentItem, error: fetchError } = await supabase
             .from('inventory_items')
-            .select('current_stock')
+            .select('current_stock, item_name, last_price, item_number, manufacturer_item_number, gtin, category, brand, manufacturer_name')
             .eq('id', item.matchedInventoryId)
             .single();
 
@@ -22188,13 +22446,78 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
           const newStock = (parseFloat(currentItem.current_stock) || 0) + (parseFloat(item.detectedQuantity) || 0);
 
-          // Update the stock
+          // Prepare update object
+          const updateData = {
+            current_stock: newStock,
+            last_counted_date: new Date().toISOString()
+          };
+
+          // Update PFG tracking fields if this item has PFG data and fields are empty
+          if (item.pfgData) {
+            console.log('📦 PFG data detected for', currentItem.item_name);
+
+            if (item.pfgData.itemNumber && !currentItem.item_number) {
+              updateData.item_number = item.pfgData.itemNumber;
+              console.log('  → Adding item_number:', item.pfgData.itemNumber);
+            }
+            if (item.pfgData.manufacturerItemNumber && !currentItem.manufacturer_item_number) {
+              updateData.manufacturer_item_number = item.pfgData.manufacturerItemNumber;
+            }
+            if (item.pfgData.gtin && !currentItem.gtin) {
+              updateData.gtin = item.pfgData.gtin;
+            }
+            if (item.pfgData.category && !currentItem.category) {
+              updateData.category = item.pfgData.category;
+            }
+            if (item.pfgData.brand && !currentItem.brand) {
+              updateData.brand = item.pfgData.brand;
+            }
+            if (item.pfgData.manufacturerName && !currentItem.manufacturer_name) {
+              updateData.manufacturer_name = item.pfgData.manufacturerName;
+            }
+
+            // Track price changes if price is provided
+            if (item.detectedPrice && item.detectedPrice > 0) {
+              const oldPrice = parseFloat(currentItem.last_price) || 0;
+              const newPrice = parseFloat(item.detectedPrice);
+
+              if (oldPrice !== newPrice && oldPrice > 0) {
+                const priceChange = newPrice - oldPrice;
+                const priceChangePercent = ((priceChange / oldPrice) * 100).toFixed(2);
+
+                console.log(`  💰 Price change: $${oldPrice} → $${newPrice} (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent}%)`);
+
+                // Save to price_history table
+                const { error: priceHistoryError } = await supabase
+                  .from('price_history')
+                  .insert({
+                    inventory_item_id: item.matchedInventoryId,
+                    item_number: item.pfgData.itemNumber,
+                    old_price: oldPrice,
+                    new_price: newPrice,
+                    price_change: priceChange,
+                    price_change_percent: parseFloat(priceChangePercent),
+                    invoice_number: item.pfgData.invoiceNumber,
+                    invoice_date: item.pfgData.invoiceDate,
+                    vendor: item.pfgData.vendor
+                  });
+
+                if (priceHistoryError) {
+                  console.error('Failed to save price history:', priceHistoryError);
+                } else {
+                  console.log('  ✅ Price history saved!');
+                }
+              }
+
+              // Update last_price regardless
+              updateData.last_price = newPrice;
+            }
+          }
+
+          // Update the inventory item
           const { error: updateError } = await supabase
             .from('inventory_items')
-            .update({
-              current_stock: newStock,
-              last_counted_date: new Date().toISOString()
-            })
+            .update(updateData)
             .eq('id', item.matchedInventoryId);
 
           if (updateError) throw updateError;
@@ -22233,11 +22556,76 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       document.getElementById('invoiceFileInput').value = '';
       document.getElementById('invoiceCameraInput').value = '';
 
-      // If there are flagged new items, show modal to add them
+      // If there are flagged new items, auto-create them with PFG data or show modal
       if (newItems.length > 0) {
-        setTimeout(() => {
-          showAddNewItemsModal(newItems);
-        }, 500);
+        // Separate items with PFG data (auto-create) from items without (manual entry)
+        const itemsWithPFG = newItems.filter(item => item.pfgData && item.pfgData.itemNumber);
+        const itemsWithoutPFG = newItems.filter(item => !item.pfgData || !item.pfgData.itemNumber);
+
+        // Auto-create items with PFG data
+        if (itemsWithPFG.length > 0) {
+          console.log(`🆕 Auto-creating ${itemsWithPFG.length} new items with PFG data...`);
+
+          showLoading('Creating New Items', `Adding ${itemsWithPFG.length} item(s) to inventory...`);
+
+          setTimeout(async () => {
+            try {
+              const itemsToCreate = itemsWithPFG.map(item => ({
+                item_name: item.detectedName,
+                vendor: item.pfgData.vendor || 'PFG',
+                unit: item.detectedUnit || 'case',
+                par_level: item.detectedQuantity || 1,
+                current_stock: item.detectedQuantity || 0,
+                last_price: item.detectedPrice || 0,
+                item_number: item.pfgData.itemNumber,
+                manufacturer_item_number: item.pfgData.manufacturerItemNumber,
+                gtin: item.pfgData.gtin,
+                category: item.pfgData.category,
+                brand: item.pfgData.brand,
+                manufacturer_name: item.pfgData.manufacturerName,
+                item_type: 'regular',
+                last_counted_date: new Date().toISOString()
+              }));
+
+              const { data: createdItems, error: createError } = await supabase
+                .from('inventory_items')
+                .insert(itemsToCreate)
+                .select();
+
+              if (createError) throw createError;
+
+              hideLoading();
+              showMessage(`✅ Auto-created ${createdItems.length} new item(s) with PFG tracking data!`, 'success');
+              console.log('✅ Created items:', createdItems.map(i => i.item_name).join(', '));
+
+              // Reload inventory
+              await loadInventoryData();
+
+              // If there are items without PFG data, show modal for manual entry
+              if (itemsWithoutPFG.length > 0) {
+                setTimeout(() => {
+                  showAddNewItemsModal(itemsWithoutPFG);
+                }, 500);
+              }
+
+            } catch (error) {
+              hideLoading();
+              console.error('Error auto-creating items:', error);
+              showMessage('Failed to auto-create items: ' + error.message, 'error');
+
+              // Fallback: show modal for all new items (including PFG ones)
+              setTimeout(() => {
+                showAddNewItemsModal(newItems);
+              }, 500);
+            }
+          }, 100);
+
+        } else if (itemsWithoutPFG.length > 0) {
+          // No PFG data, show modal for manual entry
+          setTimeout(() => {
+            showAddNewItemsModal(itemsWithoutPFG);
+          }, 500);
+        }
       }
 
     } catch (error) {
