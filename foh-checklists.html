@@ -266,6 +266,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="foh-checklists-data.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
   <!-- Loading Overlay -->
@@ -1803,7 +1804,7 @@
   }
 
   /**
-   * Load completed checklists from today and yesterday for review
+   * Load ALL checklists from last 2 days for review (completed and incomplete)
    */
   async function loadCompletedChecklistsForReview() {
     try {
@@ -1814,18 +1815,17 @@
         .from('foh_checklist_sessions')
         .select('*')
         .in('session_date', [today, yesterday])
-        .eq('is_complete', true)
-        .order('completed_at', { ascending: false });
+        .order('started_at', { ascending: false });
 
       if (error) {
-        console.error('Error loading completed checklists:', error);
+        console.error('Error loading checklists for review:', error);
         return [];
       }
 
-      console.log('✅ Loaded completed checklists for review:', sessions?.length || 0);
+      console.log('✅ Loaded checklists for review:', sessions?.length || 0);
       return sessions || [];
     } catch (error) {
-      console.error('Error loading completed checklists:', error);
+      console.error('Error loading checklists for review:', error);
       return [];
     }
   }
@@ -3486,10 +3486,10 @@
       container.innerHTML = `
         <div style="text-align: center; padding: 40px;">
           <p style="font-size: 16px; color: var(--gray-700); margin-bottom: 12px;">
-            📋 No completed checklists found
+            📋 No checklists found
           </p>
           <p style="font-size: 13px; color: var(--gray-500);">
-            Completed checklists from today and yesterday will appear here for review.
+            Checklists from today and yesterday will appear here for review.
           </p>
         </div>
       `;
@@ -3497,12 +3497,12 @@
     }
 
     let html = `
-      <div style="margin-bottom: 20px; padding: 16px; background: var(--success-bg); border-left: 4px solid var(--success-border); border-radius: 0;">
-        <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: var(--success-text); text-transform: uppercase; letter-spacing: 1px;">
-          ✅ COMPLETED CHECKLISTS
+      <div style="margin-bottom: 20px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
+        <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: var(--blue-text); text-transform: uppercase; letter-spacing: 1px;">
+          📋 RECENT CHECKLISTS
         </h3>
-        <p style="color: var(--success-text); font-size: 12px; margin: 0;">
-          Review previous checklists for accountability and continuity. Click to view photos, notes, and ratings.
+        <p style="color: var(--blue-text); font-size: 12px; margin: 0;">
+          All checklists from the last 2 days. Click to view, print, or download as PDF.
         </p>
       </div>
 
@@ -3510,7 +3510,7 @@
     `;
 
     completedSessions.forEach(session => {
-      const completedTime = new Date(session.completed_at).toLocaleString('en-US', {
+      const startedTime = new Date(session.started_at).toLocaleString('en-US', {
         timeZone: 'America/Los_Angeles',
         hour: 'numeric',
         minute: '2-digit',
@@ -3519,33 +3519,82 @@
       const sessionDate = session.session_date === getPacificDate() ? 'Today' : 'Yesterday';
       const checklistName = session.checklist_name || session.checklist_type.replace(/_/g, ' ').toUpperCase();
 
+      const isComplete = session.is_complete === true;
+      const statusBadge = isComplete
+        ? `<span style="background: var(--success-bg); color: var(--success-text); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">✓ COMPLETE</span>`
+        : `<span style="background: var(--warning-bg); color: var(--warning-text); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">⏳ IN PROGRESS</span>`;
+
       html += `
         <div style="
           background: white;
           border: 2px solid var(--gray-300);
           padding: 16px;
-          cursor: pointer;
           transition: all 0.15s ease;
         "
-        onclick="viewCompletedChecklistSession(${session.id})"
         onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';"
         onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">
               ${checklistName}
             </h4>
-            <span style="
-              background: var(--success-bg);
-              color: var(--success-text);
-              padding: 4px 10px;
+            ${statusBadge}
+          </div>
+          <div style="font-size: 12px; color: var(--gray-600); margin-bottom: 12px;">
+            <div>👤 ${session.staff_name || 'Unknown'}</div>
+            <div>📅 ${sessionDate} at ${startedTime}</div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button onclick="viewCompletedChecklistSession(${session.id})" style="
+              flex: 1;
+              min-width: 100px;
+              padding: 8px 12px;
+              background: var(--gray-900);
+              color: white;
+              border: 2px solid var(--gray-900);
               font-size: 11px;
               font-weight: 700;
-              border-radius: 0;
-            ">✓ COMPLETE</span>
-          </div>
-          <div style="font-size: 12px; color: var(--gray-600);">
-            <div>👤 ${session.staff_name || 'Unknown'}</div>
-            <div>📅 ${sessionDate} at ${completedTime}</div>
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.background='#000'"
+            onmouseout="this.style.background='var(--gray-900)'"
+            >👁️ VIEW</button>
+            <button onclick="downloadChecklistPDF(${session.id})" style="
+              flex: 1;
+              min-width: 100px;
+              padding: 8px 12px;
+              background: var(--gray-100);
+              color: var(--gray-900);
+              border: 2px solid var(--gray-300);
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.borderColor='var(--gray-700)'"
+            onmouseout="this.style.borderColor='var(--gray-300)'"
+            >📄 DOWNLOAD PDF</button>
+            <button onclick="printChecklistPDF(${session.id})" style="
+              flex: 1;
+              min-width: 100px;
+              padding: 8px 12px;
+              background: var(--gray-100);
+              color: var(--gray-900);
+              border: 2px solid var(--gray-300);
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+            "
+            onmouseover="this.style.borderColor='var(--gray-700)'"
+            onmouseout="this.style.borderColor='var(--gray-300)'"
+            >🖨️ PRINT</button>
           </div>
         </div>
       `;
@@ -3554,6 +3603,227 @@
     html += '</div>';
 
     container.innerHTML = html;
+  }
+
+  /**
+   * Generate checklist PDF (compact, fits on double-sided page)
+   */
+  async function generateChecklistPDF(sessionId) {
+    try {
+      showLoading('Generating PDF...', 'Loading checklist data...');
+
+      // Load session data
+      const { data: session, error } = await supabase
+        .from('foh_checklist_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+
+      if (error) throw error;
+      if (!session) throw new Error('Session not found');
+
+      // Load checklist definition
+      const checklistDef = await loadChecklistFromDatabase(session.checklist_type);
+
+      // Load photos
+      const { data: photos } = await supabase
+        .from('foh_photos')
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('is_deleted', false)
+        .order('uploaded_at', { ascending: true });
+
+      hideLoading();
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+
+      const pageWidth = doc.internal.pageSize.width;
+      const margin = 40;
+      let y = margin;
+
+      // Header
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(checklistDef.title.toUpperCase(), margin, y);
+      y += 20;
+
+      // Session info
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Staff: ${session.staff_name || 'Unknown'}`, margin, y);
+      y += 12;
+      doc.text(`Date: ${new Date(session.started_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}`, margin, y);
+      y += 12;
+      doc.text(`Status: ${session.is_complete ? 'COMPLETE' : 'IN PROGRESS'}`, margin, y);
+      y += 20;
+
+      // Tasks
+      if (session.tasks && session.tasks.length > 0) {
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('TASKS', margin, y);
+        y += 15;
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+
+        session.tasks.forEach((task, idx) => {
+          if (y > doc.internal.pageSize.height - 60) {
+            doc.addPage();
+            y = margin;
+          }
+
+          const checkbox = task.is_completed ? '☑' : '☐';
+          const taskText = `${checkbox} ${task.text}`;
+
+          doc.text(taskText, margin, y);
+          y += 12;
+
+          // Show notes if present
+          if (task.notes && task.notes.trim()) {
+            doc.setFont('helvetica', 'italic');
+            doc.setTextColor(100, 100, 100);
+            const noteLines = doc.splitTextToSize(`   Note: ${task.notes}`, pageWidth - margin * 2 - 20);
+            noteLines.forEach(line => {
+              doc.text(line, margin + 10, y);
+              y += 10;
+            });
+            doc.setTextColor(0, 0, 0);
+            doc.setFont('helvetica', 'normal');
+          }
+
+          // Show rating if present
+          if (task.rating) {
+            doc.text(`   Rating: ${'⭐'.repeat(task.rating)}`, margin + 10, y);
+            y += 12;
+          }
+        });
+
+        y += 10;
+      }
+
+      // Notes for next shift
+      if (session.notes_for_next_shift && session.notes_for_next_shift.trim()) {
+        if (y > doc.internal.pageSize.height - 100) {
+          doc.addPage();
+          y = margin;
+        }
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('NOTES FOR NEXT SHIFT', margin, y);
+        y += 15;
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        const noteLines = doc.splitTextToSize(session.notes_for_next_shift, pageWidth - margin * 2);
+        noteLines.forEach(line => {
+          doc.text(line, margin, y);
+          y += 10;
+        });
+        y += 10;
+      }
+
+      // Photos count
+      if (photos && photos.length > 0) {
+        if (y > doc.internal.pageSize.height - 40) {
+          doc.addPage();
+          y = margin;
+        }
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`PHOTOS (${photos.length} attached)`, margin, y);
+        y += 15;
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        photos.forEach((photo, idx) => {
+          const photoTime = new Date(photo.uploaded_at).toLocaleString('en-US', {
+            timeZone: 'America/Los_Angeles',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+          doc.text(`${idx + 1}. Uploaded at ${photoTime}`, margin, y);
+          y += 10;
+        });
+      }
+
+      // Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text(
+          `Page ${i} of ${pageCount} - Generated ${new Date().toLocaleString()}`,
+          pageWidth / 2,
+          doc.internal.pageSize.height - 20,
+          { align: 'center' }
+        );
+      }
+
+      return doc;
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      hideLoading();
+      showMessage('Error generating PDF: ' + error.message, 'error');
+      return null;
+    }
+  }
+
+  /**
+   * Download checklist as PDF
+   */
+  async function downloadChecklistPDF(sessionId) {
+    const doc = await generateChecklistPDF(sessionId);
+    if (!doc) return;
+
+    const filename = `Checklist_${sessionId}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+    showMessage('✅ PDF downloaded!', 'success');
+  }
+
+  /**
+   * Print checklist PDF to Epson printer
+   */
+  async function printChecklistPDF(sessionId) {
+    try {
+      const doc = await generateChecklistPDF(sessionId);
+      if (!doc) return;
+
+      showLoading('Sending to printer...', 'Preparing PDF...');
+
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      const filename = `Checklist_${sessionId}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      // Send to printer via backend API
+      const response = await fetch('/api/send-ordering-guide-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pdfBase64: pdfBase64,
+          filename: filename
+        })
+      });
+
+      const result = await response.json();
+
+      hideLoading();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send to printer');
+      }
+
+      showMessage('✅ Checklist sent to printer!', 'success');
+
+    } catch (error) {
+      console.error('Error printing PDF:', error);
+      hideLoading();
+      showMessage('Error sending to printer: ' + error.message, 'error');
+    }
   }
 
   /**
