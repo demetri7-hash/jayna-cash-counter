@@ -2210,6 +2210,9 @@
       }
     });
 
+    // Check auto-print status on initial page load (PREP tab is default)
+    setTimeout(() => checkAutoPrintStatus(), 500);
+
     // Removed "App ready" message to prevent page bouncing
   });
   
@@ -17501,23 +17504,48 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     if (!statusDiv) return;
 
     try {
-      // Calculate 8-hour window (9pm yesterday to 4am today Pacific time)
+      // Calculate 8-hour window (9pm to 4am) based on current time
       const now = new Date();
       const pacificNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      const currentHour = pacificNow.getHours();
 
-      const fourAmToday = new Date(pacificNow);
-      fourAmToday.setHours(4, 0, 0, 0);
+      let windowStart, windowEnd;
 
-      const ninePmYesterday = new Date(fourAmToday);
-      ninePmYesterday.setHours(ninePmYesterday.getHours() - 7); // 9pm = 4am - 7 hours
+      if (currentHour >= 21) {
+        // After 9pm - check from 9pm today to 4am tomorrow
+        windowStart = new Date(pacificNow);
+        windowStart.setHours(21, 0, 0, 0);
+
+        windowEnd = new Date(windowStart);
+        windowEnd.setDate(windowEnd.getDate() + 1); // Next day
+        windowEnd.setHours(4, 0, 0, 0);
+      } else if (currentHour < 4) {
+        // Before 4am - check from 9pm yesterday to 4am today
+        windowEnd = new Date(pacificNow);
+        windowEnd.setHours(4, 0, 0, 0);
+
+        windowStart = new Date(windowEnd);
+        windowStart.setDate(windowStart.getDate() - 1); // Previous day
+        windowStart.setHours(21, 0, 0, 0);
+      } else {
+        // Between 4am and 9pm - check LAST completed window (9pm yesterday to 4am today)
+        windowEnd = new Date(pacificNow);
+        windowEnd.setHours(4, 0, 0, 0);
+
+        windowStart = new Date(windowEnd);
+        windowStart.setDate(windowStart.getDate() - 1); // Previous day
+        windowStart.setHours(21, 0, 0, 0);
+      }
+
+      console.log('Checking prep window:', windowStart.toLocaleString(), 'to', windowEnd.toLocaleString());
 
       // Check if any prep items were counted in the 8-hour window
       const { data: recentCounts, error } = await supabase
         .from('inventory_items')
         .select('item_name, last_counted_date')
         .or('vendor.eq.PREP,item_type.eq.prep')
-        .gte('last_counted_date', ninePmYesterday.toISOString())
-        .lte('last_counted_date', fourAmToday.toISOString())
+        .gte('last_counted_date', windowStart.toISOString())
+        .lte('last_counted_date', windowEnd.toISOString())
         .limit(5); // Get up to 5 items for display
 
       if (error) {
