@@ -65,9 +65,11 @@ export default async function handler(req, res) {
     // Step 2: Fetch time entries for date range
     console.log('Fetching time entries...');
 
-    // Convert dates to ISO 8601 format with time (Pacific timezone -0800)
-    const startDateTime = `${startDate}T00:00:00.000-0800`;
-    const endDateTime = `${endDate}T23:59:59.999-0800`;
+    // Convert dates to ISO 8601 format with UTC time (Toast API requires Z suffix for UTC)
+    const startDateTime = `${startDate}T00:00:00.000Z`;
+    const endDateTime = `${endDate}T23:59:59.999Z`;
+
+    console.log(`Requesting time entries from ${startDateTime} to ${endDateTime}`);
 
     const timeEntriesUrl = `${toastApiUrl}/labor/v1/timeEntries?startDate=${encodeURIComponent(startDateTime)}&endDate=${encodeURIComponent(endDateTime)}`;
 
@@ -83,9 +85,11 @@ export default async function handler(req, res) {
     if (!timeEntriesResponse.ok) {
       const errorText = await timeEntriesResponse.text();
       console.error(`Failed to fetch time entries: ${timeEntriesResponse.status}`, errorText);
+      console.error(`Request URL was: ${timeEntriesUrl}`);
       return res.status(timeEntriesResponse.status).json({
         error: 'Failed to fetch time entries',
-        details: errorText
+        details: errorText,
+        requestUrl: timeEntriesUrl
       });
     }
 
