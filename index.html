@@ -1722,6 +1722,13 @@
             </button>
           </div>
 
+          <!-- Auto-Print Status Disclaimer -->
+          <div id="autoPrintStatus" style="margin-bottom: 20px;">
+            <p style="text-align: center; padding: 12px; color: var(--gray-500); font-size: 12px;">
+              Checking auto-print status...
+            </p>
+          </div>
+
           <!-- Prep Summary Stats -->
           <div id="prepSummaryStats" style="
             display: grid;
@@ -10753,6 +10760,7 @@
 
     // Auto-refresh prep sheet and count session when tab is opened
     if (tabName === 'prepSheet') {
+      checkAutoPrintStatus(); // Check if prep list was auto-printed at 4am
       refreshPrepSheet();
       updateCountSessionDisplay(); // Update session info each time PREP tab is opened
     }
@@ -17486,10 +17494,89 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   // ============================================
 
   /**
+   * Check auto-print status and update disclaimer
+   */
+  async function checkAutoPrintStatus() {
+    const statusDiv = document.getElementById('autoPrintStatus');
+    if (!statusDiv) return;
+
+    try {
+      // Calculate 8-hour window (9pm yesterday to 4am today Pacific time)
+      const now = new Date();
+      const pacificNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+
+      const fourAmToday = new Date(pacificNow);
+      fourAmToday.setHours(4, 0, 0, 0);
+
+      const ninePmYesterday = new Date(fourAmToday);
+      ninePmYesterday.setHours(ninePmYesterday.getHours() - 7); // 9pm = 4am - 7 hours
+
+      // Check if any prep items were counted in the 8-hour window
+      const { data: recentCounts, error } = await supabase
+        .from('inventory_items')
+        .select('item_name, last_counted_at')
+        .eq('is_prep', true)
+        .gte('last_counted_at', ninePmYesterday.toISOString())
+        .lte('last_counted_at', fourAmToday.toISOString())
+        .limit(5); // Get up to 5 items for display
+
+      if (error) {
+        console.error('Error checking auto-print status:', error);
+        statusDiv.innerHTML = `
+          <p style="text-align: center; padding: 12px; background: var(--gray-100); border-left: 4px solid var(--gray-500); color: var(--gray-700); font-size: 12px; border-radius: 0;">
+            ⚠️ Unable to check auto-print status
+          </p>
+        `;
+        return;
+      }
+
+      if (!recentCounts || recentCounts.length === 0) {
+        // RED disclaimer: No counts detected
+        statusDiv.innerHTML = `
+          <div style="padding: 14px 16px; background: #fee2e2; border-left: 4px solid #dc2626; border-radius: 0;">
+            <p style="color: #991b1b; font-size: 13px; margin: 0 0 8px 0; font-weight: 700;">
+              ⚠️ NO AUTO-PRINT AT 4AM
+            </p>
+            <p style="color: #7f1d1d; font-size: 12px; margin: 0; line-height: 1.6;">
+              No prep counts detected between 9pm and 4am. Please update stock counts above and click <strong>EMAIL TO PRINTER</strong> to get today's prep list.
+            </p>
+          </div>
+        `;
+      } else {
+        // GREEN disclaimer: Auto-print ran successfully
+        const itemNames = recentCounts.map(c => c.item_name).join(', ');
+        const itemCount = recentCounts.length;
+
+        statusDiv.innerHTML = `
+          <div style="padding: 14px 16px; background: #d1fae5; border-left: 4px solid #059669; border-radius: 0;">
+            <p style="color: #065f46; font-size: 13px; margin: 0 0 8px 0; font-weight: 700;">
+              ✅ PREP LIST AUTO-PRINTED AT 4AM
+            </p>
+            <p style="color: #047857; font-size: 12px; margin: 0; line-height: 1.6;">
+              ${itemCount} prep item${itemCount !== 1 ? 's' : ''} counted overnight (${itemNames}${itemCount === 5 ? ', ...' : ''}). <strong>Check the printer</strong> for today's auto-generated prep list.
+            </p>
+          </div>
+        `;
+      }
+
+    } catch (error) {
+      console.error('Error in checkAutoPrintStatus:', error);
+      statusDiv.innerHTML = `
+        <p style="text-align: center; padding: 12px; background: var(--gray-100); border-left: 4px solid var(--gray-500); color: var(--gray-700); font-size: 12px; border-radius: 0;">
+          ⚠️ Error checking auto-print status
+        </p>
+      `;
+    }
+  }
+
+  /**
    * Refresh prep sheet with current recommendations
    */
   async function refreshPrepSheet() {
     console.log('Refreshing prep sheet...');
+
+    // Check auto-print status when refreshing
+    checkAutoPrintStatus();
     const prepItems = orderingSystemState.items.filter(item => item.vendor === 'PREP' || item.itemType === 'prep');
 
     if (prepItems.length === 0) {
