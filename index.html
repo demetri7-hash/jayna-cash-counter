@@ -19754,9 +19754,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       return;
     }
 
-    // Handle CSV files (PFG Invoice Export)
+    // Handle CSV files (Auto-detect vendor format)
     if (isCSV) {
-      handlePFGInvoiceCSV(file);
+      detectVendorAndParseCSV(file);
       return;
     }
 
@@ -19764,6 +19764,488 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     if (isExcel) {
       handlePFGInsightsExcel(file);
       return;
+    }
+
+    /**
+     * Detect Vendor from CSV Headers and Route to Appropriate Parser
+     */
+    async function detectVendorAndParseCSV(file) {
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const csvText = e.target.result;
+
+        // Parse just the header row to detect vendor
+        Papa.parse(csvText, {
+          header: true,
+          preview: 1, // Just read first row to get headers
+          complete: async function(results) {
+            const headers = results.meta.fields || [];
+            console.log('📋 Detected CSV headers:', headers);
+
+            // Detect vendor by header columns
+            const hasPFGHeaders = headers.includes('Product #') && headers.includes('Manufacturer Product #') && headers.includes('GTIN');
+            const hasGreenleafHeaders = headers.includes('Product No.') && headers.includes('Description') && headers.includes('Receiving Date');
+            const hasManiHeaders = headers.includes('Item Code') && headers.includes('Item Name') && headers.includes('Order Qty');
+
+            if (hasPFGHeaders) {
+              console.log('✅ Detected PFG Invoice format');
+              showMessage('Detected PFG Invoice - Processing...', 'success');
+              handlePFGInvoiceCSV(file);
+            } else if (hasGreenleafHeaders) {
+              console.log('✅ Detected Greenleaf Invoice format');
+              showMessage('Detected Greenleaf Invoice - Processing...', 'success');
+              handleGreenleafInvoiceCSV(file);
+            } else if (hasManiHeaders) {
+              console.log('✅ Detected Mani Invoice format');
+              showMessage('Detected Mani Invoice - Processing...', 'success');
+              handleManiInvoiceCSV(file);
+            } else {
+              console.log('🤖 Unknown vendor format - Using SMART UNIVERSAL parser');
+              showMessage('Unknown vendor - Using smart parser...', 'success');
+              handleUniversalSmartCSV(file, headers);
+            }
+          }
+        });
+      };
+      reader.readAsText(file);
+    }
+
+    /**
+     * Handle Greenleaf Invoice CSV Upload
+     * Parses Greenleaf order CSV format
+     * Columns: Product No., Description, Order Date, Receiving Date, Unit Price, Quantity
+     */
+    async function handleGreenleafInvoiceCSV(file) {
+      console.log('🥬 Handling Greenleaf Invoice CSV:', file.name);
+      showMessage('Processing Greenleaf Invoice CSV...', 'success');
+
+      // Set invoice type to 'invoice' (receiving items)
+      orderingSystemState.invoiceType = 'invoice';
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const csvText = e.target.result;
+
+        // Parse CSV with PapaParse
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: async function(results) {
+            console.log('✅ CSV parsed:', results.data.length, 'rows');
+
+            if (results.errors.length > 0) {
+              console.warn('CSV parsing errors:', results.errors);
+            }
+
+            // Clear existing extracted items
+            orderingSystemState.extractedInvoiceItems = [];
+
+            // Load ALL inventory items if not loaded
+            if (orderingSystemState.items.length === 0) {
+              console.log('Loading inventory items...');
+              await loadInventoryItemsForOrdering();
+            }
+
+            // Extract items from CSV
+            let itemsMatched = 0;
+            let itemsNotMatched = 0;
+
+            for (const row of results.data) {
+              // Parse Greenleaf columns
+              const productNo = row['Product No.']?.trim();
+              const description = row['Description']?.trim();
+              const quantity = parseFloat(row['Quantity']) || 0;
+              const unitPrice = parseFloat(row['Unit Price']) || 0;
+              const receivingDate = row['Receiving Date']?.trim();
+
+              if (!description || quantity === 0) {
+                console.warn('Skipping row with no description or 0 quantity');
+                continue;
+              }
+
+              // Extract item name from description (everything before pack size info)
+              // Example: "WILD ARUGULA                        4#/CS" -> "WILD ARUGULA"
+              let itemName = description.split(/\s+\d+/).join('').trim(); // Remove pack size numbers
+              itemName = itemName.replace(/\s+/g, ' ').trim(); // Normalize whitespace
+
+              console.log(`\n🥬 Processing: ${itemName} (Greenleaf #${productNo})`);
+              console.log(`   Description: ${description}`);
+              console.log(`   Quantity: ${quantity}, Price: $${unitPrice}`);
+
+              // Try to match with existing inventory using fuzzy matching
+              let matchedItem = null;
+              let matchConfidence = 0;
+
+              // PRIORITY 1: Match by item_number (Greenleaf Product No.)
+              matchedItem = orderingSystemState.items.find(inv =>
+                inv.item_number && inv.item_number.toLowerCase() === productNo.toLowerCase()
+              );
+
+              if (matchedItem) {
+                matchConfidence = 1.0;
+                console.log(`✅ MATCHED by item_number: ${matchedItem.item_name} (100%)`);
+              } else {
+                // PRIORITY 2: Fuzzy match by name
+                const fuzzyResult = fuzzyMatchInventoryItem(itemName, orderingSystemState.items);
+                if (fuzzyResult) {
+                  matchedItem = fuzzyResult.item;
+                  matchConfidence = fuzzyResult.confidence;
+                  console.log(`✅ FUZZY MATCHED: "${itemName}" -> "${matchedItem.item_name}" (${(matchConfidence * 100).toFixed(1)}%)`);
+                }
+              }
+
+              if (matchedItem && matchConfidence >= 0.7) {
+                // Matched successfully
+                orderingSystemState.extractedInvoiceItems.push({
+                  detectedName: itemName,
+                  detectedQuantity: quantity,
+                  detectedPrice: unitPrice,
+                  detectedUnit: matchedItem.unit || 'case',
+                  matchedInventoryId: matchedItem.id,
+                  matchedInventoryName: matchedItem.item_name,
+                  matchConfidence: matchConfidence,
+                  greenleafData: {
+                    productNo: productNo,
+                    description: description,
+                    receivingDate: receivingDate,
+                    vendor: 'Greenleaf'
+                  }
+                });
+                itemsMatched++;
+              } else {
+                // No match - add to extracted items for manual review
+                orderingSystemState.extractedInvoiceItems.push({
+                  detectedName: itemName,
+                  detectedQuantity: quantity,
+                  detectedPrice: unitPrice,
+                  detectedUnit: 'case',
+                  matchedInventoryId: null,
+                  matchedInventoryName: null,
+                  matchConfidence: 0,
+                  greenleafData: {
+                    productNo: productNo,
+                    description: description,
+                    receivingDate: receivingDate,
+                    vendor: 'Greenleaf'
+                  }
+                });
+                itemsNotMatched++;
+                console.warn(`⚠️ NO MATCH FOUND for: ${itemName}`);
+              }
+            }
+
+            console.log(`\n✅ Greenleaf CSV processed:`);
+            console.log(`   - Items matched: ${itemsMatched}`);
+            console.log(`   - Items not matched: ${itemsNotMatched}`);
+            console.log(`   - Total items: ${orderingSystemState.extractedInvoiceItems.length}`);
+
+            // Show results in UI
+            displayExtractedItems();
+            showMessage(`✅ Greenleaf CSV processed! ${itemsMatched} items matched, ${itemsNotMatched} need review.`, 'success');
+          }
+        });
+      };
+      reader.readAsText(file);
+    }
+
+    /**
+     * Handle Mani Invoice CSV Upload
+     * Parses Mani order CSV format
+     * Columns: Item Code, Item Name, Order Qty, Unit Price, etc.
+     */
+    async function handleManiInvoiceCSV(file) {
+      console.log('🍚 Handling Mani Invoice CSV:', file.name);
+      showMessage('Processing Mani Invoice CSV...', 'success');
+
+      orderingSystemState.invoiceType = 'invoice';
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const csvText = e.target.result;
+
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: async function(results) {
+            console.log('✅ CSV parsed:', results.data.length, 'rows');
+
+            if (results.errors.length > 0) {
+              console.warn('CSV parsing errors:', results.errors);
+            }
+
+            orderingSystemState.extractedInvoiceItems = [];
+
+            if (orderingSystemState.items.length === 0) {
+              console.log('Loading inventory items...');
+              await loadInventoryItemsForOrdering();
+            }
+
+            let itemsMatched = 0;
+            let itemsNotMatched = 0;
+
+            for (const row of results.data) {
+              const itemCode = row['Item Code']?.trim();
+              const itemName = row['Item Name']?.trim();
+              const quantity = parseFloat(row['Order Qty'] || row['Quantity']) || 0;
+              const unitPrice = parseFloat(row['Unit Price'] || row['Price']) || 0;
+
+              if (!itemName || quantity === 0) {
+                console.warn('Skipping row with no item name or 0 quantity');
+                continue;
+              }
+
+              console.log(`\n🍚 Processing: ${itemName} (Mani #${itemCode})`);
+              console.log(`   Quantity: ${quantity}, Price: $${unitPrice}`);
+
+              let matchedItem = null;
+              let matchConfidence = 0;
+
+              // PRIORITY 1: Match by item_number (Mani Item Code)
+              matchedItem = orderingSystemState.items.find(inv =>
+                inv.item_number && inv.item_number.toLowerCase() === itemCode?.toLowerCase()
+              );
+
+              if (matchedItem) {
+                matchConfidence = 1.0;
+                console.log(`✅ MATCHED by item_number: ${matchedItem.item_name} (100%)`);
+              } else {
+                // PRIORITY 2: Fuzzy match by name
+                const fuzzyResult = fuzzyMatchInventoryItem(itemName, orderingSystemState.items);
+                if (fuzzyResult) {
+                  matchedItem = fuzzyResult.item;
+                  matchConfidence = fuzzyResult.confidence;
+                  console.log(`✅ FUZZY MATCHED: "${itemName}" -> "${matchedItem.item_name}" (${(matchConfidence * 100).toFixed(1)}%)`);
+                }
+              }
+
+              if (matchedItem && matchConfidence >= 0.7) {
+                orderingSystemState.extractedInvoiceItems.push({
+                  detectedName: itemName,
+                  detectedQuantity: quantity,
+                  detectedPrice: unitPrice,
+                  detectedUnit: matchedItem.unit || 'case',
+                  matchedInventoryId: matchedItem.id,
+                  matchedInventoryName: matchedItem.item_name,
+                  matchConfidence: matchConfidence,
+                  maniData: {
+                    itemCode: itemCode,
+                    vendor: 'Mani'
+                  }
+                });
+                itemsMatched++;
+              } else {
+                orderingSystemState.extractedInvoiceItems.push({
+                  detectedName: itemName,
+                  detectedQuantity: quantity,
+                  detectedPrice: unitPrice,
+                  detectedUnit: 'case',
+                  matchedInventoryId: null,
+                  matchedInventoryName: null,
+                  matchConfidence: 0,
+                  maniData: {
+                    itemCode: itemCode,
+                    vendor: 'Mani'
+                  }
+                });
+                itemsNotMatched++;
+                console.warn(`⚠️ NO MATCH FOUND for: ${itemName}`);
+              }
+            }
+
+            console.log(`\n✅ Mani CSV processed:`);
+            console.log(`   - Items matched: ${itemsMatched}`);
+            console.log(`   - Items not matched: ${itemsNotMatched}`);
+
+            displayExtractedItems();
+            showMessage(`✅ Mani CSV processed! ${itemsMatched} items matched, ${itemsNotMatched} need review.`, 'success');
+          }
+        });
+      };
+      reader.readAsText(file);
+    }
+
+    /**
+     * UNIVERSAL SMART CSV Parser
+     * Intelligently detects columns and parses ANY CSV format
+     * Uses AI-like column detection to figure out item names, quantities, prices
+     */
+    async function handleUniversalSmartCSV(file, detectedHeaders) {
+      console.log('🤖 SMART UNIVERSAL CSV Parser activated');
+      console.log('🧠 Analyzing CSV structure...');
+
+      orderingSystemState.invoiceType = 'invoice';
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const csvText = e.target.result;
+
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: async function(results) {
+            console.log('✅ CSV parsed:', results.data.length, 'rows');
+
+            const headers = results.meta.fields || detectedHeaders;
+            console.log('📋 Available columns:', headers);
+
+            // INTELLIGENT COLUMN DETECTION
+            const columnMap = detectColumns(headers);
+            console.log('🧠 Smart column detection:', columnMap);
+
+            if (!columnMap.itemName) {
+              showMessage('❌ Could not detect item name column. Please use a supported vendor format.', 'error');
+              return;
+            }
+
+            orderingSystemState.extractedInvoiceItems = [];
+
+            if (orderingSystemState.items.length === 0) {
+              console.log('Loading inventory items...');
+              await loadInventoryItemsForOrdering();
+            }
+
+            let itemsMatched = 0;
+            let itemsNotMatched = 0;
+
+            for (const row of results.data) {
+              const itemName = row[columnMap.itemName]?.trim();
+              const quantity = parseFloat(row[columnMap.quantity] || 1) || 1;
+              const unitPrice = parseFloat(row[columnMap.price] || 0) || 0;
+              const itemCode = columnMap.itemCode ? row[columnMap.itemCode]?.trim() : null;
+
+              if (!itemName) {
+                console.warn('Skipping row with no item name');
+                continue;
+              }
+
+              console.log(`\n🤖 Processing: ${itemName}${itemCode ? ` (Code: ${itemCode})` : ''}`);
+              console.log(`   Quantity: ${quantity}, Price: $${unitPrice}`);
+
+              let matchedItem = null;
+              let matchConfidence = 0;
+
+              // PRIORITY 1: Match by item_number/code
+              if (itemCode) {
+                matchedItem = orderingSystemState.items.find(inv =>
+                  inv.item_number && inv.item_number.toLowerCase() === itemCode.toLowerCase()
+                );
+                if (matchedItem) {
+                  matchConfidence = 1.0;
+                  console.log(`✅ MATCHED by item_number: ${matchedItem.item_name} (100%)`);
+                }
+              }
+
+              // PRIORITY 2: Fuzzy match by name
+              if (!matchedItem) {
+                const fuzzyResult = fuzzyMatchInventoryItem(itemName, orderingSystemState.items);
+                if (fuzzyResult) {
+                  matchedItem = fuzzyResult.item;
+                  matchConfidence = fuzzyResult.confidence;
+                  console.log(`✅ FUZZY MATCHED: "${itemName}" -> "${matchedItem.item_name}" (${(matchConfidence * 100).toFixed(1)}%)`);
+                }
+              }
+
+              if (matchedItem && matchConfidence >= 0.7) {
+                orderingSystemState.extractedInvoiceItems.push({
+                  detectedName: itemName,
+                  detectedQuantity: quantity,
+                  detectedPrice: unitPrice,
+                  detectedUnit: matchedItem.unit || 'case',
+                  matchedInventoryId: matchedItem.id,
+                  matchedInventoryName: matchedItem.item_name,
+                  matchConfidence: matchConfidence,
+                  universalData: {
+                    itemCode: itemCode,
+                    vendor: 'Unknown',
+                    detectedColumns: columnMap
+                  }
+                });
+                itemsMatched++;
+              } else {
+                orderingSystemState.extractedInvoiceItems.push({
+                  detectedName: itemName,
+                  detectedQuantity: quantity,
+                  detectedPrice: unitPrice,
+                  detectedUnit: 'case',
+                  matchedInventoryId: null,
+                  matchedInventoryName: null,
+                  matchConfidence: 0,
+                  universalData: {
+                    itemCode: itemCode,
+                    vendor: 'Unknown',
+                    detectedColumns: columnMap
+                  }
+                });
+                itemsNotMatched++;
+                console.warn(`⚠️ NO MATCH FOUND for: ${itemName}`);
+              }
+            }
+
+            console.log(`\n✅ Smart CSV processed:`);
+            console.log(`   - Items matched: ${itemsMatched}`);
+            console.log(`   - Items not matched: ${itemsNotMatched}`);
+
+            displayExtractedItems();
+            showMessage(`🤖 Smart parser processed ${itemsMatched} matches, ${itemsNotMatched} need review.`, 'success');
+          }
+        });
+      };
+      reader.readAsText(file);
+    }
+
+    /**
+     * Intelligent Column Detection
+     * Analyzes CSV headers and detects which columns contain item names, quantities, prices
+     */
+    function detectColumns(headers) {
+      const columnMap = {
+        itemName: null,
+        quantity: null,
+        price: null,
+        itemCode: null
+      };
+
+      // ITEM NAME detection (product, item, description, name)
+      const nameKeywords = ['name', 'description', 'product', 'item', 'desc'];
+      for (const header of headers) {
+        const lower = header.toLowerCase();
+        if (nameKeywords.some(kw => lower.includes(kw))) {
+          columnMap.itemName = header;
+          break;
+        }
+      }
+
+      // QUANTITY detection (qty, quantity, amount, count, ordered, shipped)
+      const qtyKeywords = ['qty', 'quantity', 'amount', 'count', 'order', 'ship'];
+      for (const header of headers) {
+        const lower = header.toLowerCase();
+        if (qtyKeywords.some(kw => lower.includes(kw))) {
+          columnMap.quantity = header;
+          break;
+        }
+      }
+
+      // PRICE detection (price, cost, unit price, each)
+      const priceKeywords = ['price', 'cost', 'unit', 'each'];
+      for (const header of headers) {
+        const lower = header.toLowerCase();
+        if (priceKeywords.some(kw => lower.includes(kw)) && !lower.includes('total')) {
+          columnMap.price = header;
+          break;
+        }
+      }
+
+      // ITEM CODE detection (code, number, sku, id, #)
+      const codeKeywords = ['code', 'number', 'sku', 'id', '#', 'no'];
+      for (const header of headers) {
+        const lower = header.toLowerCase();
+        if (codeKeywords.some(kw => lower.includes(kw)) && !lower.includes('phone') && !lower.includes('order')) {
+          columnMap.itemCode = header;
+          break;
+        }
+      }
+
+      return columnMap;
     }
 
     /**
