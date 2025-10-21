@@ -1780,11 +1780,44 @@
           <!-- Pending Order Check-In View (dynamically populated) -->
           <div id="pendingOrderCheckInView" style="display: none;"></div>
 
+          <!-- Pending Order Metadata (shown BEFORE upload if type is 'order') -->
+          <div id="pendingOrderMetadata" style="display: none; background: white; border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+            <h4 style="margin: 0 0 16px 0; color: var(--gray-900); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Order Details</h4>
+
+            <label style="display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">
+              YOUR NAME: <span style="color: #dc2626;">*</span>
+            </label>
+            <input
+              type="text"
+              id="pendingOrderName"
+              placeholder="Enter your name"
+              style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; margin-bottom: 16px; box-sizing: border-box;"
+            />
+
+            <label style="display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">
+              EXPECTED DELIVERY DATE: <span style="color: #dc2626;">*</span>
+            </label>
+            <input
+              type="date"
+              id="pendingOrderDate"
+              style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; margin-bottom: 16px; box-sizing: border-box;"
+            />
+
+            <label style="display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">
+              NOTES (OPTIONAL):
+            </label>
+            <textarea
+              id="pendingOrderNotes"
+              placeholder="Add any special instructions or notes..."
+              style="width: 100%; min-height: 80px; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; resize: vertical; font-family: inherit; box-sizing: border-box;"
+            ></textarea>
+          </div>
+
           <!-- Upload Section -->
-          <div style="background: var(--gray-100); padding: 24px; border-radius: 0; margin-bottom: 24px; border: 2px solid var(--gray-300);">
+          <div id="uploadSection" style="background: var(--gray-100); padding: 24px; border-radius: 0; margin-bottom: 24px; border: 2px solid var(--gray-300); opacity: 0.5; pointer-events: none;">
             <div style="text-align: center;">
-              <h4 style="margin: 0 0 12px 0; color: var(--gray-900); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Upload Invoice Image</h4>
-              <p style="color: var(--gray-500); font-size: 12px; margin-bottom: 16px;">Take a photo or select an image from your device</p>
+              <h4 style="margin: 0 0 12px 0; color: var(--gray-900); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Upload Invoice/Order</h4>
+              <p style="color: var(--gray-500); font-size: 12px; margin-bottom: 16px;">Select document type above first</p>
 
               <!-- File Input for Camera (Hidden) -->
               <input
@@ -19700,13 +19733,46 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     orderingSystemState.invoiceType = type;
 
     const description = document.getElementById('invoiceTypeDescription');
+    const uploadSection = document.getElementById('uploadSection');
+    const pendingOrderMetadata = document.getElementById('pendingOrderMetadata');
+    const pendingOrderDate = document.getElementById('pendingOrderDate');
 
     if (type === 'invoice') {
       description.innerHTML = '<strong>INVOICE MODE:</strong> Items will be checked in immediately and inventory quantities will be UPDATED (qty += received amount).';
+
+      // Enable upload section
+      uploadSection.style.opacity = '1';
+      uploadSection.style.pointerEvents = 'auto';
+      uploadSection.querySelector('h4').textContent = 'Upload Invoice Image';
+      uploadSection.querySelector('p').textContent = 'Take a photo or select an image from your device';
+
+      // Hide pending order fields
+      pendingOrderMetadata.style.display = 'none';
+
     } else if (type === 'order') {
-      description.innerHTML = '<strong>PENDING ORDER MODE:</strong> Items will be saved as a pending order. You will be prompted for delivery date and notes. Inventory is NOT updated until you check in the order on delivery day.';
+      description.innerHTML = '<strong>PENDING ORDER MODE:</strong> Enter order details below, then upload the order document. Inventory will NOT be updated until you check in the order on delivery day.';
+
+      // Show pending order metadata fields
+      pendingOrderMetadata.style.display = 'block';
+
+      // Set min date to today
+      if (pendingOrderDate) {
+        pendingOrderDate.min = getPacificDate();
+      }
+
+      // Enable upload section
+      uploadSection.style.opacity = '1';
+      uploadSection.style.pointerEvents = 'auto';
+      uploadSection.querySelector('h4').textContent = 'Upload Order Document';
+      uploadSection.querySelector('p').textContent = 'Upload the order document or CSV';
+
     } else {
+      // No type selected - gray out upload
       description.textContent = 'Select whether this is an invoice from a delivery you\'re receiving now, or a pending order for a future date.';
+      uploadSection.style.opacity = '0.5';
+      uploadSection.style.pointerEvents = 'none';
+      uploadSection.querySelector('p').textContent = 'Select document type above first';
+      pendingOrderMetadata.style.display = 'none';
     }
   }
 
@@ -19723,6 +19789,35 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       // Reset file input
       event.target.value = '';
       return;
+    }
+
+    // REQUIRED: If pending order, validate metadata fields are filled
+    if (orderingSystemState.invoiceType === 'order') {
+      const nameInput = document.getElementById('pendingOrderName');
+      const dateInput = document.getElementById('pendingOrderDate');
+
+      if (!nameInput || !nameInput.value.trim()) {
+        showMessage('❌ Please enter YOUR NAME for the pending order', 'error');
+        event.target.value = '';
+        if (nameInput) nameInput.focus();
+        return;
+      }
+
+      if (!dateInput || !dateInput.value) {
+        showMessage('❌ Please select EXPECTED DELIVERY DATE for the pending order', 'error');
+        event.target.value = '';
+        if (dateInput) dateInput.focus();
+        return;
+      }
+
+      // Store metadata in orderingSystemState for use when creating the order
+      orderingSystemState.pendingOrderMetadata = {
+        createdBy: nameInput.value.trim(),
+        expectedDeliveryDate: dateInput.value,
+        notes: document.getElementById('pendingOrderNotes')?.value.trim() || ''
+      };
+
+      console.log('📋 Pending order metadata stored:', orderingSystemState.pendingOrderMetadata);
     }
 
     // Validate file type (accept images, PDFs, CSV, and Excel)
@@ -21948,14 +22043,14 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       container.appendChild(card);
     });
 
-    // Add order-specific fields if type is 'order'
+    // Add vendor selector if type is 'order' (for vendor detection from items)
     if (orderingSystemState.invoiceType === 'order') {
-      // Vendor selector
+      // Show detected vendor from items
       const vendorSection = document.createElement('div');
       vendorSection.style.cssText = 'margin-top: 24px; padding: 16px; background: white; border: 2px solid var(--gray-300);';
 
       const vendorLabel = document.createElement('label');
-      vendorLabel.textContent = 'VENDOR:';
+      vendorLabel.textContent = 'VENDOR (Auto-detected from items):';
       vendorLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;';
       vendorSection.appendChild(vendorLabel);
 
@@ -21963,42 +22058,43 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       vendorSelect.id = 'orderVendorSelect';
       vendorSelect.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; background: white;';
 
-      // Get unique vendors from inventory
-      const vendors = [...new Set(orderingSystemState.items.map(item => item.vendor).filter(v => v))];
-      vendors.sort();
+      // Get unique vendors from matched items
+      const matchedVendors = [...new Set(
+        orderingSystemState.extractedInvoiceItems
+          .filter(item => item.matchedVendor)
+          .map(item => item.matchedVendor)
+      )];
 
-      const defaultOption = document.createElement('option');
-      defaultOption.value = '';
-      defaultOption.textContent = 'Select vendor...';
-      vendorSelect.appendChild(defaultOption);
-
-      vendors.forEach(vendor => {
+      // If only one vendor detected, auto-select it
+      if (matchedVendors.length === 1) {
         const option = document.createElement('option');
-        option.value = vendor;
-        option.textContent = vendor;
+        option.value = matchedVendors[0];
+        option.textContent = matchedVendors[0];
+        option.selected = true;
         vendorSelect.appendChild(option);
-      });
+      } else {
+        // Multiple vendors or none - show dropdown
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = matchedVendors.length === 0 ? 'No vendor detected - enter manually' : 'Select vendor...';
+        vendorSelect.appendChild(defaultOption);
+
+        const vendors = [...new Set(orderingSystemState.items.map(item => item.vendor).filter(v => v))];
+        vendors.sort();
+
+        vendors.forEach(vendor => {
+          const option = document.createElement('option');
+          option.value = vendor;
+          option.textContent = vendor;
+          if (matchedVendors.includes(vendor)) {
+            option.textContent += ' ✓';
+          }
+          vendorSelect.appendChild(option);
+        });
+      }
 
       vendorSection.appendChild(vendorSelect);
       container.appendChild(vendorSection);
-
-      // Delivery date picker
-      const dateSection = document.createElement('div');
-      dateSection.style.cssText = 'margin-top: 16px; padding: 16px; background: white; border: 2px solid var(--gray-300);';
-
-      const dateLabel = document.createElement('label');
-      dateLabel.textContent = 'EXPECTED DELIVERY DATE:';
-      dateLabel.style.cssText = 'display: block; color: var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;';
-      dateSection.appendChild(dateLabel);
-
-      const dateInput = document.createElement('input');
-      dateInput.type = 'date';
-      dateInput.id = 'orderDeliveryDate';
-      dateInput.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;';
-      dateInput.min = getPacificDate(); // Can't be in the past - Pacific Time, not UTC
-      dateSection.appendChild(dateInput);
-
-      container.appendChild(dateSection);
     }
 
     // Add action button at the bottom
@@ -22388,16 +22484,22 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     showLoading('Saving Order', 'Creating pending order...');
 
     try {
+      // Use metadata from form if available, otherwise fall back to existing fields
+      const metadata = orderingSystemState.pendingOrderMetadata || {};
+      const createdBy = metadata.createdBy || 'System';
+      const notes = metadata.notes || 'Created from CSV/OCR';
+      const expectedDate = metadata.expectedDeliveryDate || deliveryDate;
+
       // Create pending order record
       const { data: orderData, error: orderError } = await supabase
         .from('pending_orders')
         .insert({
           vendor: vendor,
           order_date: getPacificDate(),
-          expected_delivery_date: deliveryDate,
+          expected_delivery_date: expectedDate,
           status: 'pending',
-          created_by: 'System',
-          notes: 'Created from OCR order sheet',
+          created_by: createdBy,
+          notes: notes,
           total_items: matchedItems.length
         })
         .select()
