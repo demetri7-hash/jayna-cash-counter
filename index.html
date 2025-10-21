@@ -22391,22 +22391,24 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       return;
     }
 
-    // Get vendor and delivery date
+    // Get vendor from auto-detected dropdown
     const vendorSelect = document.getElementById('orderVendorSelect');
-    const dateInput = document.getElementById('orderDeliveryDate');
 
     if (!vendorSelect || !vendorSelect.value) {
       showMessage('Please select a vendor', 'warning');
       return;
     }
 
-    if (!dateInput || !dateInput.value) {
-      showMessage('Please select an expected delivery date', 'warning');
+    const vendor = vendorSelect.value;
+
+    // Get delivery date from metadata collected BEFORE upload
+    const metadata = orderingSystemState.pendingOrderMetadata || {};
+    const deliveryDate = metadata.expectedDeliveryDate;
+
+    if (!deliveryDate) {
+      showMessage('❌ Expected delivery date is missing. Please go back and fill in the required fields.', 'error');
       return;
     }
-
-    const vendor = vendorSelect.value;
-    const deliveryDate = dateInput.value;
 
     // Filter matched items (exclude skipped and flagged as new)
     const matchedItems = items.filter(item => item.matchedInventoryId && !item.flaggedAsNew && !item.skipped);
