@@ -1754,27 +1754,22 @@
               Upload an invoice photo to scan and reconcile items with inventory.
             </p>
 
-            <!-- Type Selector -->
+            <!-- Type Selector - REQUIRED DROPDOWN -->
             <div style="background: white; border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 20px;">
-              <label style="display: block; color: var(--gray-700); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">DOCUMENT TYPE:</label>
-              <div style="display: flex; gap: 10px;">
-                <button
-                  id="invoiceTypeInvoice"
-                  onclick="selectInvoiceType('invoice')"
-                  style="flex: 1; padding: 12px; background: #212121; color: white; border: 2px solid #212121; border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer;"
-                >
-                  INVOICE
-                </button>
-                <button
-                  id="invoiceTypeOrder"
-                  onclick="selectInvoiceType('order')"
-                  style="flex: 1; padding: 12px; background: white; color: var(--gray-700); border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer;"
-                >
-                  ORDER
-                </button>
-              </div>
-              <p id="invoiceTypeDescription" style="margin-top: 10px; font-size: 11px; color: var(--gray-500);">
-                Reconcile received items against invoice
+              <label for="documentTypeSelect" style="display: block; color: var(--gray-700); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">
+                DOCUMENT TYPE: <span style="color: #dc2626;">* REQUIRED</span>
+              </label>
+              <select
+                id="documentTypeSelect"
+                onchange="selectInvoiceType(this.value)"
+                style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; background: white; font-weight: 600; cursor: pointer;"
+              >
+                <option value="">-- SELECT TYPE --</option>
+                <option value="invoice">INVOICE FROM DELIVERY (Updates Inventory)</option>
+                <option value="order">PENDING ORDER (For Future Delivery)</option>
+              </select>
+              <p id="invoiceTypeDescription" style="margin-top: 10px; font-size: 11px; color: var(--gray-500); line-height: 1.5;">
+                Select whether this is an invoice from a delivery you're receiving now, or a pending order for a future date.
               </p>
             </div>
           </div>
@@ -19704,33 +19699,14 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     console.log('Selected invoice type:', type);
     orderingSystemState.invoiceType = type;
 
-    // Update button styles
-    const invoiceBtn = document.getElementById('invoiceTypeInvoice');
-    const orderBtn = document.getElementById('invoiceTypeOrder');
     const description = document.getElementById('invoiceTypeDescription');
 
     if (type === 'invoice') {
-      // Invoice selected (default)
-      invoiceBtn.style.background = '#212121';
-      invoiceBtn.style.color = 'white';
-      invoiceBtn.style.borderColor = '#212121';
-
-      orderBtn.style.background = 'white';
-      orderBtn.style.color = 'var(--gray-700)';
-      orderBtn.style.borderColor = 'var(--gray-300)';
-
-      description.textContent = 'Reconcile received items against invoice';
+      description.innerHTML = '<strong>INVOICE MODE:</strong> Items will be checked in immediately and inventory quantities will be UPDATED (qty += received amount).';
+    } else if (type === 'order') {
+      description.innerHTML = '<strong>PENDING ORDER MODE:</strong> Items will be saved as a pending order. You will be prompted for delivery date and notes. Inventory is NOT updated until you check in the order on delivery day.';
     } else {
-      // Order selected
-      orderBtn.style.background = '#212121';
-      orderBtn.style.color = 'white';
-      orderBtn.style.borderColor = '#212121';
-
-      invoiceBtn.style.background = 'white';
-      invoiceBtn.style.color = 'var(--gray-700)';
-      invoiceBtn.style.borderColor = 'var(--gray-300)';
-
-      description.textContent = 'Track order placement and expected delivery';
+      description.textContent = 'Select whether this is an invoice from a delivery you\'re receiving now, or a pending order for a future date.';
     }
   }
 
@@ -19740,6 +19716,14 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   function handleInvoiceUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
+
+    // REQUIRED: Check if document type is selected
+    if (!orderingSystemState.invoiceType) {
+      showMessage('❌ Please select DOCUMENT TYPE first (Invoice or Pending Order)', 'error');
+      // Reset file input
+      event.target.value = '';
+      return;
+    }
 
     // Validate file type (accept images, PDFs, CSV, and Excel)
     const isImage = file.type.startsWith('image/');
@@ -19817,10 +19801,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
      */
     async function handleGreenleafInvoiceCSV(file) {
       console.log('🥬 Handling Greenleaf Invoice CSV:', file.name);
-      showMessage('Processing Greenleaf Invoice CSV...', 'success');
+      console.log('📋 Document type:', orderingSystemState.invoiceType);
+      showMessage('Processing Greenleaf CSV...', 'success');
 
-      // Set invoice type to 'invoice' (receiving items)
-      orderingSystemState.invoiceType = 'invoice';
+      // Type already set by selectInvoiceType - DO NOT override
 
       const reader = new FileReader();
       reader.onload = async function(e) {
@@ -19970,10 +19954,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
      * Columns: Item Code, Item Name, Order Qty, Unit Price, etc.
      */
     async function handleManiInvoiceCSV(file) {
-      console.log('🍚 Handling Mani Invoice CSV:', file.name);
-      showMessage('Processing Mani Invoice CSV...', 'success');
+      console.log('🍚 Handling Mani CSV:', file.name);
+      console.log('📋 Document type:', orderingSystemState.invoiceType);
+      showMessage('Processing Mani CSV...', 'success');
 
-      orderingSystemState.invoiceType = 'invoice';
+      // Type already set by selectInvoiceType - DO NOT override
 
       const reader = new FileReader();
       reader.onload = async function(e) {
@@ -20103,9 +20088,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
      */
     async function handleUniversalSmartCSV(file, detectedHeaders) {
       console.log('🤖 SMART UNIVERSAL CSV Parser activated');
+      console.log('📋 Document type:', orderingSystemState.invoiceType);
       console.log('🧠 Analyzing CSV structure...');
 
-      orderingSystemState.invoiceType = 'invoice';
+      // Type already set by selectInvoiceType - DO NOT override
 
       const reader = new FileReader();
       reader.onload = async function(e) {
@@ -20302,11 +20288,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
      * Auto-creates missing items with full PFG data tracking
      */
     async function handlePFGInvoiceCSV(file) {
-      console.log('📋 Handling PFG Invoice CSV:', file.name);
-      showMessage('Processing PFG Invoice CSV...', 'success');
+      console.log('📋 Handling PFG CSV:', file.name);
+      console.log('📋 Document type:', orderingSystemState.invoiceType);
+      showMessage('Processing PFG CSV...', 'success');
 
-      // Set invoice type to 'invoice' (receiving items)
-      orderingSystemState.invoiceType = 'invoice';
+      // Type already set by selectInvoiceType - DO NOT override
 
       const reader = new FileReader();
       reader.onload = async function(e) {
