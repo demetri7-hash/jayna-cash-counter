@@ -19865,7 +19865,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
               // Extract item name from description (everything before pack size info)
               // Example: "WILD ARUGULA                        4#/CS" -> "WILD ARUGULA"
-              let itemName = description.split(/\s+\d+/).join('').trim(); // Remove pack size numbers
+              // Remove pack size patterns like "4#/CS", "24ct/CS", "1bunch/EA", "25#", "90ct"
+              let itemName = description.replace(/\s+\d+(\.\d+)?(#|ct|bunch|lb|oz|g|kg)(\/[A-Z]+)?/gi, '').trim();
               itemName = itemName.replace(/\s+/g, ' ').trim(); // Normalize whitespace
 
               console.log(`\n🥬 Processing: ${itemName} (Greenleaf #${productNo})`);
@@ -19886,7 +19887,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                 console.log(`✅ MATCHED by item_number: ${matchedItem.item_name} (100%)`);
               } else {
                 // PRIORITY 2: Fuzzy match by name
-                const fuzzyResult = fuzzyMatchInventoryItem(itemName, orderingSystemState.items);
+                const fuzzyResult = fuzzyMatchInventoryItem(itemName, 'Greenleaf');
                 if (fuzzyResult) {
                   matchedItem = fuzzyResult.item;
                   matchConfidence = fuzzyResult.confidence;
@@ -20010,7 +20011,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                 console.log(`✅ MATCHED by item_number: ${matchedItem.item_name} (100%)`);
               } else {
                 // PRIORITY 2: Fuzzy match by name
-                const fuzzyResult = fuzzyMatchInventoryItem(itemName, orderingSystemState.items);
+                const fuzzyResult = fuzzyMatchInventoryItem(itemName, 'Mani');
                 if (fuzzyResult) {
                   matchedItem = fuzzyResult.item;
                   matchConfidence = fuzzyResult.confidence;
@@ -20137,7 +20138,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
               // PRIORITY 2: Fuzzy match by name
               if (!matchedItem) {
-                const fuzzyResult = fuzzyMatchInventoryItem(itemName, orderingSystemState.items);
+                const fuzzyResult = fuzzyMatchInventoryItem(itemName, null);
                 if (fuzzyResult) {
                   matchedItem = fuzzyResult.item;
                   matchConfidence = fuzzyResult.confidence;
