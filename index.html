@@ -10513,11 +10513,6 @@
    */
   async function downloadOrderingGuide(vendor) {
     try {
-      // Check if EmailJS is loaded
-      if (typeof emailjs === 'undefined') {
-        throw new Error('EmailJS library not loaded. Please refresh the page.');
-      }
-
       // Ensure inventory data is loaded
       if (!orderingSystemState.items || orderingSystemState.items.length === 0) {
         showMessage('Loading inventory data...', 'info');
@@ -19146,26 +19141,27 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
       // Convert PDF to base64
       const pdfBase64 = doc.output('datauristring').split(',')[1];
+      const filename = `Pending_Orders_${getPacificDate()}.pdf`;
 
-      // Check if EmailJS is loaded
-      if (typeof emailjs === 'undefined') {
-        throw new Error('EmailJS library not loaded. Please refresh the page.');
+      // Send via backend Gmail API (same as prep sheet)
+      const response = await fetch('/api/send-prep-sheet-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          pdfBase64: pdfBase64,
+          filename: filename,
+          subject: `Pending Orders - ${getPacificDate()}`,
+          toEmail: 'GSS4168CTJJA73@print.epsonconnect.com'  // Epson printer email
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send email');
       }
-
-      // Send email using EmailJS
-      const emailParams = {
-        to_email: 'jaynaprinter@gmail.com',
-        subject: `Pending Orders - ${getPacificDate()}`,
-        message: `Pending orders generated at ${timeStr}`,
-        attachment: pdfBase64,
-        filename: `Pending_Orders_${getPacificDate()}.pdf`
-      };
-
-      await emailjs.send(
-        'service_3hgxezm',
-        'template_9lxqeqc',
-        emailParams
-      );
 
       showMessage('✅ Pending orders sent to printer successfully!', 'success');
 
