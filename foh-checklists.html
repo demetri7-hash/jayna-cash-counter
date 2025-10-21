@@ -2144,13 +2144,74 @@
 
         <div style="margin-bottom: 24px;">
           <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
-            Your Name *
+            ${checklist.staff_count > 1 ? `Team Members (up to ${checklist.staff_count})` : 'Your Name'} *
           </label>
+
+          <!-- Staff 1 (required) -->
           <input
             type="text"
             id="fohStaffName"
             value="${savedUsername}"
-            placeholder="Enter your name"
+            placeholder="Staff Member 1 (required)"
+            style="
+              width: 100%;
+              padding: 14px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 14px;
+              box-sizing: border-box;
+              margin-bottom: ${checklist.staff_count > 1 ? '12px' : '0'};
+            "
+            onfocus="this.style.borderColor='var(--gray-700)'"
+            onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
+          />
+
+          ${checklist.staff_count >= 2 ? `
+          <!-- Staff 2 (optional for multi-user) -->
+          <input
+            type="text"
+            id="fohStaffName2"
+            placeholder="Staff Member 2 (optional)"
+            style="
+              width: 100%;
+              padding: 14px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 14px;
+              box-sizing: border-box;
+              margin-bottom: ${checklist.staff_count > 2 ? '12px' : '0'};
+            "
+            onfocus="this.style.borderColor='var(--gray-700)'"
+            onblur="this.style.borderColor='var(--gray-300)'"
+          />
+          ` : ''}
+
+          ${checklist.staff_count >= 3 ? `
+          <!-- Staff 3 (optional for multi-user) -->
+          <input
+            type="text"
+            id="fohStaffName3"
+            placeholder="Staff Member 3 (optional)"
+            style="
+              width: 100%;
+              padding: 14px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 14px;
+              box-sizing: border-box;
+              margin-bottom: ${checklist.staff_count > 3 ? '12px' : '0'};
+            "
+            onfocus="this.style.borderColor='var(--gray-700)'"
+            onblur="this.style.borderColor='var(--gray-300)'"
+          />
+          ` : ''}
+
+          ${checklist.staff_count >= 4 ? `
+          <!-- Staff 4 (optional for multi-user) -->
+          <input
+            type="text"
+            id="fohStaffName4"
+            placeholder="Staff Member 4 (optional)"
             style="
               width: 100%;
               padding: 14px;
@@ -2160,10 +2221,12 @@
               box-sizing: border-box;
             "
             onfocus="this.style.borderColor='var(--gray-700)'"
-            onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
+            onblur="this.style.borderColor='var(--gray-300)'"
           />
+          ` : ''}
+
           <p style="margin: 8px 0 0 0; font-size: 11px; color: var(--gray-500);">
-            Your name will be saved and used for all your actions in this checklist
+            ${checklist.staff_count > 1 ? `At least one team member name is required. Add up to ${checklist.staff_count} members.` : 'Your name will be saved and used for all your actions in this checklist'}
           </p>
         </div>
 
@@ -2270,11 +2333,18 @@
     showLoading('Starting Checklist', 'Creating session...');
 
     try {
+      // Capture all staff names (up to 4 for multi-user reviews)
+      const staffName2 = document.getElementById('fohStaffName2')?.value.trim() || null;
+      const staffName3 = document.getElementById('fohStaffName3')?.value.trim() || null;
+      const staffName4 = document.getElementById('fohStaffName4')?.value.trim() || null;
+
       // Create session in database
       const sessionData = {
         checklist_type: checklist.type,
         staff_name: staffName,
-        staff_name_2: null, // No longer using second name
+        staff_name_2: staffName2,
+        staff_name_3: staffName3,
+        staff_name_4: staffName4,
         session_date: getPacificDate(),
         session_time: new Date().toLocaleTimeString('en-US', {
           timeZone: 'America/Los_Angeles',
@@ -2517,7 +2587,7 @@
             </h3>
             <div style="font-size: 13px; color: var(--success-text); line-height: 1.6;">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span>👤 ${fohSystemState.staffName || 'Not set'}</span>
+                <span>👤 ${[session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).join(', ') || 'Not set'}</span>
                 ${!fohSystemState.reviewMode ? `
                 <button
                   onclick="changeUsername()"
@@ -3722,7 +3792,7 @@
               ${statusBadge}
             </div>
             <div style="font-size: 12px; color: var(--gray-600); margin-bottom: 12px;">
-              <div>👤 ${session.staff_name || 'Unknown'}</div>
+              <div>👤 ${[session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).join(', ') || 'Unknown'}</div>
               <div>🕐 ${startedTime}</div>
             </div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -3857,7 +3927,8 @@
       // Session info
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Staff: ${session.staff_name || 'Unknown'}`, margin, y);
+      const staffNames = [session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).join(', ') || 'Unknown';
+      doc.text(`Staff: ${staffNames}`, margin, y);
       y += 12;
       doc.text(`Date: ${new Date(session.started_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}`, margin, y);
       y += 12;
@@ -6205,7 +6276,7 @@
                   ${checklistTitle}
                 </h3>
                 <div style="font-size: 13px; color: ${session.is_complete ? 'var(--success-text)' : 'var(--warning-text)'}; line-height: 1.6;">
-                  <div>👤 ${session.staff_name}${session.staff_name_2 ? ` & ${session.staff_name_2}` : ''}</div>
+                  <div>👤 ${[session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).join(', ')}</div>
                   <div>🕒 Started: ${formatPacificDateDisplay(new Date(session.started_at), {
                     hour: 'numeric',
                     minute: '2-digit',
@@ -7475,10 +7546,11 @@
           reportContent += `\n${'-'.repeat(60)}\n`;
           reportContent += `CHECKLIST #${index + 1}\n`;
           reportContent += `${'-'.repeat(60)}\n`;
+          const staffNames = [session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).join(', ') || 'N/A';
           reportContent += `Type: ${session.checklist_type}\n`;
           reportContent += `Started: ${new Date(session.started_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}\n`;
           reportContent += `Completed: ${session.completed_at ? new Date(session.completed_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }) : 'INCOMPLETE'}\n`;
-          reportContent += `Staff: ${session.staff_names || 'N/A'}\n`;
+          reportContent += `Staff: ${staffNames}\n`;
           reportContent += `Status: ${session.completed_at ? '✅ COMPLETE' : '⚠️ INCOMPLETE'}\n`;
 
           // Tasks
