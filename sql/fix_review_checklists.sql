@@ -158,13 +158,14 @@ SELECT
   d.title,
   d.time_range,
   d.staff_count,
+  d.start_hour,
   COUNT(DISTINCT s.id) as section_count,
   COUNT(c.id) as category_count
 FROM checklist_definitions d
 LEFT JOIN checklist_sections s ON d.id = s.checklist_id
 LEFT JOIN checklist_section_categories c ON s.id = c.section_id
 WHERE d.type IN ('am_cleaning', 'closing_review', 'transition_review')
-GROUP BY d.type, d.title, d.time_range, d.staff_count
+GROUP BY d.type, d.title, d.time_range, d.staff_count, d.start_hour
 ORDER BY d.start_hour;
 
 -- ============================================
