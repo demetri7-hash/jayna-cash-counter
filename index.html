@@ -19904,13 +19904,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
               if (matchedItem && matchConfidence >= 0.7) {
                 // Matched successfully
                 orderingSystemState.extractedInvoiceItems.push({
+                  id: Date.now() + Math.random(),
                   detectedName: itemName,
                   detectedQuantity: quantity,
                   detectedPrice: unitPrice,
                   detectedUnit: matchedItem.unit || 'case',
                   matchedInventoryId: matchedItem.id,
                   matchedItemName: matchedItem.item_name,
+                  matchedVendor: matchedItem.vendor,
                   matchConfidence: matchConfidence,
+                  skipped: false,
+                  flaggedAsNew: false,
                   greenleafData: {
                     productNo: productNo,
                     description: description,
@@ -19922,13 +19926,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
               } else {
                 // No match - add to extracted items for manual review
                 orderingSystemState.extractedInvoiceItems.push({
+                  id: Date.now() + Math.random(),
                   detectedName: itemName,
                   detectedQuantity: quantity,
                   detectedPrice: unitPrice,
                   detectedUnit: 'case',
                   matchedInventoryId: null,
                   matchedItemName: null,
+                  matchedVendor: null,
                   matchConfidence: 0,
+                  skipped: false,
+                  flaggedAsNew: true,
                   greenleafData: {
                     productNo: productNo,
                     description: description,
@@ -19946,7 +19954,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             console.log(`   - Items not matched: ${itemsNotMatched}`);
             console.log(`   - Total items: ${orderingSystemState.extractedInvoiceItems.length}`);
 
-            // Show results in UI
+            // Show extracted items section
+            document.getElementById('extractedItemsSection').style.display = 'block';
             renderExtractedItems();
             showMessage(`✅ Greenleaf CSV processed! ${itemsMatched} items matched, ${itemsNotMatched} need review.`, 'success');
           }
@@ -20033,13 +20042,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
               if (matchedItem && matchConfidence >= 0.7) {
                 orderingSystemState.extractedInvoiceItems.push({
+                  id: Date.now() + Math.random(),
                   detectedName: itemName,
                   detectedQuantity: quantity,
                   detectedPrice: unitPrice,
                   detectedUnit: matchedItem.unit || 'case',
                   matchedInventoryId: matchedItem.id,
                   matchedItemName: matchedItem.item_name,
+                  matchedVendor: matchedItem.vendor,
                   matchConfidence: matchConfidence,
+                  skipped: false,
+                  flaggedAsNew: false,
                   maniData: {
                     itemCode: itemCode,
                     vendor: 'Mani'
@@ -20048,13 +20061,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                 itemsMatched++;
               } else {
                 orderingSystemState.extractedInvoiceItems.push({
+                  id: Date.now() + Math.random(),
                   detectedName: itemName,
                   detectedQuantity: quantity,
                   detectedPrice: unitPrice,
                   detectedUnit: 'case',
                   matchedInventoryId: null,
                   matchedItemName: null,
+                  matchedVendor: null,
                   matchConfidence: 0,
+                  skipped: false,
+                  flaggedAsNew: true,
                   maniData: {
                     itemCode: itemCode,
                     vendor: 'Mani'
@@ -20069,6 +20086,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             console.log(`   - Items matched: ${itemsMatched}`);
             console.log(`   - Items not matched: ${itemsNotMatched}`);
 
+            // Show extracted items section
+            document.getElementById('extractedItemsSection').style.display = 'block';
             renderExtractedItems();
             showMessage(`✅ Mani CSV processed! ${itemsMatched} items matched, ${itemsNotMatched} need review.`, 'success');
           }
@@ -20166,13 +20185,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
               if (matchedItem && matchConfidence >= 0.7) {
                 orderingSystemState.extractedInvoiceItems.push({
+                  id: Date.now() + Math.random(),
                   detectedName: itemName,
                   detectedQuantity: quantity,
                   detectedPrice: unitPrice,
                   detectedUnit: matchedItem.unit || 'case',
                   matchedInventoryId: matchedItem.id,
                   matchedItemName: matchedItem.item_name,
+                  matchedVendor: matchedItem.vendor,
                   matchConfidence: matchConfidence,
+                  skipped: false,
+                  flaggedAsNew: false,
                   universalData: {
                     itemCode: itemCode,
                     vendor: 'Unknown',
@@ -20182,13 +20205,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                 itemsMatched++;
               } else {
                 orderingSystemState.extractedInvoiceItems.push({
+                  id: Date.now() + Math.random(),
                   detectedName: itemName,
                   detectedQuantity: quantity,
                   detectedPrice: unitPrice,
                   detectedUnit: 'case',
                   matchedInventoryId: null,
                   matchedItemName: null,
+                  matchedVendor: null,
                   matchConfidence: 0,
+                  skipped: false,
+                  flaggedAsNew: true,
                   universalData: {
                     itemCode: itemCode,
                     vendor: 'Unknown',
@@ -20204,6 +20231,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             console.log(`   - Items matched: ${itemsMatched}`);
             console.log(`   - Items not matched: ${itemsNotMatched}`);
 
+            // Show extracted items section
+            document.getElementById('extractedItemsSection').style.display = 'block';
             renderExtractedItems();
             showMessage(`🤖 Smart parser processed ${itemsMatched} matches, ${itemsNotMatched} need review.`, 'success');
           }
