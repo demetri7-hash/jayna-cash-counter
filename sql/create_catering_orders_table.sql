@@ -10,15 +10,19 @@
 --   - Automatic timestamps
 --   - Unique constraint on source + external order ID
 
-CREATE TABLE IF NOT EXISTS catering_orders (
+-- Drop table if it exists (clean start)
+DROP TABLE IF EXISTS catering_orders CASCADE;
+
+-- Create the table
+CREATE TABLE catering_orders (
   -- Primary key
   id BIGSERIAL PRIMARY KEY,
 
   -- Source identification (Toast or EZCater)
-  source_system VARCHAR(50) NOT NULL, -- 'TOAST' or 'EZCATER'
-  source_type VARCHAR(100), -- 'Catering', 'Invoice', 'Catering Online Ordering'
-  external_order_id VARCHAR(255) NOT NULL, -- Toast GUID or EZCater order ID
-  order_number VARCHAR(100), -- Display number
+  source_system VARCHAR(50) NOT NULL,
+  source_type VARCHAR(100),
+  external_order_id VARCHAR(255) NOT NULL,
+  order_number VARCHAR(100),
 
   -- Customer information
   customer_name VARCHAR(255),
@@ -34,10 +38,10 @@ CREATE TABLE IF NOT EXISTS catering_orders (
   -- Order details
   headcount INTEGER,
   total_amount DECIMAL(10, 2),
-  business_date INTEGER, -- Toast business date format (yyyymmdd)
+  business_date INTEGER,
 
   -- Status
-  status VARCHAR(50), -- 'pending', 'confirmed', 'in_progress', 'delivered', 'cancelled'
+  status VARCHAR(50),
 
   -- Full order data (JSONB for flexibility)
   order_data JSONB NOT NULL,
@@ -45,11 +49,12 @@ CREATE TABLE IF NOT EXISTS catering_orders (
   -- Timestamps
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  last_synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-
-  -- Unique constraint: one order per source system + external ID
-  CONSTRAINT unique_order_per_source UNIQUE (source_system, external_order_id)
+  last_synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add unique constraint AFTER table is created
+ALTER TABLE catering_orders
+  ADD CONSTRAINT unique_order_per_source UNIQUE (source_system, external_order_id);
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_catering_orders_delivery_date ON catering_orders(delivery_date);
