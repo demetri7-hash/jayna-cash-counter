@@ -10,9 +10,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#00A8E1">
 
-  <!-- Supabase JS Library -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
     /* Jayna Brand Design - Sky Blue & Grayscale (Matching index.html) */
     :root {
@@ -55,7 +52,7 @@
       -webkit-overflow-scrolling: touch;
     }
     .container {
-      max-width: 1200px; /* Wider for catering view */
+      max-width: 1200px;
       margin: 0 auto;
       background: var(--white);
       border-radius: 0;
@@ -188,6 +185,14 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
+    .order-source {
+      font-size: 9px;
+      color: var(--gray-500);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
     .order-status {
       padding: 4px 10px;
       border-radius: 0;
@@ -201,6 +206,7 @@
     .status-pending { background: var(--warning-bg); color: var(--warning-text); }
     .status-cancelled { background: var(--error-bg); color: var(--error-text); }
     .status-delivered { background: var(--blue-bg); color: var(--blue-text); }
+    .status-completed { background: var(--blue-bg); color: var(--blue-text); }
 
     .order-details {
       display: grid;
@@ -336,7 +342,7 @@
     <!-- Header -->
     <div class="header">
       <h1>🍽️ CATERING MANAGEMENT</h1>
-      <p>EZCater Orders & Scheduling</p>
+      <p>Toast POS Catering Orders</p>
     </div>
 
     <div class="content">
@@ -350,7 +356,6 @@
       <!-- Action Buttons -->
       <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
         <button class="refresh-btn" onclick="refreshOrders()">🔄 REFRESH ORDERS</button>
-        <button class="refresh-btn" style="background: var(--warning); border-color: var(--warning);" onclick="discoverSchema()">🔍 DISCOVER SCHEMA (DEBUG)</button>
       </div>
 
       <!-- Tab Navigation -->
@@ -366,7 +371,7 @@
           <!-- Orders will be loaded here -->
           <div class="loading-spinner">
             <div class="spinner"></div>
-            <div class="loading-text">Loading upcoming orders...</div>
+            <div class="loading-text">Authenticating with Toast POS...</div>
           </div>
         </div>
       </div>
@@ -394,8 +399,50 @@
   <script>
     /**
      * JAYNA CATERING MANAGEMENT SYSTEM
-     * Connected to EZCater API via backend proxy
+     * Connected to Toast POS API - Filters for Catering Orders
+     *
+     * Catering orders have source values:
+     * - "Invoice"
+     * - "Catering"
+     * - "Catering Online Ordering"
      */
+
+    // ============================================
+    // TOAST AUTHENTICATION (From index.html)
+    // ============================================
+    const TOAST_CLIENT_ID = 'TOAST_c2ab72ae-51e6-4dcf-90f5-7d0c42bb9e44-14';
+    const TOAST_CLIENT_SECRET = 'c0e2aa94f47cc16c2f3c78ce9cd5df27fbaa29e40e6f61e36b6af1c4e80e8b15';
+
+    let toastAccessToken = null;
+
+    async function authenticateToast() {
+      try {
+        const response = await fetch('/api/toast-auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            clientId: TOAST_CLIENT_ID,
+            clientSecret: TOAST_CLIENT_SECRET
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.token) {
+          toastAccessToken = data.token;
+          console.log('✅ Toast API authenticated successfully');
+          return true;
+        } else {
+          console.error('❌ Toast authentication failed:', data.error);
+          throw new Error(data.error || 'Authentication failed');
+        }
+      } catch (error) {
+        console.error('❌ Toast authentication error:', error);
+        throw error;
+      }
+    }
 
     // ============================================
     // TAB NAVIGATION
@@ -415,15 +462,7 @@
     }
 
     // ============================================
-    // SUPABASE CLIENT
-    // ============================================
-    const SUPABASE_URL = 'https://xklppzvdvbcgsewmmxdz.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrbHBwenZkdmJjZ3Nld21teGR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjcxMDQxMDcsImV4cCI6MjA0MjY4MDEwN30.6VzVQ9p4DwXDR1n_LivdXfJZCsPpzwkEJzUq3XgKy_E';
-
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // ============================================
-    // FETCH UPCOMING ORDERS (From Supabase, not EZCater)
+    // FETCH UPCOMING CATERING ORDERS (From Toast API)
     // ============================================
     async function fetchUpcomingOrders() {
       const container = document.getElementById('upcomingContent');
@@ -433,9 +472,14 @@
         container.innerHTML = `
           <div class="loading-spinner">
             <div class="spinner"></div>
-            <div class="loading-text">Loading upcoming orders...</div>
+            <div class="loading-text">Loading upcoming catering orders...</div>
           </div>
         `;
+
+        // Authenticate if needed
+        if (!toastAccessToken) {
+          await authenticateToast();
+        }
 
         // Calculate date range (today + 14 days)
         const today = new Date();
@@ -445,38 +489,43 @@
         const startDateStr = formatDate(today);
         const endDateStr = formatDate(endDate);
 
-        console.log(`Fetching orders from database: ${startDateStr} to ${endDateStr}`);
+        console.log(`📋 Fetching catering orders: ${startDateStr} to ${endDateStr}`);
 
-        // Query Supabase for orders in date range
-        const { data, error } = await supabase
-          .from('ezcater_orders')
-          .select('*')
-          .gte('delivery_date', startDateStr)
-          .lte('delivery_date', endDateStr)
-          .order('delivery_date', { ascending: true })
-          .order('delivery_time', { ascending: true });
+        // Call Toast catering orders API
+        const response = await fetch('/api/toast-catering-orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            accessToken: toastAccessToken,
+            startDate: startDateStr,
+            endDate: endDateStr
+          })
+        });
 
-        if (error) {
-          console.error('Supabase error:', error);
-          throw new Error(error.message);
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch catering orders');
         }
 
-        console.log(`✅ Found ${data.length} orders`);
+        console.log(`✅ Found ${data.data.totalOrders} catering orders`);
 
         // Display orders
-        displayUpcomingOrders(data || []);
+        displayUpcomingOrders(data.data.orders || []);
 
       } catch (error) {
         console.error('Error fetching orders:', error);
         container.innerHTML = `
           <div class="error-message">
-            ❌ Error loading orders: ${error.message}
+            ❌ Error loading catering orders: ${error.message}
             <br><br>
-            ${error.message.includes('ezcater_orders') ?
-              'Database table not found. Run the SQL migration first (see CATERING_SETUP_GUIDE.md).' :
-              'Please check your configuration or try again later.'}
+            ${error.message.includes('Authentication') || error.message.includes('401') ?
+              'Toast API authentication failed. Please check your credentials.' :
+              'Please try refreshing the page or contact support.'}
           </div>
-          <button class="refresh-btn" onclick="fetchUpcomingOrders()">🔄 TRY AGAIN</button>
+          <button class="refresh-btn" onclick="refreshOrders()">🔄 TRY AGAIN</button>
         `;
       }
     }
@@ -491,8 +540,12 @@
         container.innerHTML = `
           <div class="empty-state">
             <div class="empty-icon">📅</div>
-            <div class="empty-title">No Upcoming Orders</div>
+            <div class="empty-title">No Upcoming Catering Orders</div>
             <div class="empty-message">No catering orders scheduled for the next 14 days.</div>
+            <br>
+            <p style="font-size: 12px; color: var(--gray-500);">
+              Showing orders with source: Invoice, Catering, or Catering Online Ordering
+            </p>
           </div>
         `;
         return;
@@ -501,7 +554,7 @@
       // Group orders by date
       const ordersByDate = {};
       orders.forEach(order => {
-        const date = order.delivery_date;  // Database field name
+        const date = order.delivery_date;
         if (!ordersByDate[date]) {
           ordersByDate[date] = [];
         }
@@ -521,7 +574,7 @@
         html += `
           <div class="date-group">
             <div class="date-group-header ${dateClass}">
-              ${dateLabel}
+              ${dateLabel} (${dateOrders.length} order${dateOrders.length > 1 ? 's' : ''})
             </div>
         `;
 
@@ -542,10 +595,16 @@
       const statusClass = getStatusClass(order.status);
       const statusLabel = formatStatus(order.status);
 
+      // Extract delivery notes from order data
+      const deliveryNotes = order.order_data?.deliveryInfo?.notes || order.delivery_notes;
+
       return `
-        <div class="order-card" onclick="viewOrderDetails('${order.ezcater_order_id}')">
+        <div class="order-card" onclick="viewOrderDetails('${order.toast_order_id}')">
           <div class="order-header">
-            <div class="order-number">Order #${order.order_number || order.ezcater_order_id.substring(0, 8)}</div>
+            <div>
+              <div class="order-number">Order #${order.order_number}</div>
+              <div class="order-source">${order.source}</div>
+            </div>
             <div class="order-status ${statusClass}">${statusLabel}</div>
           </div>
 
@@ -555,20 +614,28 @@
               <div class="detail-value">${order.customer_name || 'N/A'}</div>
             </div>
             <div class="detail-item">
-              <div class="detail-label">Headcount</div>
-              <div class="detail-value">${order.headcount || 'N/A'} people</div>
+              <div class="detail-label">Phone</div>
+              <div class="detail-value">${order.customer_phone || 'N/A'}</div>
             </div>
-            ${order.special_instructions ? `
+            <div class="detail-item">
+              <div class="detail-label">Headcount</div>
+              <div class="detail-value">${order.headcount ? order.headcount + ' people' : 'N/A'}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Delivery Time</div>
+              <div class="detail-value">${formatTime(order.delivery_time)}</div>
+            </div>
+            ${deliveryNotes ? `
             <div class="detail-item" style="grid-column: 1 / -1;">
-              <div class="detail-label">Special Instructions</div>
-              <div class="detail-value" style="font-size: 12px; font-weight: 400;">${order.special_instructions}</div>
+              <div class="detail-label">Delivery Notes</div>
+              <div class="detail-value" style="font-size: 12px; font-weight: 400;">${deliveryNotes}</div>
             </div>
             ` : ''}
           </div>
 
           <div class="order-footer">
             <div class="order-total">$${(order.total || 0).toFixed(2)}</div>
-            <div class="order-time">⏰ ${formatTime(order.delivery_time)}</div>
+            <div class="order-time">📍 ${order.delivery_address || 'Pickup'}</div>
           </div>
         </div>
       `;
@@ -627,6 +694,7 @@
       if (statusLower.includes('pending')) return 'status-pending';
       if (statusLower.includes('cancel')) return 'status-cancelled';
       if (statusLower.includes('deliver')) return 'status-delivered';
+      if (statusLower.includes('complete')) return 'status-completed';
       return 'status-pending';
     }
 
@@ -634,17 +702,20 @@
       return (status || 'PENDING').toUpperCase();
     }
 
-    function formatTime(time) {
-      if (!time) return 'TBD';
-      // Convert 24h to 12h format if needed
+    function formatTime(timeStr) {
+      if (!timeStr) return 'TBD';
       try {
-        const [hours, minutes] = time.split(':');
-        const hour = parseInt(hours);
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const hour12 = hour % 12 || 12;
-        return `${hour12}:${minutes} ${ampm}`;
+        const date = new Date(timeStr);
+        if (isNaN(date.getTime())) return timeStr;
+
+        const hours = date.getHours();
+        const minutes = date.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const hour12 = hours % 12 || 12;
+        const minuteStr = String(minutes).padStart(2, '0');
+        return `${hour12}:${minuteStr} ${ampm}`;
       } catch {
-        return time;
+        return timeStr;
       }
     }
 
@@ -655,70 +726,16 @@
     }
 
     function refreshOrders() {
+      toastAccessToken = null; // Force re-authentication
       fetchUpcomingOrders();
-    }
-
-    // ============================================
-    // DISCOVER SCHEMA (INTROSPECTION)
-    // ============================================
-    async function discoverSchema() {
-      console.log('🔍 Running GraphQL introspection query...');
-
-      try {
-        const response = await fetch('/api/ezcater-proxy', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            query: `
-              query IntrospectionQuery {
-                __schema {
-                  queryType {
-                    name
-                    fields {
-                      name
-                      description
-                      args {
-                        name
-                        type {
-                          name
-                          kind
-                        }
-                      }
-                      type {
-                        name
-                        kind
-                      }
-                    }
-                  }
-                }
-              }
-            `
-          })
-        });
-
-        const data = await response.json();
-
-        console.log('📊 EZCATER API SCHEMA:');
-        console.log(JSON.stringify(data, null, 2));
-
-        alert(`Schema discovered! Check browser console (F12) for full details.\n\nLook for queries related to "orders" or "order" to find the correct query format.`);
-
-      } catch (error) {
-        console.error('Error discovering schema:', error);
-        alert(`Error: ${error.message}\n\nCheck console for details.`);
-      }
     }
 
     // ============================================
     // INITIALIZATION
     // ============================================
     document.addEventListener('DOMContentLoaded', () => {
-      console.log('🍽️ Jayna Catering Management System loaded');
-      // Don't auto-fetch - wait for user to click refresh or debug schema first
-      // fetchUpcomingOrders();
-      console.log('ℹ️ Click "DISCOVER SCHEMA" to see EZCater API structure, or "REFRESH ORDERS" to test current query.');
+      console.log('🍽️ Jayna Catering Management System loaded (Toast POS)');
+      fetchUpcomingOrders();
     });
   </script>
 </body>
