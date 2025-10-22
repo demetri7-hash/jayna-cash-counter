@@ -810,12 +810,240 @@
     }
 
     // ============================================
+    // BACKGROUND AUTO-SYNC WITH UPDATE CONFIRMATION
+    // ============================================
+    let backgroundSyncInterval = null;
+    let pendingUpdates = [];
+
+    async function backgroundSync() {
+      try {
+        console.log('🔄 Background sync: Checking for new/updated orders...');
+
+        // Authenticate if needed
+        if (!toastAccessToken) {
+          await authenticateToast();
+        }
+
+        // Calculate date range (today + 14 days)
+        const today = new Date();
+        const endDate = new Date();
+        endDate.setDate(today.getDate() + 14);
+
+        const startDateStr = formatDate(today);
+        const endDateStr = formatDate(endDate);
+
+        // Fetch fresh orders from Toast API
+        const toastResponse = await fetch('/api/toast-catering-orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            accessToken: toastAccessToken,
+            startDate: startDateStr,
+            endDate: endDateStr
+          })
+        });
+
+        const toastData = await toastResponse.json();
+
+        if (!toastData.success) {
+          console.warn('⚠️ Background sync: Failed to fetch from Toast');
+          return;
+        }
+
+        // Check for new/updated orders
+        const checkResponse = await fetch('/api/check-order-updates', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            orders: toastData.data.orders || []
+          })
+        });
+
+        const checkData = await checkResponse.json();
+
+        if (!checkData.success) {
+          console.warn('⚠️ Background sync: Failed to check for updates');
+          return;
+        }
+
+        // Auto-save NEW orders silently
+        if (checkData.data.newOrders && checkData.data.newOrders.length > 0) {
+          console.log(`🆕 Found ${checkData.data.newOrders.length} new orders - auto-saving...`);
+
+          const saveResponse = await fetch('/api/save-new-orders', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              orders: checkData.data.newOrders
+            })
+          });
+
+          const saveData = await saveResponse.json();
+
+          if (saveData.success) {
+            console.log(`✅ Auto-saved ${saveData.data.savedCount} new orders`);
+            // Reload orders from database to show new orders
+            loadOrdersFromDatabase();
+          }
+        }
+
+        // Show confirmation for UPDATED orders
+        if (checkData.data.updatedOrders && checkData.data.updatedOrders.length > 0) {
+          console.log(`📝 Found ${checkData.data.updatedOrders.length} updated orders - requesting confirmation...`);
+          pendingUpdates = checkData.data.updatedOrders;
+          showUpdateConfirmationModal();
+        }
+
+      } catch (error) {
+        console.error('❌ Background sync error:', error);
+      }
+    }
+
+    function showUpdateConfirmationModal() {
+      // Build modal HTML
+      let changesHTML = '';
+
+      pendingUpdates.forEach((update, index) => {
+        changesHTML += `
+          <div style="background: var(--gray-100); border: 2px solid var(--gray-300); padding: 12px; margin-bottom: 12px;">
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">
+              Order #${update.order.order_number}
+            </div>
+            <div style="font-size: 12px; margin-bottom: 8px;">
+              ${update.changes.map(change => `
+                <div style="margin-bottom: 4px;">
+                  <strong>${change.field}:</strong> ${change.old || 'N/A'} → ${change.new || 'N/A'}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      });
+
+      const modalHTML = `
+        <div id="updateConfirmationModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px; overflow-y: auto;">
+          <div style="background: white; padding: 24px; max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; border: 3px solid var(--gray-700);">
+            <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px;">
+              📝 ORDER UPDATES DETECTED
+            </h2>
+            <p style="font-size: 13px; margin-bottom: 16px; color: var(--gray-700);">
+              ${pendingUpdates.length} order${pendingUpdates.length > 1 ? 's have' : ' has'} been updated in Toast POS. Review the changes below:
+            </p>
+            <div style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
+              ${changesHTML}
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button onclick="dismissUpdates()" style="padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+                DISMISS
+              </button>
+              <button onclick="applyUpdates()" style="padding: 12px 24px; background: var(--primary-blue); border: 2px solid var(--primary-blue); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+                APPLY UPDATES
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Add modal to page
+      const modalContainer = document.createElement('div');
+      modalContainer.innerHTML = modalHTML;
+      document.body.appendChild(modalContainer);
+    }
+
+    function dismissUpdates() {
+      // Remove modal
+      const modal = document.getElementById('updateConfirmationModal');
+      if (modal) {
+        modal.parentElement.remove();
+      }
+      pendingUpdates = [];
+      console.log('❌ User dismissed order updates');
+    }
+
+    async function applyUpdates() {
+      try {
+        console.log(`📝 Applying ${pendingUpdates.length} order updates...`);
+
+        // Extract just the orders (not the change metadata)
+        const ordersToUpdate = pendingUpdates.map(u => u.order);
+
+        const response = await fetch('/api/apply-order-updates', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            orders: ordersToUpdate
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          console.log(`✅ Successfully applied ${data.data.updatedCount} updates`);
+
+          // Remove modal
+          const modal = document.getElementById('updateConfirmationModal');
+          if (modal) {
+            modal.parentElement.remove();
+          }
+
+          pendingUpdates = [];
+
+          // Reload orders from database to show updates
+          loadOrdersFromDatabase();
+
+          // Show success message
+          const statusDiv = document.getElementById('syncStatus');
+          statusDiv.style.display = 'block';
+          statusDiv.style.background = 'var(--success-bg)';
+          statusDiv.style.borderColor = 'var(--success-border)';
+          statusDiv.style.color = 'var(--success-text)';
+          statusDiv.textContent = `✅ Successfully applied ${data.data.updatedCount} order updates!`;
+
+          setTimeout(() => {
+            statusDiv.style.display = 'none';
+          }, 5000);
+        } else {
+          alert(`Error applying updates: ${data.error}`);
+        }
+      } catch (error) {
+        console.error('❌ Error applying updates:', error);
+        alert(`Error applying updates: ${error.message}`);
+      }
+    }
+
+    // Start background sync every 5 minutes
+    function startBackgroundSync() {
+      // Initial sync after 30 seconds
+      setTimeout(() => {
+        backgroundSync();
+      }, 30000);
+
+      // Then sync every 5 minutes
+      backgroundSyncInterval = setInterval(() => {
+        backgroundSync();
+      }, 5 * 60 * 1000); // 5 minutes
+
+      console.log('✅ Background auto-sync enabled (checks every 5 minutes)');
+    }
+
+    // ============================================
     // INITIALIZATION
     // ============================================
     document.addEventListener('DOMContentLoaded', () => {
       console.log('🍽️ Jayna Catering Management System loaded');
       console.log('📂 Loading orders from database (fast)...');
       loadOrdersFromDatabase();
+
+      // Start background sync
+      startBackgroundSync();
     });
   </script>
 </body>
