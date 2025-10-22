@@ -10,6 +10,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#00A8E1">
 
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     /* Jayna Brand Design - Sky Blue & Grayscale (Matching index.html) */
     :root {
@@ -412,7 +415,15 @@
     }
 
     // ============================================
-    // FETCH UPCOMING ORDERS
+    // SUPABASE CLIENT
+    // ============================================
+    const SUPABASE_URL = 'https://xklppzvdvbcgsewmmxdz.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrbHBwenZkdmJjZ3Nld21teGR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjcxMDQxMDcsImV4cCI6MjA0MjY4MDEwN30.6VzVQ9p4DwXDR1n_LivdXfJZCsPpzwkEJzUq3XgKy_E';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ============================================
+    // FETCH UPCOMING ORDERS (From Supabase, not EZCater)
     // ============================================
     async function fetchUpcomingOrders() {
       const container = document.getElementById('upcomingContent');
@@ -434,58 +445,26 @@
         const startDateStr = formatDate(today);
         const endDateStr = formatDate(endDate);
 
-        console.log(`Fetching EZCater orders from ${startDateStr} to ${endDateStr}`);
+        console.log(`Fetching orders from database: ${startDateStr} to ${endDateStr}`);
 
-        // Call backend proxy (will be created next)
-        const response = await fetch('/api/ezcater-proxy', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            query: `
-              query GetOrders($startDate: String!, $endDate: String!) {
-                orders(
-                  filter: {
-                    deliveryDate: {
-                      gte: $startDate
-                      lte: $endDate
-                    }
-                  }
-                ) {
-                  id
-                  orderNumber
-                  customerName
-                  deliveryDate
-                  deliveryTime
-                  headcount
-                  total
-                  status
-                  specialInstructions
-                }
-              }
-            `,
-            variables: {
-              startDate: startDateStr,
-              endDate: endDateStr
-            }
-          })
-        });
+        // Query Supabase for orders in date range
+        const { data, error } = await supabase
+          .from('ezcater_orders')
+          .select('*')
+          .gte('delivery_date', startDateStr)
+          .lte('delivery_date', endDateStr)
+          .order('delivery_date', { ascending: true })
+          .order('delivery_time', { ascending: true });
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (error) {
+          console.error('Supabase error:', error);
+          throw new Error(error.message);
         }
 
-        const data = await response.json();
-
-        if (data.errors && data.errors.length > 0) {
-          throw new Error(data.errors[0].message);
-        }
-
-        const orders = data.data?.orders || [];
+        console.log(`✅ Found ${data.length} orders`);
 
         // Display orders
-        displayUpcomingOrders(orders);
+        displayUpcomingOrders(data || []);
 
       } catch (error) {
         console.error('Error fetching orders:', error);
@@ -493,7 +472,9 @@
           <div class="error-message">
             ❌ Error loading orders: ${error.message}
             <br><br>
-            Please check your API configuration or try again later.
+            ${error.message.includes('ezcater_orders') ?
+              'Database table not found. Run the SQL migration first (see CATERING_SETUP_GUIDE.md).' :
+              'Please check your configuration or try again later.'}
           </div>
           <button class="refresh-btn" onclick="fetchUpcomingOrders()">🔄 TRY AGAIN</button>
         `;
@@ -520,7 +501,7 @@
       // Group orders by date
       const ordersByDate = {};
       orders.forEach(order => {
-        const date = order.deliveryDate;
+        const date = order.delivery_date;  // Database field name
         if (!ordersByDate[date]) {
           ordersByDate[date] = [];
         }
@@ -562,32 +543,32 @@
       const statusLabel = formatStatus(order.status);
 
       return `
-        <div class="order-card" onclick="viewOrderDetails('${order.id}')">
+        <div class="order-card" onclick="viewOrderDetails('${order.ezcater_order_id}')">
           <div class="order-header">
-            <div class="order-number">Order #${order.orderNumber || order.id.substring(0, 8)}</div>
+            <div class="order-number">Order #${order.order_number || order.ezcater_order_id.substring(0, 8)}</div>
             <div class="order-status ${statusClass}">${statusLabel}</div>
           </div>
 
           <div class="order-details">
             <div class="detail-item">
               <div class="detail-label">Customer</div>
-              <div class="detail-value">${order.customerName || 'N/A'}</div>
+              <div class="detail-value">${order.customer_name || 'N/A'}</div>
             </div>
             <div class="detail-item">
               <div class="detail-label">Headcount</div>
               <div class="detail-value">${order.headcount || 'N/A'} people</div>
             </div>
-            ${order.specialInstructions ? `
+            ${order.special_instructions ? `
             <div class="detail-item" style="grid-column: 1 / -1;">
               <div class="detail-label">Special Instructions</div>
-              <div class="detail-value" style="font-size: 12px; font-weight: 400;">${order.specialInstructions}</div>
+              <div class="detail-value" style="font-size: 12px; font-weight: 400;">${order.special_instructions}</div>
             </div>
             ` : ''}
           </div>
 
           <div class="order-footer">
             <div class="order-total">$${(order.total || 0).toFixed(2)}</div>
-            <div class="order-time">⏰ ${formatTime(order.deliveryTime)}</div>
+            <div class="order-time">⏰ ${formatTime(order.delivery_time)}</div>
           </div>
         </div>
       `;
