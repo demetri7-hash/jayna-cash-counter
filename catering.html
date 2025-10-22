@@ -342,7 +342,7 @@
     <!-- Header -->
     <div class="header">
       <h1>🍽️ CATERING MANAGEMENT</h1>
-      <p>Toast POS Catering Orders</p>
+      <p>Toast POS & EZCater Orders</p>
     </div>
 
     <div class="content">
@@ -355,8 +355,11 @@
 
       <!-- Action Buttons -->
       <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
-        <button class="refresh-btn" onclick="refreshOrders()">🔄 REFRESH ORDERS</button>
+        <button class="refresh-btn" onclick="loadOrdersFromDatabase()">🔄 RELOAD FROM DATABASE</button>
+        <button class="refresh-btn" onclick="syncFromToast()" style="background: var(--primary-blue); border-color: var(--primary-blue);">🔄 SYNC FROM TOAST</button>
       </div>
+
+      <div id="syncStatus" style="display: none; padding: 12px; margin-bottom: 20px; border: 2px solid; font-size: 13px; font-weight: 600;"></div>
 
       <!-- Tab Navigation -->
       <div class="tab-navigation">
@@ -455,9 +458,9 @@
     }
 
     // ============================================
-    // FETCH UPCOMING CATERING ORDERS (From Toast API)
+    // LOAD ORDERS FROM DATABASE (FAST - DEFAULT)
     // ============================================
-    async function fetchUpcomingOrders() {
+    async function loadOrdersFromDatabase() {
       const container = document.getElementById('upcomingContent');
 
       try {
@@ -465,7 +468,69 @@
         container.innerHTML = `
           <div class="loading-spinner">
             <div class="spinner"></div>
-            <div class="loading-text">Loading upcoming catering orders...</div>
+            <div class="loading-text">Loading catering orders from database...</div>
+          </div>
+        `;
+
+        // Calculate date range (today + 14 days)
+        const today = new Date();
+        const endDate = new Date();
+        endDate.setDate(today.getDate() + 14);
+
+        const startDateStr = formatDate(today);
+        const endDateStr = formatDate(endDate);
+
+        console.log(`📋 Fetching orders from database: ${startDateStr} to ${endDateStr}`);
+
+        // Call database API (no authentication needed, very fast!)
+        const response = await fetch(`/api/get-catering-orders?startDate=${startDateStr}&endDate=${endDateStr}`, {
+          method: 'GET'
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch orders from database');
+        }
+
+        console.log(`✅ Found ${data.data.totalOrders} orders in database`);
+
+        // Display orders
+        displayUpcomingOrders(data.data.orders || []);
+
+      } catch (error) {
+        console.error('Error loading orders:', error);
+        container.innerHTML = `
+          <div class="error-message">
+            ❌ Error loading orders from database: ${error.message}
+            <br><br>
+            Try syncing from Toast to refresh your orders.
+          </div>
+          <button class="refresh-btn" onclick="syncFromToast()">🔄 SYNC FROM TOAST</button>
+        `;
+      }
+    }
+
+    // ============================================
+    // SYNC FROM TOAST API (FULL REFRESH)
+    // ============================================
+    async function syncFromToast() {
+      const container = document.getElementById('upcomingContent');
+      const statusDiv = document.getElementById('syncStatus');
+
+      try {
+        // Show sync status
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'var(--blue-bg)';
+        statusDiv.style.borderColor = 'var(--primary-blue)';
+        statusDiv.style.color = 'var(--blue-text)';
+        statusDiv.textContent = '🔄 Syncing from Toast POS...';
+
+        // Show loading state
+        container.innerHTML = `
+          <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">Syncing catering orders from Toast POS...</div>
           </div>
         `;
 
@@ -482,9 +547,9 @@
         const startDateStr = formatDate(today);
         const endDateStr = formatDate(endDate);
 
-        console.log(`📋 Fetching catering orders: ${startDateStr} to ${endDateStr}`);
+        console.log(`🔄 Syncing from Toast: ${startDateStr} to ${endDateStr}`);
 
-        // Call Toast catering orders API
+        // Call Toast catering orders API (will save to database)
         const response = await fetch('/api/toast-catering-orders', {
           method: 'POST',
           headers: {
@@ -500,25 +565,45 @@
         const data = await response.json();
 
         if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch catering orders');
+          throw new Error(data.error || 'Failed to sync catering orders');
         }
 
-        console.log(`✅ Found ${data.data.totalOrders} catering orders`);
+        console.log(`✅ Synced ${data.data.totalOrders} orders from Toast`);
+
+        // Show success status
+        statusDiv.style.background = 'var(--success-bg)';
+        statusDiv.style.borderColor = 'var(--success-border)';
+        statusDiv.style.color = 'var(--success-text)';
+        statusDiv.textContent = `✅ Successfully synced ${data.data.totalOrders} orders from Toast POS to database!`;
+
+        // Hide status after 5 seconds
+        setTimeout(() => {
+          statusDiv.style.display = 'none';
+        }, 5000);
 
         // Display orders
         displayUpcomingOrders(data.data.orders || []);
 
       } catch (error) {
-        console.error('Error fetching orders:', error);
+        console.error('Error syncing from Toast:', error);
+
+        // Show error status
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'var(--error-bg)';
+        statusDiv.style.borderColor = 'var(--error-border)';
+        statusDiv.style.color = 'var(--error-text)';
+        statusDiv.textContent = `❌ Sync failed: ${error.message}`;
+
         container.innerHTML = `
           <div class="error-message">
-            ❌ Error loading catering orders: ${error.message}
+            ❌ Error syncing from Toast: ${error.message}
             <br><br>
             ${error.message.includes('Authentication') || error.message.includes('401') ?
               'Toast API authentication failed. Please check your credentials.' :
-              'Please try refreshing the page or contact support.'}
+              'Please try again or load from database.'}
           </div>
-          <button class="refresh-btn" onclick="refreshOrders()">🔄 TRY AGAIN</button>
+          <button class="refresh-btn" onclick="syncFromToast()">🔄 TRY AGAIN</button>
+          <button class="refresh-btn" onclick="loadOrdersFromDatabase()" style="background: var(--gray-700);">📂 LOAD FROM DATABASE</button>
         `;
       }
     }
@@ -591,11 +676,17 @@
       // Extract delivery notes from order data
       const deliveryNotes = order.order_data?.deliveryInfo?.notes || order.delivery_notes;
 
+      // Source system badge (Toast vs EZCater)
+      const sourceSystem = order.source_system || 'TOAST';
+      const sourceSystemBadge = sourceSystem === 'TOAST'
+        ? '<span style="background: var(--primary-blue); color: white; padding: 2px 6px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; margin-left: 8px;">TOAST</span>'
+        : '<span style="background: var(--warning); color: white; padding: 2px 6px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; margin-left: 8px;">EZCATER</span>';
+
       return `
-        <div class="order-card" onclick="viewOrderDetails('${order.toast_order_id}')">
+        <div class="order-card" onclick="viewOrderDetails('${order.toast_order_id || order.db_id}')">
           <div class="order-header">
             <div>
-              <div class="order-number">Order #${order.order_number}</div>
+              <div class="order-number">Order #${order.order_number}${sourceSystemBadge}</div>
               <div class="order-source">${order.source}</div>
             </div>
             <div class="order-status ${statusClass}">${statusLabel}</div>
@@ -713,22 +804,18 @@
     }
 
     function viewOrderDetails(orderId) {
-      // TODO: Open modal with full order details
+      // TODO: Open modal with full order details for editing
       console.log('View order:', orderId);
-      alert(`Order details modal coming soon!\nOrder ID: ${orderId}`);
-    }
-
-    function refreshOrders() {
-      toastAccessToken = null; // Force re-authentication
-      fetchUpcomingOrders();
+      alert(`Order editing modal coming soon!\nOrder ID: ${orderId}\n\nThis will allow you to edit all fields.`);
     }
 
     // ============================================
     // INITIALIZATION
     // ============================================
     document.addEventListener('DOMContentLoaded', () => {
-      console.log('🍽️ Jayna Catering Management System loaded (Toast POS)');
-      fetchUpcomingOrders();
+      console.log('🍽️ Jayna Catering Management System loaded');
+      console.log('📂 Loading orders from database (fast)...');
+      loadOrdersFromDatabase();
     });
   </script>
 </body>

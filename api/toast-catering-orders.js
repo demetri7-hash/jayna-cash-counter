@@ -1,12 +1,21 @@
 /**
  * Vercel Serverless Function: Toast Catering Orders
  * Fetches catering orders from Toast API for upcoming date range
+ * and stores them in Supabase database
  *
  * Catering orders identified by source field:
  * - "Invoice"
  * - "Catering"
  * - "Catering Online Ordering"
  */
+
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -119,14 +128,15 @@ export default async function handler(req, res) {
       // Extract delivery info
       const deliveryInfo = order.deliveryInfo || {};
 
-      // Extract customer info - Toast catering uses different field structure
-      const customer = order.customer || {};
+      // CRITICAL: Customer info is INSIDE the checks array, not at order level!
+      let customer = {};
+      if (order.checks && order.checks.length > 0 && order.checks[0].customer) {
+        customer = order.checks[0].customer;
+      }
 
-      // Try multiple customer name sources
+      // Build customer name
       let customerName = 'Unknown';
-      if (customer.businessName) {
-        customerName = customer.businessName;
-      } else if (customer.firstName && customer.lastName) {
+      if (customer.firstName && customer.lastName) {
         customerName = `${customer.firstName} ${customer.lastName}`;
       } else if (customer.firstName) {
         customerName = customer.firstName;
@@ -134,17 +144,15 @@ export default async function handler(req, res) {
         customerName = customer.lastName;
       }
 
-      // Add contact name if different from business name
-      if (customer.businessName && (customer.firstName || customer.lastName)) {
-        const contactName = [customer.firstName, customer.lastName].filter(Boolean).join(' ');
-        if (contactName) {
-          customerName = `${customer.businessName} - ${contactName}`;
-        }
+      // Get phone number and clean it
+      let customerPhone = customer.phone || null;
+      if (customerPhone && !customerPhone.includes('-') && !customerPhone.includes('(')) {
+        // Format phone: 2165011552 -> (216) 501-1552
+        customerPhone = `(${customerPhone.substring(0, 3)}) ${customerPhone.substring(3, 6)}-${customerPhone.substring(6)}`;
       }
 
-      // Try multiple phone number sources
-      const customerPhone = customer.phone || customer.phoneNumber ||
-                          deliveryInfo.phone || deliveryInfo.phoneNumber || null;
+      // Get email
+      const customerEmail = customer.email || null;
 
       // Parse business date to readable format
       const dateStr = order.businessDate?.toString() || '';
@@ -152,31 +160,44 @@ export default async function handler(req, res) {
         ? `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`
         : null;
 
-      // Calculate total from checks - sum all check amounts
+      // Build full delivery address from parts
+      let deliveryAddress = null;
+      if (deliveryInfo.address1) {
+        const parts = [
+          deliveryInfo.address1,
+          deliveryInfo.address2,
+          deliveryInfo.city,
+          deliveryInfo.state,
+          deliveryInfo.zipCode
+        ].filter(Boolean);
+        deliveryAddress = parts.join(', ');
+      }
+
+      // Calculate TOTAL from checks - use totalAmount (includes tip & fees), NOT amount
       let total = 0;
       if (order.checks && Array.isArray(order.checks)) {
         total = order.checks.reduce((sum, check) => {
-          // check.amount is already in cents, sum them
-          return sum + (check.amount || 0);
+          // Use totalAmount (includes tip/service charges) in CENTS
+          return sum + (check.totalAmount || check.amount || 0);
         }, 0);
       }
 
-      console.log(`💰 Order ${order.guid?.substring(0, 8)} total: ${total} cents = $${(total / 100).toFixed(2)}`);
+      console.log(`💰 Order ${order.guid?.substring(0, 8)} total: $${(total / 100).toFixed(2)} (${total} cents)`);
 
       return {
         // Order IDs
         toast_order_id: order.guid,
-        order_number: order.orderNumber || order.guid?.substring(0, 8),
+        order_number: order.displayNumber || order.guid?.substring(0, 8),
 
-        // Customer info
+        // Customer info (from check.customer)
         customer_name: customerName,
-        customer_email: customer.email || null,
+        customer_email: customerEmail,
         customer_phone: customerPhone,
 
         // Delivery info
         delivery_date: deliveryDate,
         delivery_time: order.promisedDate || order.openedDate || null,
-        delivery_address: deliveryInfo.address || null,
+        delivery_address: deliveryAddress,
         delivery_notes: deliveryInfo.notes || null,
 
         // Order details
@@ -200,6 +221,45 @@ export default async function handler(req, res) {
       return a.delivery_date.localeCompare(b.delivery_date);
     });
 
+    // Save orders to Supabase database (UPSERT to avoid duplicates)
+    console.log('💾 Saving orders to Supabase...');
+
+    const ordersToSave = cateringData.map(order => ({
+      source_system: 'TOAST',
+      source_type: order.source,
+      external_order_id: order.toast_order_id,
+      order_number: order.order_number,
+      customer_name: order.customer_name,
+      customer_email: order.customer_email,
+      customer_phone: order.customer_phone,
+      delivery_date: order.delivery_date,
+      delivery_time: order.delivery_time,
+      delivery_address: order.delivery_address,
+      delivery_notes: order.delivery_notes,
+      headcount: order.headcount,
+      total_amount: order.total,
+      business_date: order.business_date,
+      status: order.status,
+      order_data: order.order_data,
+      last_synced_at: new Date().toISOString()
+    }));
+
+    // Use upsert to insert new orders or update existing ones
+    const { data: savedOrders, error: saveError } = await supabase
+      .from('catering_orders')
+      .upsert(ordersToSave, {
+        onConflict: 'source_system,external_order_id',
+        ignoreDuplicates: false // Update existing orders
+      })
+      .select();
+
+    if (saveError) {
+      console.error('❌ Error saving orders to database:', saveError);
+      // Don't fail the request, just log the error
+    } else {
+      console.log(`✅ Saved ${savedOrders?.length || ordersToSave.length} orders to database`);
+    }
+
     return res.status(200).json({
       success: true,
       message: `Found ${cateringData.length} catering orders`,
@@ -207,7 +267,8 @@ export default async function handler(req, res) {
         startDate,
         endDate,
         totalOrders: cateringData.length,
-        orders: cateringData
+        orders: cateringData,
+        savedToDatabase: !saveError
       }
     });
 
