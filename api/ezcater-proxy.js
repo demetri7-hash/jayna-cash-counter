@@ -39,12 +39,14 @@ export default async function handler(req, res) {
     console.log('Variables:', JSON.stringify(variables));
 
     // Forward request to EZCater GraphQL API
+    // NOTE: EZCater auth format is just the token, NOT "Bearer <token>"
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiToken}`,
-        'Accept': 'application/json'
+        'Authorization': apiToken,  // Direct token, no "Bearer" prefix
+        'Apollographql-client-name': 'jayna-catering-system',
+        'Apollographql-client-version': '1.0.0'
       },
       body: JSON.stringify({
         query,

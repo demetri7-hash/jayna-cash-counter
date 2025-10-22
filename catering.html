@@ -344,8 +344,11 @@
         <a href="manager.html">Manager Dashboard</a>
       </div>
 
-      <!-- Refresh Button -->
-      <button class="refresh-btn" onclick="refreshOrders()">🔄 REFRESH ORDERS</button>
+      <!-- Action Buttons -->
+      <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+        <button class="refresh-btn" onclick="refreshOrders()">🔄 REFRESH ORDERS</button>
+        <button class="refresh-btn" style="background: var(--warning); border-color: var(--warning);" onclick="discoverSchema()">🔍 DISCOVER SCHEMA (DEBUG)</button>
+      </div>
 
       <!-- Tab Navigation -->
       <div class="tab-navigation">
@@ -675,11 +678,66 @@
     }
 
     // ============================================
+    // DISCOVER SCHEMA (INTROSPECTION)
+    // ============================================
+    async function discoverSchema() {
+      console.log('🔍 Running GraphQL introspection query...');
+
+      try {
+        const response = await fetch('/api/ezcater-proxy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            query: `
+              query IntrospectionQuery {
+                __schema {
+                  queryType {
+                    name
+                    fields {
+                      name
+                      description
+                      args {
+                        name
+                        type {
+                          name
+                          kind
+                        }
+                      }
+                      type {
+                        name
+                        kind
+                      }
+                    }
+                  }
+                }
+              }
+            `
+          })
+        });
+
+        const data = await response.json();
+
+        console.log('📊 EZCATER API SCHEMA:');
+        console.log(JSON.stringify(data, null, 2));
+
+        alert(`Schema discovered! Check browser console (F12) for full details.\n\nLook for queries related to "orders" or "order" to find the correct query format.`);
+
+      } catch (error) {
+        console.error('Error discovering schema:', error);
+        alert(`Error: ${error.message}\n\nCheck console for details.`);
+      }
+    }
+
+    // ============================================
     // INITIALIZATION
     // ============================================
     document.addEventListener('DOMContentLoaded', () => {
       console.log('🍽️ Jayna Catering Management System loaded');
-      fetchUpcomingOrders();
+      // Don't auto-fetch - wait for user to click refresh or debug schema first
+      // fetchUpcomingOrders();
+      console.log('ℹ️ Click "DISCOVER SCHEMA" to see EZCater API structure, or "REFRESH ORDERS" to test current query.');
     });
   </script>
 </body>
