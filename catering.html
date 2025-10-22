@@ -408,11 +408,8 @@
      */
 
     // ============================================
-    // TOAST AUTHENTICATION (From index.html)
+    // TOAST AUTHENTICATION
     // ============================================
-    const TOAST_CLIENT_ID = 'TOAST_c2ab72ae-51e6-4dcf-90f5-7d0c42bb9e44-14';
-    const TOAST_CLIENT_SECRET = 'c0e2aa94f47cc16c2f3c78ce9cd5df27fbaa29e40e6f61e36b6af1c4e80e8b15';
-
     let toastAccessToken = null;
 
     async function authenticateToast() {
@@ -421,17 +418,13 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            clientId: TOAST_CLIENT_ID,
-            clientSecret: TOAST_CLIENT_SECRET
-          })
+          }
         });
 
         const data = await response.json();
 
-        if (data.success && data.token) {
-          toastAccessToken = data.token;
+        if (data.success && data.data && data.data.accessToken) {
+          toastAccessToken = data.data.accessToken;
           console.log('✅ Toast API authenticated successfully');
           return true;
         } else {
