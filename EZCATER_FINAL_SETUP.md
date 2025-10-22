@@ -32,7 +32,19 @@ This is the **correct** architecture per EZCater's design.
 
 ---
 
-## 📋 SETUP STEPS
+## 🚀 QUICK START
+
+**Ready to activate EZCater integration? Follow these 3 simple steps:**
+
+1. **Create database table** - Run SQL in Supabase (Step 1 below)
+2. **Add Caterer ID** - Add `EZCATER_CATERER_ID` to Vercel environment variables (Step 2A below)
+3. **Visit setup page** - Go to [ezcater-setup.html](https://jayna-cash-counter.vercel.app/ezcater-setup.html) and click the setup button
+
+**That's it!** Orders will automatically sync from EZCater to your catering page.
+
+---
+
+## 📋 DETAILED SETUP STEPS
 
 ### Step 1: Create Database Table
 
@@ -54,33 +66,31 @@ SELECT COUNT(*) FROM ezcater_orders;
 
 ---
 
-### Step 2: Set Up EZCater Webhook
+### Step 2: Set Up EZCater Event Subscriptions
 
-**A. Get your webhook URL:**
-```
-https://jayna-cash-counter.vercel.app/api/ezcater-webhook
-```
+**A. Add Environment Variable to Vercel:**
+- Go to Vercel Dashboard → Settings → Environment Variables
+- Add: `EZCATER_CATERER_ID` with your caterer ID
 
-**B. Login to ezManage:**
-- Go to https://manage.ezcater.com/ (or your ezManage portal)
-- Navigate to **Settings → API** or **Integrations**
+**Finding your Caterer ID:**
+- Login to https://manage.ezcater.com/
+- Navigate to Settings → API or Integrations
+- Look for "Caterer ID" or "Restaurant ID"
+- OR contact: api_support@ezcater.com
 
-**C. Create webhook subscription:**
-- **Webhook URL:** `https://jayna-cash-counter.vercel.app/api/ezcater-webhook`
-- **Events to subscribe to:**
-  - `order.submitted` (new orders)
-  - `order.modified` (changes to orders)
-  - `order.cancelled` (cancelled orders)
-- **Save** webhook
+**B. Run One-Time Setup:**
+- Visit: **https://jayna-cash-counter.vercel.app/ezcater-setup.html**
+- Follow the step-by-step instructions
+- Click "🚀 CREATE EZCATER SUBSCRIPTIONS" button
+- Wait for success confirmation
 
-**D. Test webhook** (if ezManage has test feature):
-- Send test event
-- Check Vercel Function Logs for "📦 EZCater Webhook: Event received"
+**What this creates:**
+- Event subscription for `order.submitted` (new orders)
+- Event subscription for `order.accepted` (accepted orders)
+- Event subscription for `order.rejected` (rejected orders)
+- Event subscription for `order.cancelled` (cancelled orders)
 
-**If you can't find webhook settings:**
-- Contact: api_support@ezcater.com
-- Ask: "How do I set up webhooks for order events?"
-- Provide webhook URL: `https://jayna-cash-counter.vercel.app/api/ezcater-webhook`
+All events will be sent to: `https://jayna-cash-counter.vercel.app/api/ezcater-webhook`
 
 ---
 
@@ -172,9 +182,12 @@ Then visit catering.html and click refresh - you should see the test order!
 | `sql/create_ezcater_orders_table.sql` | Database schema |
 | `api/ezcater-webhook.js` | Webhook endpoint |
 | `api/ezcater-proxy.js` | GraphQL proxy (for order details) |
+| `api/setup-ezcater-subscription.js` | One-time subscription setup |
+| `ezcater-setup.html` | Setup UI with instructions |
 | `catering.html` | Frontend display |
 | `EZCATER_SCHEMA_DISCOVERY.md` | How we found real schema |
 | `EZCATER_INTEGRATION.md` | Technical documentation |
+| `EZCATER_FINAL_SETUP.md` | This guide |
 
 ---
 
@@ -288,11 +301,14 @@ Run the SQL migration script in Supabase SQL Editor
 - ✅ Error handling and user feedback
 
 **What's Needed:**
-1. ⏳ Run SQL migration in Supabase
-2. ⏳ Configure webhook in ezManage
-3. ⏳ Test with real or test orders
+1. ⏳ Run SQL migration in Supabase (~2 minutes)
+2. ⏳ Add EZCATER_CATERER_ID environment variable in Vercel (~1 minute)
+3. ⏳ Visit [ezcater-setup.html](https://jayna-cash-counter.vercel.app/ezcater-setup.html) and click setup button (~1 minute)
+4. ⏳ Test with real or test orders (~5 minutes)
 
-**Time to Complete:** ~15 minutes
+**Time to Complete:** ~10 minutes
+
+**Setup Page:** https://jayna-cash-counter.vercel.app/ezcater-setup.html
 
 ---
 
