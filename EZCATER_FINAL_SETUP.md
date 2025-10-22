@@ -46,7 +46,9 @@ This is the **correct** architecture per EZCater's design.
 
 ## 📋 DETAILED SETUP STEPS
 
-### Step 1: Create Database Table
+### Step 1: Create/Update Database Table
+
+**If you HAVEN'T created the table yet:**
 
 Run this SQL in Supabase SQL Editor:
 
@@ -54,14 +56,22 @@ Run this SQL in Supabase SQL Editor:
 
 ```bash
 # Copy the entire file and paste into Supabase SQL Editor
-# OR use psql:
-psql -h your-supabase-db-url -U postgres -d postgres -f sql/create_ezcater_orders_table.sql
 ```
 
-**Verify table created:**
+**If you ALREADY created the table before (and got "trigger already exists" error):**
+
+Run this SQL instead to add missing columns:
+
+**File:** `/sql/update_ezcater_orders_add_delivery_fields.sql`
+
+```bash
+# Copy the entire file and paste into Supabase SQL Editor
+```
+
+**Verify table exists:**
 ```sql
 SELECT COUNT(*) FROM ezcater_orders;
--- Should return 0 (empty table)
+-- Should return 0 or more (number of existing orders)
 ```
 
 ---
