@@ -570,16 +570,27 @@
 
         console.log(`✅ Synced ${data.data.totalOrders} orders from Toast`);
 
-        // Show success status
-        statusDiv.style.background = 'var(--success-bg)';
-        statusDiv.style.borderColor = 'var(--success-border)';
-        statusDiv.style.color = 'var(--success-text)';
-        statusDiv.textContent = `✅ Successfully synced ${data.data.totalOrders} orders from Toast POS to database!`;
+        // Check if database save failed
+        if (data.data.savedToDatabase === false) {
+          // Show warning - database table doesn't exist
+          statusDiv.style.background = 'var(--warning-bg)';
+          statusDiv.style.borderColor = 'var(--warning-border)';
+          statusDiv.style.color = 'var(--warning-text)';
+          statusDiv.innerHTML = `⚠️ Orders fetched but NOT saved to database!<br><br><strong>Database Error:</strong> ${data.data.databaseError || 'Unknown error'}<br><br><strong>Fix:</strong> Run /sql/create_catering_orders_table.sql in Supabase SQL Editor`;
 
-        // Hide status after 5 seconds
-        setTimeout(() => {
-          statusDiv.style.display = 'none';
-        }, 5000);
+          // Don't auto-hide this error
+        } else {
+          // Show success status
+          statusDiv.style.background = 'var(--success-bg)';
+          statusDiv.style.borderColor = 'var(--success-border)';
+          statusDiv.style.color = 'var(--success-text)';
+          statusDiv.textContent = `✅ Successfully synced ${data.data.totalOrders} orders from Toast POS to database!`;
+
+          // Hide status after 5 seconds
+          setTimeout(() => {
+            statusDiv.style.display = 'none';
+          }, 5000);
+        }
 
         // Display orders
         displayUpcomingOrders(data.data.orders || []);

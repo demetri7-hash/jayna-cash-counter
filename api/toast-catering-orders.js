@@ -174,15 +174,16 @@ export default async function handler(req, res) {
       }
 
       // Calculate TOTAL from checks - use totalAmount (includes tip & fees), NOT amount
+      // IMPORTANT: Toast returns amounts in DOLLARS (e.g. 303.55), NOT cents!
       let total = 0;
       if (order.checks && Array.isArray(order.checks)) {
         total = order.checks.reduce((sum, check) => {
-          // Use totalAmount (includes tip/service charges) in CENTS
+          // Use totalAmount (includes tip/service charges) - ALREADY IN DOLLARS
           return sum + (check.totalAmount || check.amount || 0);
         }, 0);
       }
 
-      console.log(`💰 Order ${order.guid?.substring(0, 8)} total: $${(total / 100).toFixed(2)} (${total} cents)`);
+      console.log(`💰 Order ${order.guid?.substring(0, 8)} total: $${total.toFixed(2)}`);
 
       return {
         // Order IDs
@@ -204,7 +205,7 @@ export default async function handler(req, res) {
         source: order.source,
         business_date: order.businessDate,
         headcount: order.numberOfGuests || null,
-        total: total / 100, // Convert cents to dollars
+        total: total, // Already in dollars!
 
         // Status
         status: parseOrderStatus(order),
@@ -255,7 +256,21 @@ export default async function handler(req, res) {
 
     if (saveError) {
       console.error('❌ Error saving orders to database:', saveError);
-      // Don't fail the request, just log the error
+      console.error('Database error details:', JSON.stringify(saveError, null, 2));
+
+      // Return error to user so they know table needs to be created
+      return res.status(200).json({
+        success: true,
+        message: `Found ${cateringData.length} catering orders`,
+        data: {
+          startDate,
+          endDate,
+          totalOrders: cateringData.length,
+          orders: cateringData,
+          savedToDatabase: false,
+          databaseError: saveError.message || 'Database table may not exist. Run /sql/create_catering_orders_table.sql in Supabase.'
+        }
+      });
     } else {
       console.log(`✅ Saved ${savedOrders?.length || ordersToSave.length} orders to database`);
     }
@@ -268,7 +283,7 @@ export default async function handler(req, res) {
         endDate,
         totalOrders: cateringData.length,
         orders: cateringData,
-        savedToDatabase: !saveError
+        savedToDatabase: true
       }
     });
 
