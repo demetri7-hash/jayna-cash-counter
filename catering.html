@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>Jayna Catering Management</title>
+
+  <link rel="apple-touch-icon" href="https://static.spotapps.co/website_images/ab_websites/229800_website_v1/logo.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#00A8E1">
+
+  <style>
+    /* Jayna Brand Design - Sky Blue & Grayscale (Matching index.html) */
+    :root {
+      --primary-blue: #00A8E1;
+      --secondary-blue: #0094D6;
+      --light-blue: #E3F4FC;
+      --accent-blue: #0081C6;
+      --gray-900: #212121;
+      --gray-700: #424242;
+      --gray-600: #616161;
+      --gray-500: #757575;
+      --gray-400: #BDBDBD;
+      --gray-300: #E0E0E0;
+      --gray-100: #F5F5F5;
+      --success: #00C853;
+      --warning: #FFB300;
+      --error: #D32F2F;
+      --white: #FFFFFF;
+      --blue-bg: #dbeafe;
+      --blue-text: #1e40af;
+      --success-bg: #d1fae5;
+      --success-text: #065f46;
+      --success-border: #059669;
+      --warning-bg: #fef3c7;
+      --warning-text: #92400e;
+      --warning-border: #f59e0b;
+      --error-bg: #fee2e2;
+      --error-text: #991b1b;
+      --error-border: #dc2626;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      font-family: 'Aptos', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--white);
+      min-height: 100vh;
+      padding: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .container {
+      max-width: 1200px; /* Wider for catering view */
+      margin: 0 auto;
+      background: var(--white);
+      border-radius: 0;
+      overflow: visible;
+      box-shadow: none;
+      min-height: auto;
+      max-height: none;
+    }
+    .header {
+      background: var(--white);
+      color: var(--gray-900);
+      text-align: center;
+      padding: 12px;
+      border-radius: 0;
+      border-bottom: 1px solid var(--gray-300);
+    }
+    .header h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; letter-spacing: 1.5px; text-transform: uppercase; }
+    .header p { opacity: 0.7; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+    .content {
+      padding: 12px;
+      max-height: none;
+      overflow: visible;
+    }
+
+    /* Navigation Links */
+    .secondary-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 20px;
+      font-size: 11px;
+    }
+    .secondary-links a {
+      color: var(--gray-700);
+      text-decoration: underline;
+      cursor: pointer;
+      transition: color 0.15s ease;
+    }
+    .secondary-links a:hover { color: var(--gray-900); }
+
+    /* Tab Navigation */
+    .tab-navigation {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--gray-300);
+      padding-bottom: 0;
+    }
+    .tab-btn {
+      padding: 12px 20px;
+      background: var(--gray-100);
+      color: var(--gray-700);
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex: 1;
+    }
+    .tab-btn:hover {
+      background: var(--gray-200);
+      color: var(--gray-900);
+    }
+    .tab-btn.active {
+      background: var(--white);
+      color: var(--gray-900);
+      border-bottom-color: var(--primary-blue);
+    }
+
+    /* Tab Content */
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Order Cards */
+    .date-group {
+      margin-bottom: 32px;
+    }
+    .date-group-header {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gray-900);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gray-300);
+    }
+    .date-group-header.today {
+      color: var(--primary-blue);
+      border-bottom-color: var(--primary-blue);
+    }
+    .date-group-header.tomorrow {
+      color: var(--warning);
+      border-bottom-color: var(--warning);
+    }
+
+    .order-card {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .order-card:hover {
+      border-color: var(--gray-400);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      transform: translateY(-1px);
+    }
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      gap: 12px;
+    }
+    .order-number {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--gray-900);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .order-status {
+      padding: 4px 10px;
+      border-radius: 0;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .status-confirmed { background: var(--success-bg); color: var(--success-text); }
+    .status-pending { background: var(--warning-bg); color: var(--warning-text); }
+    .status-cancelled { background: var(--error-bg); color: var(--error-text); }
+    .status-delivered { background: var(--blue-bg); color: var(--blue-text); }
+
+    .order-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .detail-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--gray-600);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .detail-value {
+      font-size: 13px;
+      color: var(--gray-900);
+      font-weight: 600;
+    }
+
+    .order-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid var(--gray-200);
+    }
+    .order-total {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gray-900);
+    }
+    .order-time {
+      font-size: 12px;
+      color: var(--gray-600);
+      font-weight: 600;
+    }
+
+    /* Loading & Empty States */
+    .loading-spinner {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    .spinner {
+      border: 3px solid var(--gray-300);
+      border-top: 3px solid var(--primary-blue);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-text {
+      font-size: 14px;
+      color: var(--gray-600);
+      font-weight: 600;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    .empty-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .empty-message {
+      font-size: 14px;
+      color: var(--gray-600);
+    }
+
+    /* Error Display */
+    .error-message {
+      background: var(--error-bg);
+      border: 2px solid var(--error-border);
+      padding: 16px;
+      margin-bottom: 20px;
+      color: var(--error-text);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* Refresh Button */
+    .refresh-btn {
+      padding: 12px 24px;
+      background: var(--gray-900);
+      color: white;
+      border: 2px solid var(--gray-900);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-bottom: 20px;
+    }
+    .refresh-btn:hover {
+      background: #000;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 600px) {
+      .order-details {
+        grid-template-columns: 1fr;
+      }
+      .tab-btn {
+        padding: 10px 12px;
+        font-size: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🍽️ CATERING MANAGEMENT</h1>
+      <p>EZCater Orders & Scheduling</p>
+    </div>
+
+    <div class="content">
+      <!-- Navigation Links (Back to Main Systems) -->
+      <div class="secondary-links">
+        <a href="index.html">← Cash Counter</a>
+        <a href="foh-checklists.html">FOH Checklists</a>
+        <a href="manager.html">Manager Dashboard</a>
+      </div>
+
+      <!-- Refresh Button -->
+      <button class="refresh-btn" onclick="refreshOrders()">🔄 REFRESH ORDERS</button>
+
+      <!-- Tab Navigation -->
+      <div class="tab-navigation">
+        <button class="tab-btn active" onclick="showTab('upcoming')">UPCOMING</button>
+        <button class="tab-btn" onclick="showTab('past')">PAST</button>
+        <button class="tab-btn" onclick="showTab('analytics')">ANALYTICS</button>
+      </div>
+
+      <!-- UPCOMING Tab -->
+      <div id="upcomingTab" class="tab-content active">
+        <div id="upcomingContent">
+          <!-- Orders will be loaded here -->
+          <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading upcoming orders...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAST Tab (Future Implementation) -->
+      <div id="pastTab" class="tab-content">
+        <div class="empty-state">
+          <div class="empty-icon">📦</div>
+          <div class="empty-title">Past Orders</div>
+          <div class="empty-message">Historical order view coming soon!</div>
+        </div>
+      </div>
+
+      <!-- ANALYTICS Tab (Future Implementation) -->
+      <div id="analyticsTab" class="tab-content">
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <div class="empty-title">Analytics Dashboard</div>
+          <div class="empty-message">Order analytics and insights coming soon!</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * JAYNA CATERING MANAGEMENT SYSTEM
+     * Connected to EZCater API via backend proxy
+     */
+
+    // ============================================
+    // TAB NAVIGATION
+    // ============================================
+    function showTab(tabName) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      // Show selected tab
+      document.getElementById(`${tabName}Tab`).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    // ============================================
+    // FETCH UPCOMING ORDERS
+    // ============================================
+    async function fetchUpcomingOrders() {
+      const container = document.getElementById('upcomingContent');
+
+      try {
+        // Show loading state
+        container.innerHTML = `
+          <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading upcoming orders...</div>
+          </div>
+        `;
+
+        // Calculate date range (today + 14 days)
+        const today = new Date();
+        const endDate = new Date();
+        endDate.setDate(today.getDate() + 14);
+
+        const startDateStr = formatDate(today);
+        const endDateStr = formatDate(endDate);
+
+        console.log(`Fetching EZCater orders from ${startDateStr} to ${endDateStr}`);
+
+        // Call backend proxy (will be created next)
+        const response = await fetch('/api/ezcater-proxy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            query: `
+              query GetOrders($startDate: String!, $endDate: String!) {
+                orders(
+                  filter: {
+                    deliveryDate: {
+                      gte: $startDate
+                      lte: $endDate
+                    }
+                  }
+                ) {
+                  id
+                  orderNumber
+                  customerName
+                  deliveryDate
+                  deliveryTime
+                  headcount
+                  total
+                  status
+                  specialInstructions
+                }
+              }
+            `,
+            variables: {
+              startDate: startDateStr,
+              endDate: endDateStr
+            }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.errors && data.errors.length > 0) {
+          throw new Error(data.errors[0].message);
+        }
+
+        const orders = data.data?.orders || [];
+
+        // Display orders
+        displayUpcomingOrders(orders);
+
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        container.innerHTML = `
+          <div class="error-message">
+            ❌ Error loading orders: ${error.message}
+            <br><br>
+            Please check your API configuration or try again later.
+          </div>
+          <button class="refresh-btn" onclick="fetchUpcomingOrders()">🔄 TRY AGAIN</button>
+        `;
+      }
+    }
+
+    // ============================================
+    // DISPLAY UPCOMING ORDERS
+    // ============================================
+    function displayUpcomingOrders(orders) {
+      const container = document.getElementById('upcomingContent');
+
+      if (!orders || orders.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">📅</div>
+            <div class="empty-title">No Upcoming Orders</div>
+            <div class="empty-message">No catering orders scheduled for the next 14 days.</div>
+          </div>
+        `;
+        return;
+      }
+
+      // Group orders by date
+      const ordersByDate = {};
+      orders.forEach(order => {
+        const date = order.deliveryDate;
+        if (!ordersByDate[date]) {
+          ordersByDate[date] = [];
+        }
+        ordersByDate[date].push(order);
+      });
+
+      // Sort dates
+      const sortedDates = Object.keys(ordersByDate).sort();
+
+      // Build HTML
+      let html = '';
+      sortedDates.forEach(date => {
+        const dateOrders = ordersByDate[date];
+        const dateLabel = formatDateLabel(date);
+        const dateClass = getDateClass(date);
+
+        html += `
+          <div class="date-group">
+            <div class="date-group-header ${dateClass}">
+              ${dateLabel}
+            </div>
+        `;
+
+        dateOrders.forEach(order => {
+          html += renderOrderCard(order);
+        });
+
+        html += `</div>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // ============================================
+    // RENDER ORDER CARD
+    // ============================================
+    function renderOrderCard(order) {
+      const statusClass = getStatusClass(order.status);
+      const statusLabel = formatStatus(order.status);
+
+      return `
+        <div class="order-card" onclick="viewOrderDetails('${order.id}')">
+          <div class="order-header">
+            <div class="order-number">Order #${order.orderNumber || order.id.substring(0, 8)}</div>
+            <div class="order-status ${statusClass}">${statusLabel}</div>
+          </div>
+
+          <div class="order-details">
+            <div class="detail-item">
+              <div class="detail-label">Customer</div>
+              <div class="detail-value">${order.customerName || 'N/A'}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Headcount</div>
+              <div class="detail-value">${order.headcount || 'N/A'} people</div>
+            </div>
+            ${order.specialInstructions ? `
+            <div class="detail-item" style="grid-column: 1 / -1;">
+              <div class="detail-label">Special Instructions</div>
+              <div class="detail-value" style="font-size: 12px; font-weight: 400;">${order.specialInstructions}</div>
+            </div>
+            ` : ''}
+          </div>
+
+          <div class="order-footer">
+            <div class="order-total">$${(order.total || 0).toFixed(2)}</div>
+            <div class="order-time">⏰ ${formatTime(order.deliveryTime)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    function formatDate(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function formatDateLabel(dateStr) {
+      const date = new Date(dateStr + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const orderDate = new Date(date);
+      orderDate.setHours(0, 0, 0, 0);
+
+      if (orderDate.getTime() === today.getTime()) {
+        return `TODAY - ${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`;
+      } else if (orderDate.getTime() === tomorrow.getTime()) {
+        return `TOMORROW - ${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`;
+      } else {
+        return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      }
+    }
+
+    function getDateClass(dateStr) {
+      const date = new Date(dateStr + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const orderDate = new Date(date);
+      orderDate.setHours(0, 0, 0, 0);
+
+      if (orderDate.getTime() === today.getTime()) {
+        return 'today';
+      } else if (orderDate.getTime() === tomorrow.getTime()) {
+        return 'tomorrow';
+      }
+      return '';
+    }
+
+    function getStatusClass(status) {
+      const statusLower = (status || '').toLowerCase();
+      if (statusLower.includes('confirm')) return 'status-confirmed';
+      if (statusLower.includes('pending')) return 'status-pending';
+      if (statusLower.includes('cancel')) return 'status-cancelled';
+      if (statusLower.includes('deliver')) return 'status-delivered';
+      return 'status-pending';
+    }
+
+    function formatStatus(status) {
+      return (status || 'PENDING').toUpperCase();
+    }
+
+    function formatTime(time) {
+      if (!time) return 'TBD';
+      // Convert 24h to 12h format if needed
+      try {
+        const [hours, minutes] = time.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const hour12 = hour % 12 || 12;
+        return `${hour12}:${minutes} ${ampm}`;
+      } catch {
+        return time;
+      }
+    }
+
+    function viewOrderDetails(orderId) {
+      // TODO: Open modal with full order details
+      console.log('View order:', orderId);
+      alert(`Order details modal coming soon!\nOrder ID: ${orderId}`);
+    }
+
+    function refreshOrders() {
+      fetchUpcomingOrders();
+    }
+
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('🍽️ Jayna Catering Management System loaded');
+      fetchUpcomingOrders();
+    });
+  </script>
+</body>
+</html>
