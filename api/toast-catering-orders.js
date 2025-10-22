@@ -103,13 +103,48 @@ export default async function handler(req, res) {
 
     console.log(`📦 Total catering orders found: ${allCateringOrders.length}`);
 
+    // DEBUG: Log first order structure to understand Toast API response
+    if (allCateringOrders.length > 0) {
+      const firstOrder = allCateringOrders[0];
+      console.log('🔍 DEBUG - First order structure:');
+      console.log('Customer object:', JSON.stringify(firstOrder.customer, null, 2));
+      console.log('Delivery info:', JSON.stringify(firstOrder.deliveryInfo, null, 2));
+      console.log('Checks array:', JSON.stringify(firstOrder.checks, null, 2));
+      console.log('Number of guests:', firstOrder.numberOfGuests);
+      console.log('Order keys:', Object.keys(firstOrder));
+    }
+
     // Transform orders to catering format
     const cateringData = allCateringOrders.map(order => {
       // Extract delivery info
       const deliveryInfo = order.deliveryInfo || {};
 
-      // Extract customer info
+      // Extract customer info - Toast catering uses different field structure
       const customer = order.customer || {};
+
+      // Try multiple customer name sources
+      let customerName = 'Unknown';
+      if (customer.businessName) {
+        customerName = customer.businessName;
+      } else if (customer.firstName && customer.lastName) {
+        customerName = `${customer.firstName} ${customer.lastName}`;
+      } else if (customer.firstName) {
+        customerName = customer.firstName;
+      } else if (customer.lastName) {
+        customerName = customer.lastName;
+      }
+
+      // Add contact name if different from business name
+      if (customer.businessName && (customer.firstName || customer.lastName)) {
+        const contactName = [customer.firstName, customer.lastName].filter(Boolean).join(' ');
+        if (contactName) {
+          customerName = `${customer.businessName} - ${contactName}`;
+        }
+      }
+
+      // Try multiple phone number sources
+      const customerPhone = customer.phone || customer.phoneNumber ||
+                          deliveryInfo.phone || deliveryInfo.phoneNumber || null;
 
       // Parse business date to readable format
       const dateStr = order.businessDate?.toString() || '';
@@ -117,11 +152,16 @@ export default async function handler(req, res) {
         ? `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`
         : null;
 
-      // Calculate total from checks
+      // Calculate total from checks - sum all check amounts
       let total = 0;
       if (order.checks && Array.isArray(order.checks)) {
-        total = order.checks.reduce((sum, check) => sum + (check.amount || 0), 0);
+        total = order.checks.reduce((sum, check) => {
+          // check.amount is already in cents, sum them
+          return sum + (check.amount || 0);
+        }, 0);
       }
+
+      console.log(`💰 Order ${order.guid?.substring(0, 8)} total: ${total} cents = $${(total / 100).toFixed(2)}`);
 
       return {
         // Order IDs
@@ -129,11 +169,9 @@ export default async function handler(req, res) {
         order_number: order.orderNumber || order.guid?.substring(0, 8),
 
         // Customer info
-        customer_name: customer.firstName && customer.lastName
-          ? `${customer.firstName} ${customer.lastName}`
-          : customer.firstName || customer.lastName || 'Unknown',
+        customer_name: customerName,
         customer_email: customer.email || null,
-        customer_phone: customer.phone || null,
+        customer_phone: customerPhone,
 
         // Delivery info
         delivery_date: deliveryDate,
