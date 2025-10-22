@@ -70,6 +70,11 @@ export default async function handler(req, res) {
         customer_phone: orderData.customer_phone,
         delivery_date: orderData.delivery_date,
         delivery_time: orderData.delivery_time,
+        delivery_address_street: orderData.delivery_address_street,
+        delivery_address_city: orderData.delivery_address_city,
+        delivery_address_state: orderData.delivery_address_state,
+        delivery_address_zip: orderData.delivery_address_zip,
+        delivery_instructions: orderData.delivery_instructions,
         headcount: orderData.headcount,
         special_instructions: orderData.special_instructions,
         subtotal: orderData.subtotal,
@@ -133,37 +138,59 @@ async function fetchOrderFromEZCater(orderId) {
         query: `
           query GetOrder($id: ID!) {
             order(id: $id) {
-              id
+              uuid
               orderNumber
-              customer {
-                name
-                email
-                phone
-                company
+              orderCustomer {
+                firstName
+                lastName
+                fullName
               }
-              deliveryDate
-              deliveryTime
-              deliveryAddress {
-                street
-                city
-                state
-                zip
+              event {
+                timestamp
+                catererHandoffFoodTime
+                headcount
+                address {
+                  street
+                  street2
+                  city
+                  state
+                  zip
+                  deliveryInstructions
+                }
+                contact {
+                  name
+                  phone
+                }
+                timeZoneIdentifier
               }
-              headcount
-              specialInstructions
-              subtotal
-              tax
-              tip
-              deliveryFee
-              serviceFee
-              total
-              status
-              items {
-                id
-                name
-                quantity
-                price
+              totals {
+                customerTotalDue
+                tip
+                salesTax
+                subTotal
               }
+              catererCart {
+                totals {
+                  catererTotalDue
+                }
+                orderItems {
+                  uuid
+                  name
+                  quantity
+                  totalInSubunits
+                  specialInstructions
+                  menuItemSizeName
+                  customizations {
+                    name
+                    quantity
+                  }
+                }
+              }
+              lifecycle {
+                orderIsCurrently
+              }
+              isTaxExempt
+              deliveryId
             }
           }
         `,
@@ -190,23 +217,52 @@ async function fetchOrderFromEZCater(orderId) {
 
 /**
  * Parse order data from EZCater format to database format
+ * Based on official EZCater API schema (October 2025)
  */
 function parseOrderData(order) {
+  // Extract timestamp and convert to date/time
+  const eventTimestamp = order.event?.timestamp ? new Date(order.event.timestamp) : null;
+  const deliveryDate = eventTimestamp ? eventTimestamp.toISOString().split('T')[0] : null;
+  const deliveryTime = eventTimestamp ? eventTimestamp.toISOString().split('T')[1].substring(0, 8) : null;
+
+  // Extract customer info (orderCustomer in actual schema, not "customer")
+  const customerName = order.orderCustomer?.fullName ||
+                       `${order.orderCustomer?.firstName || ''} ${order.orderCustomer?.lastName || ''}`.trim() ||
+                       null;
+
+  // Extract delivery address (nested under event.address, not top-level)
+  const address = order.event?.address;
+
+  // Extract totals (nested under totals object, not top-level)
+  const totals = order.totals || {};
+  const subtotal = totals.subTotal || 0;
+  const tax = totals.salesTax || 0;
+  const tip = totals.tip || 0;
+  const total = totals.customerTotalDue || 0;
+
+  // Extract status (lifecycle.orderIsCurrently, not "status")
+  const status = parseStatus(order.lifecycle?.orderIsCurrently);
+
   return {
-    ezcater_order_id: order.id,
-    order_number: order.orderNumber || order.id.substring(0, 8),
-    customer_name: order.customer?.name || null,
-    customer_email: order.customer?.email || null,
-    customer_phone: order.customer?.phone || null,
-    delivery_date: order.deliveryDate || null,
-    delivery_time: order.deliveryTime || null,
-    headcount: order.headcount || null,
-    special_instructions: order.specialInstructions || null,
-    subtotal: order.subtotal || 0,
-    tax: order.tax || 0,
-    tip: order.tip || 0,
-    total: order.total || 0,
-    status: parseStatus(order.status)
+    ezcater_order_id: order.uuid,
+    order_number: order.orderNumber || order.uuid?.substring(0, 8),
+    customer_name: customerName,
+    customer_email: null,  // Not provided in order query schema
+    customer_phone: order.event?.contact?.phone || null,
+    delivery_date: deliveryDate,
+    delivery_time: deliveryTime,
+    delivery_address_street: address?.street || null,
+    delivery_address_city: address?.city || null,
+    delivery_address_state: address?.state || null,
+    delivery_address_zip: address?.zip || null,
+    delivery_instructions: address?.deliveryInstructions || null,
+    headcount: order.event?.headcount || null,
+    special_instructions: null,  // Order-level special instructions not in schema (item-level only)
+    subtotal: subtotal,
+    tax: tax,
+    tip: tip,
+    total: total,
+    status: status
   };
 }
 
