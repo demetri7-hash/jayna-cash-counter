@@ -1689,15 +1689,16 @@
     try {
       console.log('🔄 Loading ALL checklists from database...');
 
-      // Load ALL checklists from database (not just hardcoded ones!)
+      // Load ALL BOH checklists from database (not just hardcoded ones!)
       const { data: allChecklists, error } = await supabase
         .from('checklist_definitions')
-        .select('type, title, time_range, start_hour, start_minute, end_hour, end_minute');
+        .select('type, title, time_range, start_hour, start_minute, end_hour, end_minute')
+        .like('type', 'boh_%');  // FILTER FOR BOH ONLY
 
       if (error) throw error;
 
       if (!allChecklists || allChecklists.length === 0) {
-        console.warn('⚠️ No checklists found in database');
+        console.warn('⚠️ No BOH checklists found in database. Run sql/insert_boh_checklists.sql first!');
         return;
       }
 
