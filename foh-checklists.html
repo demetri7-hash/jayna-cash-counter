@@ -836,25 +836,26 @@
    * Individual checklists load from database with fallback to static data
    */
   async function loadAllChecklistsFromDatabase() {
-    // Query database for ALL checklist types - NO FALLBACK, FAIL LOUD IF BROKEN
+    // Query database for FOH checklist types only
     const { data, error } = await supabase
       .from('checklist_definitions')
       .select('type')
+      .like('type', 'foh_%')  // FILTER FOR FOH ONLY
       .order('type');
 
     if (error) {
-      console.error('❌ Database error loading checklist types:', error);
+      console.error('❌ Database error loading FOH checklist types:', error);
       throw new Error(`Database error: ${error.message}`);
     }
 
     if (!data || data.length === 0) {
-      console.error('❌ No checklists found in database!');
-      throw new Error('No checklists found in database. Run migrations first!');
+      console.error('❌ No FOH checklists found in database!');
+      throw new Error('No FOH checklists found in database. Run sql/foh_checklists_migration.sql first!');
     }
 
     // Extract unique checklist types
     const types = [...new Set(data.map(row => row.type))];
-    console.log(`✅ Loaded ${types.length} checklist types from database:`, types);
+    console.log(`✅ Loaded ${types.length} FOH checklist types from database:`, types);
     return types;
   }
 
@@ -1697,15 +1698,16 @@
     try {
       console.log('🔄 Loading ALL checklists from database...');
 
-      // Load ALL checklists from database (not just hardcoded ones!)
+      // Load ALL FOH checklists from database (not just hardcoded ones!)
       const { data: allChecklists, error } = await supabase
         .from('checklist_definitions')
-        .select('type, title, time_range, start_hour, start_minute, end_hour, end_minute');
+        .select('type, title, time_range, start_hour, start_minute, end_hour, end_minute')
+        .like('type', 'foh_%');  // FILTER FOR FOH ONLY
 
       if (error) throw error;
 
       if (!allChecklists || allChecklists.length === 0) {
-        console.warn('⚠️ No checklists found in database');
+        console.warn('⚠️ No FOH checklists found in database. Run sql/foh_checklists_migration.sql first!');
         return;
       }
 
