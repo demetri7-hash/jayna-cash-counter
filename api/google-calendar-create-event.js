@@ -109,7 +109,8 @@ ${imageUrl ? `<img src="${imageUrl}" style="max-width: 100%; height: auto;" />` 
         reminders: {
           useDefault: false,
           overrides: [
-            { method: 'popup', minutes: 120 } // 2 hours before
+            { method: 'popup', minutes: 120 }, // 2 hours before (popup on desktop)
+            { method: 'email', minutes: 120 }  // 2 hours before (email notification)
           ]
         },
         colorId: '11' // Red color for catering orders
