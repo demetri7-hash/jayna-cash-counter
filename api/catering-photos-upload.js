@@ -123,7 +123,7 @@ export default async function handler(req, res) {
         .upload(fileName, buffer, {
           contentType: 'image/jpeg',
           cacheControl: '3600',
-          upsert: false
+          upsert: true  // Allow overwriting existing files (handles retries)
         });
 
       if (uploadError) {
