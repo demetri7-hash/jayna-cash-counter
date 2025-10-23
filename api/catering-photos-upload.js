@@ -102,6 +102,8 @@ export default async function handler(req, res) {
 
     // Upload image to Supabase Storage to get a real public URL
     let publicImageUrl = null;
+    let storageUploadSucceeded = false;
+
     try {
       // Convert base64 to buffer
       const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -112,6 +114,8 @@ export default async function handler(req, res) {
       const fileName = `${orderDueDate}_${orderNumber.replace(/\s/g, '_')}_${timestamp}.jpg`;
 
       console.log(`☁️ Uploading to Supabase Storage: ${fileName}`);
+      console.log(`📦 Bucket: catering-photos`);
+      console.log(`📏 File size: ${buffer.length} bytes`);
 
       // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -124,20 +128,36 @@ export default async function handler(req, res) {
 
       if (uploadError) {
         console.error('❌ Storage upload error:', uploadError);
+        console.error('❌ Error details:', JSON.stringify(uploadError, null, 2));
         throw uploadError;
       }
 
-      // Get public URL
+      console.log('✅ Upload successful, data:', uploadData);
+      storageUploadSucceeded = true;
+
+      // Get public URL - CRITICAL: Bucket must be set to PUBLIC in Supabase dashboard
       const { data: urlData } = supabase.storage
         .from('catering-photos')
         .getPublicUrl(fileName);
 
+      if (!urlData || !urlData.publicUrl) {
+        throw new Error('getPublicUrl returned no URL - bucket may not be public');
+      }
+
       publicImageUrl = urlData.publicUrl;
-      console.log(`✅ Image uploaded: ${publicImageUrl}`);
+      console.log(`✅ Public URL generated: ${publicImageUrl}`);
+      console.log(`🔗 URL length: ${publicImageUrl.length} characters`);
 
     } catch (storageError) {
       console.error('❌ Storage upload failed:', storageError);
-      // Fallback to base64 if storage fails
+      console.error('❌ Error type:', storageError.name);
+      console.error('❌ Error message:', storageError.message);
+
+      // CRITICAL: If upload fails, use base64 as fallback BUT log warning
+      console.warn('⚠️ FALLING BACK TO BASE64 - Calendar event will have large URL');
+      console.warn('⚠️ To fix: Ensure "catering-photos" bucket is PUBLIC in Supabase dashboard');
+      console.warn('⚠️ Settings → Storage → catering-photos → Make Public');
+
       publicImageUrl = imageData;
     }
 
