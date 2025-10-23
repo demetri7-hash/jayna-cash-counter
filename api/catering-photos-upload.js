@@ -75,7 +75,54 @@ export default async function handler(req, res) {
 
     const nextOrder = (maxOrder && maxOrder.length > 0) ? maxOrder[0].display_order + 1 : 0;
 
-    // Insert photo with order metadata
+    // Count existing orders on the same date (for dynamic numbering)
+    const { data: sameDayOrders, error: countError } = await supabase
+      .from('catering_photos')
+      .select('id')
+      .eq('order_due_date', orderDueDate);
+
+    if (countError) {
+      console.error('❌ Error counting same-day orders:', countError);
+    }
+
+    const orderNumber = `Order #${(sameDayOrders?.length || 0) + 1}`;
+    console.log(`📋 Assigned order number: ${orderNumber} for ${orderDueDate}`);
+
+    // Create Google Calendar event
+    let calendarEventId = null;
+    try {
+      console.log('📅 Creating Google Calendar event...');
+
+      const calendarResponse = await fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/google-calendar-create-event`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          orderType,
+          orderDueDate,
+          timeDue,
+          leaveJaynaAt,
+          imageData,
+          orderNumber
+        })
+      });
+
+      const calendarData = await calendarResponse.json();
+
+      if (calendarData.success) {
+        calendarEventId = calendarData.data.eventId;
+        console.log(`✅ Calendar event created: ${calendarEventId}`);
+      } else {
+        console.warn(`⚠️ Calendar event creation failed: ${calendarData.error}`);
+        // Continue with photo upload even if calendar sync fails
+      }
+    } catch (calendarError) {
+      console.error('❌ Calendar sync error:', calendarError);
+      // Continue with photo upload even if calendar sync fails
+    }
+
+    // Insert photo with order metadata and calendar event ID
     const { data: photo, error } = await supabase
       .from('catering_photos')
       .insert({
@@ -86,7 +133,8 @@ export default async function handler(req, res) {
         order_type: orderType,
         order_due_date: orderDueDate,
         time_due: timeDue,
-        leave_jayna_at: orderType === 'DELIVERY' ? leaveJaynaAt : null
+        leave_jayna_at: orderType === 'DELIVERY' ? leaveJaynaAt : null,
+        calendar_event_id: calendarEventId
       })
       .select()
       .single();
@@ -105,7 +153,11 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       message: 'Photo uploaded successfully',
-      data: photo
+      data: {
+        ...photo,
+        orderNumber,
+        calendarSynced: !!calendarEventId
+      }
     });
 
   } catch (error) {

@@ -29,6 +29,15 @@ CREATE TABLE catering_photos (
   brightness INTEGER DEFAULT 100, -- 100 = normal, 115 = scan mode
   contrast INTEGER DEFAULT 100,   -- 100 = normal, 125 = scan mode
 
+  -- Order metadata (for calendar sync)
+  order_type VARCHAR(20), -- 'PICKUP' or 'DELIVERY'
+  order_due_date DATE, -- Date when order is due
+  time_due TIME, -- Time when order is due
+  leave_jayna_at TIME, -- For deliveries: time to leave restaurant
+
+  -- Google Calendar sync
+  calendar_event_id VARCHAR(255), -- Google Calendar event ID for updates/deletes
+
   -- Optional metadata
   caption TEXT,
   uploaded_by VARCHAR(100),
