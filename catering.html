@@ -412,6 +412,10 @@
       display: block;
       object-fit: cover;
       transition: filter 0.3s ease;
+      cursor: pointer;
+    }
+    .photo-img:hover {
+      opacity: 0.9;
     }
     .photo-metadata {
       padding: 8px 0 0 0;
@@ -542,6 +546,63 @@
     .filter-preset-btn:hover {
       background: var(--secondary-blue);
       border-color: var(--secondary-blue);
+    }
+
+    /* Image Lightbox Modal */
+    .lightbox-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 100000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow: auto;
+    }
+    .lightbox-modal.active {
+      display: flex;
+    }
+    .lightbox-close {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      background: var(--error-border);
+      color: white;
+      border: 3px solid white;
+      font-size: 24px;
+      font-weight: 700;
+      cursor: pointer;
+      z-index: 100001;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    .lightbox-close:hover {
+      background: #b91c1c;
+      transform: scale(1.1);
+    }
+    .lightbox-image {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      display: block;
+      margin: auto;
+      cursor: zoom-in;
+    }
+    .lightbox-image.zoomed {
+      max-width: none;
+      max-height: none;
+      width: auto;
+      height: auto;
+      cursor: zoom-out;
     }
   </style>
 </head>
@@ -1441,12 +1502,13 @@
                 </button>
               </div>
 
-              <!-- Image -->
+              <!-- Image (click to expand) -->
               <img src="${photo.image_url}"
                    alt="Catering Order"
                    class="photo-img"
                    id="photo-img-${photo.id}"
-                   style="${filterStyle}">
+                   style="${filterStyle} cursor: pointer;"
+                   onclick="openLightbox('${photo.image_url}', ${brightness}, ${contrast})">
 
               <!-- Order Metadata -->
               <div class="photo-metadata">
@@ -1919,6 +1981,38 @@
       // Start background sync
       startBackgroundSync();
     });
+
+    // ============================================
+    // IMAGE LIGHTBOX / FULL-SIZE VIEWER
+    // ============================================
+    function openLightbox(imageUrl, brightness, contrast) {
+      const modal = document.getElementById('lightboxModal');
+      const img = document.getElementById('lightboxImage');
+
+      img.src = imageUrl;
+      img.style.filter = `brightness(${brightness || 100}%) contrast(${contrast || 100}%)`;
+      img.classList.remove('zoomed');
+
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    function closeLightbox() {
+      const modal = document.getElementById('lightboxModal');
+      modal.classList.remove('active');
+      document.body.style.overflow = ''; // Restore scrolling
+    }
+
+    function toggleZoom(event) {
+      const img = event.target;
+      img.classList.toggle('zoomed');
+    }
   </script>
+
+  <!-- Image Lightbox Modal -->
+  <div id="lightboxModal" class="lightbox-modal" onclick="closeLightbox()">
+    <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+    <img id="lightboxImage" class="lightbox-image" onclick="toggleZoom(event); event.stopPropagation();" alt="Full Size Photo">
+  </div>
 </body>
 </html>
