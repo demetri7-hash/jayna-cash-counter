@@ -88,6 +88,47 @@ export default async function handler(req, res) {
     const orderNumber = `Order #${(sameDayOrders?.length || 0) + 1}`;
     console.log(`📋 Assigned order number: ${orderNumber} for ${orderDueDate}`);
 
+    // Upload image to Supabase Storage to get a real public URL
+    let publicImageUrl = null;
+    try {
+      // Convert base64 to buffer
+      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const fileName = `${orderDueDate}_${orderNumber.replace(/\s/g, '_')}_${timestamp}.jpg`;
+
+      console.log(`☁️ Uploading to Supabase Storage: ${fileName}`);
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('catering-photos')
+        .upload(fileName, buffer, {
+          contentType: 'image/jpeg',
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('❌ Storage upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('catering-photos')
+        .getPublicUrl(fileName);
+
+      publicImageUrl = urlData.publicUrl;
+      console.log(`✅ Image uploaded: ${publicImageUrl}`);
+
+    } catch (storageError) {
+      console.error('❌ Storage upload failed:', storageError);
+      // Fallback to base64 if storage fails
+      publicImageUrl = imageData;
+    }
+
     // Create Google Calendar event
     let calendarEventId = null;
     try {
@@ -103,7 +144,7 @@ export default async function handler(req, res) {
           orderDueDate,
           timeDue,
           leaveJaynaAt,
-          imageData,
+          imageUrl: publicImageUrl, // Use real URL instead of base64
           orderNumber
         })
       });
@@ -126,8 +167,8 @@ export default async function handler(req, res) {
     const { data: photo, error } = await supabase
       .from('catering_photos')
       .insert({
-        image_data: imageData,
-        image_url: imageData, // For now, store base64 as URL
+        image_data: imageData, // Keep base64 as backup
+        image_url: publicImageUrl, // Store real public URL
         caption: caption || null,
         display_order: nextOrder,
         order_type: orderType,

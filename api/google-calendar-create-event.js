@@ -31,7 +31,7 @@ export default async function handler(req, res) {
       orderDueDate,
       timeDue,
       leaveJaynaAt,
-      imageData,
+      imageUrl, // Real public URL instead of base64
       orderNumber // "Order #1", "Order #2", etc.
     } = req.body;
 
@@ -89,7 +89,7 @@ Due: ${orderDueDate} at ${timeDue}
 ${orderType === 'DELIVERY' ? `Leave Jayna: ${leaveJaynaAt}\n` : ''}
 
 Order Photo:
-${imageData ? `<img src="${imageData}" style="max-width: 100%; height: auto;" />` : 'No photo available'}
+${imageUrl ? `<img src="${imageUrl}" style="max-width: 100%; height: auto;" />` : 'No photo available'}
     `.trim();
 
     // Create calendar event
