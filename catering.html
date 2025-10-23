@@ -1555,6 +1555,8 @@
     }
 
     async function uploadPhoto(base64Data) {
+      const gallery = document.getElementById('photoGallery');
+
       try {
         // Get form values
         const orderTypePickup = document.getElementById('orderTypePickup');
@@ -1586,7 +1588,15 @@
           return;
         }
 
-        console.log('📤 Uploading photo with order metadata...');
+        // Show loading spinner
+        gallery.innerHTML = `
+          <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">UPLOADING PHOTO...</div>
+          </div>
+        `;
+
+        console.log('UPLOADING PHOTO WITH ORDER METADATA...');
 
         const response = await fetch('/api/catering-photos-upload', {
           method: 'POST',
@@ -1608,7 +1618,19 @@
           throw new Error(data.error || 'Failed to upload photo');
         }
 
-        console.log('✅ Photo uploaded successfully');
+        console.log('PHOTO UPLOADED SUCCESSFULLY');
+
+        // Show success message briefly
+        gallery.innerHTML = `
+          <div style="text-align: center; padding: 40px 20px;">
+            <div style="font-size: 16px; font-weight: 700; color: var(--success-text); background: var(--success-bg); padding: 16px; border: 2px solid var(--success-border); margin-bottom: 16px;">
+              PHOTO UPLOADED SUCCESSFULLY
+            </div>
+            <div style="font-size: 13px; color: var(--gray-600); font-weight: 600;">
+              REFRESHING GALLERY...
+            </div>
+          </div>
+        `;
 
         // Clear form
         if (orderTypePickup) orderTypePickup.checked = false;
@@ -1618,11 +1640,25 @@
         document.getElementById('leaveJaynaAt').value = '';
         toggleDeliveryField();
 
-        // Reload photos
-        await loadPhotos();
+        // Wait a moment for user to see success message, then reload photos
+        setTimeout(async () => {
+          await loadPhotos();
+        }, 800);
+
       } catch (error) {
         console.error('Error uploading photo:', error);
-        alert(`ERROR: ${error.message}`);
+
+        // Show error in gallery
+        gallery.innerHTML = `
+          <div class="error-message">
+            ERROR UPLOADING PHOTO: ${error.message}
+          </div>
+        `;
+
+        // Reload existing photos after 3 seconds
+        setTimeout(async () => {
+          await loadPhotos();
+        }, 3000);
       }
     }
 
