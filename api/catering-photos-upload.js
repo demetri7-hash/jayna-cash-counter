@@ -5,9 +5,29 @@
 
 import { createClient } from '@supabase/supabase-js';
 
+// CRITICAL: SUPABASE_KEY must be the SERVICE ROLE KEY (bypasses RLS)
+// NOT the anon key (subject to RLS policies)
+const supabaseKey = process.env.SUPABASE_KEY;
+const keyPrefix = supabaseKey?.substring(0, 20) || 'undefined';
+
+console.log(`🔑 Using Supabase key: ${keyPrefix}... (${supabaseKey?.length || 0} chars)`);
+
+// Validate key exists
+if (!supabaseKey || supabaseKey.length < 100) {
+  console.error('❌ SUPABASE_KEY appears invalid or missing!');
+  console.error('❌ Expected: Long JWT token (200+ characters)');
+  console.error('❌ Check Vercel environment variables');
+}
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  supabaseKey,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
 );
 
 export default async function handler(req, res) {
