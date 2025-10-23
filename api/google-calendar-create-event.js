@@ -80,7 +80,7 @@ export default async function handler(req, res) {
 
     const calendar = google.calendar({ version: 'v3', auth });
 
-    // Build event description with image
+    // Build event description (WITHOUT img tag - Google Calendar doesn't support it)
     const eventDescription = `
 🍽️ Catering Order Details
 
@@ -88,16 +88,23 @@ Type: ${orderType}
 Due: ${orderDueDate} at ${timeDue}
 ${orderType === 'DELIVERY' ? `Leave Jayna: ${leaveJaynaAt}\n` : ''}
 
-Order Photo:
-${imageUrl ? `<img src="${imageUrl}" style="max-width: 100%; height: auto;" />` : 'No photo available'}
+Order Photo: See attachment below
     `.trim();
 
-    // Create calendar event
+    // Create calendar event with attachment
     const event = {
       calendarId: 'jaynascans@gmail.com',
+      supportsAttachments: true, // REQUIRED for attachments
       requestBody: {
         summary: orderNumber, // "Order #1", "Order #2", etc.
         description: eventDescription,
+        attachments: imageUrl ? [
+          {
+            fileUrl: imageUrl,
+            title: `${orderNumber} - Order Photo`,
+            mimeType: 'image/jpeg'
+          }
+        ] : [],
         start: {
           dateTime: eventDateTime,
           timeZone: 'America/Los_Angeles' // Pacific Time
