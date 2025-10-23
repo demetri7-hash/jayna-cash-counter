@@ -8,9 +8,18 @@ When a catering order photo is uploaded, the system automatically:
 - ✅ Creates a Google Calendar event in `jaynascans@gmail.com`
 - ✅ Sets event title as "Order #1", "Order #2", etc. (dynamic based on same-day orders)
 - ✅ Sets event time to "leave jayna at" (delivery) or "time due" (pickup)
-- ✅ Adds 2-hour reminder before the event
-- ✅ Embeds order photo in event description
+- ✅ Attaches order photo as event attachment (clickable link)
 - ✅ Stores calendar event ID for future updates/deletes
+
+**⚠️ Known Limitation: Reminders**
+- Service accounts CANNOT override calendar reminder defaults (Google API limitation)
+- Events will use the calendar's default reminder settings (usually 30 minutes)
+- **To fix:** Calendar owner must manually change default in Google Calendar Settings:
+  1. Open Google Calendar as `jaynascans@gmail.com`
+  2. Click Settings (gear icon) → Settings
+  3. Find your calendar in left sidebar → Click it
+  4. Scroll to "Event notifications"
+  5. Change default from "30 minutes" to "2 hours"
 
 ---
 
