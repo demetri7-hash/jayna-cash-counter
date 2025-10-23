@@ -342,12 +342,15 @@
       background: white;
       border: 2px solid var(--gray-300);
       padding: 8px;
-      cursor: move;
+      cursor: default;
       transition: all 0.2s ease;
     }
     .photo-item:hover {
       border-color: var(--gray-400);
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    .photo-item.edit-mode {
+      cursor: move;
     }
     .photo-item.dragging {
       opacity: 0.5;
@@ -369,10 +372,10 @@
       position: absolute;
       top: 16px;
       right: 16px;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(220, 38, 38, 0.9);
       color: white;
-      padding: 8px 12px;
-      font-size: 11px;
+      padding: 10px 14px;
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -380,10 +383,16 @@
       border-radius: 4px;
       transition: all 0.15s ease;
       z-index: 10;
+      display: none; /* Hidden by default */
+      border: 2px solid white;
+    }
+    .photo-overlay.visible {
+      display: block;
     }
     .photo-overlay:hover {
-      background: rgba(255, 0, 0, 0.9);
-      transform: scale(1.05);
+      background: rgba(185, 28, 28, 1);
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.5);
     }
   </style>
 </head>
@@ -426,6 +435,16 @@
           <input type="file" id="photoInput" accept="image/*" style="display: none;" onchange="handlePhotoSelect(event)">
           <button onclick="document.getElementById('photoInput').click()" class="refresh-btn" style="margin: 0; background: var(--primary-blue); border-color: var(--primary-blue);">
             📸 SELECT PHOTO
+          </button>
+        </div>
+
+        <!-- Edit Mode Controls -->
+        <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+          <button id="editBtn" onclick="promptEditMode()" class="refresh-btn" style="margin: 0; background: var(--warning); border-color: var(--warning); color: var(--gray-900);">
+            ✏️ EDIT
+          </button>
+          <button id="saveBtn" onclick="saveEditMode()" class="refresh-btn" style="margin: 0; background: var(--success); border-color: var(--success); display: none;">
+            ✅ SAVE
           </button>
         </div>
 
@@ -1120,6 +1139,7 @@
     // ============================================
     let allPhotos = [];
     let draggedElement = null;
+    let isEditMode = false; // Track edit mode state
 
     async function loadPhotos() {
       try {
@@ -1160,9 +1180,14 @@
         return;
       }
 
+      // Only make photos draggable and show overlays in edit mode
+      const editModeClass = isEditMode ? 'edit-mode' : '';
+      const overlayVisibleClass = isEditMode ? 'visible' : '';
+      const draggableAttr = isEditMode ? 'draggable="true"' : '';
+
       gallery.innerHTML = allPhotos.map((photo, index) => `
-        <div class="photo-item"
-             draggable="true"
+        <div class="photo-item ${editModeClass}"
+             ${draggableAttr}
              data-id="${photo.id}"
              data-index="${index}"
              ondragstart="handleDragStart(event)"
@@ -1170,7 +1195,7 @@
              ondragover="handleDragOver(event)"
              ondrop="handleDrop(event)"
              ondragleave="handleDragLeave(event)">
-          <div class="photo-overlay" onclick="promptDeletePhoto(${photo.id})">
+          <div class="photo-overlay ${overlayVisibleClass}" onclick="promptDeletePhoto(${photo.id})">
             ✕ DELETE
           </div>
           <img src="${photo.image_url}" alt="Catering Order" class="photo-img">
@@ -1305,8 +1330,94 @@
       }
     }
 
-    // Delete Photo with Password Protection
+    // Edit Mode Functions
+    function promptEditMode() {
+      // Show password prompt modal
+      const modalHTML = `
+        <div id="editModeModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px;">
+          <div style="background: white; padding: 24px; max-width: 400px; width: 100%; border: 3px solid var(--warning-border);">
+            <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; color: var(--warning-text);">
+              ✏️ EDIT MODE
+            </h2>
+            <p style="font-size: 13px; margin-bottom: 16px; color: var(--gray-700);">
+              Enter password to enable photo editing and reordering.
+            </p>
+            <input type="password" id="editModePassword" placeholder="Password" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); margin-bottom: 16px; font-size: 14px; box-sizing: border-box;">
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button onclick="closeEditModeModal()" style="padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+                CANCEL
+              </button>
+              <button onclick="activateEditMode()" style="padding: 12px 24px; background: var(--warning); border: 2px solid var(--warning); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+                ACTIVATE
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const modalContainer = document.createElement('div');
+      modalContainer.innerHTML = modalHTML;
+      document.body.appendChild(modalContainer);
+
+      // Focus password input
+      setTimeout(() => {
+        document.getElementById('editModePassword')?.focus();
+      }, 100);
+    }
+
+    function closeEditModeModal() {
+      const modal = document.getElementById('editModeModal');
+      if (modal) {
+        modal.parentElement.remove();
+      }
+    }
+
+    function activateEditMode() {
+      const password = document.getElementById('editModePassword')?.value;
+
+      // Check password
+      if (password !== 'reorder') {
+        alert('❌ Incorrect password');
+        return;
+      }
+
+      // Close modal
+      closeEditModeModal();
+
+      // Enable edit mode
+      isEditMode = true;
+      console.log('✏️ Edit mode activated');
+
+      // Show SAVE button, update EDIT button text
+      document.getElementById('saveBtn').style.display = 'block';
+
+      // Re-render photos with edit mode enabled
+      renderPhotos();
+    }
+
+    async function saveEditMode() {
+      // Save the current photo order
+      await savePhotoOrder();
+
+      // Disable edit mode
+      isEditMode = false;
+      console.log('✅ Edit mode saved and deactivated');
+
+      // Hide SAVE button
+      document.getElementById('saveBtn').style.display = 'none';
+
+      // Re-render photos with edit mode disabled
+      renderPhotos();
+    }
+
+    // Delete Photo with Confirmation
     function promptDeletePhoto(photoId) {
+      // Only allow deletion in edit mode
+      if (!isEditMode) {
+        return; // Do nothing if not in edit mode
+      }
+
+      // Show confirmation modal (no password needed - already in edit mode)
       const modalHTML = `
         <div id="deletePhotoModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px;">
           <div style="background: white; padding: 24px; max-width: 400px; width: 100%; border: 3px solid var(--error-border);">
@@ -1314,9 +1425,8 @@
               🗑️ DELETE PHOTO
             </h2>
             <p style="font-size: 13px; margin-bottom: 16px; color: var(--gray-700);">
-              Enter password to delete this photo permanently.
+              Are you sure you want to delete this photo permanently? This action cannot be undone.
             </p>
-            <input type="password" id="deletePassword" placeholder="Password" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); margin-bottom: 16px; font-size: 14px; box-sizing: border-box;">
             <div style="display: flex; gap: 12px; justify-content: flex-end;">
               <button onclick="closeDeleteModal()" style="padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
                 CANCEL
@@ -1332,11 +1442,6 @@
       const modalContainer = document.createElement('div');
       modalContainer.innerHTML = modalHTML;
       document.body.appendChild(modalContainer);
-
-      // Focus password input
-      setTimeout(() => {
-        document.getElementById('deletePassword')?.focus();
-      }, 100);
     }
 
     function closeDeleteModal() {
@@ -1347,13 +1452,7 @@
     }
 
     async function confirmDeletePhoto(photoId) {
-      const password = document.getElementById('deletePassword')?.value;
-
-      // Check password (using same manager password as other features)
-      if (password !== '0000') {
-        alert('❌ Incorrect password');
-        return;
-      }
+      // No password check needed - already in edit mode which is password-protected
 
       try {
         console.log(`🗑️ Deleting photo ${photoId}...`);
