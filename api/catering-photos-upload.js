@@ -25,12 +25,42 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { imageData, caption } = req.body;
+    const { imageData, caption, orderType, orderDueDate, timeDue, leaveJaynaAt } = req.body;
 
     if (!imageData) {
       return res.status(400).json({
         success: false,
         error: 'Image data is required'
+      });
+    }
+
+    // Validate required fields
+    if (!orderType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Order type (PICKUP/DELIVERY) is required'
+      });
+    }
+
+    if (!orderDueDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'Order due date is required'
+      });
+    }
+
+    if (!timeDue) {
+      return res.status(400).json({
+        success: false,
+        error: 'Time due is required'
+      });
+    }
+
+    // Validate leaveJaynaAt is provided for DELIVERY orders
+    if (orderType === 'DELIVERY' && !leaveJaynaAt) {
+      return res.status(400).json({
+        success: false,
+        error: 'Leave Jayna at time is required for delivery orders'
       });
     }
 
@@ -45,14 +75,18 @@ export default async function handler(req, res) {
 
     const nextOrder = (maxOrder && maxOrder.length > 0) ? maxOrder[0].display_order + 1 : 0;
 
-    // Insert photo
+    // Insert photo with order metadata
     const { data: photo, error } = await supabase
       .from('catering_photos')
       .insert({
         image_data: imageData,
         image_url: imageData, // For now, store base64 as URL
         caption: caption || null,
-        display_order: nextOrder
+        display_order: nextOrder,
+        order_type: orderType,
+        order_due_date: orderDueDate,
+        time_due: timeDue,
+        leave_jayna_at: orderType === 'DELIVERY' ? leaveJaynaAt : null
       })
       .select()
       .single();

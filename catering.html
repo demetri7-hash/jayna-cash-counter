@@ -375,6 +375,25 @@
     }
 
     /* Photo Gallery Styles */
+    .photo-date-group {
+      margin-bottom: 28px;
+    }
+    .photo-date-header {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--gray-900);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background: var(--gray-100);
+      border: 2px solid var(--gray-300);
+    }
+    .photo-thumbnails-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
     .photo-item {
       position: relative;
       background: white;
@@ -389,11 +408,32 @@
     }
     .photo-img {
       width: 100%;
-      height: auto;
+      height: 200px;
       display: block;
-      max-height: 600px;
-      object-fit: contain;
+      object-fit: cover;
       transition: filter 0.3s ease;
+    }
+    .photo-metadata {
+      padding: 8px 0 0 0;
+      font-size: 11px;
+      color: var(--gray-700);
+      border-top: 1px solid var(--gray-200);
+      margin-top: 8px;
+    }
+    .photo-metadata-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .photo-metadata-label {
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-600);
+    }
+    .photo-metadata-value {
+      font-weight: 600;
+      color: var(--gray-900);
     }
     .photo-overlay {
       position: absolute;
@@ -550,11 +590,46 @@
 
       <!-- PHOTOS Tab (DEFAULT) -->
       <div id="photosTab" class="tab-content active">
-        <div style="background: var(--gray-100); border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
-          <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; color: var(--gray-900);">📸 UPLOAD ORDER PHOTO</h3>
+        <div style="background: var(--gray-100); border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 20px;">
+          <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; color: var(--gray-900);">UPLOAD ORDER PHOTO</h3>
+
+          <!-- Order Type -->
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">ORDER TYPE *</label>
+            <div style="display: flex; gap: 16px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--gray-900);">
+                <input type="radio" name="orderType" value="PICKUP" id="orderTypePickup" onchange="toggleDeliveryField()" style="width: 18px; height: 18px; cursor: pointer;">
+                PICK UP
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--gray-900);">
+                <input type="radio" name="orderType" value="DELIVERY" id="orderTypeDelivery" onchange="toggleDeliveryField()" style="width: 18px; height: 18px; cursor: pointer;">
+                DELIVERY
+              </label>
+            </div>
+          </div>
+
+          <!-- Order Due Date -->
+          <div style="margin-bottom: 16px;">
+            <label for="orderDueDate" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">ORDER DUE *</label>
+            <input type="date" id="orderDueDate" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box;">
+          </div>
+
+          <!-- Time Due -->
+          <div style="margin-bottom: 16px;">
+            <label for="timeDue" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">TIME DUE *</label>
+            <input type="time" id="timeDue" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box;">
+          </div>
+
+          <!-- Leave Jayna At (Conditional - only for DELIVERY) -->
+          <div id="leaveJaynaAtContainer" style="margin-bottom: 16px; display: none;">
+            <label for="leaveJaynaAt" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">LEAVE JAYNA AT *</label>
+            <input type="time" id="leaveJaynaAt" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box;">
+          </div>
+
+          <!-- Photo Selection -->
           <input type="file" id="photoInput" accept="image/*" style="display: none;" onchange="handlePhotoSelect(event)">
           <button onclick="document.getElementById('photoInput').click()" class="refresh-btn" style="margin: 0; background: var(--primary-blue); border-color: var(--primary-blue);">
-            📸 SELECT PHOTO
+            SELECT PHOTO
           </button>
         </div>
 
@@ -568,8 +643,8 @@
           </button>
         </div>
 
-        <div id="photoGallery" style="display: grid; grid-template-columns: 1fr; gap: 12px;">
-          <!-- Photos will be loaded here -->
+        <div id="photoGallery">
+          <!-- Photos will be loaded here grouped by date -->
           <div class="loading-spinner">
             <div class="spinner"></div>
             <div class="loading-text">Loading photos...</div>
@@ -1300,61 +1375,158 @@
       if (allPhotos.length === 0) {
         gallery.innerHTML = `
           <div class="empty-state">
-            <div class="empty-icon">📷</div>
-            <div class="empty-title">No Photos Yet</div>
-            <div class="empty-message">Upload photos of upcoming catering orders to share with your team!</div>
+            <div class="empty-title">NO PHOTOS YET</div>
+            <div class="empty-message">Upload photos of upcoming catering orders to share with your team</div>
           </div>
         `;
         return;
       }
 
+      // Group photos by order_due_date
+      const photosByDate = {};
+      allPhotos.forEach(photo => {
+        const date = photo.order_due_date || 'NO DATE';
+        if (!photosByDate[date]) {
+          photosByDate[date] = [];
+        }
+        photosByDate[date].push(photo);
+      });
+
+      // Sort dates (earliest first)
+      const sortedDates = Object.keys(photosByDate).sort((a, b) => {
+        if (a === 'NO DATE') return 1;
+        if (b === 'NO DATE') return -1;
+        return new Date(a) - new Date(b);
+      });
+
       // Show controls in edit mode
       const overlayVisibleClass = isEditMode ? 'visible' : '';
       const controlsVisibleClass = isEditMode ? 'visible' : '';
 
-      gallery.innerHTML = allPhotos.map((photo, index) => {
-        // Build CSS filter string from stored values (default: normal)
-        const brightness = photo.brightness || 100;
-        const contrast = photo.contrast || 100;
-        const filterStyle = `filter: brightness(${brightness}%) contrast(${contrast}%);`;
+      // Build HTML grouped by date
+      let html = '';
+      sortedDates.forEach(date => {
+        const photos = photosByDate[date];
+        const dateLabel = formatPhotoDateLabel(date);
 
-        return `
-          <div class="photo-item" data-id="${photo.id}" data-index="${index}">
-            <!-- Delete Button (top right) -->
-            <div class="photo-overlay ${overlayVisibleClass}" onclick="promptDeletePhoto(${photo.id})">
-              ✕ DELETE
+        html += `
+          <div class="photo-date-group">
+            <div class="photo-date-header">${dateLabel}</div>
+            <div class="photo-thumbnails-grid">
+        `;
+
+        photos.forEach((photo, localIndex) => {
+          const globalIndex = allPhotos.indexOf(photo);
+          const brightness = photo.brightness || 100;
+          const contrast = photo.contrast || 100;
+          const filterStyle = `filter: brightness(${brightness}%) contrast(${contrast}%);`;
+
+          const timeDue = formatTimeDisplay(photo.time_due);
+          const leaveJaynaAt = photo.order_type === 'DELIVERY' ? formatTimeDisplay(photo.leave_jayna_at) : null;
+
+          html += `
+            <div class="photo-item" data-id="${photo.id}" data-index="${globalIndex}">
+              <!-- Delete Button (top right) -->
+              <div class="photo-overlay ${overlayVisibleClass}" onclick="promptDeletePhoto(${photo.id})">
+                DELETE
+              </div>
+
+              <!-- Reorder Buttons (top left) -->
+              <div class="reorder-controls ${controlsVisibleClass}">
+                <button class="reorder-btn" onclick="movePhotoUp(${globalIndex})" ${globalIndex === 0 ? 'disabled' : ''}>
+                  ▲
+                </button>
+                <button class="reorder-btn" onclick="movePhotoDown(${globalIndex})" ${globalIndex === allPhotos.length - 1 ? 'disabled' : ''}>
+                  ▼
+                </button>
+              </div>
+
+              <!-- Image -->
+              <img src="${photo.image_url}"
+                   alt="Catering Order"
+                   class="photo-img"
+                   id="photo-img-${photo.id}"
+                   style="${filterStyle}">
+
+              <!-- Order Metadata -->
+              <div class="photo-metadata">
+                <div class="photo-metadata-row">
+                  <span class="photo-metadata-label">TYPE:</span>
+                  <span class="photo-metadata-value">${photo.order_type || 'N/A'}</span>
+                </div>
+                <div class="photo-metadata-row">
+                  <span class="photo-metadata-label">TIME DUE:</span>
+                  <span class="photo-metadata-value">${timeDue}</span>
+                </div>
+                ${leaveJaynaAt ? `
+                <div class="photo-metadata-row">
+                  <span class="photo-metadata-label">LEAVE AT:</span>
+                  <span class="photo-metadata-value">${leaveJaynaAt}</span>
+                </div>
+                ` : ''}
+              </div>
+
+              <!-- Enhancement Controls (bottom section) -->
+              <div class="enhancement-controls ${controlsVisibleClass}">
+                <label class="enhancement-label">IMAGE ENHANCEMENT</label>
+                <button class="filter-preset-btn" onclick="applyScanMode(${photo.id}, ${globalIndex})">
+                  SCAN MODE
+                </button>
+                <button class="filter-preset-btn" onclick="resetFilters(${photo.id}, ${globalIndex})" style="background: var(--gray-700); border-color: var(--gray-700);">
+                  RESET
+                </button>
+              </div>
             </div>
+          `;
+        });
 
-            <!-- Reorder Buttons (top left) -->
-            <div class="reorder-controls ${controlsVisibleClass}">
-              <button class="reorder-btn" onclick="movePhotoUp(${index})" ${index === 0 ? 'disabled' : ''}>
-                ▲
-              </button>
-              <button class="reorder-btn" onclick="movePhotoDown(${index})" ${index === allPhotos.length - 1 ? 'disabled' : ''}>
-                ▼
-              </button>
-            </div>
-
-            <!-- Image -->
-            <img src="${photo.image_url}"
-                 alt="Catering Order"
-                 class="photo-img"
-                 id="photo-img-${photo.id}"
-                 style="${filterStyle}">
-
-            <!-- Enhancement Controls (bottom section) -->
-            <div class="enhancement-controls ${controlsVisibleClass}">
-              <label class="enhancement-label">IMAGE ENHANCEMENT</label>
-              <button class="filter-preset-btn" onclick="applyScanMode(${photo.id}, ${index})">
-                📄 SCAN MODE
-              </button>
-              <button class="filter-preset-btn" onclick="resetFilters(${photo.id}, ${index})" style="background: var(--gray-700); border-color: var(--gray-700);">
-                RESET
-              </button>
+        html += `
             </div>
           </div>
         `;
-      }).join('');
+      });
+
+      gallery.innerHTML = html;
+    }
+
+    // Format date header for photo groups
+    function formatPhotoDateLabel(dateStr) {
+      if (dateStr === 'NO DATE') return 'NO DATE SPECIFIED';
+
+      const date = new Date(dateStr + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const orderDate = new Date(date);
+      orderDate.setHours(0, 0, 0, 0);
+
+      const dayLabel = date.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+      const dateLabel = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
+
+      if (orderDate.getTime() === today.getTime()) {
+        return `TODAY - ${dayLabel}, ${dateLabel}`;
+      } else if (orderDate.getTime() === tomorrow.getTime()) {
+        return `TOMORROW - ${dayLabel}, ${dateLabel}`;
+      } else {
+        return `${dayLabel}, ${dateLabel}`;
+      }
+    }
+
+    // Format time for display
+    function formatTimeDisplay(timeStr) {
+      if (!timeStr) return 'N/A';
+      try {
+        // Parse HH:MM format
+        const [hours, minutes] = timeStr.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const hour12 = hour % 12 || 12;
+        return `${hour12}:${minutes} ${ampm}`;
+      } catch {
+        return timeStr;
+      }
     }
 
     async function handlePhotoSelect(event) {
@@ -1373,9 +1545,48 @@
       event.target.value = '';
     }
 
+    // Toggle LEAVE JAYNA AT field based on order type
+    function toggleDeliveryField() {
+      const isDelivery = document.getElementById('orderTypeDelivery')?.checked;
+      const container = document.getElementById('leaveJaynaAtContainer');
+      if (container) {
+        container.style.display = isDelivery ? 'block' : 'none';
+      }
+    }
+
     async function uploadPhoto(base64Data) {
       try {
-        console.log('📤 Uploading photo...');
+        // Get form values
+        const orderTypePickup = document.getElementById('orderTypePickup');
+        const orderTypeDelivery = document.getElementById('orderTypeDelivery');
+        const orderDueDate = document.getElementById('orderDueDate')?.value;
+        const timeDue = document.getElementById('timeDue')?.value;
+        const leaveJaynaAt = document.getElementById('leaveJaynaAt')?.value;
+
+        // Validate required fields
+        if (!orderTypePickup?.checked && !orderTypeDelivery?.checked) {
+          alert('Please select order type (PICK UP or DELIVERY)');
+          return;
+        }
+
+        if (!orderDueDate) {
+          alert('Please select ORDER DUE date');
+          return;
+        }
+
+        if (!timeDue) {
+          alert('Please enter TIME DUE');
+          return;
+        }
+
+        const orderType = orderTypePickup?.checked ? 'PICKUP' : 'DELIVERY';
+
+        if (orderType === 'DELIVERY' && !leaveJaynaAt) {
+          alert('Please enter LEAVE JAYNA AT time for delivery orders');
+          return;
+        }
+
+        console.log('📤 Uploading photo with order metadata...');
 
         const response = await fetch('/api/catering-photos-upload', {
           method: 'POST',
@@ -1383,7 +1594,11 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            imageData: base64Data
+            imageData: base64Data,
+            orderType,
+            orderDueDate,
+            timeDue,
+            leaveJaynaAt: orderType === 'DELIVERY' ? leaveJaynaAt : null
           })
         });
 
@@ -1395,11 +1610,19 @@
 
         console.log('✅ Photo uploaded successfully');
 
+        // Clear form
+        if (orderTypePickup) orderTypePickup.checked = false;
+        if (orderTypeDelivery) orderTypeDelivery.checked = false;
+        document.getElementById('orderDueDate').value = '';
+        document.getElementById('timeDue').value = '';
+        document.getElementById('leaveJaynaAt').value = '';
+        toggleDeliveryField();
+
         // Reload photos
         await loadPhotos();
       } catch (error) {
         console.error('Error uploading photo:', error);
-        alert(`Error uploading photo: ${error.message}`);
+        alert(`ERROR: ${error.message}`);
       }
     }
 
