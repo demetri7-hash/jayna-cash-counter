@@ -335,6 +335,56 @@
         font-size: 10px;
       }
     }
+
+    /* Photo Gallery Styles */
+    .photo-item {
+      position: relative;
+      background: white;
+      border: 2px solid var(--gray-300);
+      padding: 8px;
+      cursor: move;
+      transition: all 0.2s ease;
+    }
+    .photo-item:hover {
+      border-color: var(--gray-400);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    .photo-item.dragging {
+      opacity: 0.5;
+      transform: rotate(2deg);
+    }
+    .photo-item.drag-over {
+      border-color: var(--primary-blue);
+      border-style: dashed;
+      background: var(--light-blue);
+    }
+    .photo-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      max-height: 600px;
+      object-fit: contain;
+    }
+    .photo-overlay {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+      z-index: 10;
+    }
+    .photo-overlay:hover {
+      background: rgba(255, 0, 0, 0.9);
+      transform: scale(1.05);
+    }
   </style>
 </head>
 <body>
@@ -363,13 +413,33 @@
 
       <!-- Tab Navigation -->
       <div class="tab-navigation">
-        <button class="tab-btn active" onclick="showTab('upcoming')">UPCOMING</button>
+        <button class="tab-btn active" onclick="showTab('photos')">PHOTOS</button>
+        <button class="tab-btn" onclick="showTab('beta')">BETA</button>
         <button class="tab-btn" onclick="showTab('past')">PAST</button>
         <button class="tab-btn" onclick="showTab('analytics')">ANALYTICS</button>
       </div>
 
-      <!-- UPCOMING Tab -->
-      <div id="upcomingTab" class="tab-content active">
+      <!-- PHOTOS Tab (DEFAULT) -->
+      <div id="photosTab" class="tab-content active">
+        <div style="background: var(--gray-100); border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+          <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; color: var(--gray-900);">📸 UPLOAD ORDER PHOTO</h3>
+          <input type="file" id="photoInput" accept="image/*" style="display: none;" onchange="handlePhotoSelect(event)">
+          <button onclick="document.getElementById('photoInput').click()" class="refresh-btn" style="margin: 0; background: var(--primary-blue); border-color: var(--primary-blue);">
+            📸 SELECT PHOTO
+          </button>
+        </div>
+
+        <div id="photoGallery" style="display: grid; grid-template-columns: 1fr; gap: 12px;">
+          <!-- Photos will be loaded here -->
+          <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading photos...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BETA Tab (was UPCOMING) -->
+      <div id="betaTab" class="tab-content">
         <div id="upcomingContent">
           <!-- Orders will be loaded here -->
           <div class="loading-spinner">
@@ -1046,11 +1116,288 @@
     }
 
     // ============================================
+    // PHOTO GALLERY FUNCTIONS
+    // ============================================
+    let allPhotos = [];
+    let draggedElement = null;
+
+    async function loadPhotos() {
+      try {
+        console.log('📸 Loading catering photos...');
+
+        const response = await fetch('/api/catering-photos-get');
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load photos');
+        }
+
+        allPhotos = data.data || [];
+        console.log(`✅ Loaded ${allPhotos.length} photos`);
+
+        renderPhotos();
+      } catch (error) {
+        console.error('Error loading photos:', error);
+        document.getElementById('photoGallery').innerHTML = `
+          <div class="error-message">
+            ❌ Error loading photos: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    function renderPhotos() {
+      const gallery = document.getElementById('photoGallery');
+
+      if (allPhotos.length === 0) {
+        gallery.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">📷</div>
+            <div class="empty-title">No Photos Yet</div>
+            <div class="empty-message">Upload photos of upcoming catering orders to share with your team!</div>
+          </div>
+        `;
+        return;
+      }
+
+      gallery.innerHTML = allPhotos.map((photo, index) => `
+        <div class="photo-item"
+             draggable="true"
+             data-id="${photo.id}"
+             data-index="${index}"
+             ondragstart="handleDragStart(event)"
+             ondragend="handleDragEnd(event)"
+             ondragover="handleDragOver(event)"
+             ondrop="handleDrop(event)"
+             ondragleave="handleDragLeave(event)">
+          <div class="photo-overlay" onclick="promptDeletePhoto(${photo.id})">
+            ✕ DELETE
+          </div>
+          <img src="${photo.image_url}" alt="Catering Order" class="photo-img">
+        </div>
+      `).join('');
+    }
+
+    async function handlePhotoSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target.result;
+        await uploadPhoto(base64);
+      };
+      reader.readAsDataURL(file);
+
+      // Clear input
+      event.target.value = '';
+    }
+
+    async function uploadPhoto(base64Data) {
+      try {
+        console.log('📤 Uploading photo...');
+
+        const response = await fetch('/api/catering-photos-upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            imageData: base64Data
+          })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to upload photo');
+        }
+
+        console.log('✅ Photo uploaded successfully');
+
+        // Reload photos
+        await loadPhotos();
+      } catch (error) {
+        console.error('Error uploading photo:', error);
+        alert(`Error uploading photo: ${error.message}`);
+      }
+    }
+
+    // Drag and Drop Functions
+    function handleDragStart(event) {
+      draggedElement = event.target;
+      event.target.classList.add('dragging');
+      event.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragEnd(event) {
+      event.target.classList.remove('dragging');
+
+      // Remove drag-over class from all items
+      document.querySelectorAll('.photo-item').forEach(item => {
+        item.classList.remove('drag-over');
+      });
+    }
+
+    function handleDragOver(event) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+
+      const target = event.target.closest('.photo-item');
+      if (target && target !== draggedElement) {
+        target.classList.add('drag-over');
+      }
+    }
+
+    function handleDragLeave(event) {
+      const target = event.target.closest('.photo-item');
+      if (target) {
+        target.classList.remove('drag-over');
+      }
+    }
+
+    async function handleDrop(event) {
+      event.preventDefault();
+
+      const target = event.target.closest('.photo-item');
+      if (!target || target === draggedElement) return;
+
+      target.classList.remove('drag-over');
+
+      const draggedIndex = parseInt(draggedElement.dataset.index);
+      const targetIndex = parseInt(target.dataset.index);
+
+      // Reorder photos array
+      const [movedPhoto] = allPhotos.splice(draggedIndex, 1);
+      allPhotos.splice(targetIndex, 0, movedPhoto);
+
+      // Save new order to database
+      await savePhotoOrder();
+
+      // Re-render
+      renderPhotos();
+    }
+
+    async function savePhotoOrder() {
+      try {
+        const photoIds = allPhotos.map(photo => photo.id);
+
+        const response = await fetch('/api/catering-photos-reorder', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            photoIds
+          })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to save order');
+        }
+
+        console.log('✅ Photo order saved');
+      } catch (error) {
+        console.error('Error saving photo order:', error);
+      }
+    }
+
+    // Delete Photo with Password Protection
+    function promptDeletePhoto(photoId) {
+      const modalHTML = `
+        <div id="deletePhotoModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px;">
+          <div style="background: white; padding: 24px; max-width: 400px; width: 100%; border: 3px solid var(--error-border);">
+            <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; color: var(--error-text);">
+              🗑️ DELETE PHOTO
+            </h2>
+            <p style="font-size: 13px; margin-bottom: 16px; color: var(--gray-700);">
+              Enter password to delete this photo permanently.
+            </p>
+            <input type="password" id="deletePassword" placeholder="Password" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); margin-bottom: 16px; font-size: 14px; box-sizing: border-box;">
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button onclick="closeDeleteModal()" style="padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+                CANCEL
+              </button>
+              <button onclick="confirmDeletePhoto(${photoId})" style="padding: 12px 24px; background: var(--error-border); border: 2px solid var(--error-border); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+                DELETE
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const modalContainer = document.createElement('div');
+      modalContainer.innerHTML = modalHTML;
+      document.body.appendChild(modalContainer);
+
+      // Focus password input
+      setTimeout(() => {
+        document.getElementById('deletePassword')?.focus();
+      }, 100);
+    }
+
+    function closeDeleteModal() {
+      const modal = document.getElementById('deletePhotoModal');
+      if (modal) {
+        modal.parentElement.remove();
+      }
+    }
+
+    async function confirmDeletePhoto(photoId) {
+      const password = document.getElementById('deletePassword')?.value;
+
+      // Check password (using same manager password as other features)
+      if (password !== '0000') {
+        alert('❌ Incorrect password');
+        return;
+      }
+
+      try {
+        console.log(`🗑️ Deleting photo ${photoId}...`);
+
+        const response = await fetch('/api/catering-photos-delete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            photoId
+          })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to delete photo');
+        }
+
+        console.log('✅ Photo deleted');
+
+        // Close modal
+        closeDeleteModal();
+
+        // Reload photos
+        await loadPhotos();
+      } catch (error) {
+        console.error('Error deleting photo:', error);
+        alert(`Error deleting photo: ${error.message}`);
+      }
+    }
+
+    // ============================================
     // INITIALIZATION
     // ============================================
     document.addEventListener('DOMContentLoaded', () => {
       console.log('🍽️ Jayna Catering Management System loaded');
-      console.log('📂 Loading orders from database (fast)...');
+
+      // Load photos on Photos tab
+      loadPhotos();
+
+      // Load orders for Beta tab (but don't show loading state on Photos tab)
+      console.log('📂 Pre-loading orders for Beta tab...');
       loadOrdersFromDatabase();
 
       // Start background sync
