@@ -349,24 +349,13 @@
       border-color: var(--gray-400);
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
     }
-    .photo-item.edit-mode {
-      cursor: move;
-    }
-    .photo-item.dragging {
-      opacity: 0.5;
-      transform: rotate(2deg);
-    }
-    .photo-item.drag-over {
-      border-color: var(--primary-blue);
-      border-style: dashed;
-      background: var(--light-blue);
-    }
     .photo-img {
       width: 100%;
       height: auto;
       display: block;
       max-height: 600px;
       object-fit: contain;
+      transition: filter 0.3s ease;
     }
     .photo-overlay {
       position: absolute;
@@ -393,6 +382,88 @@
       background: rgba(185, 28, 28, 1);
       transform: scale(1.1);
       box-shadow: 0 4px 12px rgba(220, 38, 38, 0.5);
+    }
+
+    /* Reorder Arrow Buttons */
+    .reorder-controls {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10;
+    }
+    .reorder-controls.visible {
+      display: flex;
+    }
+    .reorder-btn {
+      background: rgba(0, 168, 225, 0.95);
+      color: white;
+      border: 2px solid white;
+      padding: 10px 14px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .reorder-btn:hover {
+      background: rgba(0, 148, 214, 1);
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(0, 168, 225, 0.5);
+    }
+    .reorder-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* Image Enhancement Controls */
+    .enhancement-controls {
+      background: var(--gray-100);
+      border-top: 2px solid var(--gray-300);
+      padding: 12px;
+      margin-top: 8px;
+      display: none;
+    }
+    .enhancement-controls.visible {
+      display: block;
+    }
+    .enhancement-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--gray-700);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      display: block;
+    }
+    .enhancement-slider {
+      width: 100%;
+      margin-bottom: 12px;
+    }
+    .filter-preset-btn {
+      padding: 8px 12px;
+      background: var(--primary-blue);
+      color: white;
+      border: 2px solid var(--primary-blue);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    .filter-preset-btn:hover {
+      background: var(--secondary-blue);
+      border-color: var(--secondary-blue);
     }
   </style>
 </head>
@@ -1180,27 +1251,53 @@
         return;
       }
 
-      // Only make photos draggable and show overlays in edit mode
-      const editModeClass = isEditMode ? 'edit-mode' : '';
+      // Show controls in edit mode
       const overlayVisibleClass = isEditMode ? 'visible' : '';
-      const draggableAttr = isEditMode ? 'draggable="true"' : '';
+      const controlsVisibleClass = isEditMode ? 'visible' : '';
 
-      gallery.innerHTML = allPhotos.map((photo, index) => `
-        <div class="photo-item ${editModeClass}"
-             ${draggableAttr}
-             data-id="${photo.id}"
-             data-index="${index}"
-             ondragstart="handleDragStart(event)"
-             ondragend="handleDragEnd(event)"
-             ondragover="handleDragOver(event)"
-             ondrop="handleDrop(event)"
-             ondragleave="handleDragLeave(event)">
-          <div class="photo-overlay ${overlayVisibleClass}" onclick="promptDeletePhoto(${photo.id})">
-            ✕ DELETE
+      gallery.innerHTML = allPhotos.map((photo, index) => {
+        // Build CSS filter string from stored values (default: normal)
+        const brightness = photo.brightness || 100;
+        const contrast = photo.contrast || 100;
+        const filterStyle = `filter: brightness(${brightness}%) contrast(${contrast}%);`;
+
+        return `
+          <div class="photo-item" data-id="${photo.id}" data-index="${index}">
+            <!-- Delete Button (top right) -->
+            <div class="photo-overlay ${overlayVisibleClass}" onclick="promptDeletePhoto(${photo.id})">
+              ✕ DELETE
+            </div>
+
+            <!-- Reorder Buttons (top left) -->
+            <div class="reorder-controls ${controlsVisibleClass}">
+              <button class="reorder-btn" onclick="movePhotoUp(${index})" ${index === 0 ? 'disabled' : ''}>
+                ▲
+              </button>
+              <button class="reorder-btn" onclick="movePhotoDown(${index})" ${index === allPhotos.length - 1 ? 'disabled' : ''}>
+                ▼
+              </button>
+            </div>
+
+            <!-- Image -->
+            <img src="${photo.image_url}"
+                 alt="Catering Order"
+                 class="photo-img"
+                 id="photo-img-${photo.id}"
+                 style="${filterStyle}">
+
+            <!-- Enhancement Controls (bottom section) -->
+            <div class="enhancement-controls ${controlsVisibleClass}">
+              <label class="enhancement-label">IMAGE ENHANCEMENT</label>
+              <button class="filter-preset-btn" onclick="applyScanMode(${photo.id}, ${index})">
+                📄 SCAN MODE
+              </button>
+              <button class="filter-preset-btn" onclick="resetFilters(${photo.id}, ${index})" style="background: var(--gray-700); border-color: var(--gray-700);">
+                RESET
+              </button>
+            </div>
           </div>
-          <img src="${photo.image_url}" alt="Catering Order" class="photo-img">
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     async function handlePhotoSelect(event) {
@@ -1249,64 +1346,68 @@
       }
     }
 
-    // Drag and Drop Functions
-    function handleDragStart(event) {
-      draggedElement = event.target;
-      event.target.classList.add('dragging');
-      event.dataTransfer.effectAllowed = 'move';
-    }
+    // Mobile-Friendly Reordering Functions (Up/Down Arrows)
+    function movePhotoUp(index) {
+      if (index === 0) return; // Already at top
 
-    function handleDragEnd(event) {
-      event.target.classList.remove('dragging');
+      // Swap with photo above
+      const temp = allPhotos[index - 1];
+      allPhotos[index - 1] = allPhotos[index];
+      allPhotos[index] = temp;
 
-      // Remove drag-over class from all items
-      document.querySelectorAll('.photo-item').forEach(item => {
-        item.classList.remove('drag-over');
-      });
-    }
-
-    function handleDragOver(event) {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-
-      const target = event.target.closest('.photo-item');
-      if (target && target !== draggedElement) {
-        target.classList.add('drag-over');
-      }
-    }
-
-    function handleDragLeave(event) {
-      const target = event.target.closest('.photo-item');
-      if (target) {
-        target.classList.remove('drag-over');
-      }
-    }
-
-    async function handleDrop(event) {
-      event.preventDefault();
-
-      const target = event.target.closest('.photo-item');
-      if (!target || target === draggedElement) return;
-
-      target.classList.remove('drag-over');
-
-      const draggedIndex = parseInt(draggedElement.dataset.index);
-      const targetIndex = parseInt(target.dataset.index);
-
-      // Reorder photos array
-      const [movedPhoto] = allPhotos.splice(draggedIndex, 1);
-      allPhotos.splice(targetIndex, 0, movedPhoto);
-
-      // Save new order to database
-      await savePhotoOrder();
-
-      // Re-render
+      // Re-render immediately (no save until user clicks SAVE button)
       renderPhotos();
+    }
+
+    function movePhotoDown(index) {
+      if (index === allPhotos.length - 1) return; // Already at bottom
+
+      // Swap with photo below
+      const temp = allPhotos[index + 1];
+      allPhotos[index + 1] = allPhotos[index];
+      allPhotos[index] = temp;
+
+      // Re-render immediately (no save until user clicks SAVE button)
+      renderPhotos();
+    }
+
+    // Image Enhancement Functions
+    function applyScanMode(photoId, index) {
+      // Scan mode: Boost brightness and contrast for clearer text
+      allPhotos[index].brightness = 115; // 15% brighter
+      allPhotos[index].contrast = 125;   // 25% more contrast
+
+      // Update image element immediately
+      const imgElement = document.getElementById(`photo-img-${photoId}`);
+      if (imgElement) {
+        imgElement.style.filter = 'brightness(115%) contrast(125%)';
+      }
+
+      console.log(`✨ Scan mode applied to photo ${photoId}`);
+    }
+
+    function resetFilters(photoId, index) {
+      // Reset to normal (100%)
+      allPhotos[index].brightness = 100;
+      allPhotos[index].contrast = 100;
+
+      // Update image element immediately
+      const imgElement = document.getElementById(`photo-img-${photoId}`);
+      if (imgElement) {
+        imgElement.style.filter = 'brightness(100%) contrast(100%)';
+      }
+
+      console.log(`🔄 Filters reset for photo ${photoId}`);
     }
 
     async function savePhotoOrder() {
       try {
-        const photoIds = allPhotos.map(photo => photo.id);
+        // Send full photo objects with brightness/contrast values
+        const photosToSave = allPhotos.map(photo => ({
+          id: photo.id,
+          brightness: photo.brightness || 100,
+          contrast: photo.contrast || 100
+        }));
 
         const response = await fetch('/api/catering-photos-reorder', {
           method: 'POST',
@@ -1314,17 +1415,17 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            photoIds
+            photos: photosToSave
           })
         });
 
         const data = await response.json();
 
         if (!data.success) {
-          throw new Error(data.error || 'Failed to save order');
+          throw new Error(data.error || 'Failed to save order and filters');
         }
 
-        console.log('✅ Photo order saved');
+        console.log('✅ Photo order and filters saved');
       } catch (error) {
         console.error('Error saving photo order:', error);
       }

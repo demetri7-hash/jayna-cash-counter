@@ -2,10 +2,12 @@
 -- CATERING PHOTOS TABLE
 -- ============================================
 -- Created: October 22, 2025
+-- Updated: October 22, 2025 - Added brightness/contrast for scan mode
 -- Purpose: Store uploaded photos of catering orders
 -- Features:
---   - Drag-and-drop reordering
+--   - Mobile-friendly up/down arrow reordering
 --   - Delete with password protection
+--   - Scan mode (brightness/contrast enhancement)
 --   - Display order persists for all users
 
 -- Drop table if exists
@@ -22,6 +24,10 @@ CREATE TABLE catering_photos (
 
   -- Display order (lower numbers show first)
   display_order INTEGER NOT NULL DEFAULT 0,
+
+  -- Image enhancement filters
+  brightness INTEGER DEFAULT 100, -- 100 = normal, 115 = scan mode
+  contrast INTEGER DEFAULT 100,   -- 100 = normal, 125 = scan mode
 
   -- Optional metadata
   caption TEXT,

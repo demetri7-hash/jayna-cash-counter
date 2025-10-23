@@ -1,6 +1,6 @@
 /**
- * Vercel Serverless Function: Reorder Catering Photos
- * Updates display_order for all photos based on new positions
+ * Vercel Serverless Function: Reorder Catering Photos & Update Filters
+ * Updates display_order, brightness, and contrast for all photos
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -25,39 +25,43 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { photoIds } = req.body; // Array of photo IDs in new order
+    const { photos } = req.body; // Array of photo objects with id, order, brightness, contrast
 
-    if (!photoIds || !Array.isArray(photoIds)) {
+    if (!photos || !Array.isArray(photos)) {
       return res.status(400).json({
         success: false,
-        error: 'Photo IDs array is required'
+        error: 'Photos array is required'
       });
     }
 
-    console.log(`🔄 Reordering ${photoIds.length} photos...`);
+    console.log(`🔄 Updating ${photos.length} photos (order + filters)...`);
 
-    // Update each photo's display_order
-    const updates = photoIds.map((id, index) =>
+    // Update each photo's display_order, brightness, and contrast
+    const updates = photos.map((photo, index) =>
       supabase
         .from('catering_photos')
-        .update({ display_order: index })
-        .eq('id', id)
+        .update({
+          display_order: index,
+          brightness: photo.brightness || 100,
+          contrast: photo.contrast || 100
+        })
+        .eq('id', photo.id)
     );
 
     await Promise.all(updates);
 
-    console.log('✅ Photos reordered successfully');
+    console.log('✅ Photos updated successfully');
 
     return res.status(200).json({
       success: true,
-      message: 'Photos reordered successfully'
+      message: 'Photos updated successfully'
     });
 
   } catch (error) {
-    console.error('❌ Reorder error:', error);
+    console.error('❌ Update error:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to reorder photos',
+      error: 'Failed to update photos',
       details: error.message
     });
   }
