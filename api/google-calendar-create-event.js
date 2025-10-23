@@ -61,15 +61,20 @@ export default async function handler(req, res) {
     console.log(`📅 Creating calendar event: ${orderNumber} at ${eventDateTime}`);
 
     // Authenticate with Google Calendar API using service account
-    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}');
+    // Read from separate environment variables (more reliable than single JSON variable)
+    const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+    const privateKey = process.env.GOOGLE_PRIVATE_KEY;
 
-    if (!credentials.client_email) {
-      throw new Error('Google service account credentials not configured');
+    if (!clientEmail || !privateKey) {
+      throw new Error('Google service account credentials not configured. Set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in Vercel environment variables.');
     }
 
+    // Replace literal \n with actual newlines (Vercel env vars may escape them)
+    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+
     const auth = new google.auth.JWT({
-      email: credentials.client_email,
-      key: credentials.private_key,
+      email: clientEmail,
+      key: formattedPrivateKey,
       scopes: ['https://www.googleapis.com/auth/calendar']
     });
 

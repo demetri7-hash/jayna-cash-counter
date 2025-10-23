@@ -67,17 +67,46 @@ When a catering order photo is uploaded, the system automatically:
 
 ### Step 6: Add Credentials to Vercel
 
+**IMPORTANT:** Don't try to paste the entire JSON - Vercel doesn't handle multi-line values well. Instead, add each field separately:
+
 1. Open your downloaded JSON key file
-2. Copy the **entire contents** of the file
-3. Go to [Vercel Dashboard](https://vercel.com/dashboard)
-4. Select your project: **jayna-cash-counter**
-5. Go to **Settings** → **Environment Variables**
-6. Add a new variable:
-   - **Name:** `GOOGLE_SERVICE_ACCOUNT_KEY`
-   - **Value:** Paste the entire JSON contents
+2. Go to [Vercel Dashboard](https://vercel.com/dashboard)
+3. Select your project: **jayna-cash-counter**
+4. Go to **Settings** → **Environment Variables**
+5. Add these **4 separate variables** (copy values from your JSON file):
+
+   **Variable 1:**
+   - **Name:** `GOOGLE_CLIENT_EMAIL`
+   - **Value:** (copy the `client_email` value from JSON)
    - **Environments:** Select all (Production, Preview, Development)
-7. Click **Save**
-8. **Redeploy** your app for changes to take effect
+
+   **Variable 2:**
+   - **Name:** `GOOGLE_PRIVATE_KEY`
+   - **Value:** (copy the `private_key` value from JSON - include the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` parts)
+   - **Environments:** Select all (Production, Preview, Development)
+
+   **Variable 3:**
+   - **Name:** `GOOGLE_PROJECT_ID`
+   - **Value:** (copy the `project_id` value from JSON)
+   - **Environments:** Select all (Production, Preview, Development)
+
+   **Variable 4:**
+   - **Name:** `GOOGLE_PRIVATE_KEY_ID`
+   - **Value:** (copy the `private_key_id` value from JSON)
+   - **Environments:** Select all (Production, Preview, Development)
+
+6. Click **Save** after each variable
+7. **Redeploy** your app for changes to take effect
+
+**Example of what to copy:**
+```json
+{
+  "client_email": "jayna-catering-sync@project-123.iam.gserviceaccount.com", ← Copy this
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBg...\n-----END PRIVATE KEY-----\n", ← Copy this (all of it)
+  "project_id": "jayna-project-123", ← Copy this
+  "private_key_id": "abc123def456" ← Copy this
+}
+```
 
 ### Step 7: Run Database Migration
 
@@ -174,8 +203,14 @@ You should see these new columns:
 ## Environment Variables Reference
 
 ```bash
-# Required for Google Calendar sync
-GOOGLE_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"...","private_key_id":"...","private_key":"...","client_email":"...","client_id":"...","auth_uri":"...","token_uri":"...","auth_provider_x509_cert_url":"...","client_x509_cert_url":"..."}'
+# Required for Google Calendar sync (add these in Vercel Settings → Environment Variables)
+GOOGLE_CLIENT_EMAIL=jayna-catering-sync@your-project-id.iam.gserviceaccount.com
+GOOGLE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBg...\n-----END PRIVATE KEY-----\n
+GOOGLE_PROJECT_ID=your-project-id
+GOOGLE_PRIVATE_KEY_ID=abc123def456
+
+# Optional (not currently used but good to have)
+# GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
 ```
 
 ---
