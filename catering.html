@@ -78,6 +78,44 @@
       overflow: visible;
     }
 
+    /* Main Menu */
+    .main-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .menu-btn {
+      padding: 16px 12px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      background: var(--gray-100);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-900);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      text-decoration: none;
+    }
+    .menu-btn:hover {
+      background: var(--gray-300);
+      color: var(--gray-900);
+      border-color: var(--gray-400);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+    .menu-btn.primary {
+      background: var(--white);
+      color: var(--gray-700);
+      border-color: var(--gray-300);
+    }
+    .menu-btn.primary:hover {
+      background: var(--gray-100);
+      border-color: var(--gray-400);
+    }
+
     /* Navigation Links */
     .secondary-links {
       display: flex;
@@ -476,20 +514,25 @@
     </div>
 
     <div class="content">
-      <!-- Navigation Links (Back to Main Systems) -->
+      <!-- Main Menu -->
+      <div class="main-menu">
+        <a href="index.html" class="menu-btn primary">Cash</a>
+        <a href="index.html" class="menu-btn" style="background: var(--gray-700) !important; color: white !important; border-color: var(--gray-700) !important;">Orders & Prep</a>
+        <a href="foh-checklists.html" class="menu-btn primary">FOH</a>
+        <a href="#" class="menu-btn" style="background: var(--gray-700) !important; color: white !important; border-color: var(--gray-700) !important; cursor: default;">BOH</a>
+        <a href="catering.html" class="menu-btn primary" style="background: var(--gray-300) !important; border-color: var(--gray-400) !important;">Catering</a>
+      </div>
+
+      <!-- Secondary Links -->
       <div class="secondary-links">
-        <a href="index.html">← Cash Counter</a>
-        <a href="foh-checklists.html">FOH Checklists</a>
-        <a href="manager.html">Manager Dashboard</a>
+        <a href="index.html">Generate Report</a>
+        <span style="color: var(--gray-400);">|</span>
+        <a href="index.html">Tip Pool</a>
+        <span style="color: var(--gray-400);">|</span>
+        <a href="index.html">Weekly Cashbox</a>
+        <span style="color: var(--gray-400);">|</span>
+        <a href="manager.html">Manager</a>
       </div>
-
-      <!-- Action Buttons -->
-      <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
-        <button class="refresh-btn" onclick="loadOrdersFromDatabase()">🔄 RELOAD FROM DATABASE</button>
-        <button class="refresh-btn" onclick="syncFromToast()" style="background: var(--primary-blue); border-color: var(--primary-blue);">🔄 SYNC FROM TOAST</button>
-      </div>
-
-      <div id="syncStatus" style="display: none; padding: 12px; margin-bottom: 20px; border: 2px solid; font-size: 13px; font-weight: 600;"></div>
 
       <!-- Tab Navigation -->
       <div class="tab-navigation">
@@ -530,6 +573,14 @@
 
       <!-- BETA Tab (was UPCOMING) -->
       <div id="betaTab" class="tab-content">
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+          <button class="refresh-btn" onclick="loadOrdersFromDatabase()">🔄 RELOAD FROM DATABASE</button>
+          <button class="refresh-btn" onclick="syncFromToast()" style="background: var(--primary-blue); border-color: var(--primary-blue);">🔄 SYNC FROM TOAST</button>
+        </div>
+
+        <div id="syncStatus" style="display: none; padding: 12px; margin-bottom: 20px; border: 2px solid; font-size: 13px; font-weight: 600;"></div>
+
         <div id="upcomingContent">
           <!-- Orders will be loaded here -->
           <div class="loading-spinner">
@@ -1064,11 +1115,11 @@
           }
         }
 
-        // Show confirmation for UPDATED orders
+        // Show confirmation for UPDATED orders (DISABLED - will re-enable later)
         if (checkData.data.updatedOrders && checkData.data.updatedOrders.length > 0) {
-          console.log(`📝 Found ${checkData.data.updatedOrders.length} updated orders - requesting confirmation...`);
-          pendingUpdates = checkData.data.updatedOrders;
-          showUpdateConfirmationModal();
+          console.log(`📝 Found ${checkData.data.updatedOrders.length} updated orders - confirmation popup disabled`);
+          // pendingUpdates = checkData.data.updatedOrders;
+          // showUpdateConfirmationModal(); // DISABLED FOR NOW
         }
 
       } catch (error) {
