@@ -696,6 +696,41 @@
             <input type="time" id="leaveJaynaAt" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box;">
           </div>
 
+          <!-- Customer Information -->
+          <div style="border-top: 2px solid var(--gray-300); padding-top: 16px; margin-top: 16px; margin-bottom: 16px;">
+            <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; color: var(--gray-900);">CUSTOMER INFORMATION</h4>
+
+            <!-- Guest Name -->
+            <div style="margin-bottom: 16px;">
+              <label for="guestName" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">GUEST NAME</label>
+              <input type="text" id="guestName" placeholder="Customer name" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <!-- Phone Number -->
+            <div style="margin-bottom: 16px;">
+              <label for="phoneNumber" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">PHONE NUMBER</label>
+              <input type="tel" id="phoneNumber" placeholder="(555) 555-5555" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <!-- Email -->
+            <div style="margin-bottom: 16px;">
+              <label for="email" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">EMAIL</label>
+              <input type="email" id="email" placeholder="customer@example.com" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <!-- Delivery Address (Conditional - only for DELIVERY) -->
+            <div id="deliveryAddressContainer" style="margin-bottom: 16px; display: none;">
+              <label for="deliveryAddress" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">DELIVERY ADDRESS</label>
+              <input type="text" id="deliveryAddress" placeholder="123 Main St, Sacramento, CA 95814" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <!-- Special Notes -->
+            <div style="margin-bottom: 16px;">
+              <label for="specialNotes" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">SPECIAL NOTES</label>
+              <textarea id="specialNotes" placeholder="Special instructions, dietary restrictions, etc." rows="3" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box; resize: vertical;"></textarea>
+            </div>
+          </div>
+
           <!-- Photo Selection -->
           <input type="file" id="photoInput" accept="image/*" style="display: none;" onchange="handlePhotoSelect(event)">
           <button onclick="document.getElementById('photoInput').click()" class="refresh-btn" style="margin: 0; background: var(--primary-blue); border-color: var(--primary-blue);">
@@ -1616,12 +1651,17 @@
       event.target.value = '';
     }
 
-    // Toggle LEAVE JAYNA AT field based on order type
+    // Toggle LEAVE JAYNA AT and DELIVERY ADDRESS fields based on order type
     function toggleDeliveryField() {
       const isDelivery = document.getElementById('orderTypeDelivery')?.checked;
-      const container = document.getElementById('leaveJaynaAtContainer');
-      if (container) {
-        container.style.display = isDelivery ? 'block' : 'none';
+      const leaveJaynaContainer = document.getElementById('leaveJaynaAtContainer');
+      const deliveryAddressContainer = document.getElementById('deliveryAddressContainer');
+
+      if (leaveJaynaContainer) {
+        leaveJaynaContainer.style.display = isDelivery ? 'block' : 'none';
+      }
+      if (deliveryAddressContainer) {
+        deliveryAddressContainer.style.display = isDelivery ? 'block' : 'none';
       }
     }
 
@@ -1629,12 +1669,19 @@
       const gallery = document.getElementById('photoGallery');
 
       try {
-        // Get form values
+        // Get form values - Order Details
         const orderTypePickup = document.getElementById('orderTypePickup');
         const orderTypeDelivery = document.getElementById('orderTypeDelivery');
         const orderDueDate = document.getElementById('orderDueDate')?.value;
         const timeDue = document.getElementById('timeDue')?.value;
         const leaveJaynaAt = document.getElementById('leaveJaynaAt')?.value;
+
+        // Get form values - Customer Information
+        const guestName = document.getElementById('guestName')?.value || null;
+        const phoneNumber = document.getElementById('phoneNumber')?.value || null;
+        const email = document.getElementById('email')?.value || null;
+        const deliveryAddress = document.getElementById('deliveryAddress')?.value || null;
+        const specialNotes = document.getElementById('specialNotes')?.value || null;
 
         // Validate required fields
         if (!orderTypePickup?.checked && !orderTypeDelivery?.checked) {
@@ -1679,7 +1726,12 @@
             orderType,
             orderDueDate,
             timeDue,
-            leaveJaynaAt: orderType === 'DELIVERY' ? leaveJaynaAt : null
+            leaveJaynaAt: orderType === 'DELIVERY' ? leaveJaynaAt : null,
+            guestName,
+            phoneNumber,
+            email,
+            deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress : null,
+            specialNotes
           })
         });
 
@@ -1709,6 +1761,11 @@
         document.getElementById('orderDueDate').value = '';
         document.getElementById('timeDue').value = '';
         document.getElementById('leaveJaynaAt').value = '';
+        document.getElementById('guestName').value = '';
+        document.getElementById('phoneNumber').value = '';
+        document.getElementById('email').value = '';
+        document.getElementById('deliveryAddress').value = '';
+        document.getElementById('specialNotes').value = '';
         toggleDeliveryField();
 
         // Wait a moment for user to see success message, then reload photos

@@ -94,11 +94,23 @@ export default async function handler(req, res) {
         const orderNumber = `Order #${sameDayOrders?.length || 1}`;
 
         // Determine event time (leave_jayna_at for delivery, time_due for pickup)
-        const eventTime = (photo.order_type === 'DELIVERY' && photo.leave_jayna_at)
+        let eventTime = (photo.order_type === 'DELIVERY' && photo.leave_jayna_at)
           ? photo.leave_jayna_at
           : photo.time_due;
 
-        const eventDateTime = `${photo.order_due_date}T${eventTime}:00`;
+        // Format time properly (handle if it already has seconds or not)
+        if (eventTime && !eventTime.includes(':')) {
+          throw new Error(`Invalid time format: ${eventTime}`);
+        }
+
+        // Ensure time is in HH:MM:SS format
+        if (eventTime && eventTime.split(':').length === 2) {
+          eventTime = `${eventTime}:00`;
+        }
+
+        const eventDateTime = `${photo.order_due_date}T${eventTime}`;
+
+        console.log(`📅 Creating event for photo ${photo.id}: ${eventDateTime}`);
 
         // Build event description
         const eventDescription = `
@@ -167,12 +179,19 @@ ${photo.image_url ? `<img src="${photo.image_url}" style="max-width: 100%; heigh
         }
 
       } catch (photoError) {
-        console.error(`❌ Failed to process photo ${photo.id}:`, photoError.message);
+        console.error(`❌ Failed to process photo ${photo.id}:`, photoError);
         failed++;
         results.push({
           photoId: photo.id,
           status: 'failed',
-          error: photoError.message
+          error: photoError.message,
+          details: photoError.response?.data || photoError.toString(),
+          photoData: {
+            order_due_date: photo.order_due_date,
+            time_due: photo.time_due,
+            leave_jayna_at: photo.leave_jayna_at,
+            order_type: photo.order_type
+          }
         });
       }
     }

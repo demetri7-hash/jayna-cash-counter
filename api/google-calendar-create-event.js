@@ -32,7 +32,12 @@ export default async function handler(req, res) {
       timeDue,
       leaveJaynaAt,
       imageUrl, // Real public URL instead of base64
-      orderNumber // "Order #1", "Order #2", etc.
+      orderNumber, // "Order #1", "Order #2", etc.
+      guestName,
+      phoneNumber,
+      email,
+      deliveryAddress,
+      specialNotes
     } = req.body;
 
     // Validate required fields
@@ -80,7 +85,7 @@ export default async function handler(req, res) {
 
     const calendar = google.calendar({ version: 'v3', auth });
 
-    // Build event description with clickable image link
+    // Build event description with clickable image link and customer info
     // Note: Google Calendar attachments only work with Google Drive files, not external URLs
     const eventDescription = `
 🍽️ Catering Order Details
@@ -89,7 +94,9 @@ Type: ${orderType}
 Due: ${orderDueDate} at ${timeDue}
 ${orderType === 'DELIVERY' ? `Leave Jayna: ${leaveJaynaAt}\n` : ''}
 
-${imageUrl ? `📸 Order Photo: ${imageUrl}` : 'No photo available'}
+${guestName || phoneNumber || email || deliveryAddress ? `\n👤 Customer Information\n` : ''}${guestName ? `Name: ${guestName}\n` : ''}${phoneNumber ? `Phone: ${phoneNumber}\n` : ''}${email ? `Email: ${email}\n` : ''}${deliveryAddress ? `Address: ${deliveryAddress}\n` : ''}
+${specialNotes ? `\n📝 Special Notes:\n${specialNotes}\n` : ''}
+${imageUrl ? `\n📸 Order Photo: ${imageUrl}` : '\nNo photo available'}
     `.trim();
 
     // Create calendar event

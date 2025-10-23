@@ -25,7 +25,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { imageData, caption, orderType, orderDueDate, timeDue, leaveJaynaAt } = req.body;
+    const {
+      imageData,
+      caption,
+      orderType,
+      orderDueDate,
+      timeDue,
+      leaveJaynaAt,
+      guestName,
+      phoneNumber,
+      email,
+      deliveryAddress,
+      specialNotes
+    } = req.body;
 
     if (!imageData) {
       return res.status(400).json({
@@ -145,7 +157,12 @@ export default async function handler(req, res) {
           timeDue,
           leaveJaynaAt,
           imageUrl: publicImageUrl, // Use real URL instead of base64
-          orderNumber
+          orderNumber,
+          guestName,
+          phoneNumber,
+          email,
+          deliveryAddress,
+          specialNotes
         })
       });
 
@@ -163,7 +180,7 @@ export default async function handler(req, res) {
       // Continue with photo upload even if calendar sync fails
     }
 
-    // Insert photo with order metadata and calendar event ID
+    // Insert photo with order metadata, customer info, and calendar event ID
     const { data: photo, error } = await supabase
       .from('catering_photos')
       .insert({
@@ -175,6 +192,11 @@ export default async function handler(req, res) {
         order_due_date: orderDueDate,
         time_due: timeDue,
         leave_jayna_at: orderType === 'DELIVERY' ? leaveJaynaAt : null,
+        guest_name: guestName,
+        phone_number: phoneNumber,
+        email: email,
+        delivery_address: orderType === 'DELIVERY' ? deliveryAddress : null,
+        special_notes: specialNotes,
         calendar_event_id: calendarEventId
       })
       .select()
