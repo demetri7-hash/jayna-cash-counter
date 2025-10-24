@@ -16561,19 +16561,15 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    * Toggle multiple locations checkbox and show location selector modal
    */
   async function toggleMultipleLocations(itemId, enableMultipleLocations) {
+    console.log('toggleMultipleLocations called:', itemId, enableMultipleLocations);
     const checkbox = document.getElementById(`multiple-locations-${itemId}`);
 
     if (enableMultipleLocations) {
       // Show location selector modal
+      console.log('Opening location selector modal for item:', itemId);
       await showLocationSelectorModal(itemId);
     } else {
-      // Disable multi-location: clear location data
-      const confirmed = confirm('This will remove all location-specific counts and use a single count. Continue?');
-      if (!confirmed) {
-        checkbox.checked = true; // Revert
-        return;
-      }
-
+      // Disable multi-location: clear location data (no confirmation needed - user can re-enable)
       try {
         const { error } = await supabase
           .from('inventory_items')
@@ -16607,10 +16603,16 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    * Show modal to select locations for an item
    */
   async function showLocationSelectorModal(itemId) {
+    console.log('showLocationSelectorModal called for item:', itemId);
     await loadPrepLocations();
+    console.log('Prep locations loaded:', prepLocationsCache);
 
     const item = orderingSystemState.items.find(i => i.id === itemId);
-    if (!item) return;
+    if (!item) {
+      console.error('Item not found:', itemId);
+      return;
+    }
+    console.log('Found item:', item);
 
     const existingLocations = Object.keys(item.locationCounts || {});
 
@@ -16780,7 +16782,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       }
 
       if (locations.length === 0) {
-        alert('Please select at least one location');
+        showMessage('Please select at least one location', 'error');
         return;
       }
 
@@ -16818,7 +16820,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     modal.appendChild(btnContainer);
     overlay.appendChild(modal);
+    console.log('Appending location selector modal to body');
     document.body.appendChild(overlay);
+    console.log('Modal should now be visible');
   }
 
   /**
