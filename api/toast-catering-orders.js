@@ -3,16 +3,23 @@
  * Fetches catering orders from Toast API for upcoming date range
  * and stores them in Supabase database
  *
- * Catering orders identified by source field:
- * - "Invoice"
- * - "Catering"
- * - "Catering Online Ordering"
- * - "Catering Pick Up"
+ * Catering orders identified by:
+ * 1. Source field:
+ *    - "Invoice"
+ *    - "Catering"
+ *    - "Catering Online Ordering"
+ *    - "Catering Pick Up"
+ *
+ * 2. "In Store" orders with catering indicators:
+ *    - Has deliveryInfo object (catering pickup has customer/delivery details)
+ *    - Has promisedDate (scheduled/expected pickup time)
+ *    - diningOption contains "CATERING"
  *
  * OPTIMIZATIONS (Oct 2025):
  * - Full pagination support (fetches ALL orders, not just first 100)
  * - Rate limit protection (200ms delay = 5 req/sec, Toast limit compliance)
  * - Retry logic for 429 errors (exponential backoff)
+ * - Enhanced catering detection (source + metadata indicators)
  * - Source detection logging for debugging
  */
 
@@ -133,11 +140,30 @@ export default async function handler(req, res) {
             // Filter for catering orders only
             const cateringOrders = orders.filter(order => {
               // Check if order is a catering order by source
-              const isCatering =
+              const isCateringBySource =
                 order.source === 'Invoice' ||
                 order.source === 'Catering' ||
                 order.source === 'Catering Online Ordering' ||
                 order.source === 'Catering Pick Up';
+
+              // ALSO check for "In Store" orders with catering indicators:
+              // - deliveryInfo object exists (catering pickup has delivery details)
+              // - promisedDate exists (scheduled/catering orders have expected time)
+              // - diningOption contains "CATERING"
+              const hasDeliveryInfo = order.deliveryInfo && Object.keys(order.deliveryInfo).length > 0;
+              const hasPromisedDate = !!order.promisedDate;
+              const hasCateringDiningOption = order.diningOption && order.diningOption.toLowerCase().includes('catering');
+
+              const isCateringPickup = order.source === 'In Store' && (
+                hasDeliveryInfo || hasPromisedDate || hasCateringDiningOption
+              );
+
+              // Log "In Store" catering pickups for debugging
+              if (isCateringPickup) {
+                console.log(`🎯 Detected In Store catering pickup - Order ${order.displayNumber || order.guid?.substring(0, 8)}: deliveryInfo=${hasDeliveryInfo}, promisedDate=${hasPromisedDate}, diningOption=${order.diningOption || 'none'}`);
+              }
+
+              const isCatering = isCateringBySource || isCateringPickup;
 
               // Exclude voided/deleted orders
               const isValid = !order.voided && !order.deleted;
