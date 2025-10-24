@@ -14964,13 +14964,25 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     }
 
     // Group items by storage location
+    // MULTI-LOCATION ITEMS: appear in EACH location's group
     const groupedItems = {};
     prepItems.forEach(item => {
-      const area = item.storageLocation || 'No Defined Area';
-      if (!groupedItems[area]) {
-        groupedItems[area] = [];
+      if (item.hasMultipleLocations && item.locationCounts) {
+        // Multi-location: add item to EACH location group
+        Object.keys(item.locationCounts).forEach(location => {
+          if (!groupedItems[location]) {
+            groupedItems[location] = [];
+          }
+          groupedItems[location].push(item);
+        });
+      } else {
+        // Single location: add to storageLocation group
+        const area = item.storageLocation || 'No Defined Area';
+        if (!groupedItems[area]) {
+          groupedItems[area] = [];
+        }
+        groupedItems[area].push(item);
       }
-      groupedItems[area].push(item);
     });
 
     // Sort areas alphabetically, but put "No Defined Area" last
@@ -15079,7 +15091,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                          "
                          onmouseover="this.style.opacity='1'; this.style.textDecoration='underline'"
                          onmouseout="this.style.opacity='0.85'; this.style.textDecoration='none'">
-                        ${item.storageLocation || 'No defined area'}
+                        ${item.hasMultipleLocations ? Object.keys(item.locationCounts || {}).join(', ') : (item.storageLocation || 'No defined area')}
                       </a>
                     </div>
                   </div>
