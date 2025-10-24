@@ -12346,7 +12346,10 @@ async function renderOrdersTab() {
         batchLifespan: item.batch_lifespan_hours,
         storageLocation: item.storage_location,
         lastInvoiceQty: item.last_invoice_qty, // Track quantity added from latest invoice
-        lastInvoiceDate: item.last_invoice_date // Track when latest invoice was received
+        lastInvoiceDate: item.last_invoice_date, // Track when latest invoice was received
+        showInBottleCount: item.show_in_bottle_count || false, // Track if item should appear in bottle count
+        hasMultipleLocations: item.has_multiple_locations || false, // Track if item uses multi-location counting
+        locationCounts: item.location_counts || {} // Location-specific counts (JSONB)
       }));
 
       console.log('orderingSystemState.items:', orderingSystemState.items);
@@ -14912,90 +14915,179 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
                 <!-- Stock Input with Quick Adjustments -->
                 <div>
-                  <label style="display: block; font-size: 12px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                    Current Stock
-                  </label>
-                  <div style="display: flex; gap: 5px; align-items: stretch;">
-                    <!-- Decrement Button -->
-                    <button
-                      type="button"
-                      onclick="quickAdjustStock(${item.id}, -0.25)"
-                      style="
-                        flex: 0 0 40px;
-                        padding: 0;
-                        font-size: 22px;
-                        font-weight: 700;
-                        background: var(--gray-100);
-                        border: 2px solid var(--gray-300);
-                        border-radius: 0;
-                        color: var(--gray-700);
-                        cursor: pointer;
-                        transition: all 0.2s;
-                        min-height: 48px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                      "
-                      onmousedown="this.style.background='var(--gray-300)'; this.style.transform='scale(0.95)';"
-                      onmouseup="this.style.background='var(--gray-100)'; this.style.transform='scale(1)';"
-                      onmouseleave="this.style.background='var(--gray-100)'; this.style.transform='scale(1)';"
-                    >−</button>
+                  ${item.hasMultipleLocations ? `
+                    <!-- MULTIPLE LOCATIONS MODE -->
+                    ${Object.keys(item.locationCounts || {}).map(location => `
+                      <div style="margin-bottom: 12px;">
+                        <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                          ${location}
+                        </label>
+                        <div style="display: flex; gap: 5px; align-items: stretch;">
+                          <button
+                            type="button"
+                            onclick="quickAdjustLocationStock(${item.id}, '${location.replace(/'/g, "\\'")}', -0.25)"
+                            style="
+                              flex: 0 0 36px;
+                              padding: 0;
+                              font-size: 18px;
+                              font-weight: 700;
+                              background: var(--gray-100);
+                              border: 2px solid var(--gray-300);
+                              border-radius: 0;
+                              color: var(--gray-700);
+                              cursor: pointer;
+                              transition: all 0.2s;
+                              min-height: 40px;
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                            "
+                          >−</button>
+                          <input
+                            type="number"
+                            inputmode="decimal"
+                            id="location-stock-${item.id}-${location.replace(/\s/g, '_')}"
+                            value="${item.locationCounts[location] || 0}"
+                            min="0"
+                            step="0.25"
+                            onblur="autoSaveLocationStock(${item.id}, '${location.replace(/'/g, "\\'")}', this.value, this)"
+                            onchange="autoSaveLocationStock(${item.id}, '${location.replace(/'/g, "\\'")}', this.value, this)"
+                            style="
+                              flex: 1;
+                              padding: 10px 6px;
+                              font-size: 16px;
+                              font-weight: 700;
+                              text-align: center;
+                              border: 2px solid var(--gray-500);
+                              border-radius: 0;
+                              background: white;
+                              color: var(--gray-900);
+                              box-sizing: border-box;
+                              min-height: 40px;
+                            "
+                          />
+                          <button
+                            type="button"
+                            onclick="quickAdjustLocationStock(${item.id}, '${location.replace(/'/g, "\\'")}', 0.25)"
+                            style="
+                              flex: 0 0 36px;
+                              padding: 0;
+                              font-size: 18px;
+                              font-weight: 700;
+                              background: var(--gray-700);
+                              border: 2px solid var(--gray-700);
+                              border-radius: 0;
+                              color: white;
+                              cursor: pointer;
+                              transition: all 0.2s;
+                              min-height: 40px;
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                            "
+                          >+</button>
+                        </div>
+                      </div>
+                    `).join('')}
 
-                    <!-- Stock Input Field -->
-                    <input
-                      type="number"
-                      inputmode="decimal"
-                      id="stock-${item.id}"
-                      value="${item.currentStock}"
-                      min="0"
-                      step="0.25"
-                      onblur="autoSaveStockCount(${item.id}, this.value, this)"
-                      onchange="autoSaveStockCount(${item.id}, this.value, this)"
-                      style="
-                        flex: 1;
-                        padding: 12px 6px;
-                        font-size: 20px;
-                        font-weight: 700;
-                        text-align: center;
-                        border: 2px solid var(--gray-700);
-                        border-radius: 0;
-                        background: var(--gray-100);
-                        color: var(--gray-900);
-                        box-sizing: border-box;
-                        -webkit-appearance: none;
-                        -moz-appearance: textfield;
-                        min-height: 48px;
-                        transition: all 0.2s;
-                      "
-                      onfocus="this.style.borderColor='var(--gray-900)'; this.style.background='var(--white)'; this.select();"
-                      onblur="this.style.borderColor='var(--gray-700)'; this.style.background='var(--gray-100)';"
-                    />
+                    <!-- TOTAL COUNT (Read-only, grayed out) -->
+                    <div style="margin-top: 16px; padding-top: 12px; border-top: 2px solid var(--gray-300);">
+                      <label style="display: block; font-size: 12px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Total Stock (All Locations)
+                      </label>
+                      <input
+                        type="number"
+                        id="stock-${item.id}"
+                        value="${Object.values(item.locationCounts || {}).reduce((sum, count) => sum + parseFloat(count || 0), 0)}"
+                        disabled
+                        style="
+                          width: 100%;
+                          padding: 12px 6px;
+                          font-size: 20px;
+                          font-weight: 700;
+                          text-align: center;
+                          border: 2px solid var(--gray-400);
+                          border-radius: 0;
+                          background: var(--gray-200);
+                          color: var(--gray-500);
+                          box-sizing: border-box;
+                          min-height: 48px;
+                          cursor: not-allowed;
+                        "
+                      />
+                    </div>
 
-                    <!-- Increment Button -->
-                    <button
-                      type="button"
-                      onclick="quickAdjustStock(${item.id}, 0.25)"
-                      style="
-                        flex: 0 0 40px;
-                        padding: 0;
-                        font-size: 22px;
-                        font-weight: 700;
-                        background: var(--gray-700);
-                        border: 2px solid var(--gray-700);
-                        border-radius: 0;
-                        color: var(--white);
-                        cursor: pointer;
-                        transition: all 0.2s;
-                        min-height: 48px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                      "
-                      onmousedown="this.style.background='var(--gray-900)'; this.style.transform='scale(0.95)';"
-                      onmouseup="this.style.background='var(--gray-700)'; this.style.transform='scale(1)';"
-                      onmouseleave="this.style.background='var(--gray-700)'; this.style.transform='scale(1)';"
-                    >+</button>
-                  </div>
+                  ` : `
+                    <!-- SINGLE LOCATION MODE (Normal) -->
+                    <label style="display: block; font-size: 12px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Current Stock
+                    </label>
+                    <div style="display: flex; gap: 5px; align-items: stretch;">
+                      <button
+                        type="button"
+                        onclick="quickAdjustStock(${item.id}, -0.25)"
+                        style="
+                          flex: 0 0 40px;
+                          padding: 0;
+                          font-size: 22px;
+                          font-weight: 700;
+                          background: var(--gray-100);
+                          border: 2px solid var(--gray-300);
+                          border-radius: 0;
+                          color: var(--gray-700);
+                          cursor: pointer;
+                          transition: all 0.2s;
+                          min-height: 48px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                      >−</button>
+                      <input
+                        type="number"
+                        inputmode="decimal"
+                        id="stock-${item.id}"
+                        value="${item.currentStock}"
+                        min="0"
+                        step="0.25"
+                        onblur="autoSaveStockCount(${item.id}, this.value, this)"
+                        onchange="autoSaveStockCount(${item.id}, this.value, this)"
+                        style="
+                          flex: 1;
+                          padding: 12px 6px;
+                          font-size: 20px;
+                          font-weight: 700;
+                          text-align: center;
+                          border: 2px solid var(--gray-700);
+                          border-radius: 0;
+                          background: var(--gray-100);
+                          color: var(--gray-900);
+                          box-sizing: border-box;
+                          min-height: 48px;
+                        "
+                      />
+                      <button
+                        type="button"
+                        onclick="quickAdjustStock(${item.id}, 0.25)"
+                        style="
+                          flex: 0 0 40px;
+                          padding: 0;
+                          font-size: 22px;
+                          font-weight: 700;
+                          background: var(--gray-700);
+                          border: 2px solid var(--gray-700);
+                          border-radius: 0;
+                          color: var(--white);
+                          cursor: pointer;
+                          transition: all 0.2s;
+                          min-height: 48px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                      >+</button>
+                    </div>
+                  `}
 
                   <!-- Save Status Indicator -->
                   <div
@@ -16264,6 +16356,123 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     // Trigger auto-save
     autoSaveStockCount(itemId, roundedValue, inputElement);
+  }
+
+  /**
+   * Quick adjust location-specific stock with +/- buttons
+   */
+  function quickAdjustLocationStock(itemId, location, adjustment) {
+    const locationKey = location.replace(/\s/g, '_');
+    const inputElement = document.getElementById(`location-stock-${itemId}-${locationKey}`);
+    if (!inputElement) return;
+
+    const currentValue = parseFloat(inputElement.value) || 0;
+    const newValue = Math.max(0, currentValue + adjustment);
+    const roundedValue = Math.round(newValue * 100) / 100;
+
+    inputElement.value = roundedValue;
+    autoSaveLocationStock(itemId, location, roundedValue, inputElement);
+  }
+
+  /**
+   * Auto-save location-specific stock count
+   */
+  async function autoSaveLocationStock(itemId, location, newValue, inputElement) {
+    const stockValue = parseFloat(newValue);
+    if (isNaN(stockValue)) return;
+
+    const statusDiv = document.getElementById(`save-status-${itemId}`);
+
+    inputElement.style.borderColor = '#ff9800';
+    inputElement.style.background = '#fff3e0';
+    inputElement.disabled = true;
+
+    if (statusDiv) {
+      statusDiv.textContent = '💾 Saving...';
+      statusDiv.style.color = '#ff9800';
+      statusDiv.style.opacity = '1';
+    }
+
+    try {
+      // Find item in local state
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      if (!item) throw new Error('Item not found');
+
+      // Update location counts
+      const updatedLocationCounts = { ...(item.locationCounts || {}) };
+      updatedLocationCounts[location] = stockValue;
+
+      // Calculate total stock as sum of all locations
+      const totalStock = Object.values(updatedLocationCounts).reduce((sum, count) => sum + parseFloat(count || 0), 0);
+
+      // Save to database
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({
+          location_counts: updatedLocationCounts,
+          current_stock: totalStock,
+          last_counted_date: new Date().toISOString()
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      item.locationCounts = updatedLocationCounts;
+      item.currentStock = totalStock;
+      item.lastCountedDate = new Date().toISOString();
+
+      // Update total display
+      const totalInput = document.getElementById(`stock-${itemId}`);
+      if (totalInput) {
+        totalInput.value = totalStock;
+      }
+
+      // Success feedback
+      inputElement.style.borderColor = '#388e3c';
+      inputElement.style.background = '#e8f5e9';
+
+      if (statusDiv) {
+        statusDiv.textContent = '✓ Saved!';
+        statusDiv.style.color = '#388e3c';
+      }
+
+      setTimeout(() => {
+        inputElement.style.borderColor = '#2e7d32';
+        inputElement.style.background = 'white';
+        inputElement.disabled = false;
+
+        if (statusDiv) {
+          statusDiv.style.opacity = '0';
+        }
+      }, 800);
+
+      calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
+      refreshBottleCount();
+
+    } catch (error) {
+      console.error('Auto-save location failed:', error);
+      inputElement.style.borderColor = '#d32f2f';
+      inputElement.style.background = '#ffebee';
+
+      if (statusDiv) {
+        statusDiv.textContent = '✗ Failed';
+        statusDiv.style.color = '#d32f2f';
+      }
+
+      setTimeout(() => {
+        inputElement.style.borderColor = '';
+        inputElement.style.background = '';
+        inputElement.disabled = false;
+
+        if (statusDiv) {
+          statusDiv.style.opacity = '0';
+        }
+      }, 1000);
+
+      showMessage(`Failed to save: ${error.message}`, 'error');
+    }
   }
 
   /**
@@ -24707,6 +24916,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const batchLifespan = parseInt(document.getElementById('newPrepItemLifespanModal').value);
     const storageLocation = document.getElementById('newPrepItemStorageModal').value;
 
+    // Check multi-location settings
+    const multiLocCheckbox = document.getElementById('multipleLocationsCheckbox');
+    const hasMultipleLocations = multiLocCheckbox && multiLocCheckbox.checked;
+
     if (!itemName || !unit) {
       showMessage('Please fill in all required fields!', 'error');
       return;
@@ -24716,19 +24929,73 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     showLoading('Adding Prep Item', 'Saving to database...');
 
     try {
+      // Gather locations if multi-location is enabled
+      let locationCounts = {};
+      if (hasMultipleLocations) {
+        const locations = [];
+
+        // Process location 1
+        const loc1Select = document.getElementById('location1Select');
+        const loc1Input = document.getElementById('location1Input');
+        if (loc1Select.value === '__add_new__' && loc1Input.value.trim()) {
+          const newLoc = loc1Input.value.trim();
+          const capitalized = newLoc.charAt(0).toUpperCase() + newLoc.slice(1);
+          locations.push(capitalized);
+          await saveNewLocation(capitalized);
+        } else if (loc1Select.value && loc1Select.value !== '__add_new__') {
+          locations.push(loc1Select.value);
+        }
+
+        // Process location 2
+        const loc2Select = document.getElementById('location2Select');
+        const loc2Input = document.getElementById('location2Input');
+        if (loc2Select.value === '__add_new__' && loc2Input.value.trim()) {
+          const newLoc = loc2Input.value.trim();
+          const capitalized = newLoc.charAt(0).toUpperCase() + newLoc.slice(1);
+          locations.push(capitalized);
+          await saveNewLocation(capitalized);
+        } else if (loc2Select.value && loc2Select.value !== '__add_new__') {
+          locations.push(loc2Select.value);
+        }
+
+        // Process location 3 (if visible)
+        const loc3Container = document.getElementById('location3Container');
+        if (loc3Container.style.display !== 'none') {
+          const loc3Select = document.getElementById('location3Select');
+          const loc3Input = document.getElementById('location3Input');
+          if (loc3Select.value === '__add_new__' && loc3Input.value.trim()) {
+            const newLoc = loc3Input.value.trim();
+            const capitalized = newLoc.charAt(0).toUpperCase() + newLoc.slice(1);
+            locations.push(capitalized);
+            await saveNewLocation(capitalized);
+          } else if (loc3Select.value && loc3Select.value !== '__add_new__') {
+            locations.push(loc3Select.value);
+          }
+        }
+
+        // Initialize counts for each location
+        locations.forEach(loc => {
+          locationCounts[loc] = 0;
+        });
+      }
+
+      const insertData = {
+        item_name: itemName,
+        vendor: vendor,
+        unit: unit,
+        par_level: parLevel,
+        current_stock: 0,
+        item_type: 'prep',
+        batch_lifespan_hours: batchLifespan,
+        storage_location: storageLocation,
+        created_date: new Date().toISOString(),
+        has_multiple_locations: hasMultipleLocations,
+        location_counts: hasMultipleLocations ? locationCounts : {}
+      };
+
       const { data, error } = await supabase
         .from('inventory_items')
-        .insert([{
-          item_name: itemName,
-          vendor: vendor,
-          unit: unit,
-          par_level: parLevel,
-          current_stock: 0,
-          item_type: 'prep',
-          batch_lifespan_hours: batchLifespan,
-          storage_location: storageLocation,
-          created_date: new Date().toISOString()
-        }])
+        .insert([insertData])
         .select();
 
       if (error) throw error;
@@ -24743,7 +25010,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         itemType: data[0].item_type,
         batchLifespan: data[0].batch_lifespan_hours,
         storageLocation: data[0].storage_location,
-        lastCountedDate: null
+        lastCountedDate: null,
+        hasMultipleLocations: data[0].has_multiple_locations,
+        locationCounts: data[0].location_counts || {}
       });
 
       renderPrepCountList();
@@ -24754,6 +25023,20 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     } catch (error) {
       hideLoading();
       showMessage(`Error adding prep item: ${error.message}`, 'error');
+    }
+  }
+
+  // Helper function to save new location to database
+  async function saveNewLocation(locationName) {
+    try {
+      await fetch('/api/prep-locations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: locationName })
+      });
+      await loadPrepLocations(); // Refresh cache
+    } catch (error) {
+      console.error('Error saving location:', error);
     }
   }
 
