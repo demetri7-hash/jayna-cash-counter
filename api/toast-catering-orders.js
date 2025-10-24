@@ -330,6 +330,79 @@ export default async function handler(req, res) {
       });
     } else {
       console.log(`✅ Saved ${savedOrders?.length || ordersToSave.length} orders to database`);
+
+      // EXTRACT AND SAVE ORDER LINE ITEMS
+      console.log('📝 Extracting order line items from Toast orders...');
+
+      const allLineItems = [];
+
+      for (const savedOrder of savedOrders || []) {
+        const orderData = savedOrder.order_data;
+        if (!orderData || !orderData.checks) continue;
+
+        // Extract line items from each check
+        for (const check of orderData.checks) {
+          if (!check.selections || !Array.isArray(check.selections)) continue;
+
+          for (const selection of check.selections) {
+            // Skip voided items
+            if (selection.voided || selection.voidDate) continue;
+
+            // Extract modifiers
+            const modifiers = selection.modifiers && Array.isArray(selection.modifiers)
+              ? selection.modifiers.map(mod => ({
+                  name: mod.name,
+                  price: mod.price,
+                  quantity: mod.quantity
+                }))
+              : [];
+
+            // Build line item
+            const lineItem = {
+              order_id: savedOrder.id, // Database ID from saved order
+              external_order_id: savedOrder.external_order_id,
+              item_guid: selection.itemGuid || selection.guid,
+              item_name: selection.name || 'Unknown Item',
+              quantity: selection.quantity || 1,
+              unit_price: selection.price || 0,
+              total_price: (selection.price || 0) * (selection.quantity || 1),
+              selection_type: selection.selectionType || 'ITEM',
+              modifiers: modifiers.length > 0 ? modifiers : null,
+              special_requests: selection.specialRequests || null,
+              menu_group: selection.menuGroupName || null,
+              tax_included: selection.tax ? true : false,
+              item_data: selection
+            };
+
+            allLineItems.push(lineItem);
+          }
+        }
+      }
+
+      console.log(`📦 Extracted ${allLineItems.length} line items from ${savedOrders?.length || 0} orders`);
+
+      // Delete existing line items for these orders (to avoid duplicates on re-sync)
+      if (savedOrders && savedOrders.length > 0) {
+        const orderIds = savedOrders.map(o => o.id);
+        await supabase
+          .from('catering_order_items')
+          .delete()
+          .in('order_id', orderIds);
+      }
+
+      // Save line items to database
+      if (allLineItems.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('catering_order_items')
+          .insert(allLineItems);
+
+        if (itemsError) {
+          console.error('❌ Error saving order line items:', itemsError);
+          console.error('Line items error details:', JSON.stringify(itemsError, null, 2));
+        } else {
+          console.log(`✅ Saved ${allLineItems.length} order line items to database`);
+        }
+      }
     }
 
     return res.status(200).json({

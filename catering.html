@@ -1551,6 +1551,7 @@
         if (ordersData.success && ordersData.data && ordersData.data.orders) {
           toastOrders = ordersData.data.orders.map(order => ({
             id: `toast_${order.db_id}`, // Unique ID for Toast orders
+            db_id: order.db_id, // Database ID for fetching line items
             source_type: order.source || 'TOAST',
             order_due_date: order.delivery_date,
             time_due: order.delivery_time ? new Date(order.delivery_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
@@ -1729,12 +1730,13 @@
                   ${photo.source_type}
                 </div>
 
-                <!-- No Image Placeholder -->
-                <div style="width: 100%; height: 300px; background: white; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid var(--gray-300);">
+                <!-- No Image Placeholder (CLICKABLE to view order details) -->
+                <div onclick="viewToastOrderDetails(${photo.db_id})" style="width: 100%; height: 300px; background: white; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid var(--gray-300); cursor: pointer; transition: background 0.15s ease;">
                   <div style="text-align: center; padding: 20px;">
                     <div style="font-size: 48px; margin-bottom: 12px;">📋</div>
                     <div style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ORDER ${photo.toast_order_number || 'N/A'}</div>
                     ${photo.toast_total ? `<div style="font-size: 18px; font-weight: 700; color: var(--primary-blue); margin-top: 8px;">$${photo.toast_total.toFixed(2)}</div>` : ''}
+                    <div style="font-size: 11px; font-weight: 600; color: var(--primary-blue); margin-top: 12px; text-transform: uppercase; letter-spacing: 0.5px;">CLICK TO VIEW FULL ORDER</div>
                   </div>
                 </div>
 
@@ -1838,6 +1840,149 @@
         return `${hour12}:${minutes} ${ampm}`;
       } catch {
         return timeStr;
+      }
+    }
+
+    // View full Toast order details (line items, modifiers, totals)
+    async function viewToastOrderDetails(orderId) {
+      try {
+        console.log(`📋 Fetching order details for order ID: ${orderId}`);
+        showLoading('LOADING ORDER', 'Fetching order details...');
+
+        const response = await fetch(`/api/get-order-items?order_id=${orderId}`);
+        const result = await response.json();
+
+        hideLoading();
+
+        if (!result.success) {
+          showMessage(`Failed to load order details: ${result.error}`, 'error');
+          return;
+        }
+
+        const { order, lineItems } = result.data;
+
+        // Build modal HTML
+        let modalHtml = `
+          <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000; overflow-y: auto; padding: 20px;" onclick="closeToastOrderModal(event)">
+            <div style="background: white; padding: 24px; max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; border: 3px solid var(--gray-700);" onclick="event.stopPropagation()">
+
+              <!-- Header -->
+              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px solid var(--gray-300);">
+                <div>
+                  <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900);">
+                    ORDER ${order.order_number || 'N/A'}
+                  </h2>
+                  <div style="font-size: 13px; color: var(--gray-600);">
+                    ${order.source_type} - ${order.status?.toUpperCase() || 'CONFIRMED'}
+                  </div>
+                </div>
+                <button onclick="closeToastOrderModal()" style="background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                  CLOSE
+                </button>
+              </div>
+
+              <!-- Customer Info -->
+              ${order.customer_name || order.customer_phone || order.customer_email ? `
+              <div style="margin-bottom: 24px; padding: 16px; background: var(--gray-100); border: 2px solid var(--gray-300);">
+                <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-900);">CUSTOMER INFORMATION</h3>
+                ${order.customer_name ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Name:</strong> ${order.customer_name}</div>` : ''}
+                ${order.customer_phone ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Phone:</strong> ${order.customer_phone}</div>` : ''}
+                ${order.customer_email ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Email:</strong> ${order.customer_email}</div>` : ''}
+                ${order.delivery_address ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Address:</strong> ${order.delivery_address}</div>` : ''}
+                ${order.headcount ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Headcount:</strong> ${order.headcount} guests</div>` : ''}
+              </div>
+              ` : ''}
+
+              <!-- Delivery Info -->
+              ${order.delivery_date || order.delivery_time ? `
+              <div style="margin-bottom: 24px; padding: 16px; background: var(--blue-bg); border: 2px solid var(--primary-blue);">
+                <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--primary-blue);">DELIVERY DETAILS</h3>
+                ${order.delivery_date ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Date:</strong> ${new Date(order.delivery_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>` : ''}
+                ${order.delivery_time ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Time:</strong> ${new Date(order.delivery_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>` : ''}
+                ${order.delivery_notes ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Notes:</strong> ${order.delivery_notes}</div>` : ''}
+              </div>
+              ` : ''}
+
+              <!-- Order Items -->
+              <div style="margin-bottom: 24px;">
+                <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-900);">ORDER ITEMS</h3>
+
+                ${lineItems.length === 0 ? `
+                  <div style="padding: 40px; text-align: center; background: var(--gray-100); border: 2px solid var(--gray-300);">
+                    <div style="font-size: 13px; color: var(--gray-600);">No line items found. This order may not have been synced with item details yet.</div>
+                  </div>
+                ` : `
+                  <div style="border: 2px solid var(--gray-300);">
+                    ${lineItems.map((item, idx) => `
+                      <div style="padding: 16px; border-bottom: ${idx === lineItems.length - 1 ? 'none' : '1px solid var(--gray-200)'}; ${idx % 2 === 0 ? 'background: white;' : 'background: var(--gray-50);'}">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                          <div>
+                            <div style="font-size: 14px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px;">
+                              ${item.quantity}x ${item.item_name}
+                            </div>
+                            ${item.menu_group ? `<div style="font-size: 11px; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">${item.menu_group}</div>` : ''}
+                          </div>
+                          <div style="text-align: right;">
+                            ${item.unit_price ? `<div style="font-size: 12px; color: var(--gray-600);">$${parseFloat(item.unit_price).toFixed(2)} each</div>` : ''}
+                            <div style="font-size: 16px; font-weight: 700; color: var(--gray-900);">$${parseFloat(item.total_price).toFixed(2)}</div>
+                          </div>
+                        </div>
+
+                        ${item.modifiers && item.modifiers.length > 0 ? `
+                          <div style="margin-left: 16px; padding-left: 12px; border-left: 3px solid var(--gray-300);">
+                            ${item.modifiers.map(mod => `
+                              <div style="font-size: 12px; color: var(--gray-700); margin-bottom: 4px;">
+                                + ${mod.name} ${mod.price ? `($${parseFloat(mod.price).toFixed(2)})` : ''}
+                              </div>
+                            `).join('')}
+                          </div>
+                        ` : ''}
+
+                        ${item.special_requests ? `
+                          <div style="margin-top: 8px; padding: 8px; background: var(--warning-bg); border-left: 3px solid var(--warning-border);">
+                            <div style="font-size: 11px; font-weight: 700; color: var(--warning-text); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">SPECIAL REQUEST</div>
+                            <div style="font-size: 12px; color: var(--gray-900);">${item.special_requests}</div>
+                          </div>
+                        ` : ''}
+                      </div>
+                    `).join('')}
+                  </div>
+                `}
+              </div>
+
+              <!-- Order Total -->
+              <div style="padding: 16px; background: var(--success-bg); border: 2px solid var(--success-border);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--success-text);">ORDER TOTAL</div>
+                  <div style="font-size: 24px; font-weight: 700; color: var(--success-text);">$${parseFloat(order.total_amount || 0).toFixed(2)}</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        `;
+
+        // Create modal element
+        const modal = document.createElement('div');
+        modal.id = 'toastOrderModal';
+        modal.innerHTML = modalHtml;
+        document.body.appendChild(modal);
+
+      } catch (error) {
+        hideLoading();
+        console.error('Error loading order details:', error);
+        showMessage(`Failed to load order details: ${error.message}`, 'error');
+      }
+    }
+
+    // Close Toast order details modal
+    function closeToastOrderModal(event) {
+      // Allow closing by clicking overlay OR close button
+      if (!event || event.target === event.currentTarget || !event) {
+        const modal = document.getElementById('toastOrderModal');
+        if (modal) {
+          modal.remove();
+        }
       }
     }
 
