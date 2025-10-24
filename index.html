@@ -17054,11 +17054,6 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     event.preventDefault();
     event.stopPropagation();
 
-    // Load prep locations from API
-    await loadPrepLocations();
-
-    console.log('📍 prepLocationsCache after load:', prepLocationsCache);
-
     const item = orderingSystemState.items.find(i => i.id === itemId);
     if (!item) return;
 
@@ -17066,10 +17061,32 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const existingLocations = Object.keys(item.locationCounts || {});
     const selectedAreas = new Set(existingLocations);
 
-    console.log('📍 Existing locations for this item:', existingLocations);
+    // Get all unique storage locations from ALL prep items (combines storageLocation + locationCounts keys)
+    const prepItems = orderingSystemState.items.filter(item =>
+      item.vendor === 'PREP' || item.itemType === 'prep'
+    );
 
-    // Get all unique storage locations from saved locations
-    const uniqueAreas = prepLocationsCache.map(loc => loc.name).sort();
+    const allLocations = new Set();
+
+    // Add from storageLocation field
+    prepItems.forEach(item => {
+      if (item.storageLocation && item.storageLocation.trim()) {
+        allLocations.add(item.storageLocation.trim());
+      }
+    });
+
+    // Add from locationCounts keys (multi-location items)
+    prepItems.forEach(item => {
+      if (item.locationCounts) {
+        Object.keys(item.locationCounts).forEach(loc => {
+          if (loc && loc.trim()) {
+            allLocations.add(loc.trim());
+          }
+        });
+      }
+    });
+
+    const uniqueAreas = Array.from(allLocations).sort();
 
     console.log('📍 uniqueAreas to display:', uniqueAreas);
 
@@ -17226,12 +17243,23 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       addNewBtn.style.background = 'var(--gray-700)';
       addNewBtn.style.borderColor = 'var(--gray-700)';
     };
-    addNewBtn.onclick = async () => {
+    addNewBtn.onclick = () => {
       const newAreaName = prompt('Enter new location name:');
       if (newAreaName && newAreaName.trim()) {
         const capitalized = newAreaName.trim().charAt(0).toUpperCase() + newAreaName.trim().slice(1);
-        await saveNewLocation(capitalized);
-        // Close and reopen modal to refresh list
+
+        // Add to the list if not already there
+        if (!uniqueAreas.includes(capitalized)) {
+          uniqueAreas.push(capitalized);
+          uniqueAreas.sort();
+        }
+
+        // Auto-select the new location
+        if (selectedAreas.size < 3) {
+          selectedAreas.add(capitalized);
+        }
+
+        // Close and reopen modal to refresh with new location
         document.body.removeChild(modal);
         showAreaSelector(itemId, currentArea, event);
       }
