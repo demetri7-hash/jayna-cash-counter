@@ -1824,6 +1824,73 @@
       }
 
       console.log('✅ Loaded checklists for review:', sessions?.length || 0, sessions);
+
+      // Auto-complete expired sessions (time window has passed)
+      if (sessions && sessions.length > 0) {
+        // Get current Pacific time
+        const now = new Date();
+        const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+        const currentHour = pacificTime.getHours();
+        const currentMinute = pacificTime.getMinutes();
+        const currentTimeInMinutes = (currentHour * 60) + currentMinute;
+
+        console.log(`⏰ Current Pacific time: ${currentHour}:${String(currentMinute).padStart(2, '0')} (${currentTimeInMinutes} minutes since midnight)`);
+
+        for (const session of sessions) {
+          // Skip if already complete
+          if (session.is_complete === true) {
+            continue;
+          }
+
+          // Get checklist definition to check end time
+          const checklistDef = getChecklistByType(session.checklist_type);
+          if (!checklistDef) {
+            console.warn(`⚠️ Could not find checklist definition for type: ${session.checklist_type}`);
+            continue;
+          }
+
+          // Check if checklist has end time defined
+          if (checklistDef.end_hour === undefined || checklistDef.end_minute === undefined) {
+            console.log(`ℹ️ Checklist ${session.checklist_type} has no end time defined, skipping auto-complete`);
+            continue;
+          }
+
+          const endTimeInMinutes = (checklistDef.end_hour * 60) + (checklistDef.end_minute || 0);
+
+          // Handle overnight ranges (e.g., 10 PM - 2 AM)
+          let isExpired = false;
+          if (checklistDef.end_hour < checklistDef.start_hour) {
+            // Overnight range - expired if current time is >= end time AND < start time
+            isExpired = currentTimeInMinutes >= endTimeInMinutes && currentTimeInMinutes < (checklistDef.start_hour * 60);
+          } else {
+            // Normal range - expired if current time >= end time
+            isExpired = currentTimeInMinutes >= endTimeInMinutes;
+          }
+
+          if (isExpired) {
+            console.log(`⏱️ AUTO-COMPLETING expired session: ${session.id} (${session.checklist_type}) - end time was ${checklistDef.end_hour}:${String(checklistDef.end_minute || 0).padStart(2, '0')}`);
+
+            // Update session to complete
+            const { error: updateError } = await supabase
+              .from('foh_checklist_sessions')
+              .update({
+                is_complete: true,
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', session.id);
+
+            if (updateError) {
+              console.error(`❌ Error auto-completing session ${session.id}:`, updateError);
+            } else {
+              console.log(`✅ Auto-completed session ${session.id}`);
+              // Update local copy
+              session.is_complete = true;
+              session.completed_at = new Date().toISOString();
+            }
+          }
+        }
+      }
+
       return sessions || [];
     } catch (error) {
       console.error('❌ Exception loading checklists for review:', error);
