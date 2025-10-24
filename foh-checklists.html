@@ -2582,49 +2582,7 @@
     const requiredTasksCount = fohSystemState.tasks.filter(t => t.is_required === true).length;
     const completedRequiredCount = fohSystemState.tasks.filter(t => t.is_required === true && t.is_completed === true).length;
 
-    // Add sticky minimize button at top (iframe-compatible)
-    container.style.position = 'relative';
-
     let html = `
-      <!-- Sticky Header: MINIMIZE Button (iframe-compatible) -->
-      <div style="
-        position: -webkit-sticky;
-        position: sticky;
-        top: 0;
-        z-index: 9999;
-        background: white;
-        border-bottom: 3px solid var(--primary-blue);
-        margin: -12px -12px 16px -12px;
-        padding: 12px 16px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      ">
-        <button
-          onclick="confirmCancelChecklist()"
-          style="
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 20px;
-            background: white;
-            border: 2px solid var(--primary-blue);
-            color: var(--primary-blue);
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            width: 100%;
-            justify-content: center;
-          "
-          onmouseover="this.style.background='var(--primary-blue)'; this.style.color='white';"
-          onmouseout="this.style.background='white'; this.style.color='var(--primary-blue)';"
-        >
-          <span style="font-size: 16px;">←</span>
-          <span>MINIMIZE LIST</span>
-        </button>
-      </div>
-
       ${fohSystemState.reviewMode ? `
       <!-- Review Mode Banner -->
       <div style="margin-bottom: 16px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
@@ -3103,6 +3061,24 @@
 
     console.log(`✅ Rendered ${renderedCount} tasks for section "${section.name}"`);
 
+    // Add minimize link at end of section
+    html += `
+      <div style="text-align: center; padding: 12px 0; border-top: 1px solid var(--gray-200); margin-top: 12px;">
+        <a href="javascript:void(0)"
+           onclick="confirmCancelChecklist()"
+           style="
+             color: var(--primary-blue);
+             font-weight: 300;
+             font-style: italic;
+             font-size: 14px;
+             text-decoration: underline;
+             cursor: pointer;
+           ">
+          minimize list
+        </a>
+      </div>
+    `;
+
     html += '</div></div>';
     return html;
   }
@@ -3206,6 +3182,24 @@
         </div>
       `;
     });
+
+    // Add minimize link at end of section
+    html += `
+      <div style="text-align: center; padding: 12px 0; border-top: 1px solid var(--gray-200); margin-top: 12px;">
+        <a href="javascript:void(0)"
+           onclick="confirmCancelChecklist()"
+           style="
+             color: var(--primary-blue);
+             font-weight: 300;
+             font-style: italic;
+             font-size: 14px;
+             text-decoration: underline;
+             cursor: pointer;
+           ">
+          minimize list
+        </a>
+      </div>
+    `;
 
     html += '</div></div>';
     return html;
