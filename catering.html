@@ -1876,9 +1876,14 @@
                     ${order.source_type} - ${order.status?.toUpperCase() || 'CONFIRMED'}
                   </div>
                 </div>
-                <button onclick="closeToastOrderModal()" style="background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
-                  CLOSE
-                </button>
+                <div style="display: flex; gap: 12px;">
+                  <button onclick="printToastOrder(event, ${order.id})" style="background: var(--primary-blue); border: 2px solid var(--primary-blue); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                    PRINT ORDER
+                  </button>
+                  <button onclick="closeToastOrderModal()" style="background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                    CLOSE
+                  </button>
+                </div>
               </div>
 
               <!-- Customer Info -->
@@ -1983,6 +1988,64 @@
         if (modal) {
           modal.remove();
         }
+      }
+    }
+
+    // Print Toast order to Epson printer via Gmail
+    async function printToastOrder(event, orderId) {
+      try {
+        console.log(`🖨️ Printing Toast order ${orderId}...`);
+        showLoading('PRINTING ORDER', 'Sending order to printer...');
+
+        const response = await fetch('/api/print-toast-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ order_id: orderId })
+        });
+
+        const result = await response.json();
+
+        hideLoading();
+
+        if (!result.success) {
+          console.error(`❌ Failed to print order: ${result.error}`);
+          // Show error in modal by updating button text temporarily
+          const printBtn = event.target;
+          const originalText = printBtn.textContent;
+          printBtn.textContent = 'PRINT FAILED - SEE CONSOLE';
+          printBtn.style.background = '#dc2626';
+          setTimeout(() => {
+            printBtn.textContent = originalText;
+            printBtn.style.background = 'var(--primary-blue)';
+          }, 3000);
+          return;
+        }
+
+        console.log(`✅ Order sent to printer successfully:`, result.messageId);
+
+        // Show success feedback in button
+        const printBtn = event.target;
+        const originalText = printBtn.textContent;
+        printBtn.textContent = '✓ SENT TO PRINTER';
+        printBtn.style.background = '#059669';
+        setTimeout(() => {
+          printBtn.textContent = originalText;
+          printBtn.style.background = 'var(--primary-blue)';
+        }, 2000);
+
+      } catch (error) {
+        hideLoading();
+        console.error('❌ Error printing order:', error);
+        const printBtn = event.target;
+        const originalText = printBtn.textContent;
+        printBtn.textContent = 'PRINT ERROR';
+        printBtn.style.background = '#dc2626';
+        setTimeout(() => {
+          printBtn.textContent = originalText;
+          printBtn.style.background = 'var(--primary-blue)';
+        }, 3000);
       }
     }
 
