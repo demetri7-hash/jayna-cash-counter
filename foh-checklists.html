@@ -1759,22 +1759,31 @@
   }
 
   /**
-   * Get Available Checklists - Filter by current Pacific time
+   * Format time window for display (e.g., "3:00 AM TO 6:00 PM")
+   */
+  function formatTimeWindow(startHour, startMinute, endHour, endMinute) {
+    const formatTime = (hour, minute) => {
+      const period = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+      const displayMinute = String(minute || 0).padStart(2, '0');
+      return `${displayHour}:${displayMinute} ${period}`;
+    };
+
+    const startTime = formatTime(startHour, startMinute || 0);
+    const endTime = formatTime(endHour, endMinute || 0);
+
+    return `${startTime} TO ${endTime}`;
+  }
+
+  /**
+   * Get Available Checklists - Show all checklists regardless of time
    */
   function getAvailableChecklists() {
-    const now = new Date();
-    const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-    const currentHour = pacificTime.getHours();
-    const currentMinute = pacificTime.getMinutes();
-
-    // Convert current time to minutes since midnight for easier comparison
-    const currentTimeMinutes = (currentHour * 60) + currentMinute;
-
     // Get all checklist types from loaded checklists (including custom ones!)
     const allChecklistTypes = Object.keys(fohSystemState.allChecklists || {});
     const availableChecklists = [];
 
-    console.log(`⏰ Time check: ${currentHour}:${String(currentMinute).padStart(2, '0')} (${currentTimeMinutes} minutes since midnight)`);
+    console.log(`📋 Loading all checklists (${allChecklistTypes.length} total)`);
 
     allChecklistTypes.forEach(checklistType => {
       const checklist = fohSystemState.allChecklists?.[checklistType];
@@ -1784,29 +1793,11 @@
         return;
       }
 
-      // If checklist has time range defined, check if current time is within range
-      if (checklist.start_hour !== undefined && checklist.end_hour !== undefined) {
-        const startTimeMinutes = (checklist.start_hour * 60) + (checklist.start_minute || 0);
-        const endTimeMinutes = (checklist.end_hour * 60) + (checklist.end_minute || 0);
-
-        console.log(`  📋 ${checklistType}:`, {
-          start: `${checklist.start_hour}:${String(checklist.start_minute || 0).padStart(2, '0')} (${startTimeMinutes} min)`,
-          end: `${checklist.end_hour}:${String(checklist.end_minute || 0).padStart(2, '0')} (${endTimeMinutes} min)`,
-          inRange: currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes
-        });
-
-        // Check if current time is within range
-        if (currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes) {
-          availableChecklists.push(checklist);
-        }
-      } else {
-        console.log(`  ⚠️ ${checklistType}: No time range defined (showing by default)`);
-        // If no time range defined, always show (fallback for checklists without time data)
-        availableChecklists.push(checklist);
-      }
+      // Show ALL checklists regardless of time
+      availableChecklists.push(checklist);
     });
 
-    console.log(`✅ Available checklists: ${availableChecklists.length}/${allChecklistTypes.length}`);
+    console.log(`✅ Showing all ${availableChecklists.length} checklists`);
 
     return availableChecklists;
   }
@@ -1976,7 +1967,7 @@
     let html = `
       <div style="margin-bottom: 20px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
         <p style="color: var(--blue-text); font-size: 13px; font-weight: 600; margin: 0;">
-          📋 Select a checklist to begin. Available checklists update based on time of day.
+          📋 Select a checklist to begin. Suggested completion times are shown below each checklist.
         </p>
       </div>
 
@@ -2015,6 +2006,14 @@
           <p style="margin: 0 0 12px 0; font-size: 13px; color: var(--gray-600); line-height: 1.5;">
             ${checklist.description}
           </p>
+
+          ${checklist.start_hour !== undefined && checklist.end_hour !== undefined ? `
+          <div style="margin: 0 0 16px 0; padding: 12px; background: var(--light-blue); border-left: 4px solid var(--primary-blue);">
+            <p style="margin: 0; font-size: 13px; font-weight: 700; color: var(--primary-blue); text-transform: uppercase; letter-spacing: 0.8px; line-height: 1.4;">
+              ⏰ COMPLETE THIS CHECKLIST FROM ${formatTimeWindow(checklist.start_hour, checklist.start_minute || 0, checklist.end_hour, checklist.end_minute || 0)}
+            </p>
+          </div>
+          ` : ''}
 
           <div style="display: flex; gap: 12px; font-size: 12px; color: var(--gray-500);">
             ${checklist.staffCount > 1 ?
