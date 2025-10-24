@@ -15469,6 +15469,20 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                     SHOW IN BOTTLE COUNT
                   </label>
                 </div>
+
+                <!-- Multiple Locations Checkbox -->
+                <div style="margin-top: 6px; display: flex; align-items: center; gap: 6px;">
+                  <input
+                    type="checkbox"
+                    id="multiple-locations-${item.id}"
+                    ${item.hasMultipleLocations ? 'checked' : ''}
+                    onchange="toggleMultipleLocations(${item.id}, this.checked)"
+                    style="width: 14px; height: 14px; cursor: pointer;"
+                  />
+                  <label for="multiple-locations-${item.id}" style="font-size: 11px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer;">
+                    MULTIPLE LOCATIONS
+                  </label>
+                </div>
               </div>
             `;
             }).join('')}
@@ -16541,6 +16555,270 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
       showMessage(`Failed to update bottle count status: ${error.message}`, 'error');
     }
+  }
+
+  /**
+   * Toggle multiple locations checkbox and show location selector modal
+   */
+  async function toggleMultipleLocations(itemId, enableMultipleLocations) {
+    const checkbox = document.getElementById(`multiple-locations-${itemId}`);
+
+    if (enableMultipleLocations) {
+      // Show location selector modal
+      await showLocationSelectorModal(itemId);
+    } else {
+      // Disable multi-location: clear location data
+      const confirmed = confirm('This will remove all location-specific counts and use a single count. Continue?');
+      if (!confirmed) {
+        checkbox.checked = true; // Revert
+        return;
+      }
+
+      try {
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({
+            has_multiple_locations: false,
+            location_counts: {}
+          })
+          .eq('id', itemId);
+
+        if (error) throw error;
+
+        // Update local state
+        const item = orderingSystemState.items.find(i => i.id === itemId);
+        if (item) {
+          item.hasMultipleLocations = false;
+          item.locationCounts = {};
+        }
+
+        renderPrepCountList();
+        showMessage('✓ Multiple locations disabled', 'success');
+
+      } catch (error) {
+        console.error('Failed to disable multiple locations:', error);
+        checkbox.checked = true; // Revert
+        showMessage(`Failed: ${error.message}`, 'error');
+      }
+    }
+  }
+
+  /**
+   * Show modal to select locations for an item
+   */
+  async function showLocationSelectorModal(itemId) {
+    await loadPrepLocations();
+
+    const item = orderingSystemState.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const existingLocations = Object.keys(item.locationCounts || {});
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 10001; display: flex; align-items: center; justify-content: center; padding: 20px;';
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background: white; max-width: 500px; width: 100%; padding: 24px; border: 2px solid var(--gray-400);';
+
+    const header = document.createElement('h3');
+    header.textContent = `SELECT LOCATIONS FOR ${item.itemName}`;
+    header.style.cssText = 'margin: 0 0 20px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900);';
+    modal.appendChild(header);
+
+    // Location 1
+    const loc1Div = document.createElement('div');
+    loc1Div.style.cssText = 'margin-bottom: 12px;';
+    const loc1Label = document.createElement('label');
+    loc1Label.textContent = 'Location 1:';
+    loc1Label.style.cssText = 'display: block; font-size: 11px; font-weight: 600; color: var(--gray-600); margin-bottom: 6px;';
+    const loc1Select = document.createElement('select');
+    loc1Select.id = 'modal-loc1';
+    loc1Select.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;';
+    loc1Select.innerHTML = '<option value="">Select location...</option><option value="__add_new__">+ Add New</option>';
+    const loc1Input = document.createElement('input');
+    loc1Input.type = 'text';
+    loc1Input.id = 'modal-loc1-input';
+    loc1Input.placeholder = 'Enter new location';
+    loc1Input.style.cssText = 'display: none; width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; margin-top: 6px;';
+    loc1Div.appendChild(loc1Label);
+    loc1Div.appendChild(loc1Select);
+    loc1Div.appendChild(loc1Input);
+    modal.appendChild(loc1Div);
+
+    // Location 2
+    const loc2Div = document.createElement('div');
+    loc2Div.style.cssText = 'margin-bottom: 12px;';
+    const loc2Label = document.createElement('label');
+    loc2Label.textContent = 'Location 2:';
+    loc2Label.style.cssText = 'display: block; font-size: 11px; font-weight: 600; color: var(--gray-600); margin-bottom: 6px;';
+    const loc2Select = document.createElement('select');
+    loc2Select.id = 'modal-loc2';
+    loc2Select.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;';
+    loc2Select.innerHTML = '<option value="">Select location...</option><option value="__add_new__">+ Add New</option>';
+    const loc2Input = document.createElement('input');
+    loc2Input.type = 'text';
+    loc2Input.id = 'modal-loc2-input';
+    loc2Input.placeholder = 'Enter new location';
+    loc2Input.style.cssText = 'display: none; width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; margin-top: 6px;';
+    loc2Div.appendChild(loc2Label);
+    loc2Div.appendChild(loc2Select);
+    loc2Div.appendChild(loc2Input);
+    modal.appendChild(loc2Div);
+
+    // Location 3
+    const loc3Div = document.createElement('div');
+    loc3Div.id = 'modal-loc3-div';
+    loc3Div.style.cssText = 'margin-bottom: 12px; display: none;';
+    const loc3Label = document.createElement('label');
+    loc3Label.textContent = 'Location 3:';
+    loc3Label.style.cssText = 'display: block; font-size: 11px; font-weight: 600; color: var(--gray-600); margin-bottom: 6px;';
+    const loc3Select = document.createElement('select');
+    loc3Select.id = 'modal-loc3';
+    loc3Select.style.cssText = 'width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px;';
+    loc3Select.innerHTML = '<option value="">Select location...</option><option value="__add_new__">+ Add New</option>';
+    const loc3Input = document.createElement('input');
+    loc3Input.type = 'text';
+    loc3Input.id = 'modal-loc3-input';
+    loc3Input.placeholder = 'Enter new location';
+    loc3Input.style.cssText = 'display: none; width: 100%; padding: 10px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 13px; margin-top: 6px;';
+    loc3Div.appendChild(loc3Label);
+    loc3Div.appendChild(loc3Select);
+    loc3Div.appendChild(loc3Input);
+    modal.appendChild(loc3Div);
+
+    // Add Location link
+    const addLocLink = document.createElement('a');
+    addLocLink.href = 'javascript:void(0)';
+    addLocLink.textContent = '+ Add Location';
+    addLocLink.style.cssText = 'color: #1976d2; font-size: 12px; font-weight: 600; text-decoration: underline; cursor: pointer; display: block; margin-bottom: 20px;';
+    addLocLink.onclick = () => {
+      loc3Div.style.display = 'block';
+      addLocLink.style.display = 'none';
+    };
+    modal.appendChild(addLocLink);
+
+    // Populate dropdowns
+    prepLocationsCache.forEach(loc => {
+      [loc1Select, loc2Select, loc3Select].forEach(select => {
+        const opt = document.createElement('option');
+        opt.value = loc.name;
+        opt.textContent = loc.name;
+        select.appendChild(opt);
+      });
+    });
+
+    // Pre-select existing locations
+    if (existingLocations.length > 0) {
+      loc1Select.value = existingLocations[0] || '';
+      if (existingLocations.length > 1) loc2Select.value = existingLocations[1] || '';
+      if (existingLocations.length > 2) {
+        loc3Select.value = existingLocations[2] || '';
+        loc3Div.style.display = 'block';
+        addLocLink.style.display = 'none';
+      }
+    }
+
+    // Handle select changes
+    [loc1Select, loc2Select, loc3Select].forEach((select, idx) => {
+      select.onchange = () => {
+        const input = document.getElementById(`modal-loc${idx + 1}-input`);
+        if (select.value === '__add_new__') {
+          input.style.display = 'block';
+        } else {
+          input.style.display = 'none';
+          input.value = '';
+        }
+      };
+    });
+
+    // Buttons
+    const btnContainer = document.createElement('div');
+    btnContainer.style.cssText = 'display: flex; gap: 12px; margin-top: 20px;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = 'flex: 1; padding: 12px; background: white; color: var(--gray-700); border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; font-weight: 700; cursor: pointer;';
+    cancelBtn.onclick = () => {
+      document.body.removeChild(overlay);
+      document.getElementById(`multiple-locations-${itemId}`).checked = false; // Uncheck
+    };
+    btnContainer.appendChild(cancelBtn);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'SAVE LOCATIONS';
+    saveBtn.style.cssText = 'flex: 2; padding: 12px; background: #212121; color: white; border: 2px solid #212121; border-radius: 0; font-size: 12px; font-weight: 700; cursor: pointer;';
+    saveBtn.onclick = async () => {
+      const locations = [];
+
+      // Process location 1
+      if (loc1Select.value === '__add_new__' && loc1Input.value.trim()) {
+        const capitalized = loc1Input.value.trim().charAt(0).toUpperCase() + loc1Input.value.trim().slice(1);
+        locations.push(capitalized);
+        await saveNewLocation(capitalized);
+      } else if (loc1Select.value && loc1Select.value !== '__add_new__') {
+        locations.push(loc1Select.value);
+      }
+
+      // Process location 2
+      if (loc2Select.value === '__add_new__' && loc2Input.value.trim()) {
+        const capitalized = loc2Input.value.trim().charAt(0).toUpperCase() + loc2Input.value.trim().slice(1);
+        locations.push(capitalized);
+        await saveNewLocation(capitalized);
+      } else if (loc2Select.value && loc2Select.value !== '__add_new__') {
+        locations.push(loc2Select.value);
+      }
+
+      // Process location 3
+      if (loc3Div.style.display !== 'none') {
+        if (loc3Select.value === '__add_new__' && loc3Input.value.trim()) {
+          const capitalized = loc3Input.value.trim().charAt(0).toUpperCase() + loc3Input.value.trim().slice(1);
+          locations.push(capitalized);
+          await saveNewLocation(capitalized);
+        } else if (loc3Select.value && loc3Select.value !== '__add_new__') {
+          locations.push(loc3Select.value);
+        }
+      }
+
+      if (locations.length === 0) {
+        alert('Please select at least one location');
+        return;
+      }
+
+      // Initialize location counts
+      const locationCounts = {};
+      locations.forEach(loc => {
+        locationCounts[loc] = item.locationCounts?.[loc] || 0; // Preserve existing counts
+      });
+
+      try {
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({
+            has_multiple_locations: true,
+            location_counts: locationCounts
+          })
+          .eq('id', itemId);
+
+        if (error) throw error;
+
+        // Update local state
+        item.hasMultipleLocations = true;
+        item.locationCounts = locationCounts;
+
+        document.body.removeChild(overlay);
+        renderPrepCountList();
+        showMessage('✓ Locations saved successfully!', 'success');
+
+      } catch (error) {
+        console.error('Failed to save locations:', error);
+        showMessage(`Failed: ${error.message}`, 'error');
+      }
+    };
+    btnContainer.appendChild(saveBtn);
+
+    modal.appendChild(btnContainer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
   }
 
   /**
