@@ -7,6 +7,12 @@
  * - "Invoice"
  * - "Catering"
  * - "Catering Online Ordering"
+ *
+ * OPTIMIZATIONS (Oct 2025):
+ * - Full pagination support (fetches ALL orders, not just first 100)
+ * - Rate limit protection (200ms delay = 5 req/sec, Toast limit compliance)
+ * - Retry logic for 429 errors (exponential backoff)
+ * - Source detection logging for debugging
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -16,6 +22,37 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
+
+/**
+ * Fetch with automatic retry on rate limit errors
+ */
+async function fetchWithRateLimit(url, options, retryCount = 0) {
+  const maxRetries = 3;
+
+  try {
+    const response = await fetch(url, options);
+
+    // Handle rate limiting with retry
+    if (response.status === 429 && retryCount < maxRetries) {
+      const retryAfter = parseInt(response.headers.get('Retry-After') || '5');
+      console.log(`⚠️ Rate limited. Waiting ${retryAfter}s before retry ${retryCount + 1}/${maxRetries}...`);
+
+      await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+      return fetchWithRateLimit(url, options, retryCount + 1);
+    }
+
+    return response;
+  } catch (error) {
+    // Network error - retry with exponential backoff
+    if (retryCount < maxRetries) {
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 10000); // Max 10s
+      console.log(`⚠️ Network error. Retrying in ${delay}ms (${retryCount + 1}/${maxRetries})...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchWithRateLimit(url, options, retryCount + 1);
+    }
+    throw error;
+  }
+}
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -58,6 +95,7 @@ export default async function handler(req, res) {
 
     // Fetch orders for each day in the range
     const allCateringOrders = [];
+    const sourceStats = {}; // Track sources for debugging
     let currentDate = new Date(startDate);
     const finalDate = new Date(endDate);
 
@@ -66,51 +104,69 @@ export default async function handler(req, res) {
 
       console.log(`🔍 Fetching orders for ${businessDate}...`);
 
-      // Fetch orders for this business date
-      const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=100`;
+      // PAGINATION LOOP - Fetch ALL pages, not just first 100
+      let page = 1;
+      let hasMorePages = true;
 
-      const response = await fetch(ordersUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
-          'Content-Type': 'application/json'
+      while (hasMorePages) {
+        const ordersUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=100&page=${page}`;
+
+        const response = await fetchWithRateLimit(ordersUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Toast-Restaurant-External-ID': TOAST_CONFIG.restaurantGuid,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const orders = await response.json();
+
+          if (Array.isArray(orders) && orders.length > 0) {
+            // Log unique sources for debugging
+            orders.forEach(o => {
+              sourceStats[o.source] = (sourceStats[o.source] || 0) + 1;
+            });
+
+            // Filter for catering orders only
+            const cateringOrders = orders.filter(order => {
+              // Check if order is a catering order by source
+              const isCatering =
+                order.source === 'Invoice' ||
+                order.source === 'Catering' ||
+                order.source === 'Catering Online Ordering';
+
+              // Exclude voided/deleted orders
+              const isValid = !order.voided && !order.deleted;
+
+              return isCatering && isValid;
+            });
+
+            console.log(`✅ Found ${cateringOrders.length} catering orders on ${businessDate} (page ${page})`);
+            allCateringOrders.push(...cateringOrders);
+
+            // Check if there are more pages
+            hasMorePages = orders.length === 100;
+            page++;
+          } else {
+            hasMorePages = false;
+          }
+        } else {
+          console.error(`❌ Failed to fetch orders for ${businessDate} (page ${page}): ${response.status}`);
+          hasMorePages = false;
         }
-      });
 
-      if (response.ok) {
-        const orders = await response.json();
-
-        // Filter for catering orders only
-        if (Array.isArray(orders)) {
-          const cateringOrders = orders.filter(order => {
-            // Check if order is a catering order by source
-            const isCatering =
-              order.source === 'Invoice' ||
-              order.source === 'Catering' ||
-              order.source === 'Catering Online Ordering';
-
-            // Exclude voided/deleted orders
-            const isValid = !order.voided && !order.deleted;
-
-            return isCatering && isValid;
-          });
-
-          console.log(`✅ Found ${cateringOrders.length} catering orders on ${businessDate}`);
-          allCateringOrders.push(...cateringOrders);
-        }
-      } else {
-        console.error(`❌ Failed to fetch orders for ${businessDate}: ${response.status}`);
+        // Rate limit protection: 200ms = 5 req/sec (Toast ordersBulk limit)
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       // Move to next day
       currentDate.setDate(currentDate.getDate() + 1);
-
-      // Add small delay to avoid rate limiting (100ms between requests)
-      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     console.log(`📦 Total catering orders found: ${allCateringOrders.length}`);
+    console.log(`📊 Source breakdown:`, sourceStats);
 
     // DEBUG: Log first order structure to understand Toast API response
     if (allCateringOrders.length > 0) {
@@ -268,7 +324,8 @@ export default async function handler(req, res) {
           totalOrders: cateringData.length,
           orders: cateringData,
           savedToDatabase: false,
-          databaseError: saveError.message || 'Database table may not exist. Run /sql/create_catering_orders_table.sql in Supabase.'
+          databaseError: saveError.message || 'Database table may not exist. Run /sql/create_catering_orders_table.sql in Supabase.',
+          sourceStats // Include source breakdown for debugging
         }
       });
     } else {
@@ -283,7 +340,8 @@ export default async function handler(req, res) {
         endDate,
         totalOrders: cateringData.length,
         orders: cateringData,
-        savedToDatabase: true
+        savedToDatabase: true,
+        sourceStats // Include source breakdown for debugging
       }
     });
 
