@@ -15469,20 +15469,6 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                     SHOW IN BOTTLE COUNT
                   </label>
                 </div>
-
-                <!-- Multiple Locations Checkbox -->
-                <div style="margin-top: 6px; display: flex; align-items: center; gap: 6px;">
-                  <input
-                    type="checkbox"
-                    id="multiple-locations-${item.id}"
-                    ${item.hasMultipleLocations ? 'checked' : ''}
-                    onchange="toggleMultipleLocations(${item.id}, this.checked)"
-                    style="width: 14px; height: 14px; cursor: pointer;"
-                  />
-                  <label for="multiple-locations-${item.id}" style="font-size: 11px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer;">
-                    MULTIPLE LOCATIONS
-                  </label>
-                </div>
               </div>
             `;
             }).join('')}
@@ -17062,21 +17048,24 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
-   * Show area selector popup for a prep item
+   * Show area selector popup for a prep item - NOW SUPPORTS MULTIPLE LOCATIONS (up to 3)
    */
   async function showAreaSelector(itemId, currentArea, event) {
     event.preventDefault();
     event.stopPropagation();
 
-    // Get all unique storage locations from prep items
-    const prepItems = orderingSystemState.items.filter(item =>
-      item.vendor === 'PREP' || item.itemType === 'prep'
-    );
+    // Load prep locations from API
+    await loadPrepLocations();
 
-    const uniqueAreas = [...new Set(prepItems
-      .map(item => item.storageLocation)
-      .filter(loc => loc && loc.trim() !== '')
-    )].sort();
+    const item = orderingSystemState.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    // Get existing selected locations for this item
+    const existingLocations = Object.keys(item.locationCounts || {});
+    const selectedAreas = new Set(existingLocations);
+
+    // Get all unique storage locations from saved locations
+    const uniqueAreas = prepLocationsCache.map(loc => loc.name).sort();
 
     // Create modal
     const modal = document.createElement('div');
@@ -17107,9 +17096,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     `;
 
     const title = document.createElement('h3');
-    title.textContent = 'SELECT STORAGE AREA';
+    title.textContent = 'SELECT LOCATIONS (UP TO 3)';
     title.style.cssText = `
-      margin: 0 0 16px 0;
+      margin: 0 0 8px 0;
       font-size: 16px;
       font-weight: 700;
       text-transform: uppercase;
@@ -17117,47 +17106,72 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       color: var(--gray-900);
     `;
 
+    const subtitle = document.createElement('p');
+    subtitle.textContent = 'Click to select/deselect. Select multiple to track counts per location.';
+    subtitle.style.cssText = `
+      margin: 0 0 16px 0;
+      font-size: 12px;
+      color: var(--gray-600);
+      font-style: italic;
+    `;
+
     const areaList = document.createElement('div');
     areaList.style.cssText = 'margin-bottom: 16px;';
 
-    // Add existing areas
+    // Function to update button appearance
+    const updateButtonStyle = (btn, area, isSelected) => {
+      btn.style.background = isSelected ? '#e3f2fd' : 'var(--gray-100)';
+      btn.style.borderColor = isSelected ? '#1976d2' : 'var(--gray-300)';
+      btn.style.fontWeight = isSelected ? '700' : '400';
+      btn.style.color = isSelected ? '#1976d2' : 'var(--gray-900)';
+    };
+
+    // Add existing areas as toggleable buttons
     uniqueAreas.forEach(area => {
       const areaBtn = document.createElement('button');
       areaBtn.textContent = area;
+      const isSelected = selectedAreas.has(area);
       areaBtn.style.cssText = `
         display: block;
         width: 100%;
         padding: 12px;
         margin-bottom: 8px;
-        background: ${area === currentArea ? '#e3f2fd' : 'var(--gray-100)'};
-        border: 2px solid ${area === currentArea ? '#1976d2' : 'var(--gray-300)'};
-        color: var(--gray-900);
+        background: ${isSelected ? '#e3f2fd' : 'var(--gray-100)'};
+        border: 2px solid ${isSelected ? '#1976d2' : 'var(--gray-300)'};
+        color: ${isSelected ? '#1976d2' : 'var(--gray-900)'};
         font-size: 13px;
-        font-weight: ${area === currentArea ? '700' : '400'};
+        font-weight: ${isSelected ? '700' : '400'};
         cursor: pointer;
         text-align: left;
         transition: all 0.15s;
       `;
       areaBtn.onmouseover = () => {
-        if (area !== currentArea) {
+        if (!selectedAreas.has(area)) {
           areaBtn.style.background = '#f5f5f5';
           areaBtn.style.borderColor = 'var(--gray-400)';
         }
       };
       areaBtn.onmouseout = () => {
-        if (area !== currentArea) {
-          areaBtn.style.background = 'var(--gray-100)';
-          areaBtn.style.borderColor = 'var(--gray-300)';
-        }
+        updateButtonStyle(areaBtn, area, selectedAreas.has(area));
       };
       areaBtn.onclick = () => {
-        saveItemArea(itemId, area);
-        document.body.removeChild(modal);
+        // Toggle selection
+        if (selectedAreas.has(area)) {
+          selectedAreas.delete(area);
+        } else {
+          if (selectedAreas.size >= 3) {
+            showMessage('Maximum 3 locations allowed', 'warning');
+            return;
+          }
+          selectedAreas.add(area);
+        }
+        updateButtonStyle(areaBtn, area, selectedAreas.has(area));
       };
       areaList.appendChild(areaBtn);
     });
 
     content.appendChild(title);
+    content.appendChild(subtitle);
     content.appendChild(areaList);
 
     // Add "Add New Area" section
@@ -17189,21 +17203,30 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       addNewBtn.style.background = 'var(--gray-700)';
       addNewBtn.style.borderColor = 'var(--gray-700)';
     };
-    addNewBtn.onclick = () => {
-      showAddNewAreaInput(itemId, addNewContainer);
+    addNewBtn.onclick = async () => {
+      const newAreaName = prompt('Enter new location name:');
+      if (newAreaName && newAreaName.trim()) {
+        const capitalized = newAreaName.trim().charAt(0).toUpperCase() + newAreaName.trim().slice(1);
+        await saveNewLocation(capitalized);
+        // Close and reopen modal to refresh list
+        document.body.removeChild(modal);
+        showAreaSelector(itemId, currentArea, event);
+      }
     };
 
     addNewContainer.appendChild(addNewBtn);
     content.appendChild(addNewContainer);
 
-    // Close button
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = 'CANCEL';
-    closeBtn.style.cssText = `
-      display: block;
-      width: 100%;
+    // Button container
+    const btnContainer = document.createElement('div');
+    btnContainer.style.cssText = 'display: flex; gap: 12px; margin-top: 16px;';
+
+    // Cancel button
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = `
+      flex: 1;
       padding: 12px;
-      margin-top: 16px;
       background: var(--gray-100);
       border: 2px solid var(--gray-300);
       color: var(--gray-900);
@@ -17213,9 +17236,77 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       text-transform: uppercase;
       letter-spacing: 0.5px;
     `;
-    closeBtn.onclick = () => document.body.removeChild(modal);
+    cancelBtn.onclick = () => document.body.removeChild(modal);
 
-    content.appendChild(closeBtn);
+    // Save button
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'SAVE';
+    saveBtn.style.cssText = `
+      flex: 2;
+      padding: 12px;
+      background: #212121;
+      border: 2px solid #212121;
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    `;
+    saveBtn.onclick = async () => {
+      const selectedLocationsArray = Array.from(selectedAreas);
+
+      if (selectedLocationsArray.length === 0) {
+        // No locations selected - disable multi-location
+        try {
+          await supabase
+            .from('inventory_items')
+            .update({
+              has_multiple_locations: false,
+              location_counts: {}
+            })
+            .eq('id', itemId);
+
+          item.hasMultipleLocations = false;
+          item.locationCounts = {};
+
+          document.body.removeChild(modal);
+          renderPrepCountList();
+          showMessage('✓ Locations cleared', 'success');
+        } catch (error) {
+          showMessage(`Error: ${error.message}`, 'error');
+        }
+      } else {
+        // Save selected locations
+        const locationCounts = {};
+        selectedLocationsArray.forEach(loc => {
+          locationCounts[loc] = item.locationCounts?.[loc] || 0; // Preserve existing counts
+        });
+
+        try {
+          await supabase
+            .from('inventory_items')
+            .update({
+              has_multiple_locations: selectedLocationsArray.length > 1,
+              location_counts: locationCounts
+            })
+            .eq('id', itemId);
+
+          item.hasMultipleLocations = selectedLocationsArray.length > 1;
+          item.locationCounts = locationCounts;
+
+          document.body.removeChild(modal);
+          renderPrepCountList();
+          showMessage(`✓ ${selectedLocationsArray.length} location(s) saved!`, 'success');
+        } catch (error) {
+          showMessage(`Error: ${error.message}`, 'error');
+        }
+      }
+    };
+
+    btnContainer.appendChild(cancelBtn);
+    btnContainer.appendChild(saveBtn);
+    content.appendChild(btnContainer);
     modal.appendChild(content);
 
     // Close on backdrop click
