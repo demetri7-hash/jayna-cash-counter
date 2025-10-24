@@ -1698,11 +1698,12 @@
     try {
       console.log('🔄 Loading ALL checklists from database...');
 
-      // Load ALL FOH checklists from database (not just hardcoded ones!)
+      // Load ALL FOH checklists from database (exclude BOH only)
       const { data: allChecklists, error } = await supabase
         .from('checklist_definitions')
         .select('type, title, time_range, start_hour, start_minute, end_hour, end_minute')
-        .like('type', 'foh_%');  // FILTER FOR FOH ONLY
+        .not('type', 'like', 'boh_%')  // Exclude BOH checklists only
+        .not('type', 'like', 'BOH_%'); // Show ALL other checklists (FOH, review format, etc.)
 
       if (error) throw error;
 
