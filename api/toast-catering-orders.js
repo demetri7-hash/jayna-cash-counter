@@ -344,6 +344,13 @@ export default async function handler(req, res) {
         for (const check of orderData.checks) {
           if (!check.selections || !Array.isArray(check.selections)) continue;
 
+          // DEBUG: Log first selection to see structure
+          if (check.selections.length > 0) {
+            console.log('🔍 DEBUG - First selection structure:');
+            console.log('Selection keys:', Object.keys(check.selections[0]));
+            console.log('Full selection object:', JSON.stringify(check.selections[0], null, 2));
+          }
+
           for (const selection of check.selections) {
             // Skip voided items
             if (selection.voided || selection.voidDate) continue;
@@ -357,12 +364,19 @@ export default async function handler(req, res) {
                 }))
               : [];
 
-            // Build line item
+            // Build line item - try multiple field names for item name
+            const itemName = selection.name ||
+                            selection.displayName ||
+                            selection.itemName ||
+                            selection.menuItemName ||
+                            selection.item?.name ||
+                            'Unknown Item';
+
             const lineItem = {
               order_id: savedOrder.id, // Database ID from saved order
               external_order_id: savedOrder.external_order_id,
               item_guid: selection.itemGuid || selection.guid,
-              item_name: selection.name || 'Unknown Item',
+              item_name: itemName,
               quantity: selection.quantity || 1,
               unit_price: selection.price || 0,
               total_price: (selection.price || 0) * (selection.quantity || 1),
