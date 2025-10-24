@@ -140,7 +140,7 @@ async function generateOrderReceiptPDF(order, lineItems) {
   yPos += 25;
 
   // Delivery/Pickup Information Box
-  const isPickup = order.source_type === 'In Store';
+  const isPickup = !order.delivery_address; // No delivery address = pickup
 
   doc.setFillColor(240, 240, 240);
   doc.rect(40, yPos, 515, 110, 'F');
