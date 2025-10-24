@@ -349,18 +349,25 @@ export default async function handler(req, res) {
             console.log('🔍 DEBUG - First selection structure:');
             console.log('Selection keys:', Object.keys(check.selections[0]));
             console.log('Full selection object:', JSON.stringify(check.selections[0], null, 2));
+
+            // Also log modifiers if they exist
+            if (check.selections[0].modifiers && check.selections[0].modifiers.length > 0) {
+              console.log('🔍 DEBUG - First modifier structure:');
+              console.log('Modifier keys:', Object.keys(check.selections[0].modifiers[0]));
+              console.log('Full modifier object:', JSON.stringify(check.selections[0].modifiers[0], null, 2));
+            }
           }
 
           for (const selection of check.selections) {
             // Skip voided items
             if (selection.voided || selection.voidDate) continue;
 
-            // Extract modifiers
+            // Extract modifiers - try multiple field names
             const modifiers = selection.modifiers && Array.isArray(selection.modifiers)
               ? selection.modifiers.map(mod => ({
-                  name: mod.name,
-                  price: mod.price,
-                  quantity: mod.quantity
+                  name: mod.name || mod.displayName || mod.itemName || mod.modifierName || 'Unknown Modifier',
+                  price: mod.price || 0,
+                  quantity: mod.quantity || 1
                 }))
               : [];
 
@@ -372,14 +379,20 @@ export default async function handler(req, res) {
                             selection.item?.name ||
                             'Unknown Item';
 
+            // CRITICAL: Toast returns TOTAL price in selection.price, NOT unit price!
+            // Calculate unit price by dividing total by quantity
+            const quantity = selection.quantity || 1;
+            const totalPrice = selection.price || 0;
+            const unitPrice = totalPrice / quantity;
+
             const lineItem = {
               order_id: savedOrder.id, // Database ID from saved order
               external_order_id: savedOrder.external_order_id,
               item_guid: selection.itemGuid || selection.guid,
               item_name: itemName,
-              quantity: selection.quantity || 1,
-              unit_price: selection.price || 0,
-              total_price: (selection.price || 0) * (selection.quantity || 1),
+              quantity: quantity,
+              unit_price: unitPrice,  // Calculated from total / quantity
+              total_price: totalPrice,  // selection.price is already the total!
               selection_type: selection.selectionType || 'ITEM',
               modifiers: modifiers.length > 0 ? modifiers : null,
               special_requests: selection.specialRequests || null,
