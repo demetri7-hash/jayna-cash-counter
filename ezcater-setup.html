@@ -356,6 +356,15 @@
         </ul>
       </div>
 
+      <div class="info-box" style="background: #f0fdf4; border-color: #059669;">
+        <h3 style="color: #065f46;">🔍 AUTO-DISCOVER CATERER ID</h3>
+        <p>Don't know your Caterer ID? Click below to automatically discover it using GraphQL introspection:</p>
+        <button id="discoverBtn" class="setup-btn" onclick="discoverCatererId()" style="max-width: 300px; margin: 12px 0;">
+          🔍 FIND MY CATERER ID
+        </button>
+        <div id="discoveryResult" style="margin-top: 12px; display: none;"></div>
+      </div>
+
       <div class="step">
         <div class="step-number">1</div>
         <h4>VERIFY ENVIRONMENT VARIABLES</h4>
@@ -365,7 +374,7 @@ EZCATER_API_TOKEN=your_token_here
 EZCATER_CATERER_ID=your_caterer_id_here
 EZCATER_API_URL=https://api.ezcater.com/graphql
         </div>
-        <p><strong>Finding your Caterer ID:</strong></p>
+        <p><strong>Finding your Caterer ID manually:</strong></p>
         <ul style="margin-left: 20px; margin-top: 8px;">
           <li>Login to <a href="https://manage.ezcater.com/" target="_blank">ezManage</a></li>
           <li>Navigate to Settings → API or Integrations</li>
@@ -461,6 +470,134 @@ SELECT * FROM ezcater_orders ORDER BY created_at DESC LIMIT 5;
   </div>
 
   <script>
+    async function discoverCatererId() {
+      const discoverBtn = document.getElementById('discoverBtn');
+      const discoveryResult = document.getElementById('discoveryResult');
+
+      // Disable button and show loading
+      discoverBtn.disabled = true;
+      discoverBtn.textContent = '🔍 SEARCHING...';
+      discoveryResult.style.display = 'block';
+      discoveryResult.innerHTML = '<div class="spinner" style="margin: 20px auto;"></div><p style="text-align: center;">Searching for caterer ID using GraphQL introspection...</p>';
+
+      try {
+        console.log('🔍 Running caterer ID discovery...');
+
+        const response = await fetch('/api/ezcater-discover-caterer-id', {
+          method: 'GET'
+        });
+
+        const data = await response.json();
+
+        console.log('Discovery result:', data);
+
+        if (!data.success) {
+          throw new Error(data.error || 'Discovery failed');
+        }
+
+        // Display results
+        let resultHTML = '<div style="background: var(--white); border: 2px solid var(--gray-300); padding: 16px;">';
+
+        if (data.catererId) {
+          // SUCCESS - Found caterer ID!
+          resultHTML += `
+            <h4 style="font-size: 14px; font-weight: 700; color: var(--success-text); margin-bottom: 12px; text-transform: uppercase;">
+              ✅ CATERER ID FOUND!
+            </h4>
+            <div style="background: var(--gray-100); border: 2px solid var(--success-border); padding: 12px; margin-bottom: 12px; font-family: monospace; font-size: 14px; font-weight: 700; color: var(--success-text);">
+              ${data.catererId}
+            </div>
+            <p style="margin-bottom: 8px;"><strong>Method:</strong> ${data.recommendation}</p>
+            <p style="margin-bottom: 12px; padding: 12px; background: var(--warning-bg); border: 2px solid var(--warning-border);">
+              <strong>⚠️ IMPORTANT:</strong> Add this caterer ID to your Vercel environment variables as <code>EZCATER_CATERER_ID</code>
+            </p>
+            <ol style="margin-left: 20px; margin-top: 8px;">
+              <li>Go to Vercel Dashboard → Settings → Environment Variables</li>
+              <li>Add variable: <code>EZCATER_CATERER_ID</code></li>
+              <li>Value: <code>${data.catererId}</code></li>
+              <li>Click Save and redeploy</li>
+            </ol>
+          `;
+        } else {
+          // No caterer ID found
+          resultHTML += `
+            <h4 style="font-size: 14px; font-weight: 700; color: var(--warning-text); margin-bottom: 12px; text-transform: uppercase;">
+              ⚠️ CATERER ID NOT FOUND
+            </h4>
+            <p style="margin-bottom: 12px;">The API couldn't automatically discover your caterer ID. Try these manual methods:</p>
+            <ol style="margin-left: 20px; margin-top: 8px;">
+              <li>Login to <a href="https://manage.ezcater.com/" target="_blank">ezManage</a></li>
+              <li>Navigate to Settings → API or Integrations</li>
+              <li>Look for "Caterer ID" or "Restaurant ID"</li>
+              <li>OR contact: <a href="mailto:api_support@ezcater.com">api_support@ezcater.com</a></li>
+            </ol>
+          `;
+        }
+
+        // Show available queries
+        if (data.availableQueries && data.availableQueries.length > 0) {
+          resultHTML += `
+            <details style="margin-top: 16px;">
+              <summary style="cursor: pointer; font-weight: 700; color: var(--gray-700);">
+                🔍 Technical Details (${data.availableQueries.length} queries available)
+              </summary>
+              <div style="background: var(--gray-100); padding: 12px; margin-top: 8px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 11px;">
+                ${data.availableQueries.slice(0, 20).map(q => `
+                  <div style="margin-bottom: 4px;">${q.name}${q.args && q.args.length > 0 ? `(${q.args.join(', ')})` : ''}</div>
+                `).join('')}
+                ${data.availableQueries.length > 20 ? `<div style="margin-top: 8px; font-style: italic;">...and ${data.availableQueries.length - 20} more</div>` : ''}
+              </div>
+            </details>
+          `;
+        }
+
+        // Show attempt results
+        if (data.attemptResults && data.attemptResults.length > 0) {
+          resultHTML += `
+            <details style="margin-top: 12px;">
+              <summary style="cursor: pointer; font-weight: 700; color: var(--gray-700);">
+                📝 Query Attempts (${data.attemptResults.length} tried)
+              </summary>
+              <div style="background: var(--gray-100); padding: 12px; margin-top: 8px; max-height: 300px; overflow-y: auto;">
+                ${data.attemptResults.map(attempt => `
+                  <div style="margin-bottom: 8px; padding: 8px; background: var(--white); border: 1px solid var(--gray-300);">
+                    <div style="font-weight: 700; color: ${attempt.success ? 'var(--success-text)' : 'var(--error-text)'};">
+                      ${attempt.success ? '✅' : '❌'} ${attempt.method}
+                    </div>
+                    ${attempt.success ? `<div style="font-family: monospace; font-size: 11px; margin-top: 4px;">${JSON.stringify(attempt.data)}</div>` : ''}
+                    ${!attempt.success && attempt.error ? `<div style="color: var(--error-text); font-size: 11px; margin-top: 4px;">${attempt.error}</div>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </details>
+          `;
+        }
+
+        resultHTML += '</div>';
+        discoveryResult.innerHTML = resultHTML;
+
+        // Re-enable button
+        discoverBtn.disabled = false;
+        discoverBtn.textContent = '🔍 FIND MY CATERER ID';
+
+      } catch (error) {
+        console.error('❌ Discovery error:', error);
+
+        discoveryResult.innerHTML = `
+          <div style="background: var(--error-bg); border: 2px solid var(--error-border); padding: 16px;">
+            <h4 style="font-size: 14px; font-weight: 700; color: var(--error-text); margin-bottom: 12px; text-transform: uppercase;">
+              ❌ DISCOVERY FAILED
+            </h4>
+            <p style="color: var(--error-text); margin-bottom: 8px;">${error.message}</p>
+            <p style="margin-top: 12px;">Please try finding your caterer ID manually or contact <a href="mailto:api_support@ezcater.com">api_support@ezcater.com</a></p>
+          </div>
+        `;
+
+        discoverBtn.disabled = false;
+        discoverBtn.textContent = '🔍 FIND MY CATERER ID';
+      }
+    }
+
     async function runSetup() {
       const setupBtn = document.getElementById('setupBtn');
       const loadingBox = document.getElementById('loadingBox');
