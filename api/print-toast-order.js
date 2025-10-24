@@ -139,7 +139,9 @@ async function generateOrderReceiptPDF(order, lineItems) {
   doc.text(`Status: ${(order.status || 'CONFIRMED').toUpperCase()}`, 40, yPos);
   yPos += 25;
 
-  // Delivery Information Box
+  // Delivery/Pickup Information Box
+  const isPickup = order.source_type === 'In Store';
+
   doc.setFillColor(240, 240, 240);
   doc.rect(40, yPos, 515, 110, 'F');
   doc.setDrawColor(100, 100, 100);
@@ -148,7 +150,7 @@ async function generateOrderReceiptPDF(order, lineItems) {
   yPos += 20;
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('DELIVERY INFORMATION', 50, yPos);
+  doc.text(isPickup ? 'PICKUP INFORMATION' : 'DELIVERY INFORMATION', 50, yPos);
   yPos += 20;
 
   doc.setFontSize(10);
@@ -166,21 +168,25 @@ async function generateOrderReceiptPDF(order, lineItems) {
     const dueTime = new Date(order.delivery_time);
     const dueTimeStr = dueTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' });
     doc.setFont('helvetica', 'bold');
-    doc.text(`DUE TIME: ${dueTimeStr}`, 50, yPos);
+
+    // For pickup orders, say "PICKUP TIME" instead of "DUE TIME"
+    doc.text(`${isPickup ? 'PICKUP TIME' : 'DUE TIME'}: ${dueTimeStr}`, 50, yPos);
     doc.setFont('helvetica', 'normal');
     yPos += 20;
 
-    // SUGGESTED LEAVE JAYNA AT TIME (20-30 minutes before due time)
-    const leaveTime = new Date(dueTime.getTime() - 25 * 60000); // 25 minutes before
-    const leaveTimeStr = leaveTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' });
-    doc.setFillColor(255, 255, 200); // Light yellow highlight
-    doc.rect(50, yPos - 12, 250, 16, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text(`LEAVE JAYNA AT: ${leaveTimeStr}`, 55, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    yPos += 20;
+    // SUGGESTED LEAVE JAYNA AT TIME (ONLY for deliveries, NOT pickups)
+    if (!isPickup) {
+      const leaveTime = new Date(dueTime.getTime() - 25 * 60000); // 25 minutes before
+      const leaveTimeStr = leaveTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' });
+      doc.setFillColor(255, 255, 200); // Light yellow highlight
+      doc.rect(50, yPos - 12, 250, 16, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text(`LEAVE JAYNA AT: ${leaveTimeStr}`, 55, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      yPos += 20;
+    }
   }
 
   // Customer Name

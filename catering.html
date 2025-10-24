@@ -1163,7 +1163,7 @@
           <div class="order-header">
             <div>
               <div class="order-number">Order #${order.order_number}${sourceSystemBadge}</div>
-              <div class="order-source">${order.source}</div>
+              <div class="order-source">${order.source === 'In Store' ? 'CATERING PICK UP' : order.source}</div>
             </div>
             <div class="order-status ${statusClass}">${statusLabel}</div>
           </div>
@@ -1873,10 +1873,15 @@
                     ORDER ${order.order_number || 'N/A'}
                   </h2>
                   <div style="font-size: 13px; color: var(--gray-600);">
-                    ${order.source_type} - ${order.status?.toUpperCase() || 'CONFIRMED'}
+                    ${order.source_type === 'In Store' ? 'CATERING PICK UP' : order.source_type} - ${order.status?.toUpperCase() || 'CONFIRMED'}
                   </div>
                 </div>
-                <div style="display: flex; gap: 12px;">
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                  ${order.status !== 'completed' && order.status !== 'delivered' ? `
+                  <button onclick="markOrderAsCompleted(event, ${order.id})" style="background: var(--success); border: 2px solid var(--success); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                    ✓ MARK AS COMPLETED
+                  </button>
+                  ` : ''}
                   <button onclick="printToastOrder(event, ${order.id})" style="background: var(--primary-blue); border: 2px solid var(--primary-blue); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
                     PRINT ORDER
                   </button>
@@ -1898,10 +1903,10 @@
               </div>
               ` : ''}
 
-              <!-- Delivery Info -->
+              <!-- Delivery/Pickup Info -->
               ${order.delivery_date || order.delivery_time ? `
               <div style="margin-bottom: 24px; padding: 16px; background: var(--blue-bg); border: 2px solid var(--primary-blue);">
-                <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--primary-blue);">DELIVERY DETAILS</h3>
+                <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--primary-blue);">${order.source_type === 'In Store' ? 'PICK UP DETAILS' : 'DELIVERY DETAILS'}</h3>
                 ${order.delivery_date ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Date:</strong> ${new Date(order.delivery_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>` : ''}
                 ${order.delivery_time ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Time:</strong> ${new Date(order.delivery_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>` : ''}
                 ${order.delivery_notes ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Notes:</strong> ${order.delivery_notes}</div>` : ''}
@@ -1988,6 +1993,45 @@
         if (modal) {
           modal.remove();
         }
+      }
+    }
+
+    // Mark order as completed
+    async function markOrderAsCompleted(event, orderId) {
+      try {
+        console.log(`✅ Marking order ${orderId} as completed...`);
+        showLoading('UPDATING ORDER', 'Marking as completed...');
+
+        const response = await fetch('/api/update-catering-order-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            order_id: orderId,
+            status: 'completed'
+          })
+        });
+
+        const result = await response.json();
+        hideLoading();
+
+        if (!result.success) {
+          showMessage(`Failed to update order: ${result.error}`, 'error');
+          return;
+        }
+
+        console.log('✅ Order marked as completed');
+        showMessage('✅ Order marked as completed!', 'success');
+
+        // Close modal and reload orders
+        closeToastOrderModal();
+        await loadOrders();
+
+      } catch (error) {
+        hideLoading();
+        console.error('❌ Error marking order as completed:', error);
+        showMessage(`Error: ${error.message}`, 'error');
       }
     }
 
