@@ -474,6 +474,30 @@
       box-shadow: 0 4px 12px rgba(220, 38, 38, 0.5);
     }
 
+    /* Completed Button */
+    .completed-btn {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      background: rgba(0, 200, 83, 0.9);
+      color: white;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+      z-index: 10;
+      border: 2px solid white;
+    }
+    .completed-btn:hover {
+      background: rgba(0, 150, 63, 1);
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0, 200, 83, 0.5);
+    }
+
     /* Reorder Arrow Buttons */
     .reorder-controls {
       position: absolute;
@@ -660,7 +684,14 @@
 
       <!-- PHOTOS Tab (DEFAULT) -->
       <div id="photosTab" class="tab-content active">
-        <div style="background: var(--gray-100); border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 20px;">
+        <!-- Collapsible Upload Form -->
+        <div style="margin-bottom: 20px;">
+          <a href="javascript:void(0)" onclick="toggleUploadForm()" style="color: var(--primary-blue); font-size: 14px; font-weight: 600; text-decoration: underline; cursor: pointer; display: inline-block;">
+            <span id="uploadFormToggleText">+ Add an Order</span>
+          </a>
+        </div>
+
+        <div id="uploadFormContainer" style="display: none; background: var(--gray-100); border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 20px;">
           <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; color: var(--gray-900);">UPLOAD ORDER PHOTO</h3>
 
           <!-- Order Type -->
@@ -729,6 +760,12 @@
               <label for="specialNotes" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">SPECIAL NOTES</label>
               <textarea id="specialNotes" placeholder="Special instructions, dietary restrictions, etc." rows="3" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box; resize: vertical;"></textarea>
             </div>
+
+            <!-- Actual Order (Optional) -->
+            <div style="margin-bottom: 16px;">
+              <label for="actualOrder" style="display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--gray-700);">ACTUAL ORDER (OPTIONAL)</label>
+              <textarea id="actualOrder" placeholder="Type the actual order details here..." rows="4" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box; resize: vertical;"></textarea>
+            </div>
           </div>
 
           <!-- Photo Selection -->
@@ -736,7 +773,7 @@
           <button onclick="document.getElementById('photoInput').click()" class="refresh-btn" style="margin: 0; background: var(--primary-blue); border-color: var(--primary-blue);">
             SELECT PHOTO
           </button>
-        </div>
+        </div>  <!-- Close uploadFormContainer -->
 
         <!-- Edit Mode Controls -->
         <div style="display: flex; gap: 12px; margin-bottom: 20px;">
@@ -1453,15 +1490,16 @@
       try {
         console.log('📸 Loading catering photos...');
 
-        const response = await fetch('/api/catering-photos-get');
+        const response = await fetch('/api/catering-photos-get?archived=false');
         const data = await response.json();
 
         if (!data.success) {
           throw new Error(data.error || 'Failed to load photos');
         }
 
-        allPhotos = data.data || [];
-        console.log(`✅ Loaded ${allPhotos.length} photos`);
+        // Filter out archived photos (only show active orders in PHOTOS tab)
+        allPhotos = (data.data || []).filter(photo => !photo.archived);
+        console.log(`✅ Loaded ${allPhotos.length} active photos`);
 
         renderPhotos();
       } catch (error) {
@@ -1571,6 +1609,11 @@
                 </div>
                 ` : ''}
               </div>
+
+              <!-- Completed Button (bottom right) -->
+              <button class="completed-btn" onclick="archivePhoto(${photo.id}); event.stopPropagation();">
+                COMPLETED
+              </button>
 
               <!-- Enhancement Controls (bottom section) -->
               <div class="enhancement-controls ${controlsVisibleClass}">
@@ -1682,6 +1725,7 @@
         const email = document.getElementById('email')?.value || null;
         const deliveryAddress = document.getElementById('deliveryAddress')?.value || null;
         const specialNotes = document.getElementById('specialNotes')?.value || null;
+        const actualOrder = document.getElementById('actualOrder')?.value || null;
 
         // Validate required fields
         if (!orderTypePickup?.checked && !orderTypeDelivery?.checked) {
@@ -1731,7 +1775,8 @@
             phoneNumber,
             email,
             deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress : null,
-            specialNotes
+            specialNotes,
+            actualOrder
           })
         });
 
@@ -1766,6 +1811,7 @@
         document.getElementById('email').value = '';
         document.getElementById('deliveryAddress').value = '';
         document.getElementById('specialNotes').value = '';
+        document.getElementById('actualOrder').value = '';
         toggleDeliveryField();
 
         // Wait a moment for user to see success message, then reload photos
@@ -2032,6 +2078,168 @@
     }
 
     // ============================================
+    // UPLOAD FORM TOGGLE
+    // ============================================
+    function toggleUploadForm() {
+      const formContainer = document.getElementById('uploadFormContainer');
+      const toggleText = document.getElementById('uploadFormToggleText');
+
+      if (formContainer.style.display === 'none') {
+        formContainer.style.display = 'block';
+        toggleText.textContent = '- Hide Form';
+      } else {
+        formContainer.style.display = 'none';
+        toggleText.textContent = '+ Add an Order';
+      }
+    }
+
+    // ============================================
+    // ARCHIVE PHOTO FUNCTIONS
+    // ============================================
+    async function archivePhoto(photoId) {
+      try {
+        console.log(`📦 Archiving photo ${photoId}...`);
+
+        const response = await fetch('/api/catering-photos-archive', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            photoId,
+            archived: true
+          })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to archive photo');
+        }
+
+        console.log('✅ Photo archived');
+
+        // Reload photos to remove archived order from main view
+        await loadPhotos();
+      } catch (error) {
+        console.error('Error archiving photo:', error);
+        alert(`Error archiving photo: ${error.message}`);
+      }
+    }
+
+    // ============================================
+    // LOAD ARCHIVED PHOTOS FOR PAST TAB
+    // ============================================
+    async function loadArchivedPhotos() {
+      const container = document.getElementById('pastTab');
+
+      try {
+        console.log('📦 Loading archived catering photos...');
+
+        const response = await fetch('/api/catering-photos-get?archived=true');
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load archived photos');
+        }
+
+        const archivedPhotos = data.data || [];
+        console.log(`✅ Loaded ${archivedPhotos.length} archived photos`);
+
+        if (archivedPhotos.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">📦</div>
+              <div class="empty-title">No Archived Orders</div>
+              <div class="empty-message">Completed orders will appear here for historical records</div>
+            </div>
+          `;
+          return;
+        }
+
+        // Group archived photos by date
+        const photosByDate = {};
+        archivedPhotos.forEach(photo => {
+          const date = photo.order_due_date || 'NO DATE';
+          if (!photosByDate[date]) {
+            photosByDate[date] = [];
+          }
+          photosByDate[date].push(photo);
+        });
+
+        // Sort dates (most recent first for archived)
+        const sortedDates = Object.keys(photosByDate).sort((a, b) => {
+          if (a === 'NO DATE') return 1;
+          if (b === 'NO DATE') return -1;
+          return new Date(b) - new Date(a); // Reverse order for past
+        });
+
+        // Build HTML
+        let html = '<div style="padding: 12px;">';
+        sortedDates.forEach(date => {
+          const photos = photosByDate[date];
+          const dateLabel = formatPhotoDateLabel(date);
+
+          html += `
+            <div class="photo-date-group">
+              <div class="photo-date-header">${dateLabel} (COMPLETED)</div>
+              <div class="photo-thumbnails-grid">
+          `;
+
+          photos.forEach(photo => {
+            const brightness = photo.brightness || 100;
+            const contrast = photo.contrast || 100;
+            const filterStyle = `filter: brightness(${brightness}%) contrast(${contrast}%);`;
+            const timeDue = formatTimeDisplay(photo.time_due);
+            const leaveJaynaAt = photo.order_type === 'DELIVERY' ? formatTimeDisplay(photo.leave_jayna_at) : null;
+
+            html += `
+              <div class="photo-item" data-id="${photo.id}">
+                <img src="${photo.image_url}"
+                     alt="Catering Order"
+                     class="photo-img"
+                     style="${filterStyle} cursor: pointer;"
+                     onclick="openLightbox('${photo.image_url}', ${brightness}, ${contrast})">
+
+                <div class="photo-metadata">
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">TYPE:</span>
+                    <span class="photo-metadata-value">${photo.order_type || 'N/A'}</span>
+                  </div>
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">TIME DUE:</span>
+                    <span class="photo-metadata-value">${timeDue}</span>
+                  </div>
+                  ${leaveJaynaAt ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">LEAVE AT:</span>
+                    <span class="photo-metadata-value">${leaveJaynaAt}</span>
+                  </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          });
+
+          html += `
+              </div>
+            </div>
+          `;
+        });
+        html += '</div>';
+
+        container.innerHTML = html;
+      } catch (error) {
+        console.error('Error loading archived photos:', error);
+        container.innerHTML = `
+          <div class="error-message">
+            ❌ Error loading archived photos: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    // ============================================
     // INITIALIZATION
     // ============================================
     document.addEventListener('DOMContentLoaded', () => {
@@ -2043,6 +2251,9 @@
       // Load orders for Beta tab (but don't show loading state on Photos tab)
       console.log('📂 Pre-loading orders for Beta tab...');
       loadOrdersFromDatabase();
+
+      // Load archived photos for Past tab
+      loadArchivedPhotos();
 
       // Start background sync
       startBackgroundSync();

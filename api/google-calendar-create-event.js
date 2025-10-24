@@ -37,7 +37,8 @@ export default async function handler(req, res) {
       phoneNumber,
       email,
       deliveryAddress,
-      specialNotes
+      specialNotes,
+      actualOrder
     } = req.body;
 
     // Validate required fields
@@ -95,6 +96,7 @@ Due: ${orderDueDate} at ${timeDue}
 ${orderType === 'DELIVERY' ? `Leave Jayna: ${leaveJaynaAt}\n` : ''}
 
 ${guestName || phoneNumber || email || deliveryAddress ? `\n👤 Customer Information\n` : ''}${guestName ? `Name: ${guestName}\n` : ''}${phoneNumber ? `Phone: ${phoneNumber}\n` : ''}${email ? `Email: ${email}\n` : ''}${deliveryAddress ? `Address: ${deliveryAddress}\n` : ''}
+${actualOrder ? `\n📋 Actual Order:\n${actualOrder}\n` : ''}
 ${specialNotes ? `\n📝 Special Notes:\n${specialNotes}\n` : ''}
 ${imageUrl ? `\n📸 Order Photo: ${imageUrl}` : '\nNo photo available'}
     `.trim();

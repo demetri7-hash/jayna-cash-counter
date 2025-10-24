@@ -56,7 +56,8 @@ export default async function handler(req, res) {
       phoneNumber,
       email,
       deliveryAddress,
-      specialNotes
+      specialNotes,
+      actualOrder
     } = req.body;
 
     if (!imageData) {
@@ -202,7 +203,8 @@ export default async function handler(req, res) {
           phoneNumber,
           email,
           deliveryAddress,
-          specialNotes
+          specialNotes,
+          actualOrder
         })
       });
 
@@ -237,6 +239,7 @@ export default async function handler(req, res) {
         email: email,
         delivery_address: orderType === 'DELIVERY' ? deliveryAddress : null,
         special_notes: specialNotes,
+        actual_order: actualOrder,
         calendar_event_id: calendarEventId
       })
       .select()
