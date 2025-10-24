@@ -1974,33 +1974,66 @@
       <div style="display: grid; gap: 16px;">
     `;
 
+    // Get current Pacific time for expiration check
+    const now = new Date();
+    const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    const currentHour = pacificTime.getHours();
+    const currentMinute = pacificTime.getMinutes();
+    const currentTimeInMinutes = (currentHour * 60) + currentMinute;
+
     availableChecklists.forEach(checklist => {
+      // Check if checklist time window has expired
+      let isExpired = false;
+      if (checklist.end_hour !== undefined && checklist.end_minute !== undefined) {
+        const endTimeInMinutes = (checklist.end_hour * 60) + (checklist.end_minute || 0);
+
+        // Handle overnight time ranges (e.g., 22:00 to 02:00)
+        if (checklist.end_hour < checklist.start_hour) {
+          // Overnight range - expired if we're past end time but before start time
+          isExpired = currentTimeInMinutes >= endTimeInMinutes && currentTimeInMinutes < (checklist.start_hour * 60);
+        } else {
+          // Same-day range - expired if we're past end time
+          isExpired = currentTimeInMinutes >= endTimeInMinutes;
+        }
+      }
+
+      // Different styling for expired vs active checklists
+      const cardStyle = isExpired
+        ? `background: var(--gray-100); border: 2px solid var(--gray-300); padding: 20px; cursor: not-allowed; opacity: 0.6; transition: all 0.15s ease; border-radius: 0;`
+        : `background: white; border: 2px solid var(--gray-300); padding: 20px; cursor: pointer; transition: all 0.15s ease; border-radius: 0;`;
+
+      const hoverEvents = isExpired
+        ? ``
+        : `onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';" onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';"`;
+
+      const clickEvent = isExpired ? `` : `onclick="selectChecklist('${checklist.type}')"`;
+
+      const titleColor = isExpired ? 'var(--gray-500)' : 'var(--gray-900)';
+      const badgeStyle = isExpired
+        ? `background: var(--gray-400); color: white; padding: 4px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; border-radius: 0;`
+        : `background: var(--gray-700); color: white; padding: 4px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; border-radius: 0;`;
+
+      const timeBoxStyle = isExpired
+        ? `margin: 0 0 16px 0; padding: 12px; background: var(--gray-200); border-left: 4px solid var(--gray-400);`
+        : `margin: 0 0 16px 0; padding: 12px; background: var(--light-blue); border-left: 4px solid var(--primary-blue);`;
+
+      const timeTextColor = isExpired ? 'var(--gray-500)' : 'var(--primary-blue)';
+
       html += `
-        <div style="
-          background: white;
-          border: 2px solid var(--gray-300);
-          padding: 20px;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          border-radius: 0;
-        "
-        onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';"
-        onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';"
-        onclick="selectChecklist('${checklist.type}')">
+        <div style="${cardStyle}" ${hoverEvents} ${clickEvent}>
+          ${isExpired ? `
+          <div style="margin-bottom: 12px; padding: 8px 12px; background: var(--gray-200); border-left: 4px solid var(--gray-500);">
+            <p style="margin: 0; font-size: 12px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.8px;">
+              ⏱️ TIME WINDOW EXPIRED
+            </p>
+          </div>
+          ` : ''}
 
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: ${titleColor}; text-transform: uppercase; letter-spacing: 1px;">
               ${checklist.title}
             </h3>
-            <span style="
-              background: var(--gray-700);
-              color: white;
-              padding: 4px 10px;
-              font-size: 11px;
-              font-weight: 700;
-              letter-spacing: 0.5px;
-              border-radius: 0;
-            ">${checklist.timeRange}</span>
+            <span style="${badgeStyle}">${checklist.timeRange}</span>
           </div>
 
           <p style="margin: 0 0 12px 0; font-size: 13px; color: var(--gray-600); line-height: 1.5;">
@@ -2008,8 +2041,8 @@
           </p>
 
           ${checklist.start_hour !== undefined && checklist.end_hour !== undefined ? `
-          <div style="margin: 0 0 16px 0; padding: 12px; background: var(--light-blue); border-left: 4px solid var(--primary-blue);">
-            <p style="margin: 0; font-size: 13px; font-weight: 700; color: var(--primary-blue); text-transform: uppercase; letter-spacing: 0.8px; line-height: 1.4;">
+          <div style="${timeBoxStyle}">
+            <p style="margin: 0; font-size: 13px; font-weight: 700; color: ${timeTextColor}; text-transform: uppercase; letter-spacing: 0.8px; line-height: 1.4;">
               ⏰ COMPLETE THIS CHECKLIST FROM ${formatTimeWindow(checklist.start_hour, checklist.start_minute || 0, checklist.end_hour, checklist.end_minute || 0)}
             </p>
           </div>
