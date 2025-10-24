@@ -1688,8 +1688,74 @@
     staffName: '',
     staffName2: '',
     allChecklists: {}, // Will be populated on page load
-    reviewMode: false // Set to true when viewing from REVIEW tab (skips time window check)
+    reviewMode: false, // Set to true when viewing from REVIEW tab (skips time window check)
+    // Multi-user support
+    teamNames: [], // Array of {name: string, color: string}
+    activeUserIndex: 0, // Index of currently active user
+    activeUserTimeout: null // Timeout to reset to default user after 1 minute
   };
+
+  // Color palette for team members
+  const USER_COLORS = [
+    '#0094D6', // Blue
+    '#00C853', // Green
+    '#FFB300', // Orange
+    '#9C27B0', // Purple
+    '#F44336', // Red
+    '#00BCD4', // Cyan
+    '#FF9800', // Deep Orange
+    '#4CAF50'  // Lime Green
+  ];
+
+  /**
+   * Get color for user by index
+   */
+  function getUserColor(index) {
+    return USER_COLORS[index % USER_COLORS.length];
+  }
+
+  /**
+   * Set active user with 1-minute timeout
+   */
+  function setActiveUser(index) {
+    fohSystemState.activeUserIndex = index;
+
+    // Clear existing timeout
+    if (fohSystemState.activeUserTimeout) {
+      clearTimeout(fohSystemState.activeUserTimeout);
+    }
+
+    // Set new timeout to reset to first user after 1 minute
+    fohSystemState.activeUserTimeout = setTimeout(() => {
+      fohSystemState.activeUserIndex = 0;
+      console.log('⏰ User timeout - reset to default user');
+    }, 60000); // 1 minute
+  }
+
+  /**
+   * Cycle to next user
+   */
+  function cycleToNextUser() {
+    if (fohSystemState.teamNames.length === 0) return;
+    const nextIndex = (fohSystemState.activeUserIndex + 1) % fohSystemState.teamNames.length;
+    setActiveUser(nextIndex);
+  }
+
+  /**
+   * Get active user name
+   */
+  function getActiveUserName() {
+    if (fohSystemState.teamNames.length === 0) return fohSystemState.staffName || 'Unknown';
+    return fohSystemState.teamNames[fohSystemState.activeUserIndex]?.name || fohSystemState.staffName;
+  }
+
+  /**
+   * Get active user color
+   */
+  function getActiveUserColor() {
+    if (fohSystemState.teamNames.length === 0) return getUserColor(0);
+    return fohSystemState.teamNames[fohSystemState.activeUserIndex]?.color || getUserColor(0);
+  }
 
   /**
    * Initialize FOH System - Load ALL checklists from database (including custom ones)
@@ -2233,7 +2299,7 @@
   }
 
   /**
-   * Render Staff Name Input Screen (for new sessions)
+   * Render Staff Name Input Screen (for new sessions) - DYNAMIC MULTI-USER
    */
   function renderStaffNameInput() {
     const container = document.getElementById('fohWorkflowContent');
@@ -2258,89 +2324,50 @@
 
         <div style="margin-bottom: 24px;">
           <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
-            ${checklist.staff_count > 1 ? `Team Members (up to ${checklist.staff_count})` : 'Your Name'} *
+            Team Members *
           </label>
 
-          <!-- Staff 1 (required) -->
-          <input
-            type="text"
-            id="fohStaffName"
-            value="${savedUsername}"
-            placeholder="Staff Member 1 (required)"
-            style="
-              width: 100%;
-              padding: 14px;
-              border: 2px solid var(--gray-300);
-              border-radius: 0;
-              font-size: 14px;
-              box-sizing: border-box;
-              margin-bottom: ${checklist.staff_count > 1 ? '12px' : '0'};
-            "
-            onfocus="this.style.borderColor='var(--gray-700)'"
-            onblur="this.style.borderColor='var(--gray-300)'"
-          />
+          <div id="nameInputsContainer">
+            <!-- Initial name input -->
+            <div class="name-input-row" data-index="0" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <div style="width: 16px; height: 16px; border-radius: 50%; background: ${getUserColor(0)}; flex-shrink: 0;"></div>
+              <input
+                type="text"
+                class="staff-name-input"
+                data-index="0"
+                value="${savedUsername}"
+                placeholder="Team Member 1 (required)"
+                style="
+                  flex: 1;
+                  padding: 14px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+                onfocus="this.style.borderColor='var(--gray-700)'"
+                onblur="this.style.borderColor='var(--gray-300)'"
+              />
+            </div>
+          </div>
 
-          ${checklist.staff_count >= 2 ? `
-          <!-- Staff 2 (optional for multi-user) -->
-          <input
-            type="text"
-            id="fohStaffName2"
-            placeholder="Staff Member 2 (optional)"
-            style="
-              width: 100%;
-              padding: 14px;
-              border: 2px solid var(--gray-300);
-              border-radius: 0;
-              font-size: 14px;
-              box-sizing: border-box;
-              margin-bottom: ${checklist.staff_count > 2 ? '12px' : '0'};
-            "
-            onfocus="this.style.borderColor='var(--gray-700)'"
-            onblur="this.style.borderColor='var(--gray-300)'"
-          />
-          ` : ''}
+          <!-- +Add Name link -->
+          <div style="margin-top: 8px;">
+            <a href="javascript:void(0)"
+               onclick="addNameInput()"
+               style="
+                 color: var(--primary-blue);
+                 font-size: 12px;
+                 font-weight: 600;
+                 text-decoration: underline;
+                 cursor: pointer;
+               ">
+              + Add Name
+            </a>
+          </div>
 
-          ${checklist.staff_count >= 3 ? `
-          <!-- Staff 3 (optional for multi-user) -->
-          <input
-            type="text"
-            id="fohStaffName3"
-            placeholder="Staff Member 3 (optional)"
-            style="
-              width: 100%;
-              padding: 14px;
-              border: 2px solid var(--gray-300);
-              border-radius: 0;
-              font-size: 14px;
-              box-sizing: border-box;
-              margin-bottom: ${checklist.staff_count > 3 ? '12px' : '0'};
-            "
-            onfocus="this.style.borderColor='var(--gray-700)'"
-            onblur="this.style.borderColor='var(--gray-300)'"
-          />
-          ` : ''}
-
-          ${checklist.staff_count >= 4 ? `
-          <!-- Staff 4 (optional for multi-user) -->
-          <input
-            type="text"
-            id="fohStaffName4"
-            placeholder="Staff Member 4 (optional)"
-            style="
-              width: 100%;
-              padding: 14px;
-              border: 2px solid var(--gray-300);
-              border-radius: 0;
-              font-size: 14px;
-              box-sizing: border-box;
-            "
-            onfocus="this.style.borderColor='var(--gray-700)'"
-            onblur="this.style.borderColor='var(--gray-300)'"
-          />
-          ` : ''}
-
-          <p style="margin: 8px 0 0 0; font-size: 11px; color: var(--gray-500);">
-            ${checklist.staff_count > 1 ? `At least one team member name is required. Add up to ${checklist.staff_count} members.` : 'Your name will be saved and used for all your actions in this checklist'}
+          <p style="margin: 12px 0 0 0; font-size: 11px; color: var(--gray-500);">
+            Add team members who will be using this shared device. Each member gets a color for easy identification.
           </p>
         </div>
 
@@ -2400,10 +2427,80 @@
   }
 
   /**
-   * Start Checklist Session - Create session in database
+   * Add Name Input - Dynamically add another team member input
+   */
+  function addNameInput() {
+    const container = document.getElementById('nameInputsContainer');
+    const currentCount = container.querySelectorAll('.name-input-row').length;
+
+    if (currentCount >= 8) {
+      showMessage('Maximum 8 team members allowed', 'error');
+      return;
+    }
+
+    const index = currentCount;
+    const color = getUserColor(index);
+
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'name-input-row';
+    rowDiv.setAttribute('data-index', index);
+    rowDiv.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 12px;';
+
+    // Color dot
+    const colorDot = document.createElement('div');
+    colorDot.style.cssText = `width: 16px; height: 16px; border-radius: 50%; background: ${color}; flex-shrink: 0;`;
+    rowDiv.appendChild(colorDot);
+
+    // Name input
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'staff-name-input';
+    nameInput.setAttribute('data-index', index);
+    nameInput.placeholder = `Team Member ${index + 1} (optional)`;
+    nameInput.style.cssText = 'flex: 1; padding: 14px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; box-sizing: border-box;';
+    nameInput.onfocus = function() { this.style.borderColor = 'var(--gray-700)'; };
+    nameInput.onblur = function() { this.style.borderColor = 'var(--gray-300)'; };
+    rowDiv.appendChild(nameInput);
+
+    container.appendChild(rowDiv);
+
+    // Focus new input
+    setTimeout(() => nameInput.focus(), 100);
+  }
+
+  /**
+   * Start Checklist Session - Create session in database (UPDATED FOR MULTI-USER)
    */
   async function startChecklistSession() {
-    const staffName = document.getElementById('fohStaffName').value.trim();
+    // Collect all names from inputs
+    const nameInputs = document.querySelectorAll('.staff-name-input');
+    const names = [];
+
+    nameInputs.forEach((input, index) => {
+      const name = input.value.trim();
+      if (name) {
+        names.push({
+          name: name,
+          color: getUserColor(index)
+        });
+      }
+    });
+
+    if (names.length === 0) {
+      showMessage('Please enter at least one team member name', 'error');
+      return;
+    }
+
+    // Store team names in state
+    fohSystemState.teamNames = names;
+    fohSystemState.activeUserIndex = 0; // Start with first user
+    fohSystemState.staffName = names[0].name; // Primary name for compatibility
+
+    // Save first name to localStorage for next time
+    localStorage.setItem('foh_username', names[0].name);
+
+    // Original logic continues below...
+    const staffName = names[0].name; // Use first name for session creation
 
     if (!staffName) {
       showMessage('Please enter your name!', 'error');
@@ -3122,12 +3219,34 @@
               ` : ''}
             </div>
             ${isChecked && taskRecord && taskRecord.completed_by ? `
-              <div style="font-size: 11px; color: var(--gray-600); margin-top: 4px; font-style: italic;">
-                ✓ ${taskRecord.completed_by} • ${formatPacificDateDisplay(new Date(taskRecord.completed_at), {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                })}
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--gray-600); margin-top: 4px; font-style: italic; flex-wrap: wrap;">
+                <!-- Color dot for user -->
+                ${(() => {
+                  const userIndex = fohSystemState.teamNames.findIndex(u => u.name === taskRecord.completed_by);
+                  const userColor = userIndex >= 0 ? fohSystemState.teamNames[userIndex].color : getUserColor(0);
+                  return `<div style="width: 12px; height: 12px; border-radius: 50%; background: ${userColor}; flex-shrink: 0;"></div>`;
+                })()}
+                <span>
+                  ✓ ${taskRecord.completed_by} • ${formatPacificDateDisplay(new Date(taskRecord.completed_at), {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
+                </span>
+                ${!fohSystemState.reviewMode && fohSystemState.teamNames.length > 1 ? `
+                  <a href="javascript:void(0)"
+                     onclick="event.stopPropagation(); changeTaskUser('${taskRecord.id}')"
+                     style="
+                       color: var(--primary-blue);
+                       font-size: 11px;
+                       font-weight: 600;
+                       text-decoration: underline;
+                       cursor: pointer;
+                       font-style: normal;
+                     ">
+                    change
+                  </a>
+                ` : ''}
               </div>
             ` : ''}
 
@@ -3337,14 +3456,19 @@
   }
 
   /**
-   * Toggle Task Completion - Auto-save to database
+   * Toggle Task Completion - Auto-save to database (MULTI-USER ENABLED)
    */
   async function toggleTask(taskId) {
     const taskRecord = fohSystemState.tasks.find(t => t.id === taskId);
     if (!taskRecord) return;
 
     const newStatus = !taskRecord.is_completed;
-    const staffName = fohSystemState.staffName;
+    const staffName = getActiveUserName(); // Use active user
+
+    // Reset timeout on any action
+    if (fohSystemState.teamNames.length > 0) {
+      setActiveUser(fohSystemState.activeUserIndex);
+    }
 
     try {
       const updateData = {
@@ -3379,6 +3503,51 @@
 
     } catch (error) {
       console.error('Error toggling task:', error);
+      showMessage(`Error updating task: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Change Task User - Cycle through team members for a completed task
+   */
+  async function changeTaskUser(taskId) {
+    const taskRecord = fohSystemState.tasks.find(t => t.id === taskId);
+    if (!taskRecord || !taskRecord.is_completed) return;
+
+    if (fohSystemState.teamNames.length === 0) return;
+
+    // Find current user index
+    const currentUserIndex = fohSystemState.teamNames.findIndex(u => u.name === taskRecord.completed_by);
+
+    // Cycle to next user
+    const nextUserIndex = (currentUserIndex + 1) % fohSystemState.teamNames.length;
+    const nextUser = fohSystemState.teamNames[nextUserIndex];
+
+    try {
+      // Update task in database
+      const { error } = await supabase
+        .from('foh_checklist_tasks')
+        .update({
+          completed_by: nextUser.name,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      // Update local state
+      taskRecord.completed_by = nextUser.name;
+
+      // Set this as active user
+      setActiveUser(nextUserIndex);
+
+      // Re-render checklist to show new user
+      renderChecklist();
+
+      console.log(`✏️ Changed task user to: ${nextUser.name}`);
+
+    } catch (error) {
+      console.error('Error changing task user:', error);
       showMessage(`Error updating task: ${error.message}`, 'error');
     }
   }
