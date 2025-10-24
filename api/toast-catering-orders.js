@@ -7,6 +7,7 @@
  * - "Invoice"
  * - "Catering"
  * - "Catering Online Ordering"
+ * - "Catering Pick Up"
  *
  * OPTIMIZATIONS (Oct 2025):
  * - Full pagination support (fetches ALL orders, not just first 100)
@@ -135,7 +136,8 @@ export default async function handler(req, res) {
               const isCatering =
                 order.source === 'Invoice' ||
                 order.source === 'Catering' ||
-                order.source === 'Catering Online Ordering';
+                order.source === 'Catering Online Ordering' ||
+                order.source === 'Catering Pick Up';
 
               // Exclude voided/deleted orders
               const isValid = !order.voided && !order.deleted;
