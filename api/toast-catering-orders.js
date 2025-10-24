@@ -150,9 +150,9 @@ export default async function handler(req, res) {
               // - deliveryInfo object exists (catering pickup has delivery details)
               // - promisedDate exists (scheduled/catering orders have expected time)
               // - diningOption contains "CATERING"
-              const hasDeliveryInfo = order.deliveryInfo && Object.keys(order.deliveryInfo).length > 0;
+              const hasDeliveryInfo = order.deliveryInfo && typeof order.deliveryInfo === 'object' && Object.keys(order.deliveryInfo).length > 0;
               const hasPromisedDate = !!order.promisedDate;
-              const hasCateringDiningOption = order.diningOption && order.diningOption.toLowerCase().includes('catering');
+              const hasCateringDiningOption = order.diningOption && typeof order.diningOption === 'string' && order.diningOption.toLowerCase().includes('catering');
 
               const isCateringPickup = order.source === 'In Store' && (
                 hasDeliveryInfo || hasPromisedDate || hasCateringDiningOption
