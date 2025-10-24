@@ -13766,6 +13766,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       return;
     }
 
+    // Load locations first
+    await loadPrepLocations();
+
     const selectedItems = orderingSystemState.items.filter(item =>
       selectedItemsForBulkEdit.has(item.id)
     );
@@ -13958,8 +13961,147 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       checkboxSection.appendChild(createCheckbox(`line-cooks-${item.id}`, 'Line Cooks', item.lineCooksPrep, 'line_cooks_prep'));
       checkboxSection.appendChild(createCheckbox(`not-daily-${item.id}`, 'Not Daily', item.notMadeDaily, 'not_made_daily'));
       checkboxSection.appendChild(createCheckbox(`bottle-${item.id}`, 'Bottle Count', item.showInBottleCount, 'show_in_bottle_count'));
-      
+
       itemCard.appendChild(checkboxSection);
+
+      // Add Multiple Locations section
+      const multiLocSection = document.createElement('div');
+      multiLocSection.style.cssText = 'margin-top: 12px; padding-top: 12px; border-top: 2px solid var(--gray-300);';
+
+      const multiLocCheckbox = createCheckbox(`multi-loc-${item.id}`, 'Multiple Locations', item.hasMultipleLocations, 'has_multiple_locations');
+      multiLocCheckbox.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;';
+      multiLocSection.appendChild(multiLocCheckbox);
+
+      // Location dropdowns container (initially hidden if not multi-location)
+      const locationsContainer = document.createElement('div');
+      locationsContainer.id = `locations-container-${item.id}`;
+      locationsContainer.style.cssText = item.hasMultipleLocations ? 'display: block;' : 'display: none;';
+
+      // Get existing locations for this item
+      const existingLocations = Object.keys(item.locationCounts || {});
+
+      // Location 1
+      const loc1Div = document.createElement('div');
+      loc1Div.style.cssText = 'margin-bottom: 8px;';
+      const loc1Label = document.createElement('label');
+      loc1Label.textContent = 'Location 1:';
+      loc1Label.style.cssText = 'display: block; font-size: 10px; font-weight: 600; color: var(--gray-600); margin-bottom: 4px;';
+      const loc1Select = document.createElement('select');
+      loc1Select.id = `bulk-loc1-${item.id}`;
+      loc1Select.dataset.itemId = item.id;
+      loc1Select.dataset.locationNum = '1';
+      loc1Select.style.cssText = 'width: 100%; padding: 6px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px;';
+      loc1Select.innerHTML = '<option value="">Select location...</option><option value="__add_new__">+ Add New</option>';
+      const loc1Input = document.createElement('input');
+      loc1Input.type = 'text';
+      loc1Input.id = `bulk-loc1-input-${item.id}`;
+      loc1Input.placeholder = 'Enter new location';
+      loc1Input.style.cssText = 'display: none; width: 100%; padding: 6px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; margin-top: 4px;';
+      loc1Div.appendChild(loc1Label);
+      loc1Div.appendChild(loc1Select);
+      loc1Div.appendChild(loc1Input);
+      locationsContainer.appendChild(loc1Div);
+
+      // Location 2
+      const loc2Div = document.createElement('div');
+      loc2Div.style.cssText = 'margin-bottom: 8px;';
+      const loc2Label = document.createElement('label');
+      loc2Label.textContent = 'Location 2:';
+      loc2Label.style.cssText = 'display: block; font-size: 10px; font-weight: 600; color: var(--gray-600); margin-bottom: 4px;';
+      const loc2Select = document.createElement('select');
+      loc2Select.id = `bulk-loc2-${item.id}`;
+      loc2Select.dataset.itemId = item.id;
+      loc2Select.dataset.locationNum = '2';
+      loc2Select.style.cssText = 'width: 100%; padding: 6px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px;';
+      loc2Select.innerHTML = '<option value="">Select location...</option><option value="__add_new__">+ Add New</option>';
+      const loc2Input = document.createElement('input');
+      loc2Input.type = 'text';
+      loc2Input.id = `bulk-loc2-input-${item.id}`;
+      loc2Input.placeholder = 'Enter new location';
+      loc2Input.style.cssText = 'display: none; width: 100%; padding: 6px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; margin-top: 4px;';
+      loc2Div.appendChild(loc2Label);
+      loc2Div.appendChild(loc2Select);
+      loc2Div.appendChild(loc2Input);
+      locationsContainer.appendChild(loc2Div);
+
+      // Location 3
+      const loc3Div = document.createElement('div');
+      loc3Div.id = `bulk-loc3-div-${item.id}`;
+      loc3Div.style.cssText = 'margin-bottom: 8px; display: none;';
+      const loc3Label = document.createElement('label');
+      loc3Label.textContent = 'Location 3:';
+      loc3Label.style.cssText = 'display: block; font-size: 10px; font-weight: 600; color: var(--gray-600); margin-bottom: 4px;';
+      const loc3Select = document.createElement('select');
+      loc3Select.id = `bulk-loc3-${item.id}`;
+      loc3Select.dataset.itemId = item.id;
+      loc3Select.dataset.locationNum = '3';
+      loc3Select.style.cssText = 'width: 100%; padding: 6px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px;';
+      loc3Select.innerHTML = '<option value="">Select location...</option><option value="__add_new__">+ Add New</option>';
+      const loc3Input = document.createElement('input');
+      loc3Input.type = 'text';
+      loc3Input.id = `bulk-loc3-input-${item.id}`;
+      loc3Input.placeholder = 'Enter new location';
+      loc3Input.style.cssText = 'display: none; width: 100%; padding: 6px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 12px; margin-top: 4px;';
+      loc3Div.appendChild(loc3Label);
+      loc3Div.appendChild(loc3Select);
+      loc3Div.appendChild(loc3Input);
+      locationsContainer.appendChild(loc3Div);
+
+      // Add Location link
+      const addLocLink = document.createElement('a');
+      addLocLink.href = 'javascript:void(0)';
+      addLocLink.textContent = '+ Add Location';
+      addLocLink.id = `bulk-add-loc-link-${item.id}`;
+      addLocLink.style.cssText = 'color: #1976d2; font-size: 11px; font-weight: 600; text-decoration: underline; cursor: pointer;';
+      addLocLink.onclick = () => {
+        document.getElementById(`bulk-loc3-div-${item.id}`).style.display = 'block';
+        addLocLink.style.display = 'none';
+      };
+      locationsContainer.appendChild(addLocLink);
+
+      multiLocSection.appendChild(locationsContainer);
+
+      // Populate dropdowns with saved locations
+      prepLocationsCache.forEach(loc => {
+        [loc1Select, loc2Select, loc3Select].forEach(select => {
+          const opt = document.createElement('option');
+          opt.value = loc.name;
+          opt.textContent = loc.name;
+          select.appendChild(opt);
+        });
+      });
+
+      // Pre-select existing locations
+      if (existingLocations.length > 0) {
+        loc1Select.value = existingLocations[0] || '';
+        if (existingLocations.length > 1) loc2Select.value = existingLocations[1] || '';
+        if (existingLocations.length > 2) {
+          loc3Select.value = existingLocations[2] || '';
+          loc3Div.style.display = 'block';
+          addLocLink.style.display = 'none';
+        }
+      }
+
+      // Toggle locations visibility when checkbox changes
+      const multiLocCheckboxInput = multiLocCheckbox.querySelector('input[type="checkbox"]');
+      multiLocCheckboxInput.onchange = () => {
+        locationsContainer.style.display = multiLocCheckboxInput.checked ? 'block' : 'none';
+      };
+
+      // Handle location select changes
+      [loc1Select, loc2Select, loc3Select].forEach((select, idx) => {
+        select.onchange = () => {
+          const inputField = document.getElementById(`bulk-loc${idx + 1}-input-${item.id}`);
+          if (select.value === '__add_new__') {
+            inputField.style.display = 'block';
+          } else {
+            inputField.style.display = 'none';
+            inputField.value = '';
+          }
+        };
+      });
+
+      itemCard.appendChild(multiLocSection);
       content.appendChild(itemCard);
     });
 
@@ -14031,6 +14173,66 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       }
     });
 
+    // Process location selections for items with multi-location enabled
+    for (const [itemId, data] of Object.entries(updates)) {
+      if (data.has_multiple_locations) {
+        const locations = [];
+
+        // Check location 1
+        const loc1Select = modal.querySelector(`#bulk-loc1-${itemId}`);
+        const loc1Input = modal.querySelector(`#bulk-loc1-input-${itemId}`);
+        if (loc1Select) {
+          if (loc1Select.value === '__add_new__' && loc1Input && loc1Input.value.trim()) {
+            const newLoc = loc1Input.value.trim();
+            const capitalized = newLoc.charAt(0).toUpperCase() + newLoc.slice(1);
+            locations.push(capitalized);
+            await saveNewLocation(capitalized);
+          } else if (loc1Select.value && loc1Select.value !== '__add_new__') {
+            locations.push(loc1Select.value);
+          }
+        }
+
+        // Check location 2
+        const loc2Select = modal.querySelector(`#bulk-loc2-${itemId}`);
+        const loc2Input = modal.querySelector(`#bulk-loc2-input-${itemId}`);
+        if (loc2Select) {
+          if (loc2Select.value === '__add_new__' && loc2Input && loc2Input.value.trim()) {
+            const newLoc = loc2Input.value.trim();
+            const capitalized = newLoc.charAt(0).toUpperCase() + newLoc.slice(1);
+            locations.push(capitalized);
+            await saveNewLocation(capitalized);
+          } else if (loc2Select.value && loc2Select.value !== '__add_new__') {
+            locations.push(loc2Select.value);
+          }
+        }
+
+        // Check location 3
+        const loc3Select = modal.querySelector(`#bulk-loc3-${itemId}`);
+        const loc3Input = modal.querySelector(`#bulk-loc3-input-${itemId}`);
+        if (loc3Select) {
+          if (loc3Select.value === '__add_new__' && loc3Input && loc3Input.value.trim()) {
+            const newLoc = loc3Input.value.trim();
+            const capitalized = newLoc.charAt(0).toUpperCase() + newLoc.slice(1);
+            locations.push(capitalized);
+            await saveNewLocation(capitalized);
+          } else if (loc3Select.value && loc3Select.value !== '__add_new__') {
+            locations.push(loc3Select.value);
+          }
+        }
+
+        // Initialize location counts
+        const locationCounts = {};
+        locations.forEach(loc => {
+          locationCounts[loc] = 0;
+        });
+
+        data.location_counts = locationCounts;
+      } else if (data.has_multiple_locations === false) {
+        // If unchecking multi-location, clear location data
+        data.location_counts = {};
+      }
+    }
+
     document.body.removeChild(overlay);
     showLoading('Saving Bulk Edits', `Updating ${Object.keys(updates).length} items...`);
 
@@ -14042,10 +14244,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       for (const [itemId, data] of Object.entries(updates)) {
         try {
           console.log(`Updating item ${itemId} with data:`, data);
-          
+
           // Add last_counted_date to mark item as counted
           data.last_counted_date = new Date().toISOString();
-          
+
           const { error } = await supabase
             .from('inventory_items')
             .update(data)
@@ -14069,6 +14271,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             if (data.line_cooks_prep !== undefined) localItem.lineCooksPrep = data.line_cooks_prep;
             if (data.not_made_daily !== undefined) localItem.notMadeDaily = data.not_made_daily;
             if (data.show_in_bottle_count !== undefined) localItem.showInBottleCount = data.show_in_bottle_count;
+            if (data.has_multiple_locations !== undefined) localItem.hasMultipleLocations = data.has_multiple_locations;
+            if (data.location_counts !== undefined) localItem.locationCounts = data.location_counts;
             if (data.last_counted_date) localItem.lastCountedDate = data.last_counted_date;
           }
 
