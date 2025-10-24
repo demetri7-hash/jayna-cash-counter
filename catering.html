@@ -1519,19 +1519,72 @@
 
     async function loadPhotos() {
       try {
-        console.log('📸 Loading catering photos...');
-        showLoading('LOADING ORDERS', 'Loading catering orders...');
+        console.log('📸 Loading catering orders and photos...');
+        showLoading('LOADING ORDERS', 'Loading catering orders and photos...');
 
-        const response = await fetch('/api/catering-photos-get?archived=false');
-        const data = await response.json();
+        // Fetch BOTH uploaded photos AND Toast synced orders
+        const [photosResponse, ordersResponse] = await Promise.all([
+          fetch('/api/catering-photos-get?archived=false'),
+          fetch('/api/get-catering-orders') // Defaults to today + 14 days
+        ]);
 
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to load photos');
+        const photosData = await photosResponse.json();
+        const ordersData = await ordersResponse.json();
+
+        if (!photosData.success) {
+          throw new Error(photosData.error || 'Failed to load photos');
         }
 
-        // Filter out archived photos (only show active orders in PHOTOS tab)
-        allPhotos = (data.data || []).filter(photo => !photo.archived);
-        console.log(`✅ Loaded ${allPhotos.length} active photos`);
+        // Get uploaded photos (with images)
+        const uploadedPhotos = (photosData.data || [])
+          .filter(photo => !photo.archived)
+          .map(photo => ({
+            ...photo,
+            source_type: 'UPLOADED', // Mark as uploaded photo
+            has_image: true
+          }));
+
+        console.log(`✅ Loaded ${uploadedPhotos.length} uploaded photos`);
+
+        // Get Toast synced orders (without images)
+        let toastOrders = [];
+        if (ordersData.success && ordersData.data && ordersData.data.orders) {
+          toastOrders = ordersData.data.orders.map(order => ({
+            id: `toast_${order.db_id}`, // Unique ID for Toast orders
+            source_type: order.source || 'TOAST',
+            order_due_date: order.delivery_date,
+            time_due: order.delivery_time ? new Date(order.delivery_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
+            order_type: order.delivery_address ? 'DELIVERY' : 'PICKUP',
+            leave_jayna_at: null,
+            guest_name: order.customer_name,
+            phone_number: order.customer_phone,
+            email: order.customer_email,
+            delivery_address: order.delivery_address,
+            special_notes: order.delivery_notes,
+            actual_order: null,
+            brightness: 100,
+            contrast: 100,
+            has_image: false, // Toast orders don't have images
+            toast_order_number: order.order_number,
+            toast_headcount: order.headcount,
+            toast_total: order.total,
+            toast_status: order.status
+          }));
+
+          console.log(`✅ Loaded ${toastOrders.length} Toast orders`);
+        }
+
+        // Merge uploaded photos and Toast orders
+        allPhotos = [...uploadedPhotos, ...toastOrders];
+
+        // Sort by order_due_date
+        allPhotos.sort((a, b) => {
+          const dateA = a.order_due_date || '9999-12-31';
+          const dateB = b.order_due_date || '9999-12-31';
+          return dateA.localeCompare(dateB);
+        });
+
+        console.log(`📦 Total orders: ${allPhotos.length} (${uploadedPhotos.length} with photos, ${toastOrders.length} from Toast)`);
 
         renderPhotos();
       } catch (error) {
@@ -1539,7 +1592,7 @@
         hideLoading();
         document.getElementById('photoGallery').innerHTML = `
           <div class="error-message">
-            ❌ Error loading photos: ${error.message}
+            ❌ Error loading orders: ${error.message}
           </div>
         `;
       }
@@ -1601,69 +1654,141 @@
           const timeDue = formatTimeDisplay(photo.time_due);
           const leaveJaynaAt = photo.order_type === 'DELIVERY' ? formatTimeDisplay(photo.leave_jayna_at) : null;
 
-          html += `
-            <div class="photo-item" data-id="${photo.id}" data-index="${globalIndex}">
-              <!-- Delete Button (top right) -->
-              <div class="photo-overlay ${overlayVisibleClass}" onclick="promptDeletePhoto(${photo.id})">
-                DELETE
-              </div>
-
-              <!-- Reorder Buttons (top left) -->
-              <div class="reorder-controls ${controlsVisibleClass}">
-                <button class="reorder-btn" onclick="movePhotoUp(${globalIndex})" ${globalIndex === 0 ? 'disabled' : ''}>
-                  ▲
-                </button>
-                <button class="reorder-btn" onclick="movePhotoDown(${globalIndex})" ${globalIndex === allPhotos.length - 1 ? 'disabled' : ''}>
-                  ▼
-                </button>
-              </div>
-
-              <!-- Image (click to expand) -->
-              <img src="${photo.image_url}"
-                   alt="Catering Order"
-                   class="photo-img"
-                   id="photo-img-${photo.id}"
-                   loading="lazy"
-                   width="400"
-                   height="500"
-                   style="${filterStyle} cursor: pointer;"
-                   onclick="openLightbox('${photo.image_url}', ${brightness}, ${contrast})">
-
-              <!-- Order Metadata -->
-              <div class="photo-metadata">
-                <div class="photo-metadata-row">
-                  <span class="photo-metadata-label">TYPE:</span>
-                  <span class="photo-metadata-value">${photo.order_type || 'N/A'}</span>
+          // Render differently based on whether it has an image or not
+          if (photo.has_image) {
+            // PHOTO CARD (with image)
+            html += `
+              <div class="photo-item" data-id="${photo.id}" data-index="${globalIndex}">
+                <!-- Delete Button (top right) -->
+                <div class="photo-overlay ${overlayVisibleClass}" onclick="promptDeletePhoto(${photo.id})">
+                  DELETE
                 </div>
-                <div class="photo-metadata-row">
-                  <span class="photo-metadata-label">TIME DUE:</span>
-                  <span class="photo-metadata-value">${timeDue}</span>
-                </div>
-                ${leaveJaynaAt ? `
-                <div class="photo-metadata-row">
-                  <span class="photo-metadata-label">LEAVE AT:</span>
-                  <span class="photo-metadata-value">${leaveJaynaAt}</span>
-                </div>
-                ` : ''}
-              </div>
 
-              <!-- Completed Button (bottom right) -->
-              <button class="completed-btn" id="completeBtn_${photo.id}" onclick="archivePhoto(${photo.id}); event.stopPropagation();">
-                MARK AS COMPLETED
-              </button>
+                <!-- Reorder Buttons (top left) -->
+                <div class="reorder-controls ${controlsVisibleClass}">
+                  <button class="reorder-btn" onclick="movePhotoUp(${globalIndex})" ${globalIndex === 0 ? 'disabled' : ''}>
+                    ▲
+                  </button>
+                  <button class="reorder-btn" onclick="movePhotoDown(${globalIndex})" ${globalIndex === allPhotos.length - 1 ? 'disabled' : ''}>
+                    ▼
+                  </button>
+                </div>
 
-              <!-- Enhancement Controls (bottom section) -->
-              <div class="enhancement-controls ${controlsVisibleClass}">
-                <label class="enhancement-label">IMAGE ENHANCEMENT</label>
-                <button class="filter-preset-btn" onclick="applyScanMode(${photo.id}, ${globalIndex})">
-                  SCAN MODE
+                <!-- Image (click to expand) -->
+                <img src="${photo.image_url}"
+                     alt="Catering Order"
+                     class="photo-img"
+                     id="photo-img-${photo.id}"
+                     loading="lazy"
+                     width="400"
+                     height="500"
+                     style="${filterStyle} cursor: pointer;"
+                     onclick="openLightbox('${photo.image_url}', ${brightness}, ${contrast})">
+
+                <!-- Order Metadata -->
+                <div class="photo-metadata">
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">TYPE:</span>
+                    <span class="photo-metadata-value">${photo.order_type || 'N/A'}</span>
+                  </div>
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">TIME DUE:</span>
+                    <span class="photo-metadata-value">${timeDue}</span>
+                  </div>
+                  ${leaveJaynaAt ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">LEAVE AT:</span>
+                    <span class="photo-metadata-value">${leaveJaynaAt}</span>
+                  </div>
+                  ` : ''}
+                </div>
+
+                <!-- Completed Button (bottom right) -->
+                <button class="completed-btn" id="completeBtn_${photo.id}" onclick="archivePhoto(${photo.id}); event.stopPropagation();">
+                  MARK AS COMPLETED
                 </button>
-                <button class="filter-preset-btn" onclick="resetFilters(${photo.id}, ${globalIndex})" style="background: var(--gray-700); border-color: var(--gray-700);">
-                  RESET
-                </button>
+
+                <!-- Enhancement Controls (bottom section) -->
+                <div class="enhancement-controls ${controlsVisibleClass}">
+                  <label class="enhancement-label">IMAGE ENHANCEMENT</label>
+                  <button class="filter-preset-btn" onclick="applyScanMode(${photo.id}, ${globalIndex})">
+                    SCAN MODE
+                  </button>
+                  <button class="filter-preset-btn" onclick="resetFilters(${photo.id}, ${globalIndex})" style="background: var(--gray-700); border-color: var(--gray-700);">
+                    RESET
+                  </button>
+                </div>
               </div>
-            </div>
-          `;
+            `;
+          } else {
+            // TOAST ORDER CARD (no image)
+            html += `
+              <div class="photo-item" data-id="${photo.id}" data-index="${globalIndex}" style="background: var(--gray-100); border: 3px solid var(--primary-blue);">
+                <!-- Toast Badge -->
+                <div style="position: absolute; top: 12px; left: 12px; background: var(--primary-blue); color: white; padding: 6px 12px; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; z-index: 5;">
+                  ${photo.source_type}
+                </div>
+
+                <!-- No Image Placeholder -->
+                <div style="width: 100%; height: 300px; background: white; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid var(--gray-300);">
+                  <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 12px;">📋</div>
+                    <div style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ORDER ${photo.toast_order_number || 'N/A'}</div>
+                    ${photo.toast_total ? `<div style="font-size: 18px; font-weight: 700; color: var(--primary-blue); margin-top: 8px;">$${photo.toast_total.toFixed(2)}</div>` : ''}
+                  </div>
+                </div>
+
+                <!-- Order Metadata -->
+                <div class="photo-metadata">
+                  ${photo.guest_name ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">CUSTOMER:</span>
+                    <span class="photo-metadata-value">${photo.guest_name}</span>
+                  </div>
+                  ` : ''}
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">TYPE:</span>
+                    <span class="photo-metadata-value">${photo.order_type || 'N/A'}</span>
+                  </div>
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">TIME DUE:</span>
+                    <span class="photo-metadata-value">${timeDue}</span>
+                  </div>
+                  ${photo.toast_headcount ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">HEADCOUNT:</span>
+                    <span class="photo-metadata-value">${photo.toast_headcount} guests</span>
+                  </div>
+                  ` : ''}
+                  ${photo.phone_number ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">PHONE:</span>
+                    <span class="photo-metadata-value">${photo.phone_number}</span>
+                  </div>
+                  ` : ''}
+                  ${photo.delivery_address ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">ADDRESS:</span>
+                    <span class="photo-metadata-value">${photo.delivery_address}</span>
+                  </div>
+                  ` : ''}
+                  ${photo.special_notes ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">NOTES:</span>
+                    <span class="photo-metadata-value">${photo.special_notes}</span>
+                  </div>
+                  ` : ''}
+                </div>
+
+                <!-- Status Badge (bottom) -->
+                <div style="padding: 12px; background: var(--success-bg); border-top: 2px solid var(--success-border); text-align: center;">
+                  <span style="font-size: 11px; font-weight: 700; color: var(--success-text); text-transform: uppercase; letter-spacing: 0.8px;">
+                    ${photo.toast_status || 'CONFIRMED'} FROM TOAST POS
+                  </span>
+                </div>
+              </div>
+            `;
+          }
         });
 
         html += `
