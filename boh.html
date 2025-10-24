@@ -1598,8 +1598,9 @@
       // Check hardcoded ADMIN_PASSWORD first (fallback)
       if (enteredPassword === ADMIN_PASSWORD) {
         setManagerSession(); // Set 60-minute session
+        localStorage.setItem('manager_role', 'Admin'); // Store role as Admin
         document.body.removeChild(modal);
-        showMessage('✅ Manager session active (60 minutes)', 'success');
+        showMessage('✅ Admin session active (60 minutes) - Full Access', 'success');
         callback();
         return;
       }
@@ -1622,9 +1623,22 @@
 
         if (passwords && passwords.length > 0) {
           // Valid password found in database
+          const user = passwords[0];
+          const userRole = user.role || 'Manager'; // Default to Manager if no role set
+
           setManagerSession(); // Set 60-minute session
+          localStorage.setItem('manager_role', userRole); // Store user's role
+          localStorage.setItem('manager_username', user.username); // Store username
+
           document.body.removeChild(modal);
-          showMessage(`✅ Manager session active (60 minutes) - ${passwords[0].username}`, 'success');
+
+          // Show role-specific message
+          if (userRole === 'Admin') {
+            showMessage(`✅ Admin session active (60 minutes) - ${user.username} - Full Access`, 'success');
+          } else {
+            showMessage(`✅ ${userRole} session active (60 minutes) - ${user.username} - Checklist Editing Only`, 'success');
+          }
+
           callback();
           return;
         }
@@ -7121,10 +7135,10 @@
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <div>
               <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--blue-text); text-transform: uppercase; letter-spacing: 1px;">
-                🔐 MANAGER PASSWORD MANAGEMENT
+                🔐 PASSWORD MANAGEMENT
               </h3>
               <p style="margin: 0; font-size: 13px; color: var(--blue-text); line-height: 1.6;">
-                Create and manage passwords for manager access to FOH checklists.
+                Create passwords with role-based access. Admin = Full access to all areas. Manager/User = Checklist editing only (FOH & BOH).
               </p>
             </div>
             <button
@@ -7387,13 +7401,13 @@
             </div>
             <div id="new_password_strength" style="margin-top: 8px;"></div>
             <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--gray-500);">
-              Minimum 8 characters. Include uppercase, lowercase, numbers, and symbols.
+              Any password accepted. No minimum length or complexity requirements.
             </p>
           </div>
 
           <div style="margin-bottom: 20px;">
             <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
-              Role (Optional)
+              Role *
             </label>
             <select
               id="new_role"
@@ -7407,10 +7421,13 @@
               "
             >
               <option value="">Select role...</option>
-              <option value="Manager">Manager</option>
-              <option value="Supervisor">Supervisor</option>
-              <option value="Admin">Admin</option>
+              <option value="Admin">Admin (Full Access - All Password-Protected Areas)</option>
+              <option value="Manager">Manager (Checklist Editing Only - FOH & BOH)</option>
+              <option value="User">User (Checklist Editing Only - FOH & BOH)</option>
             </select>
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--gray-500);">
+              Admin = Full access to all areas. Manager/User = Only checklist editing permissions.
+            </p>
           </div>
 
           <div style="display: flex; gap: 12px; justify-content: flex-end;">
@@ -7473,7 +7490,7 @@
   }
 
   /**
-   * Validate Password Strength
+   * Validate Password Strength - DISABLED (Any password accepted)
    */
   function validatePasswordStrength(password, elementId) {
     const strengthDiv = document.getElementById(elementId);
@@ -7484,52 +7501,12 @@
       return;
     }
 
-    let strength = 0;
-    let feedback = [];
-
-    // Length check
-    if (password.length >= 8) strength++;
-    if (password.length >= 12) strength++;
-    else feedback.push('Use 12+ characters');
-
-    // Character type checks
-    if (/[a-z]/.test(password)) strength++;
-    else feedback.push('Add lowercase letters');
-
-    if (/[A-Z]/.test(password)) strength++;
-    else feedback.push('Add uppercase letters');
-
-    if (/[0-9]/.test(password)) strength++;
-    else feedback.push('Add numbers');
-
-    if (/[^a-zA-Z0-9]/.test(password)) strength++;
-    else feedback.push('Add symbols (!@#$%^&*)');
-
-    let color, text, bgColor;
-    if (strength <= 2) {
-      color = 'var(--error-text)';
-      bgColor = 'var(--error-bg)';
-      text = '❌ WEAK';
-    } else if (strength <= 4) {
-      color = 'var(--warning-text)';
-      bgColor = 'var(--warning-bg)';
-      text = '⚠️ MEDIUM';
-    } else {
-      color = 'var(--success-text)';
-      bgColor = 'var(--success-bg)';
-      text = '✅ STRONG';
-    }
-
+    // NO VALIDATION - ANY PASSWORD ACCEPTED
     strengthDiv.innerHTML = `
-      <div style="padding: 8px 12px; background: ${bgColor}; border-left: 3px solid ${color}; border-radius: 0;">
-        <div style="font-size: 11px; font-weight: 700; color: ${color}; margin-bottom: 4px;">
-          ${text}
+      <div style="padding: 8px 12px; background: var(--success-bg); border-left: 3px solid var(--success-border); border-radius: 0;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--success-text);">
+          ✅ ANY PASSWORD ACCEPTED
         </div>
-        ${feedback.length > 0 ? `
-          <div style="font-size: 10px; color: ${color};">
-            ${feedback.join(' • ')}
-          </div>
-        ` : ''}
       </div>
     `;
   }
@@ -7591,13 +7568,15 @@
       return;
     }
 
-    if (password.length < 8) {
-      showMessage('Password must be at least 8 characters!', 'error');
-      document.getElementById('new_password').focus();
+    if (!role) {
+      showMessage('Role is required! Select Admin, Manager, or User.', 'error');
+      document.getElementById('new_role').focus();
       return;
     }
 
-    showLoading('Creating Password', 'Saving manager password...');
+    // NO PASSWORD LENGTH REQUIREMENT - ANY PASSWORD ACCEPTED
+
+    showLoading('Creating Password', 'Saving password...');
 
     try {
       // Get current user from localStorage
@@ -7610,7 +7589,7 @@
         username: username,
         full_name: fullname || null,
         password_hash: passwordHash,
-        role: role || null,
+        role: role, // Required - Admin, Manager, or User
         is_active: true,
         created_by: createdBy,
         created_at: new Date().toISOString()
@@ -7626,7 +7605,7 @@
 
       hideLoading();
       hideAddPasswordForm();
-      showMessage(`✅ Password created for ${username}!`, 'success');
+      showMessage(`✅ Password created for ${username} (${role})`, 'success');
 
       // Reload password list
       setTimeout(() => {
