@@ -17057,6 +17057,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     // Load prep locations from API
     await loadPrepLocations();
 
+    console.log('📍 prepLocationsCache after load:', prepLocationsCache);
+
     const item = orderingSystemState.items.find(i => i.id === itemId);
     if (!item) return;
 
@@ -17064,8 +17066,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const existingLocations = Object.keys(item.locationCounts || {});
     const selectedAreas = new Set(existingLocations);
 
+    console.log('📍 Existing locations for this item:', existingLocations);
+
     // Get all unique storage locations from saved locations
     const uniqueAreas = prepLocationsCache.map(loc => loc.name).sort();
+
+    console.log('📍 uniqueAreas to display:', uniqueAreas);
 
     // Create modal
     const modal = document.createElement('div');
@@ -17125,6 +17131,23 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       btn.style.fontWeight = isSelected ? '700' : '400';
       btn.style.color = isSelected ? '#1976d2' : 'var(--gray-900)';
     };
+
+    // If no locations exist yet, show helpful message
+    if (uniqueAreas.length === 0) {
+      const noLocationsMsg = document.createElement('p');
+      noLocationsMsg.textContent = 'No locations yet. Click "Add New Area" below to create your first location.';
+      noLocationsMsg.style.cssText = `
+        padding: 16px;
+        background: var(--gray-100);
+        border: 2px solid var(--gray-300);
+        color: var(--gray-600);
+        font-size: 13px;
+        font-style: italic;
+        text-align: center;
+        margin-bottom: 12px;
+      `;
+      areaList.appendChild(noLocationsMsg);
+    }
 
     // Add existing areas as toggleable buttons
     uniqueAreas.forEach(area => {
