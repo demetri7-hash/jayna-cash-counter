@@ -639,6 +639,52 @@
   </style>
 </head>
 <body>
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(33, 33, 33, 0.85);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+  ">
+    <div style="
+      text-align: center;
+      background: white;
+      padding: 40px 50px;
+      border-radius: 0;
+      border: 3px solid var(--gray-700);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    ">
+      <div class="spinner" style="
+        border: 4px solid var(--gray-300);
+        border-top: 4px solid var(--gray-900);
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 24px;
+      "></div>
+      <h3 id="loadingTitle" style="
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: var(--gray-900);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      ">Loading...</h3>
+      <p id="loadingMessage" style="
+        font-size: 12px;
+        color: var(--gray-600);
+        margin: 0;
+      ">Please wait</p>
+    </div>
+  </div>
+
   <div class="container">
     <!-- Header -->
     <div class="header">
@@ -898,13 +944,7 @@
       const container = document.getElementById('upcomingContent');
 
       try {
-        // Show loading state
-        container.innerHTML = `
-          <div class="loading-spinner">
-            <div class="spinner"></div>
-            <div class="loading-text">Loading catering orders from database...</div>
-          </div>
-        `;
+        showLoading('Loading Orders', 'Loading catering orders from database...');
 
         // Calculate date range (today + 14 days)
         const today = new Date();
@@ -929,11 +969,14 @@
 
         console.log(`✅ Found ${data.data.totalOrders} orders in database`);
 
+        hideLoading();
+
         // Display orders
         displayUpcomingOrders(data.data.orders || []);
 
       } catch (error) {
         console.error('Error loading orders:', error);
+        hideLoading();
         container.innerHTML = `
           <div class="error-message">
             ❌ Error loading orders from database: ${error.message}
@@ -953,20 +996,14 @@
       const statusDiv = document.getElementById('syncStatus');
 
       try {
+        showLoading('Syncing Orders', 'Syncing catering orders from Toast POS...');
+
         // Show sync status
         statusDiv.style.display = 'block';
         statusDiv.style.background = 'var(--blue-bg)';
         statusDiv.style.borderColor = 'var(--primary-blue)';
         statusDiv.style.color = 'var(--blue-text)';
         statusDiv.textContent = '🔄 Syncing from Toast POS...';
-
-        // Show loading state
-        container.innerHTML = `
-          <div class="loading-spinner">
-            <div class="spinner"></div>
-            <div class="loading-text">Syncing catering orders from Toast POS...</div>
-          </div>
-        `;
 
         // Authenticate if needed
         if (!toastAccessToken) {
@@ -1004,6 +1041,8 @@
 
         console.log(`✅ Synced ${data.data.totalOrders} orders from Toast`);
 
+        hideLoading();
+
         // Check if database save failed
         if (data.data.savedToDatabase === false) {
           // Show warning - database table doesn't exist
@@ -1031,6 +1070,7 @@
 
       } catch (error) {
         console.error('Error syncing from Toast:', error);
+        hideLoading();
 
         // Show error status
         statusDiv.style.display = 'block';
@@ -1489,6 +1529,7 @@
     async function loadPhotos() {
       try {
         console.log('📸 Loading catering photos...');
+        showLoading('Loading Orders', 'Loading catering orders...');
 
         const response = await fetch('/api/catering-photos-get?archived=false');
         const data = await response.json();
@@ -1501,9 +1542,11 @@
         allPhotos = (data.data || []).filter(photo => !photo.archived);
         console.log(`✅ Loaded ${allPhotos.length} active photos`);
 
+        hideLoading();
         renderPhotos();
       } catch (error) {
         console.error('Error loading photos:', error);
+        hideLoading();
         document.getElementById('photoGallery').innerHTML = `
           <div class="error-message">
             ❌ Error loading photos: ${error.message}
@@ -2155,6 +2198,31 @@
         }
 
         alert(`Error archiving photo: ${error.message}`);
+      }
+    }
+
+    // ============================================
+    // LOADING OVERLAY FUNCTIONS
+    // ============================================
+    function showLoading(title, message) {
+      const overlay = document.getElementById('loadingOverlay');
+      const titleEl = document.getElementById('loadingTitle');
+      const messageEl = document.getElementById('loadingMessage');
+
+      if (!overlay || !titleEl || !messageEl) {
+        console.error('Loading overlay elements not found in DOM');
+        return;
+      }
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      overlay.style.display = 'flex';
+    }
+
+    function hideLoading() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.style.display = 'none';
       }
     }
 
