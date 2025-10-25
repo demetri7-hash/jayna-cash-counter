@@ -2723,35 +2723,37 @@
     }
 
     /**
-     * Generate Excel file - as simple as possible (like manually creating in Excel)
+     * Generate Excel file - EXACTLY like manually created file
+     * Uses shared strings table (SST) like native Excel files
      */
     function generateLabelsExcel(labels) {
-      // Create array of objects (Print Master might prefer this format)
+      // Create array of objects with UPPERCASE headers (matches manual file)
       const data = [];
 
-      // Data rows - ensure all values are clean strings
+      // Data rows - plain text strings
       labels.forEach(label => {
         data.push({
-          'Company': String('JAYNA GYRO CATERING'),
-          'Item': String(label.item || ''),
-          'Quantity': String(label.qty + ' - Pan ' + label.pan),
-          'Customer': String((label.packDate || '') + ' ' + (label.customerLastName || ''))
+          'COMPANY': 'JAYNA GYRO CATERING',
+          'ITEM': String(label.item || ''),
+          'QUANTITY': String(label.qty + ' - Pan ' + label.pan),
+          'CUSTOMER': String((label.packDate || '') + ' ' + (label.customerLastName || ''))
         });
       });
 
-      // Create workbook using json_to_sheet (creates proper Excel table)
+      // Create workbook using json_to_sheet
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(data, {
-        header: ['Company', 'Item', 'Quantity', 'Customer']
+        header: ['COMPANY', 'ITEM', 'QUANTITY', 'CUSTOMER']
       });
 
       // Add to workbook
       XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-      // Write with basic settings
+      // Write with SHARED STRINGS TABLE enabled (like manual Excel files)
       const wbout = XLSX.write(wb, {
         bookType: 'xlsx',
-        type: 'array'
+        type: 'array',
+        bookSST: true  // CRITICAL: Use shared strings table like native Excel
       });
 
       return new Blob([wbout], {
