@@ -10,12 +10,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#00A8E1">
 
-  <!-- Bluetooth Thermal Printer Status Bar -->
-  <div id="bluetoothStatus" style="position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: var(--gray-900); color: white; padding: 8px 12px; font-size: 12px; font-weight: 600; text-align: center; letter-spacing: 0.5px;">
-    <span id="bluetoothStatusText">🔵 Bluetooth Printer: Not Connected</span>
-    <button id="bluetoothConnectBtn" onclick="connectBluetoothPrinter()" style="margin-left: 12px; padding: 4px 12px; background: var(--primary-blue); border: none; color: white; font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">CONNECT PRINTER</button>
-  </div>
-
   <style>
     /* Jayna Brand Design - Sky Blue & Grayscale (Matching index.html) */
     :root {
@@ -698,6 +692,15 @@
   </div>
 
   <div class="container">
+
+    <!-- Bluetooth Thermal Printer Status Bar -->
+    <div id="bluetoothStatus" style="position: sticky; top: 0; left: 0; right: 0; z-index: 9999; background: #212121; color: white; padding: 12px; font-size: 13px; font-weight: 700; text-align: center; letter-spacing: 0.5px; margin-bottom: 20px; border: 3px solid #00A8E1;">
+      <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
+        <span id="bluetoothStatusText" style="font-size: 14px;">🔵 BLUETOOTH PRINTER: NOT CONNECTED</span>
+        <button id="bluetoothConnectBtn" onclick="connectBluetoothPrinter()" style="padding: 8px 20px; background: #00A8E1; border: 2px solid #00A8E1; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">CONNECT PRINTER</button>
+      </div>
+    </div>
+
     <!-- Header -->
     <div class="header">
       <img src="jayna-logo.png" alt="Jayna Gyro Logo" style="width: 80px; height: 80px; margin-bottom: 12px;">
@@ -3323,11 +3326,17 @@
         console.log('✅ Characteristic found');
 
         // Update UI
-        document.getElementById('bluetoothStatusText').textContent = `✅ Connected: ${bluetoothDevice.name}`;
+        const statusBar = document.getElementById('bluetoothStatus');
+        statusBar.style.background = '#059669';
+        statusBar.style.borderColor = '#059669';
+
+        document.getElementById('bluetoothStatusText').textContent = `✅ BLUETOOTH PRINTER: CONNECTED (${bluetoothDevice.name.toUpperCase()})`;
         document.getElementById('bluetoothConnectBtn').textContent = 'DISCONNECT';
+        document.getElementById('bluetoothConnectBtn').style.background = '#DC2626';
+        document.getElementById('bluetoothConnectBtn').style.borderColor = '#DC2626';
         document.getElementById('bluetoothConnectBtn').onclick = disconnectBluetoothPrinter;
 
-        showMessage(`✅ Printer connected: ${bluetoothDevice.name}`, 'success');
+        console.log('✅ Printer ready for label printing!');
 
       } catch (error) {
         console.error('❌ Bluetooth connection error:', error);
@@ -3345,11 +3354,17 @@
       bluetoothDevice = null;
       bluetoothCharacteristic = null;
 
-      document.getElementById('bluetoothStatusText').textContent = '🔵 Bluetooth Printer: Not Connected';
+      const statusBar = document.getElementById('bluetoothStatus');
+      statusBar.style.background = '#212121';
+      statusBar.style.borderColor = '#00A8E1';
+
+      document.getElementById('bluetoothStatusText').textContent = '🔵 BLUETOOTH PRINTER: NOT CONNECTED';
       document.getElementById('bluetoothConnectBtn').textContent = 'CONNECT PRINTER';
+      document.getElementById('bluetoothConnectBtn').style.background = '#00A8E1';
+      document.getElementById('bluetoothConnectBtn').style.borderColor = '#00A8E1';
       document.getElementById('bluetoothConnectBtn').onclick = connectBluetoothPrinter;
 
-      showMessage('Printer disconnected', 'info');
+      console.log('Printer disconnected');
     }
 
     /**
@@ -3692,14 +3707,20 @@
       event.preventDefault();
 
       if (!bluetoothCharacteristic) {
-        // Scroll to top to show the connection button
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Flash status bar red
+        const statusBar = document.getElementById('bluetoothStatus');
+        const originalBg = statusBar.style.background;
+        const originalBorder = statusBar.style.borderColor;
 
-        // Flash the connect button to draw attention
-        const connectBtn = document.getElementById('bluetoothConnectBtn');
-        connectBtn.style.animation = 'pulse 1s ease-in-out 3';
+        statusBar.style.background = '#DC2626';
+        statusBar.style.borderColor = '#DC2626';
 
-        showMessage('❌ Printer not connected!\n\nClick the "CONNECT PRINTER" button at the top of the page first.', 'error');
+        setTimeout(() => {
+          statusBar.style.background = originalBg;
+          statusBar.style.borderColor = originalBorder;
+        }, 2000);
+
+        alert('❌ PRINTER NOT CONNECTED!\n\nClick "CONNECT PRINTER" at the top first.');
         return;
       }
 
@@ -3738,12 +3759,12 @@
         }
 
         hideLoading();
-        showMessage(`✅ Successfully printed ${labels.length} labels!`, 'success');
+        alert(`✅ SUCCESS!\n\nPrinted ${labels.length} labels in grouped order:\n- BYO Gyros\n- Salads + Dressings\n- Dips + Sides\n- Greek Fries\n- Dolmas\n- Spanakopita\n- Sides\n- Desserts\n- Pinwheels`);
 
       } catch (error) {
         console.error('❌ Label printing error:', error);
         hideLoading();
-        showMessage(`❌ Printing failed: ${error.message}`, 'error');
+        alert(`❌ PRINTING FAILED!\n\nError: ${error.message}\n\nCheck:\n1. Printer is still connected\n2. Printer has labels loaded\n3. Printer is turned on`);
       }
     }
 
