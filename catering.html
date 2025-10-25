@@ -2723,37 +2723,55 @@
     }
 
     /**
-     * Generate Excel file - EXACTLY like manually created file
-     * Uses shared strings table (SST) like native Excel files
+     * Generate Excel file - Using aoa_to_sheet for simpler structure
      */
     function generateLabelsExcel(labels) {
-      // Create array of objects with UPPERCASE headers (matches manual file)
+      // Create 2D array (array of arrays) - SIMPLEST Excel format
       const data = [];
 
-      // Data rows - plain text strings
+      // Row 1: Headers (UPPERCASE)
+      data.push(['COMPANY', 'ITEM', 'QUANTITY', 'CUSTOMER']);
+
+      // Data rows - plain text only
       labels.forEach(label => {
-        data.push({
-          'COMPANY': 'JAYNA GYRO CATERING',
-          'ITEM': String(label.item || ''),
-          'QUANTITY': String(label.qty + ' - Pan ' + label.pan),
-          'CUSTOMER': String((label.packDate || '') + ' ' + (label.customerLastName || ''))
-        });
+        data.push([
+          'JAYNA GYRO CATERING',
+          String(label.item || ''),
+          String(label.qty + ' - Pan ' + label.pan),
+          String((label.packDate || '') + ' ' + (label.customerLastName || ''))
+        ]);
       });
 
-      // Create workbook using json_to_sheet
+      // Create workbook with array of arrays (simpler than json_to_sheet)
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(data, {
-        header: ['COMPANY', 'ITEM', 'QUANTITY', 'CUSTOMER']
-      });
+
+      // Set workbook properties to mimic Excel
+      wb.Props = {
+        Title: "Labels",
+        Subject: "Catering Labels",
+        Author: "Jayna Gyro",
+        CreatedDate: new Date()
+      };
+
+      const ws = XLSX.utils.aoa_to_sheet(data);
+
+      // Set column widths (like manual Excel file)
+      ws['!cols'] = [
+        { wch: 25 },  // COMPANY column width
+        { wch: 30 },  // ITEM column width
+        { wch: 25 },  // QUANTITY column width
+        { wch: 35 }   // CUSTOMER column width
+      ];
 
       // Add to workbook
       XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-      // Write as .xlsx with shared strings table and uppercase headers
+      // Write with cellDates option for better compatibility
       const wbout = XLSX.write(wb, {
         bookType: 'xlsx',
         type: 'array',
-        bookSST: true  // Use shared strings table like native Excel
+        bookSST: true,  // Use shared strings table
+        cellDates: false  // Don't use date objects
       });
 
       return new Blob([wbout], {
