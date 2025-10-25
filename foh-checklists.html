@@ -1819,10 +1819,121 @@
   initializeFOHSystem();
 
   /**
+   * Fetch Currently Clocked-In Employees from Toast API
+   * (Same method used in index.html header)
+   */
+  async function fetchClockedInEmployees() {
+    try {
+      // Get TODAY in YYYY-MM-DD format (Pacific time)
+      const todayPacific = new Date().toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+
+      const [month, day, year] = todayPacific.split(', ')[0].split('/');
+      const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+      console.log('👥 Fetching clocked-in employees from Toast for:', today);
+
+      // STEP 1: Authenticate with Toast API
+      const authResponse = await fetch('/api/toast-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!authResponse.ok) {
+        console.error('❌ Failed to authenticate with Toast API');
+        fohSystemState.clockedInEmployees = [];
+        return;
+      }
+
+      const authData = await authResponse.json();
+      if (!authData.success || !authData.data?.accessToken) {
+        console.error('❌ Toast authentication failed');
+        fohSystemState.clockedInEmployees = [];
+        return;
+      }
+
+      const token = authData.data.accessToken;
+      console.log('✅ Toast authenticated');
+
+      // STEP 2: Fetch clocked-in employees via serverless function
+      const clockedInUrl = `/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`;
+
+      console.log('🔍 Fetching clocked-in employees from serverless function');
+
+      const response = await fetch(clockedInUrl);
+
+      if (!response.ok) {
+        console.error('❌ Failed to fetch clocked-in employees:', response.status);
+        fohSystemState.clockedInEmployees = [];
+        return;
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        console.error('❌ Clocked-in API error:', result.error);
+        fohSystemState.clockedInEmployees = [];
+        return;
+      }
+
+      console.log(`📊 Total time entries today: ${result.totalTimeEntries}`);
+      console.log(`🟢 Currently clocked in: ${result.count} employees`);
+
+      if (result.clockedIn.length > 0) {
+        console.log('✅ Clocked in employees:', result.clockedIn);
+      }
+
+      // Extract first names only
+      const employees = result.clockedIn.map(emp => {
+        const fullName = emp.fullName || emp.name || 'Unknown';
+        const firstName = fullName.split(' ')[0]; // Get first name only
+        return firstName;
+      });
+
+      // Store in state
+      fohSystemState.clockedInEmployees = employees;
+
+      console.log(`✅ Stored ${employees.length} clocked-in employees:`, employees);
+
+      return employees;
+
+    } catch (error) {
+      console.error('❌ Error fetching clocked in employees:', error);
+      fohSystemState.clockedInEmployees = [];
+      return [];
+    }
+  }
+
+  // Fetch clocked-in employees on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    fetchClockedInEmployees();
+    // Refresh every 5 minutes
+    setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
+  });
+
+  /**
    * Open FOH Tab - Using EXACT pattern from working openOrderTab
+   * ADDED: Auto-close any opened checklist when switching tabs
    */
   function openFOHTab(event, tabName) {
     console.log('openFOHTab:', tabName);
+
+    // RESET: Close any opened checklist view when switching tabs
+    if (fohSystemState.currentSession) {
+      console.log('🔄 Resetting checklist view (switching tabs)');
+      fohSystemState.currentSession = null;
+      fohSystemState.currentChecklist = null;
+      fohSystemState.tasks = [];
+
+      // Reload the checklist list if switching to workflow tab
+      if (tabName === 'fohWorkflow') {
+        renderAvailableChecklists();
+      }
+    }
 
     // Hide all FOH tab contents
     const tabContents = document.querySelectorAll('#fohSystemForm .tab-content');
@@ -2124,11 +2235,22 @@
     let html = `
       <div style="margin-bottom: 20px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
         <p style="color: var(--blue-text); font-size: 13px; font-weight: 600; margin: 0;">
-          📋 Select a checklist to begin. Suggested completion times are shown below each checklist.
+          📋 Select a checklist to begin. Click any card to start.
         </p>
       </div>
 
-      <div style="display: grid; gap: 16px;">
+      <div class="checklist-grid" style="
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      ">
+        <style>
+          @media (min-width: 768px) {
+            .checklist-grid {
+              grid-template-columns: repeat(3, 1fr) !important;
+            }
+          }
+        </style>
     `;
 
     // Get current Pacific time for expiration check
@@ -2154,10 +2276,10 @@
         }
       }
 
-      // Different styling for expired vs active checklists
+      // SIMPLIFIED CARD: Show only name and time slots
       const cardStyle = isExpired
-        ? `background: var(--gray-100); border: 2px solid var(--gray-300); padding: 20px; cursor: not-allowed; opacity: 0.6; transition: all 0.15s ease; border-radius: 0;`
-        : `background: white; border: 2px solid var(--gray-300); padding: 20px; cursor: pointer; transition: all 0.15s ease; border-radius: 0;`;
+        ? `background: var(--gray-100); border: 2px solid var(--gray-300); padding: 16px; cursor: not-allowed; opacity: 0.6; transition: all 0.15s ease; border-radius: 0; min-height: 100px; display: flex; flex-direction: column; justify-content: center;`
+        : `background: white; border: 2px solid var(--gray-300); padding: 16px; cursor: pointer; transition: all 0.15s ease; border-radius: 0; min-height: 100px; display: flex; flex-direction: column; justify-content: center;`;
 
       const hoverEvents = isExpired
         ? ``
@@ -2166,53 +2288,23 @@
       const clickEvent = isExpired ? `` : `onclick="selectChecklist('${checklist.type}')"`;
 
       const titleColor = isExpired ? 'var(--gray-500)' : 'var(--gray-900)';
-      const badgeStyle = isExpired
-        ? `background: var(--gray-400); color: white; padding: 4px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; border-radius: 0;`
-        : `background: var(--gray-700); color: white; padding: 4px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; border-radius: 0;`;
-
-      const timeBoxStyle = isExpired
-        ? `margin: 0 0 16px 0; padding: 12px; background: var(--gray-200); border-left: 4px solid var(--gray-400);`
-        : `margin: 0 0 16px 0; padding: 12px; background: var(--light-blue); border-left: 4px solid var(--primary-blue);`;
-
-      const timeTextColor = isExpired ? 'var(--gray-500)' : 'var(--primary-blue)';
+      const timeColor = isExpired ? 'var(--gray-400)' : 'var(--primary-blue)';
 
       html += `
         <div style="${cardStyle}" ${hoverEvents} ${clickEvent}>
-          ${isExpired ? `
-          <div style="margin-bottom: 12px; padding: 8px 12px; background: var(--gray-200); border-left: 4px solid var(--gray-500);">
-            <p style="margin: 0; font-size: 12px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.8px;">
-              ⏱️ TIME WINDOW EXPIRED
-            </p>
-          </div>
-          ` : ''}
-
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: ${titleColor}; text-transform: uppercase; letter-spacing: 1px;">
-              ${checklist.title}
-            </h3>
-            <span style="${badgeStyle}">${checklist.timeRange}</span>
-          </div>
-
-          <p style="margin: 0 0 12px 0; font-size: 13px; color: var(--gray-600); line-height: 1.5;">
-            ${checklist.description}
-          </p>
+          <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: ${titleColor}; text-transform: uppercase; letter-spacing: 0.8px; text-align: center;">
+            ${checklist.title}
+          </h3>
 
           ${checklist.start_hour !== undefined && checklist.end_hour !== undefined ? `
-          <div style="${timeBoxStyle}">
-            <p style="margin: 0; font-size: 13px; font-weight: 700; color: ${timeTextColor}; text-transform: uppercase; letter-spacing: 0.8px; line-height: 1.4;">
-              ⏰ COMPLETE THIS CHECKLIST FROM ${formatTimeWindow(checklist.start_hour, checklist.start_minute || 0, checklist.end_hour, checklist.end_minute || 0)}
+            <p style="margin: 0; font-size: 12px; font-weight: 600; color: ${timeColor}; text-align: center; letter-spacing: 0.5px;">
+              ${formatTimeWindow(checklist.start_hour, checklist.start_minute || 0, checklist.end_hour, checklist.end_minute || 0)}
             </p>
-          </div>
-          ` : ''}
-
-          <div style="display: flex; gap: 12px; font-size: 12px; color: var(--gray-500);">
-            ${checklist.staffCount > 1 ?
-              `<span>👥 ${checklist.staffCount} Staff Members</span>` :
-              `<span>👤 ${checklist.staffCount} Staff Member</span>`
-            }
-            ${checklist.hasRatings ? '<span>⭐ Includes Ratings</span>' : ''}
-            ${checklist.hasNotes ? '<span>📝 Notes for Next Shift</span>' : ''}
-          </div>
+          ` : `
+            <p style="margin: 0; font-size: 12px; font-weight: 600; color: ${timeColor}; text-align: center; letter-spacing: 0.5px;">
+              Anytime
+            </p>
+          `}
         </div>
       `;
     });
@@ -2261,8 +2353,8 @@
         // Found existing session - join it (can be complete or incomplete)
         await joinExistingSession(existingSessions[0]);
       } else {
-        // No existing session - show name input to create new one
-        renderStaffNameInput();
+        // No existing session - AUTO-START with clocked-in employees (NO name input screen)
+        await autoStartChecklistWithClockedInEmployees();
       }
     } catch (error) {
       hideLoading();
@@ -2272,17 +2364,74 @@
   }
 
   /**
+   * Auto-Start Checklist with Clocked-In Employees (NO name input required)
+   */
+  async function autoStartChecklistWithClockedInEmployees() {
+    console.log('🚀 Auto-starting checklist with clocked-in employees');
+
+    // Use clocked-in employees as team members
+    let teamMembers = [...fohSystemState.clockedInEmployees];
+
+    // If no clocked-in employees, fall back to localStorage username
+    if (teamMembers.length === 0) {
+      const savedUsername = localStorage.getItem('foh_username');
+      if (savedUsername) {
+        teamMembers = [savedUsername];
+      } else {
+        // Last resort: prompt for name
+        renderStaffNameInput();
+        return;
+      }
+    }
+
+    console.log(`✅ Using ${teamMembers.length} clocked-in employees:`, teamMembers);
+
+    // Set up team names with colors
+    fohSystemState.teamNames = teamMembers.map((name, index) => ({
+      name: name,
+      color: getUserColor(index)
+    }));
+
+    // Set first employee as active user
+    fohSystemState.activeUserIndex = 0;
+
+    // Save first name to localStorage for consistency
+    localStorage.setItem('foh_username', teamMembers[0]);
+
+    // Start the checklist session
+    await startChecklistSession(teamMembers);
+  }
+
+  /**
    * Join Existing Session - Load tasks/ratings from existing incomplete session
+   * AUTO-POPULATE with clocked-in employees
    */
   async function joinExistingSession(session) {
     showLoading('Joining Session', 'Loading checklist data...');
 
     try {
-      // Get stored username from localStorage
-      const savedUsername = localStorage.getItem('foh_username') || '';
+      // AUTO-POPULATE with clocked-in employees
+      let teamMembers = [...fohSystemState.clockedInEmployees];
+
+      // If no clocked-in employees, fall back to saved username
+      if (teamMembers.length === 0) {
+        const savedUsername = localStorage.getItem('foh_username');
+        if (savedUsername) {
+          teamMembers = [savedUsername];
+        }
+      }
+
+      // Set up team names with colors
+      if (teamMembers.length > 0) {
+        fohSystemState.teamNames = teamMembers.map((name, index) => ({
+          name: name,
+          color: getUserColor(index)
+        }));
+        fohSystemState.activeUserIndex = 0;
+        fohSystemState.staffName = teamMembers[0];
+      }
 
       fohSystemState.currentSession = session;
-      fohSystemState.staffName = savedUsername;
 
       // Load existing tasks
       const { data: tasks, error: tasksError } = await supabase
@@ -2305,13 +2454,9 @@
 
       hideLoading();
 
-      // If no username in localStorage, prompt for it
-      if (!savedUsername) {
-        promptForUsername();
-      } else {
-        // Render checklist
-        renderChecklist();
-      }
+      // Render checklist (no name prompt needed!)
+      renderChecklist();
+
     } catch (error) {
       hideLoading();
       console.error('Error joining session:', error);
@@ -3222,27 +3367,37 @@
                   const userColor = userIndex >= 0 ? fohSystemState.teamNames[userIndex].color : getUserColor(0);
                   return `<div style="width: 12px; height: 12px; border-radius: 50%; background: ${userColor}; flex-shrink: 0;"></div>`;
                 })()}
-                <span>
-                  ✓ ${taskRecord.completed_by} • ${formatPacificDateDisplay(new Date(taskRecord.completed_at), {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true
-                  })}
-                </span>
+                <!-- CLICKABLE NAME: Click entire name text to cycle through clocked-in users -->
                 ${!fohSystemState.reviewMode && fohSystemState.teamNames.length > 1 ? `
                   <a href="javascript:void(0)"
                      onclick="event.stopPropagation(); changeTaskUser('${taskRecord.id}')"
                      style="
-                       color: var(--primary-blue);
+                       color: var(--gray-600);
                        font-size: 11px;
-                       font-weight: 600;
-                       text-decoration: underline;
+                       font-style: italic;
                        cursor: pointer;
-                       font-style: normal;
-                     ">
-                    change
+                       text-decoration: underline;
+                       text-decoration-style: dotted;
+                       text-underline-offset: 2px;
+                     "
+                     onmouseover="this.style.color='var(--primary-blue)'"
+                     onmouseout="this.style.color='var(--gray-600)'"
+                     title="Click to cycle to next user">
+                    ✓ ${taskRecord.completed_by} • ${formatPacificDateDisplay(new Date(taskRecord.completed_at), {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
                   </a>
-                ` : ''}
+                ` : `
+                  <span>
+                    ✓ ${taskRecord.completed_by} • ${formatPacificDateDisplay(new Date(taskRecord.completed_at), {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
+                  </span>
+                `}
               </div>
             ` : ''}
 
