@@ -2726,30 +2726,29 @@
      * Generate Excel file - as simple as possible (like manually creating in Excel)
      */
     function generateLabelsExcel(labels) {
-      // Simple 2D array - exactly like typing into Excel cells
+      // Create array of objects (Print Master might prefer this format)
       const data = [];
 
-      // Row 1: Headers (just plain text)
-      data.push(['Company', 'Item', 'Quantity', 'Customer']);
-
-      // Data rows - just plain text, nothing fancy
+      // Data rows - ensure all values are clean strings
       labels.forEach(label => {
-        data.push([
-          'JAYNA GYRO CATERING',
-          label.item,
-          label.qty + ' - Pan ' + label.pan,
-          label.packDate + ' ' + label.customerLastName
-        ]);
+        data.push({
+          'Company': String('JAYNA GYRO CATERING'),
+          'Item': String(label.item || ''),
+          'Quantity': String(label.qty + ' - Pan ' + label.pan),
+          'Customer': String((label.packDate || '') + ' ' + (label.customerLastName || ''))
+        });
       });
 
-      // Create workbook - most basic possible
+      // Create workbook using json_to_sheet (creates proper Excel table)
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(data);
+      const ws = XLSX.utils.json_to_sheet(data, {
+        header: ['Company', 'Item', 'Quantity', 'Customer']
+      });
 
-      // Add to workbook with default sheet name
+      // Add to workbook
       XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-      // Write with most basic/default settings (like Excel Save As default)
+      // Write with basic settings
       const wbout = XLSX.write(wb, {
         bookType: 'xlsx',
         type: 'array'
