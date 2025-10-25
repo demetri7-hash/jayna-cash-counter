@@ -2437,32 +2437,28 @@
         console.log(`🏷️ Generating labels for order ${orderId}...`);
         showLoading('GENERATING LABELS', 'Creating CSV file for batch printing...');
 
-        // Fetch order and line items
-        const { data: order, error: orderError } = await supabase
-          .from('catering_orders')
-          .select('*')
-          .eq('id', orderId)
-          .single();
+        // Fetch order and line items via API
+        const response = await fetch(`/api/get-order-items?order_id=${orderId}`);
+        const result = await response.json();
 
-        if (orderError) throw orderError;
+        if (!result.success) {
+          hideLoading();
+          showMessage(`Failed to load order: ${result.error}`, 'error');
+          return;
+        }
 
-        const { data: lineItems, error: itemsError } = await supabase
-          .from('catering_order_items')
-          .select('*')
-          .eq('order_id', orderId)
-          .order('id', { ascending: true });
-
-        if (itemsError) throw itemsError;
+        const order = result.order;
+        const lineItems = result.items || [];
 
         // Calculate prep list
-        const prep = calculatePrepList(lineItems || [], order);
+        const prep = calculatePrepList(lineItems, order);
 
         // Generate labels
         const labels = generateLabelsFromPrep(prep, order);
 
         if (labels.length === 0) {
           hideLoading();
-          alert('No containers found to label for this order.');
+          showMessage('No containers found to label for this order.', 'error');
           return;
         }
 
@@ -2485,14 +2481,14 @@
 
         hideLoading();
 
-        alert(`✅ LABELS EXPORTED!\n\n${labels.length} labels generated.\n\nFile: ${fileName}\n\nImport this CSV into Phomemo Print Master app to batch print all container labels.`);
+        showMessage(`✅ LABELS EXPORTED! ${labels.length} labels generated. File: ${fileName}. Import into Phomemo Print Master app.`, 'success');
 
         console.log(`✅ Exported ${labels.length} labels`);
 
       } catch (error) {
         console.error('❌ Label export error:', error);
         hideLoading();
-        alert(`❌ LABEL EXPORT FAILED!\n\nError: ${error.message}`);
+        showMessage(`❌ LABEL EXPORT FAILED! Error: ${error.message}`, 'error');
       }
     }
 
