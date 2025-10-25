@@ -1931,9 +1931,14 @@
               <div id="prepListSection" style="display: none; margin-bottom: 24px; padding: 20px; background: var(--success-bg); border: 3px solid var(--success-border);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid var(--success-border);">
                   <h3 style="margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--success-text);">🍽️ PREP LIST</h3>
-                  <button onclick="printPrepList(event, ${order.id})" style="background: var(--gray-900); border: 2px solid var(--gray-900); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
-                    🖨️ PRINT PREP LIST
-                  </button>
+                  <div style="display: flex; gap: 8px;">
+                    <button onclick="exportLabelsCSV(event, ${order.id})" style="background: var(--primary-blue); border: 2px solid var(--primary-blue); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                      🏷️ EXPORT LABELS
+                    </button>
+                    <button onclick="printPrepList(event, ${order.id})" style="background: var(--gray-900); border: 2px solid var(--gray-900); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                      🖨️ PRINT PREP LIST
+                    </button>
+                  </div>
                 </div>
                 <div id="prepListContent">
                   ${generatePrepListHTML(calculatePrepList(lineItems, order), order)}
@@ -2414,6 +2419,298 @@
           printBtn.style.background = 'var(--primary-blue)';
         }, 3000);
       }
+    }
+
+    /**
+     * Export container labels as CSV for Phomemo Print Master app
+     * Generates one label per container with:
+     * - Menu title (guest-facing name)
+     * - Quantity/portions
+     * - Pan numbers (1 of 2, 2 of 2, etc.)
+     * - Jayna Gyro Catering header
+     * - Pack date
+     * - Customer name + phone
+     */
+    async function exportLabelsCSV(event, orderId) {
+      try {
+        event.preventDefault();
+        console.log(`🏷️ Generating labels for order ${orderId}...`);
+        showLoading('GENERATING LABELS', 'Creating CSV file for batch printing...');
+
+        // Fetch order and line items
+        const { data: order, error: orderError } = await supabase
+          .from('catering_orders')
+          .select('*')
+          .eq('id', orderId)
+          .single();
+
+        if (orderError) throw orderError;
+
+        const { data: lineItems, error: itemsError } = await supabase
+          .from('catering_order_items')
+          .select('*')
+          .eq('order_id', orderId)
+          .order('id', { ascending: true });
+
+        if (itemsError) throw itemsError;
+
+        // Calculate prep list
+        const prep = calculatePrepList(lineItems || [], order);
+
+        // Generate labels
+        const labels = generateLabelsFromPrep(prep, order);
+
+        if (labels.length === 0) {
+          hideLoading();
+          alert('No containers found to label for this order.');
+          return;
+        }
+
+        // Create CSV
+        const csv = generateLabelsCSV(labels);
+
+        // Download CSV file
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        const fileName = `Labels_Order${order.order_number || orderId}_${order.customer_name || 'Customer'}.csv`.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        hideLoading();
+
+        alert(`✅ LABELS EXPORTED!\n\n${labels.length} labels generated.\n\nFile: ${fileName}\n\nImport this CSV into Phomemo Print Master app to batch print all container labels.`);
+
+        console.log(`✅ Exported ${labels.length} labels`);
+
+      } catch (error) {
+        console.error('❌ Label export error:', error);
+        hideLoading();
+        alert(`❌ LABEL EXPORT FAILED!\n\nError: ${error.message}`);
+      }
+    }
+
+    /**
+     * Generate label data from prep list
+     * Each label includes: company header, menu item, quantity, pan number, date, customer info
+     */
+    function generateLabelsFromPrep(prep, order) {
+      const labels = [];
+      const orderNum = order.order_number || order.id;
+      const customerName = order.customer_name || 'Customer';
+      const customerLastName = customerName.split(' ').pop(); // Get last name
+      const phoneNumber = order.phone_number || '';
+      const packDate = order.delivery_date
+        ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' })
+        : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      // BYO GYRO PITAS
+      if (prep.byoGyros.total > 0) {
+        const sets = Math.ceil(prep.byoGyros.total / 10);
+
+        // Sauce containers (3 per set)
+        for (let i = 1; i <= sets; i++) {
+          labels.push({ item: 'Tzatziki Sauce', qty: `${prep.byoGyros.total} portions`, pan: `${i} of ${sets}`, category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: 'Spicy Aioli Sauce', qty: `${prep.byoGyros.total} portions`, pan: `${i} of ${sets}`, category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: 'Lemon Vinaigrette', qty: `${prep.byoGyros.total} portions`, pan: `${i} of ${sets}`, category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+        }
+
+        // Greens (1 per set)
+        for (let i = 1; i <= sets; i++) {
+          labels.push({ item: 'Mixed Greens', qty: `${prep.byoGyros.total} portions`, pan: `${i} of ${sets}`, category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+        }
+
+        // Veggies (1 each)
+        labels.push({ item: 'Diced Tomatoes', qty: `${prep.byoGyros.total} portions`, pan: '1 of 1', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: 'Sliced Red Onion', qty: `${prep.byoGyros.total} portions`, pan: '1 of 1', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: 'Whole Pepperoncini', qty: `${prep.byoGyros.total} portions`, pan: '1 of 1', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+
+        // Pitas
+        const pitasNeeded = prep.byoGyros.total + sets;
+        labels.push({ item: 'Grilled Pita Bread', qty: `${pitasNeeded} whole pitas`, pan: '1 of 1', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+      }
+
+      // SALADS
+      prep.salads.forEach(salad => {
+        const panCount = salad.qty < 4 ? salad.qty : Math.ceil(salad.qty / 4);
+
+        // Salad pans
+        for (let i = 1; i <= panCount; i++) {
+          labels.push({
+            item: salad.name,
+            qty: `${salad.qty} portions`,
+            pan: `${i} of ${panCount}`,
+            category: 'Salad',
+            orderNum,
+            customerLastName,
+            phoneNumber,
+            packDate
+          });
+        }
+
+        // Dressing containers (1 per portion)
+        for (let i = 1; i <= salad.qty; i++) {
+          labels.push({
+            item: `${salad.name} - Lemon Vinaigrette`,
+            qty: '1 dressing',
+            pan: `${i} of ${salad.qty}`,
+            category: 'Salad Dressing',
+            orderNum,
+            customerLastName,
+            phoneNumber,
+            packDate
+          });
+        }
+      });
+
+      // DIPS
+      prep.dips.forEach(dip => {
+        // Dip containers (16oz each)
+        for (let i = 1; i <= dip.qty; i++) {
+          labels.push({
+            item: dip.name,
+            qty: '16oz container',
+            pan: `${i} of ${dip.qty}`,
+            category: 'Dip',
+            orderNum,
+            customerLastName,
+            phoneNumber,
+            packDate
+          });
+        }
+
+        // Veggie sides if ordered
+        const hasVeggies = dip.modifiers.some(m => m.name && (m.name.includes('VEGGIES') || m.name.includes('VEGGIE')));
+        if (hasVeggies) {
+          for (let i = 1; i <= dip.qty; i++) {
+            labels.push({
+              item: `${dip.name} - Veggie Sticks (Carrots)`,
+              qty: `${24 * dip.qty} pieces`,
+              pan: `${i} of ${dip.qty}`,
+              category: 'Dip Side',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+            labels.push({
+              item: `${dip.name} - Veggie Sticks (Celery)`,
+              qty: `${24 * dip.qty} pieces`,
+              pan: `${i} of ${dip.qty}`,
+              category: 'Dip Side',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+        }
+
+        // Pita sides if ordered
+        const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
+        if (hasPita) {
+          for (let i = 1; i <= dip.qty; i++) {
+            labels.push({
+              item: `${dip.name} - Sliced Pita Bread`,
+              qty: `${6 * dip.qty} pitas`,
+              pan: `${i} of ${dip.qty}`,
+              category: 'Dip Side',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+        }
+
+        // GF Pita sides if ordered
+        const gfPitaMod = dip.modifiers.find(m => m.name && m.name.includes('GLUTEN FREE PITA'));
+        if (gfPitaMod) {
+          const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
+          for (let i = 1; i <= dip.qty; i++) {
+            labels.push({
+              item: `${dip.name} - GF Pita Bread`,
+              qty: `${gfQty} GF pitas`,
+              pan: `${i} of ${dip.qty}`,
+              category: 'Dip Side',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+        }
+      });
+
+      // GREEK FRIES BAR
+      prep.greekFries.forEach(fries => {
+        labels.push({ item: 'Greek Fries + Protein', qty: `${fries.qty} portions`, pan: '1 of 1', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: 'Greek Fries - Spicy Aioli', qty: '16oz sauce', pan: '1 of 1', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: 'Greek Fries - Tzatziki', qty: '16oz sauce', pan: '1 of 1', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: 'Greek Fries - Crumbled Feta', qty: '16oz feta', pan: '1 of 1', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+      });
+
+      // DOLMAS
+      prep.dolmas.forEach(dolma => {
+        labels.push({ item: dolma.name, qty: `${dolma.qty} portions`, pan: '1 of 1', category: 'Dolmas', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: `${dolma.name} - Tzatziki Sauce`, qty: `${dolma.qty} portions`, pan: '1 of 1', category: 'Dolmas', orderNum, customerLastName, phoneNumber, packDate });
+      });
+
+      // SPANAKOPITA
+      prep.spanakopita.forEach(span => {
+        labels.push({ item: span.name, qty: `${span.qty} portions`, pan: '1 of 1', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: `${span.name} - Tzatziki Sauce`, qty: `${span.qty} portions`, pan: '1 of 1', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
+      });
+
+      // SIDES
+      prep.sides.forEach(side => {
+        labels.push({ item: side.name, qty: `${side.qty} portions`, pan: '1 of 1', category: 'Side', orderNum, customerLastName, phoneNumber, packDate });
+      });
+
+      // DESSERTS
+      prep.desserts.forEach(dessert => {
+        labels.push({ item: dessert.name, qty: `${dessert.qty} pieces`, pan: '1 of 1', category: 'Dessert', orderNum, customerLastName, phoneNumber, packDate });
+      });
+
+      // PINWHEELS
+      prep.pinwheels.forEach(pinwheel => {
+        labels.push({ item: pinwheel.name, qty: `${pinwheel.qty} portions`, pan: '1 of 1', category: 'Pinwheel', orderNum, customerLastName, phoneNumber, packDate });
+      });
+
+      return labels;
+    }
+
+    /**
+     * Generate CSV format compatible with Phomemo Print Master app
+     * Format: Line 1 = Company, Line 2 = Menu Item, Line 3 = Qty/Pan, Line 4 = Date/Customer
+     */
+    function generateLabelsCSV(labels) {
+      let csv = 'Line 1,Line 2,Line 3,Line 4\n'; // Header row
+
+      labels.forEach(label => {
+        const line1 = 'JAYNA GYRO CATERING';
+        const line2 = label.item; // Menu item name
+        const line3 = `${label.qty} - Pan ${label.pan}`; // Quantity and pan number
+        const line4 = `${label.packDate} | ${label.customerLastName}${label.phoneNumber ? ' | ' + label.phoneNumber : ''}`.substring(0, 50); // Date and customer (truncate to fit)
+
+        // Escape commas and quotes in CSV
+        const escapeCsvField = (field) => {
+          if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+            return `"${field.replace(/"/g, '""')}"`;
+          }
+          return field;
+        };
+
+        csv += `${escapeCsvField(line1)},${escapeCsvField(line2)},${escapeCsvField(line3)},${escapeCsvField(line4)}\n`;
+      });
+
+      return csv;
     }
 
     // Print Prep List to Epson printer via Gmail
