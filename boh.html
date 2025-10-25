@@ -1710,7 +1710,9 @@
     // Multi-user support
     teamNames: [], // Array of {name: string, color: string}
     activeUserIndex: 0, // Index of currently active user
-    activeUserTimeout: null // Timeout to reset to default user after 1 minute
+    activeUserTimeout: null, // Timeout to reset to default user after 1 minute
+    // Clocked-in employees (populated from Toast API)
+    clockedInEmployees: [] // Array of first names only
   };
 
   // Color palette for team members
@@ -2346,15 +2348,12 @@
           </label>
 
           <div id="nameInputsContainer">
-            <!-- Initial name input -->
+            <!-- Initial name dropdown -->
             <div class="name-input-row" data-index="0" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
               <div style="width: 16px; height: 16px; border-radius: 50%; background: ${getUserColor(0)}; flex-shrink: 0;"></div>
-              <input
-                type="text"
+              <select
                 class="staff-name-input"
                 data-index="0"
-                value="${savedUsername}"
-                placeholder="Team Member 1 (required)"
                 style="
                   flex: 1;
                   padding: 14px;
@@ -2362,10 +2361,17 @@
                   border-radius: 0;
                   font-size: 14px;
                   box-sizing: border-box;
+                  background: white;
+                  cursor: pointer;
                 "
                 onfocus="this.style.borderColor='var(--gray-700)'"
                 onblur="this.style.borderColor='var(--gray-300)'"
-              />
+              >
+                <option value="">Select Team Member 1 (required)</option>
+                ${fohSystemState.clockedInEmployees.map(name =>
+                  `<option value="${name}" ${name === savedUsername ? 'selected' : ''}>${name}</option>`
+                ).join('')}
+              </select>
             </div>
           </div>
 
@@ -2469,21 +2475,34 @@
     colorDot.style.cssText = `width: 16px; height: 16px; border-radius: 50%; background: ${color}; flex-shrink: 0;`;
     rowDiv.appendChild(colorDot);
 
-    // Name input
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.className = 'staff-name-input';
-    nameInput.setAttribute('data-index', index);
-    nameInput.placeholder = `Team Member ${index + 1} (optional)`;
-    nameInput.style.cssText = 'flex: 1; padding: 14px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; box-sizing: border-box;';
-    nameInput.onfocus = function() { this.style.borderColor = 'var(--gray-700)'; };
-    nameInput.onblur = function() { this.style.borderColor = 'var(--gray-300)'; };
-    rowDiv.appendChild(nameInput);
+    // Name dropdown
+    const nameSelect = document.createElement('select');
+    nameSelect.className = 'staff-name-input';
+    nameSelect.setAttribute('data-index', index);
+    nameSelect.style.cssText = 'flex: 1; padding: 14px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; box-sizing: border-box; background: white; cursor: pointer;';
+    nameSelect.onfocus = function() { this.style.borderColor = 'var(--gray-700)'; };
+    nameSelect.onblur = function() { this.style.borderColor = 'var(--gray-300)'; };
+
+    // Add placeholder option
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.textContent = `Select Team Member ${index + 1} (optional)`;
+    nameSelect.appendChild(placeholderOption);
+
+    // Add clocked-in employee options
+    fohSystemState.clockedInEmployees.forEach(name => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      nameSelect.appendChild(option);
+    });
+
+    rowDiv.appendChild(nameSelect);
 
     container.appendChild(rowDiv);
 
-    // Focus new input
-    setTimeout(() => nameInput.focus(), 100);
+    // Focus new dropdown
+    setTimeout(() => nameSelect.focus(), 100);
   }
 
   /**
@@ -8115,7 +8134,15 @@
         console.log('✅ Clocked in employees:', result.clockedIn);
       }
 
-      // Extract employee names
+      // Store first names globally for dropdowns (sorted alphabetically)
+      fohSystemState.clockedInEmployees = result.clockedIn
+        .map(emp => emp.firstName)
+        .filter(name => name) // Remove any nulls/undefined
+        .sort();
+
+      console.log('👥 Available staff names:', fohSystemState.clockedInEmployees);
+
+      // Extract employee full names for display
       const employees = result.clockedIn.map(emp => emp.fullName);
 
       updateClockedInDisplay(employees);
