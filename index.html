@@ -2897,45 +2897,54 @@
 
   async function fetchClockedInEmployees() {
     try {
-      const today = new Date();
-      const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-      // Fetch today's timesheets from Homebase
+      console.log('🏠 Fetching clocked-in employees for:', today);
+
+      // Fetch today's timecards from Homebase (CORRECT endpoint based on manager.html)
       const response = await fetch('/api/homebase-proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          endpoint: `/locations/LOCATION_UUID/timesheets?date=${dateStr}`,
-          method: 'GET'
+          endpoint: `/locations/LOCATION_UUID/timecards?start_date=${today}&end_date=${today}`
         })
       });
 
       const result = await response.json();
 
       if (!result.success) {
-        console.error('Failed to fetch timesheets:', result.error);
+        console.error('❌ Failed to fetch timecards:', result.error);
         updateClockedInDisplay([]);
         return;
       }
 
-      const timesheets = result.data.timesheets || [];
+      console.log('✅ Homebase timecards response:', result.data);
 
-      // Filter for currently clocked in (has clock_in but no clock_out)
-      const clockedIn = timesheets.filter(ts => {
-        return ts.clock_in && !ts.clock_out;
+      // Timecards response structure: result.data.timecards (array)
+      const timecards = result.data.timecards || [];
+
+      // Filter for currently clocked in (has clock_in_time but no clock_out_time)
+      const clockedIn = timecards.filter(tc => {
+        // Homebase timecard structure: clock_in_time and clock_out_time
+        return tc.clock_in_time && !tc.clock_out_time;
       });
 
-      // Extract employee names
-      const employees = clockedIn.map(ts => {
-        const firstName = ts.employee?.first_name || '';
-        const lastName = ts.employee?.last_name || '';
-        return `${firstName} ${lastName}`.trim() || 'Unknown';
+      console.log(`🟢 Currently clocked in: ${clockedIn.length} employees`);
+
+      // Extract employee names from timecard objects
+      const employees = clockedIn.map(tc => {
+        // Homebase timecard includes employee object
+        const employee = tc.employee || {};
+        const firstName = employee.first_name || '';
+        const lastName = employee.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        return fullName || 'Unknown';
       });
 
       updateClockedInDisplay(employees);
 
     } catch (error) {
-      console.error('Error fetching clocked in employees:', error);
+      console.error('❌ Error fetching clocked in employees:', error);
       updateClockedInDisplay([]);
     }
   }
