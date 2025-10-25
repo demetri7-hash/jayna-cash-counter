@@ -2464,21 +2464,20 @@
           return;
         }
 
-        // Generate simple CSV file (more compatible than Excel)
-        const csvContent = generateSimpleCSV(labels);
+        // Generate simple Excel file (like manually created in Excel)
+        const excelBlob = generateLabelsExcel(labels);
 
         // Format filename for display
         const guestName = (order.customer_name || 'Customer').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
         const orderDate = order.delivery_date
           ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', timeZone: 'America/Los_Angeles' }).replace(/,/g, '').replace(/\s+/g, '-')
           : new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '').replace(/\s+/g, '-');
-        const fileName = `Labels_${guestName}_${orderDate}.csv`;
+        const fileName = `Labels_${guestName}_${orderDate}.xlsx`;
 
         // Create download URL
-        const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(csvBlob);
+        const url = URL.createObjectURL(excelBlob);
 
-        // Download CSV file
+        // Download Excel file
         const link = document.createElement('a');
         link.href = url;
         link.download = fileName;
@@ -2500,11 +2499,11 @@
 
         console.log(`✅ LABELS EXPORTED! ${labels.length} labels | File: ${fileName}`);
         console.log(`📱 Next steps:
-1. Find the downloaded CSV file in your Downloads folder or Files app
+1. Find the downloaded Excel file in your Downloads folder or Files app
 2. Open Print Master app on your phone
 3. Create a NEW LABEL TEMPLATE first (40x30mm for M110) with 4 text fields
 4. After creating the template, click the "Excel" import button
-5. Select the downloaded CSV file: ${fileName}
+5. Select the downloaded Excel file: ${fileName}
 6. The app should automatically map the 4 columns to your 4 text fields
 7. Preview and print your batch labels!`);
 
@@ -2724,44 +2723,36 @@
     }
 
     /**
-     * Generate Excel file compatible with Phomemo Print Master app
-     * Print Master expects: Company, Item, Quantity, Customer columns
+     * Generate Excel file - as simple as possible (like manually creating in Excel)
      */
     function generateLabelsExcel(labels) {
-      // Create array of rows for Excel (simplified for Print Master compatibility)
-      const data = [
-        // Header row
-        ['Company', 'Item', 'Quantity', 'Customer']
-      ];
+      // Simple 2D array - exactly like typing into Excel cells
+      const data = [];
 
-      // Add data rows - clean text only, no special formatting
+      // Row 1: Headers (just plain text)
+      data.push(['Company', 'Item', 'Quantity', 'Customer']);
+
+      // Data rows - just plain text, nothing fancy
       labels.forEach(label => {
-        const company = 'JAYNA GYRO CATERING';
-        const item = String(label.item || '').trim(); // Clean string
-        const quantity = `${label.qty} - Pan ${label.pan}`;
-
-        // Simplified customer info - remove pipes that might cause issues
-        let customer = `${label.packDate} ${label.customerLastName}`;
-        if (label.phoneNumber) {
-          customer += ` ${label.phoneNumber}`;
-        }
-        customer = customer.substring(0, 50).trim();
-
-        data.push([company, item, quantity, customer]);
+        data.push([
+          'JAYNA GYRO CATERING',
+          label.item,
+          label.qty + ' - Pan ' + label.pan,
+          label.packDate + ' ' + label.customerLastName
+        ]);
       });
 
-      // Create workbook and worksheet (no fancy formatting)
+      // Create workbook - most basic possible
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(data);
 
-      // Add worksheet to workbook
+      // Add to workbook with default sheet name
       XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-      // Generate Excel file using array buffer (more reliable for mobile)
+      // Write with most basic/default settings (like Excel Save As default)
       const wbout = XLSX.write(wb, {
         bookType: 'xlsx',
-        type: 'array',
-        bookSST: false // Disable shared string table for simpler file
+        type: 'array'
       });
 
       return new Blob([wbout], {
