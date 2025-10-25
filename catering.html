@@ -10,6 +10,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#00A8E1">
 
+  <!-- Bluetooth Thermal Printer Status Bar -->
+  <div id="bluetoothStatus" style="position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: var(--gray-900); color: white; padding: 8px 12px; display: none; font-size: 12px; font-weight: 600; text-align: center; letter-spacing: 0.5px;">
+    <span id="bluetoothStatusText">🔵 Bluetooth Printer: Not Connected</span>
+    <button id="bluetoothConnectBtn" onclick="connectBluetoothPrinter()" style="margin-left: 12px; padding: 4px 12px; background: var(--primary-blue); border: none; color: white; font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">CONNECT PRINTER</button>
+  </div>
+
   <style>
     /* Jayna Brand Design - Sky Blue & Grayscale (Matching index.html) */
     :root {
@@ -1924,9 +1930,14 @@
               <div id="prepListSection" style="display: none; margin-bottom: 24px; padding: 20px; background: var(--success-bg); border: 3px solid var(--success-border);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid var(--success-border);">
                   <h3 style="margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--success-text);">🍽️ PREP LIST</h3>
-                  <button onclick="printPrepList(event, ${order.id})" style="background: var(--gray-900); border: 2px solid var(--gray-900); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
-                    🖨️ PRINT PREP LIST
-                  </button>
+                  <div style="display: flex; gap: 8px;">
+                    <button onclick="printPrepList(event, ${order.id})" style="background: var(--gray-900); border: 2px solid var(--gray-900); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                      🖨️ PRINT PREP LIST
+                    </button>
+                    <button onclick="printLabelsViaBluetooth(event, ${order.id})" style="background: var(--primary-blue); border: 2px solid var(--primary-blue); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                      🏷️ PRINT LABELS
+                    </button>
+                  </div>
                 </div>
                 <div id="prepListContent">
                   ${generatePrepListHTML(calculatePrepList(lineItems, order), order)}
@@ -3241,6 +3252,451 @@
     });
 
     // ==================== END CLOCKED IN DISPLAY ====================
+
+    // ==================== BLUETOOTH THERMAL PRINTER SYSTEM ====================
+
+    /**
+     * Phomemo M110 Bluetooth Thermal Label Printer
+     * Direct ESC/POS printing via Web Bluetooth API
+     * Label Size: 40mm x 30mm (315 dots x 236 dots at 203 DPI)
+     */
+
+    let bluetoothDevice = null;
+    let bluetoothCharacteristic = null;
+    const LABEL_WIDTH_DOTS = 384;  // 48 bytes * 8 bits = 384 dots (Phomemo M110 width)
+    const LABEL_HEIGHT_DOTS = 236; // 30mm at 203 DPI ≈ 236 dots
+
+    // Show Bluetooth status bar on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      const statusBar = document.getElementById('bluetoothStatus');
+      if (statusBar && 'bluetooth' in navigator) {
+        statusBar.style.display = 'block';
+      }
+    });
+
+    /**
+     * Connect to Phomemo M110 via Web Bluetooth API
+     */
+    async function connectBluetoothPrinter() {
+      try {
+        console.log('🔵 Requesting Bluetooth device...');
+
+        // Request Bluetooth device (Phomemo M110)
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+          filters: [
+            { namePrefix: 'M110' },
+            { namePrefix: 'Phomemo' }
+          ],
+          optionalServices: [
+            '000018f0-0000-1000-8000-00805f9b34fb', // Phomemo service
+            '0000ff00-0000-1000-8000-00805f9b34fb'  // Alternative service
+          ]
+        });
+
+        console.log('✅ Device selected:', bluetoothDevice.name);
+
+        // Connect to GATT server
+        const server = await bluetoothDevice.gatt.connect();
+        console.log('✅ Connected to GATT server');
+
+        // Get primary service
+        let service;
+        try {
+          service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+        } catch (e) {
+          service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
+        }
+        console.log('✅ Service found');
+
+        // Get write characteristic
+        try {
+          bluetoothCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+        } catch (e) {
+          bluetoothCharacteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
+        }
+        console.log('✅ Characteristic found');
+
+        // Update UI
+        document.getElementById('bluetoothStatusText').textContent = `✅ Connected: ${bluetoothDevice.name}`;
+        document.getElementById('bluetoothConnectBtn').textContent = 'DISCONNECT';
+        document.getElementById('bluetoothConnectBtn').onclick = disconnectBluetoothPrinter;
+
+        showMessage(`✅ Printer connected: ${bluetoothDevice.name}`, 'success');
+
+      } catch (error) {
+        console.error('❌ Bluetooth connection error:', error);
+        showMessage(`❌ Failed to connect: ${error.message}`, 'error');
+      }
+    }
+
+    /**
+     * Disconnect Bluetooth printer
+     */
+    function disconnectBluetoothPrinter() {
+      if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+        bluetoothDevice.gatt.disconnect();
+      }
+      bluetoothDevice = null;
+      bluetoothCharacteristic = null;
+
+      document.getElementById('bluetoothStatusText').textContent = '🔵 Bluetooth Printer: Not Connected';
+      document.getElementById('bluetoothConnectBtn').textContent = 'CONNECT PRINTER';
+      document.getElementById('bluetoothConnectBtn').onclick = connectBluetoothPrinter;
+
+      showMessage('Printer disconnected', 'info');
+    }
+
+    /**
+     * Send raw bytes to printer
+     */
+    async function sendToPrinter(data) {
+      if (!bluetoothCharacteristic) {
+        throw new Error('Printer not connected. Click "CONNECT PRINTER" first.');
+      }
+
+      // Split data into chunks (BLE has 20-byte limit per write)
+      const chunkSize = 20;
+      for (let i = 0; i < data.length; i += chunkSize) {
+        const chunk = data.slice(i, i + chunkSize);
+        await bluetoothCharacteristic.writeValue(chunk);
+        await new Promise(resolve => setTimeout(resolve, 10)); // Small delay between chunks
+      }
+    }
+
+    /**
+     * ESC/POS Commands Generator
+     */
+    const ESC = 0x1B;
+    const GS = 0x1D;
+
+    function escPos_initialize() {
+      return new Uint8Array([ESC, 0x40]); // ESC @
+    }
+
+    function escPos_setAlignment(align) {
+      // 0 = left, 1 = center, 2 = right
+      return new Uint8Array([ESC, 0x61, align]);
+    }
+
+    function escPos_setBold(enable) {
+      return new Uint8Array([ESC, 0x45, enable ? 1 : 0]);
+    }
+
+    function escPos_setFontSize(width, height) {
+      // 0 = normal, 1 = double
+      const size = (width << 4) | height;
+      return new Uint8Array([GS, 0x21, size]);
+    }
+
+    function escPos_feedLines(lines) {
+      return new Uint8Array([ESC, 0x64, lines]); // ESC d n
+    }
+
+    function escPos_printText(text) {
+      return new TextEncoder().encode(text + '\n');
+    }
+
+    function escPos_printRasterImage(imageData, width, height) {
+      // GS v 0 m xL xH yL yH d1...dk
+      const bytesPerLine = Math.ceil(width / 8);
+      const cmd = new Uint8Array([
+        GS, 0x76, 0x30, 0x00, // GS v 0 (normal mode)
+        bytesPerLine & 0xFF, (bytesPerLine >> 8) & 0xFF, // xL xH (bytes per line)
+        height & 0xFF, (height >> 8) & 0xFF // yL yH (number of lines)
+      ]);
+
+      // Concatenate command + image data
+      const result = new Uint8Array(cmd.length + imageData.length);
+      result.set(cmd);
+      result.set(imageData, cmd.length);
+
+      return result;
+    }
+
+    /**
+     * Render label to 1-bit bitmap for thermal printing
+     * @param {Object} label - Label data {orderNum, customer, date, container, item, qty, category}
+     * @returns {Uint8Array} - Bitmap data
+     */
+    function renderLabelToBitmap(label) {
+      // Create canvas for label (40mm x 30mm at 203 DPI)
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      canvas.width = LABEL_WIDTH_DOTS;
+      canvas.height = LABEL_HEIGHT_DOTS;
+
+      // White background
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Black text
+      ctx.fillStyle = 'black';
+      ctx.textAlign = 'center';
+
+      let y = 20;
+
+      // Order number (large, bold)
+      ctx.font = 'bold 32px Arial';
+      ctx.fillText(`ORDER #${label.orderNum}`, canvas.width / 2, y);
+      y += 40;
+
+      // Customer name
+      ctx.font = '20px Arial';
+      ctx.fillText(label.customer || 'Customer', canvas.width / 2, y);
+      y += 30;
+
+      // Date
+      ctx.font = '16px Arial';
+      ctx.fillText(label.date, canvas.width / 2, y);
+      y += 30;
+
+      // Horizontal line
+      ctx.fillRect(20, y, canvas.width - 40, 2);
+      y += 15;
+
+      // Container type (bold, large)
+      ctx.font = 'bold 26px Arial';
+      ctx.fillText(label.container.toUpperCase(), canvas.width / 2, y);
+      y += 35;
+
+      // Item name
+      ctx.font = 'bold 22px Arial';
+      const itemText = label.item.toUpperCase();
+      if (itemText.length > 20) {
+        // Word wrap if too long
+        const words = itemText.split(' ');
+        let line = '';
+        for (const word of words) {
+          const testLine = line + word + ' ';
+          if (ctx.measureText(testLine).width > canvas.width - 40) {
+            ctx.fillText(line, canvas.width / 2, y);
+            y += 28;
+            line = word + ' ';
+          } else {
+            line = testLine;
+          }
+        }
+        ctx.fillText(line, canvas.width / 2, y);
+        y += 28;
+      } else {
+        ctx.fillText(itemText, canvas.width / 2, y);
+        y += 28;
+      }
+
+      // Quantity
+      ctx.font = 'bold 24px Arial';
+      ctx.fillText(`QTY: ${label.qty}`, canvas.width / 2, y);
+      y += 30;
+
+      // Horizontal line
+      ctx.fillRect(20, y, canvas.width - 40, 2);
+      y += 15;
+
+      // Category/Notes (smaller)
+      if (label.category) {
+        ctx.font = '16px Arial';
+        ctx.fillText(label.category, canvas.width / 2, y);
+      }
+
+      // Convert canvas to 1-bit bitmap
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const bytesPerLine = Math.ceil(canvas.width / 8);
+      const bitmapData = new Uint8Array(bytesPerLine * canvas.height);
+
+      for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          const pixelIndex = (y * canvas.width + x) * 4;
+          const r = imageData.data[pixelIndex];
+          const g = imageData.data[pixelIndex + 1];
+          const b = imageData.data[pixelIndex + 2];
+
+          // Convert to grayscale and threshold
+          const gray = (r + g + b) / 3;
+          const bit = gray < 128 ? 1 : 0; // Black if below threshold
+
+          if (bit) {
+            const byteIndex = y * bytesPerLine + Math.floor(x / 8);
+            const bitIndex = 7 - (x % 8);
+            bitmapData[byteIndex] |= (1 << bitIndex);
+          }
+        }
+      }
+
+      return bitmapData;
+    }
+
+    /**
+     * Print single label
+     */
+    async function printLabel(labelData) {
+      // Initialize printer
+      await sendToPrinter(escPos_initialize());
+
+      // Center alignment
+      await sendToPrinter(escPos_setAlignment(1));
+
+      // Render label to bitmap
+      const bitmap = renderLabelToBitmap(labelData);
+
+      // Print image
+      await sendToPrinter(escPos_printRasterImage(bitmap, LABEL_WIDTH_DOTS, LABEL_HEIGHT_DOTS));
+
+      // Feed paper and cut
+      await sendToPrinter(escPos_feedLines(5));
+
+      // Small delay between labels
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    /**
+     * Generate label data from prep list
+     */
+    function generateLabelsFromPrepList(prep, order) {
+      const labels = [];
+      const orderNum = order.order_number || order.id;
+      const customer = order.customer_name || 'Customer';
+      const date = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
+
+      // BYO Gyros
+      if (prep.byoGyros.total > 0) {
+        const sets = Math.ceil(prep.byoGyros.total / 10);
+
+        for (let i = 0; i < sets; i++) {
+          labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (no dill)', qty: 1, category: 'BYO Gyros' });
+          labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Spicy Aioli', qty: 1, category: 'BYO Gyros' });
+          labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Lemon Vinaigrette', qty: 1, category: 'BYO Gyros' });
+          labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Mixed Greens', qty: 1, category: 'BYO Gyros' });
+        }
+
+        labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Diced Tomatoes', qty: prep.byoGyros.total, category: 'BYO Gyros' });
+        labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Sliced Red Onion', qty: prep.byoGyros.total, category: 'BYO Gyros' });
+        labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Pepperoncini', qty: prep.byoGyros.total, category: 'BYO Gyros' });
+        labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Grilled Pita', qty: prep.byoGyros.total + sets, category: 'BYO Gyros' });
+      }
+
+      // Salads
+      prep.salads.forEach(salad => {
+        const panType = salad.qty < 4 ? '½ Pan' : 'Full Pan';
+        labels.push({ orderNum, customer, date, container: panType, item: salad.name, qty: salad.qty, category: 'Salad' });
+        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Lemon Vinaigrette', qty: salad.qty, category: `${salad.name} Dressing` });
+      });
+
+      // Dips
+      prep.dips.forEach(dip => {
+        labels.push({ orderNum, customer, date, container: '16oz Deli', item: dip.name, qty: dip.qty, category: 'Dip' });
+
+        const hasVeggies = dip.modifiers.some(m => m.name && (m.name.includes('VEGGIES') || m.name.includes('VEGGIE')));
+        const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
+        const gfPitaMod = dip.modifiers.find(m => m.name && m.name.includes('GLUTEN FREE PITA'));
+
+        if (hasVeggies) {
+          labels.push({ orderNum, customer, date, container: 'Brown Bowl', item: 'Carrots', qty: dip.qty * 24, category: `${dip.name} Side` });
+          labels.push({ orderNum, customer, date, container: 'Brown Bowl', item: 'Celery', qty: dip.qty * 24, category: `${dip.name} Side` });
+        }
+        if (hasPita) {
+          labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Sliced Pita', qty: dip.qty * 6, category: `${dip.name} Side` });
+        }
+        if (gfPitaMod) {
+          const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
+          labels.push({ orderNum, customer, date, container: '½ Pan', item: 'GF Pita (Sliced)', qty: gfQty, category: `${dip.name} Side` });
+        }
+      });
+
+      // Greek Fries Bar
+      prep.greekFries.forEach(fries => {
+        labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Greek Fries + Protein', qty: fries.qty, category: 'Greek Fries Bar' });
+        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Spicy Aioli', qty: 1, category: 'Greek Fries Bar' });
+        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki', qty: 1, category: 'Greek Fries Bar' });
+        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Crumbled Feta', qty: 1, category: 'Greek Fries Bar' });
+      });
+
+      // Dolmas
+      prep.dolmas.forEach(dolma => {
+        labels.push({ orderNum, customer, date, container: '½ Pan', item: dolma.name, qty: dolma.qty, category: 'Dolmas' });
+        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (dill stripe)', qty: dolma.qty, category: 'Dolmas' });
+      });
+
+      // Spanakopita
+      prep.spanakopita.forEach(span => {
+        labels.push({ orderNum, customer, date, container: '½ Pan', item: span.name, qty: span.qty, category: 'Spanakopita' });
+        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (dill stripe)', qty: span.qty, category: 'Spanakopita' });
+      });
+
+      // Sides
+      prep.sides.forEach(side => {
+        labels.push({ orderNum, customer, date, container: '½ Pan', item: side.name, qty: side.qty, category: 'Side' });
+      });
+
+      // Desserts
+      prep.desserts.forEach(dessert => {
+        labels.push({ orderNum, customer, date, container: 'Container', item: dessert.name, qty: dessert.qty, category: 'Dessert' });
+      });
+
+      // Pinwheels
+      prep.pinwheels.forEach(pinwheel => {
+        labels.push({ orderNum, customer, date, container: 'Platter', item: pinwheel.name, qty: pinwheel.qty, category: 'Pinwheel' });
+      });
+
+      return labels;
+    }
+
+    /**
+     * Main function: Print all labels for a catering order
+     */
+    async function printLabelsViaBluetooth(event, orderId) {
+      event.preventDefault();
+
+      if (!bluetoothCharacteristic) {
+        showMessage('❌ Printer not connected! Click "CONNECT PRINTER" at the top first.', 'error');
+        return;
+      }
+
+      try {
+        showLoading('Printing Labels', 'Generating labels for all containers...');
+
+        // Fetch order and line items
+        const { data: order, error: orderError } = await supabase
+          .from('catering_orders')
+          .select('*')
+          .eq('id', orderId)
+          .single();
+
+        if (orderError) throw orderError;
+
+        const { data: lineItems, error: itemsError } = await supabase
+          .from('catering_order_items')
+          .select('*')
+          .eq('order_id', orderId)
+          .order('id', { ascending: true });
+
+        if (itemsError) throw itemsError;
+
+        // Calculate prep list
+        const prep = calculatePrepList(lineItems || [], order);
+
+        // Generate labels
+        const labels = generateLabelsFromPrepList(prep, order);
+
+        console.log(`🏷️ Printing ${labels.length} labels...`);
+
+        // Print each label
+        for (let i = 0; i < labels.length; i++) {
+          showLoading('Printing Labels', `Printing label ${i + 1} of ${labels.length}...`);
+          await printLabel(labels[i]);
+        }
+
+        hideLoading();
+        showMessage(`✅ Successfully printed ${labels.length} labels!`, 'success');
+
+      } catch (error) {
+        console.error('❌ Label printing error:', error);
+        hideLoading();
+        showMessage(`❌ Printing failed: ${error.message}`, 'error');
+      }
+    }
+
+    // ==================== END BLUETOOTH THERMAL PRINTER SYSTEM ====================
   </script>
 
   <!-- Image Lightbox Modal -->
