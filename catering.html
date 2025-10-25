@@ -898,6 +898,134 @@
      */
 
     // ============================================
+    // PACIFIC TIMEZONE UTILITIES
+    // ============================================
+    // CRITICAL: Device timezone settings are unreliable (tablets may be set to wrong timezone)
+    // These functions ALWAYS work in America/Los_Angeles timezone regardless of device settings
+
+    /**
+     * Get current date in Pacific timezone as YYYY-MM-DD string
+     */
+    function getPacificToday() {
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      return formatter.format(now); // Returns "YYYY-MM-DD"
+    }
+
+    /**
+     * Format date string (YYYY-MM-DD) as Pacific time display string
+     * Does NOT rely on device timezone settings
+     */
+    function formatPacificDate(dateStr, includeYear = true) {
+      if (!dateStr) return 'N/A';
+
+      // Parse YYYY-MM-DD
+      const [year, month, day] = dateStr.split('-').map(Number);
+
+      // Create UTC date at noon (avoids DST edge cases)
+      const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+
+      // Format in Pacific timezone
+      const options = includeYear
+        ? { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }
+        : { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles' };
+
+      return new Intl.DateTimeFormat('en-US', options).format(utcDate);
+    }
+
+    /**
+     * Format date string (YYYY-MM-DD) as short Pacific time string (e.g., "Oct-25-2025")
+     * Does NOT rely on device timezone settings
+     */
+    function formatPacificDateShort(dateStr) {
+      if (!dateStr) return 'N/A';
+
+      // Parse YYYY-MM-DD
+      const [year, month, day] = dateStr.split('-').map(Number);
+
+      // Create UTC date at noon (avoids DST edge cases)
+      const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+
+      // Format as "Oct 25 2025" then replace spaces with dashes
+      const formatted = new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+        timeZone: 'America/Los_Angeles'
+      }).format(utcDate);
+
+      return formatted.replace(/,/g, '').replace(/\s+/g, '-');
+    }
+
+    /**
+     * Format ISO datetime string as Pacific time (HH:MM AM/PM)
+     */
+    function formatPacificTime(isoTimeStr) {
+      if (!isoTimeStr) return 'TBD';
+
+      try {
+        const date = new Date(isoTimeStr);
+        return new Intl.DateTimeFormat('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'America/Los_Angeles'
+        }).format(date);
+      } catch (e) {
+        console.error('Error formatting time:', e);
+        return 'Invalid Time';
+      }
+    }
+
+    /**
+     * Format ISO datetime string as Pacific time in 24-hour format (HH:MM)
+     */
+    function formatPacificTime24(isoTimeStr) {
+      if (!isoTimeStr) return null;
+
+      try {
+        const date = new Date(isoTimeStr);
+        return new Intl.DateTimeFormat('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+          timeZone: 'America/Los_Angeles'
+        }).format(date);
+      } catch (e) {
+        console.error('Error formatting time:', e);
+        return null;
+      }
+    }
+
+    /**
+     * Compare two date strings and return if first is TODAY/TOMORROW/FUTURE
+     * Comparisons done in Pacific timezone
+     */
+    function getDateRelation(dateStr) {
+      const todayPacific = getPacificToday();
+
+      // Calculate tomorrow in Pacific time
+      const [year, month, day] = todayPacific.split('-').map(Number);
+      const tomorrowDate = new Date(Date.UTC(year, month - 1, day + 1, 12, 0, 0));
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const tomorrowPacific = formatter.format(tomorrowDate);
+
+      if (dateStr === todayPacific) return 'TODAY';
+      if (dateStr === tomorrowPacific) return 'TOMORROW';
+      return 'FUTURE';
+    }
+
+    // ============================================
     // TOAST AUTHENTICATION
     // ============================================
     let toastAccessToken = null;
@@ -1226,39 +1354,24 @@
     }
 
     function formatDateLabel(dateStr) {
-      const date = new Date(dateStr + 'T00:00:00');
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      // Use Pacific timezone utilities (device-independent)
+      const relation = getDateRelation(dateStr);
+      const formattedDate = formatPacificDate(dateStr, true);
 
-      const orderDate = new Date(date);
-      orderDate.setHours(0, 0, 0, 0);
-
-      if (orderDate.getTime() === today.getTime()) {
-        return `TODAY - ${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' })}`;
-      } else if (orderDate.getTime() === tomorrow.getTime()) {
-        return `TOMORROW - ${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' })}`;
+      if (relation === 'TODAY') {
+        return `TODAY - ${formattedDate}`;
+      } else if (relation === 'TOMORROW') {
+        return `TOMORROW - ${formattedDate}`;
       } else {
-        return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
+        return formattedDate;
       }
     }
 
     function getDateClass(dateStr) {
-      const date = new Date(dateStr + 'T00:00:00');
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const orderDate = new Date(date);
-      orderDate.setHours(0, 0, 0, 0);
-
-      if (orderDate.getTime() === today.getTime()) {
-        return 'today';
-      } else if (orderDate.getTime() === tomorrow.getTime()) {
-        return 'tomorrow';
-      }
+      // Use Pacific timezone utilities (device-independent)
+      const relation = getDateRelation(dateStr);
+      if (relation === 'TODAY') return 'today';
+      if (relation === 'TOMORROW') return 'tomorrow';
       return '';
     }
 
@@ -1277,20 +1390,8 @@
     }
 
     function formatTime(timeStr) {
-      if (!timeStr) return 'TBD';
-      try {
-        const date = new Date(timeStr);
-        if (isNaN(date.getTime())) return timeStr;
-
-        const hours = date.getHours();
-        const minutes = date.getMinutes();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const hour12 = hours % 12 || 12;
-        const minuteStr = String(minutes).padStart(2, '0');
-        return `${hour12}:${minuteStr} ${ampm}`;
-      } catch {
-        return timeStr;
-      }
+      // Use Pacific timezone utility (device-independent)
+      return formatPacificTime(timeStr);
     }
 
     function viewOrderDetails(orderId) {
@@ -1568,7 +1669,7 @@
             db_id: order.db_id, // Database ID for fetching line items
             source_type: order.source || 'TOAST',
             order_due_date: order.delivery_date,
-            time_due: order.delivery_time ? new Date(order.delivery_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Los_Angeles' }) : null,
+            time_due: order.delivery_time ? formatPacificTime24(order.delivery_time) : null,
             order_type: order.delivery_address ? 'DELIVERY' : 'PICKUP',
             leave_jayna_at: null,
             guest_name: order.customer_name,
@@ -1821,21 +1922,28 @@
     function formatPhotoDateLabel(dateStr) {
       if (dateStr === 'NO DATE') return 'NO DATE SPECIFIED';
 
-      const date = new Date(dateStr + 'T00:00:00');
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      // Use Pacific timezone utilities (device-independent)
+      const relation = getDateRelation(dateStr);
 
-      const orderDate = new Date(date);
-      orderDate.setHours(0, 0, 0, 0);
+      // Parse and format in Pacific time
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 
-      const dayLabel = date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Los_Angeles' }).toUpperCase();
-      const dateLabel = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }).toUpperCase();
+      const dayLabel = new Intl.DateTimeFormat('en-US', {
+        weekday: 'long',
+        timeZone: 'America/Los_Angeles'
+      }).format(utcDate).toUpperCase();
 
-      if (orderDate.getTime() === today.getTime()) {
+      const dateLabel = new Intl.DateTimeFormat('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'America/Los_Angeles'
+      }).format(utcDate).toUpperCase();
+
+      if (relation === 'TODAY') {
         return `TODAY - ${dayLabel}, ${dateLabel}`;
-      } else if (orderDate.getTime() === tomorrow.getTime()) {
+      } else if (relation === 'TOMORROW') {
         return `TOMORROW - ${dayLabel}, ${dateLabel}`;
       } else {
         return `${dayLabel}, ${dateLabel}`;
@@ -1924,8 +2032,8 @@
               ${order.delivery_date || order.delivery_time ? `
               <div style="margin-bottom: 24px; padding: 16px; background: var(--blue-bg); border: 2px solid var(--primary-blue);">
                 <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--primary-blue);">${order.delivery_address ? 'DELIVERY DETAILS' : 'PICK UP DETAILS'}</h3>
-                ${order.delivery_date ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Date:</strong> ${new Date(order.delivery_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' })}</div>` : ''}
-                ${order.delivery_time ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Time:</strong> ${new Date(order.delivery_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' })}</div>` : ''}
+                ${order.delivery_date ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Date:</strong> ${formatPacificDate(order.delivery_date, true)}</div>` : ''}
+                ${order.delivery_time ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Time:</strong> ${formatPacificTime(order.delivery_time)}</div>` : ''}
                 ${order.delivery_notes ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Notes:</strong> ${order.delivery_notes}</div>` : ''}
               </div>
               ` : ''}
@@ -2469,9 +2577,7 @@
 
         // Format filename for display
         const guestName = (order.customer_name || 'Customer').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
-        const orderDate = order.delivery_date
-          ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', timeZone: 'America/Los_Angeles' }).replace(/,/g, '').replace(/\s+/g, '-')
-          : new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '').replace(/\s+/g, '-');
+        const orderDate = order.delivery_date ? formatPacificDateShort(order.delivery_date) : formatPacificDateShort(getPacificToday());
         const fileName = `Labels_${guestName}_${orderDate}.xlsx`;
 
         // Create download URL
@@ -2523,9 +2629,27 @@
       const customerName = order.customer_name || 'Customer';
       const customerLastName = customerName.split(' ').pop(); // Get last name
       const phoneNumber = order.phone_number || '';
-      const packDate = order.delivery_date
-        ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' })
-        : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      // Format pack date in Pacific time (device-independent)
+      let packDate;
+      if (order.delivery_date) {
+        const [year, month, day] = order.delivery_date.split('-').map(Number);
+        const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        packDate = new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          timeZone: 'America/Los_Angeles'
+        }).format(utcDate);
+      } else {
+        const now = new Date();
+        packDate = new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          timeZone: 'America/Los_Angeles'
+        }).format(now);
+      }
 
       // BYO GYRO PITAS
       if (prep.byoGyros.total > 0) {
@@ -3911,7 +4035,18 @@
     function generateLabelsFromPrepList(prep, order) {
       const orderNum = order.order_number || order.id;
       const customer = order.customer_name || 'Customer';
-      const date = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
+
+      // Format date in Pacific time (device-independent)
+      let date = '';
+      if (order.delivery_date) {
+        const [year, month, day] = order.delivery_date.split('-').map(Number);
+        const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        date = new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'America/Los_Angeles'
+        }).format(utcDate);
+      }
 
       // Create separate arrays for each category group
       const byoGyroLabels = [];
