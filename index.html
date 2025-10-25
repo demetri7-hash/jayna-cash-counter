@@ -2910,42 +2910,39 @@
 
       console.log('🍞 Fetching clocked-in employees from Toast for:', today);
 
-      // Get Toast auth token
-      const token = localStorage.getItem('toastAuthToken');
-      if (!token) {
-        console.warn('⚠️ No Toast auth token - cannot fetch clocked-in employees');
+      // STEP 1: Authenticate with Toast API (like fetchToastCashSalesForDate does)
+      const authResponse = await fetch('/api/toast-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!authResponse.ok) {
+        console.error('❌ Failed to authenticate with Toast API');
         updateClockedInDisplay([]);
         return;
       }
 
-      // Fetch today's time entries from Toast Labor API
-      const response = await fetch(`/api/toast-labor-summary?startDate=${today}&endDate=${today}&token=${encodeURIComponent(token)}`);
-
-      if (!response.ok) {
-        console.error('❌ Failed to fetch Toast time entries:', response.status);
+      const authData = await authResponse.json();
+      if (!authData.success || !authData.data?.accessToken) {
+        console.error('❌ Toast authentication failed');
         updateClockedInDisplay([]);
         return;
       }
 
-      const result = await response.json();
+      const token = authData.data.accessToken;
+      console.log('✅ Toast authenticated');
 
-      if (!result.success) {
-        console.error('❌ Toast labor API error:', result.error);
-        updateClockedInDisplay([]);
-        return;
-      }
-
-      console.log('✅ Toast labor data:', result);
-
-      // The labor summary gives us employees who worked, but we need raw timeEntries to see who's CURRENTLY clocked in
-      // Let me fetch timeEntries directly
+      // STEP 2: Fetch time entries from Toast Labor API
       const restaurantId = 'd3efae34-7c2e-4107-a442-49081e624706';
       const toastApiUrl = 'https://ws-api.toasttab.com';
 
+      // Date format per Toast docs: 2018-11-14T01:00:00.000-0000
       const startDateTime = `${today}T00:00:00.000-0000`;
       const endDateTime = `${today}T23:59:59.999-0000`;
 
       const timeEntriesUrl = `${toastApiUrl}/labor/v1/timeEntries?startDate=${startDateTime}&endDate=${endDateTime}`;
+
+      console.log('🔍 Fetching timeEntries from:', timeEntriesUrl);
 
       const timeEntriesResp = await fetch(timeEntriesUrl, {
         method: 'GET',
@@ -2957,7 +2954,8 @@
       });
 
       if (!timeEntriesResp.ok) {
-        console.error('❌ Failed to fetch Toast timeEntries:', timeEntriesResp.status);
+        const errorText = await timeEntriesResp.text();
+        console.error('❌ Toast timeEntries error:', timeEntriesResp.status, errorText);
         updateClockedInDisplay([]);
         return;
       }
@@ -2969,9 +2967,9 @@
         console.log('🔍 Sample time entry:', JSON.stringify(timeEntries[0], null, 2));
       }
 
-      // Filter for currently clocked in (has inDate but no outDate)
+      // STEP 3: Filter for currently clocked in (outDate is null per Toast docs)
       const clockedIn = timeEntries.filter(entry => {
-        const isClockedIn = entry.inDate && !entry.outDate;
+        const isClockedIn = entry.inDate && entry.outDate === null;
         if (isClockedIn) {
           console.log('✅ Clocked in:', entry.employeeReference?.firstName, entry.employeeReference?.lastName, 'since', entry.inDate);
         }
@@ -2980,7 +2978,7 @@
 
       console.log(`🟢 Currently clocked in: ${clockedIn.length} employees`);
 
-      // Extract employee names
+      // STEP 4: Extract employee names
       const employees = clockedIn.map(entry => {
         const emp = entry.employeeReference || {};
         const firstName = emp.firstName || '';
