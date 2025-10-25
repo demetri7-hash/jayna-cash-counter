@@ -2708,52 +2708,45 @@
      * Print Master expects: Company, Item, Quantity, Customer columns
      */
     function generateLabelsExcel(labels) {
-      // Create array of rows for Excel
+      // Create array of rows for Excel (simplified for Print Master compatibility)
       const data = [
         // Header row
         ['Company', 'Item', 'Quantity', 'Customer']
       ];
 
-      // Add data rows
+      // Add data rows - clean text only, no special formatting
       labels.forEach(label => {
         const company = 'JAYNA GYRO CATERING';
-        const item = label.item; // Menu item name
-        const quantity = `${label.qty} - Pan ${label.pan}`; // Quantity and pan number
-        const customer = `${label.packDate} | ${label.customerLastName}${label.phoneNumber ? ' | ' + label.phoneNumber : ''}`.substring(0, 50);
+        const item = String(label.item || '').trim(); // Clean string
+        const quantity = `${label.qty} - Pan ${label.pan}`;
+
+        // Simplified customer info - remove pipes that might cause issues
+        let customer = `${label.packDate} ${label.customerLastName}`;
+        if (label.phoneNumber) {
+          customer += ` ${label.phoneNumber}`;
+        }
+        customer = customer.substring(0, 50).trim();
 
         data.push([company, item, quantity, customer]);
       });
 
-      // Create workbook and worksheet
+      // Create workbook and worksheet (no fancy formatting)
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(data);
 
-      // Auto-size columns
-      const colWidths = [
-        { wch: 25 }, // Company
-        { wch: 30 }, // Item
-        { wch: 25 }, // Quantity
-        { wch: 35 }  // Customer
-      ];
-      ws['!cols'] = colWidths;
-
       // Add worksheet to workbook
-      XLSX.utils.book_append_sheet(wb, ws, 'Labels');
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-      // Generate Excel file as binary string
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+      // Generate Excel file using array buffer (more reliable for mobile)
+      const wbout = XLSX.write(wb, {
+        bookType: 'xlsx',
+        type: 'array',
+        bookSST: false // Disable shared string table for simpler file
+      });
 
-      // Convert to blob
-      function s2ab(s) {
-        const buf = new ArrayBuffer(s.length);
-        const view = new Uint8Array(buf);
-        for (let i = 0; i < s.length; i++) {
-          view[i] = s.charCodeAt(i) & 0xFF;
-        }
-        return buf;
-      }
-
-      return new Blob([s2ab(wbout)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      return new Blob([wbout], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
     }
 
     // Print Prep List to Epson printer via Gmail
