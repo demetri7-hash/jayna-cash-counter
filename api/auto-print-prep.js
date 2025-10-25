@@ -25,6 +25,42 @@ const GMAIL_USER = 'jaynascans@gmail.com';
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const PRINTER_EMAIL = 'GSS4168CTJJA73@print.epsonconnect.com';
 
+/**
+ * PACIFIC TIMEZONE UTILITIES
+ * Server-side date/time formatting (Vercel runs in UTC, can't rely on local timezone)
+ */
+function formatPacificDate() {
+  const now = new Date();
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'America/Los_Angeles'
+  }).format(now);
+}
+
+function formatPacificDateShort() {
+  const now = new Date();
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'America/Los_Angeles'
+  }).format(now);
+}
+
+function formatPacificDateTime(dateObj) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'America/Los_Angeles'
+  }).format(dateObj);
+}
+
 export default async function handler(req, res) {
   console.log('🤖 Auto-print prep list triggered at', new Date().toISOString());
 
@@ -97,7 +133,7 @@ export default async function handler(req, res) {
     const mailOptions = {
       from: `Jayna Prep List <${GMAIL_USER}>`,
       to: PRINTER_EMAIL,
-      subject: `Print: Prep List - ${new Date().toLocaleDateString()}`,
+      subject: `Print: Prep List - ${formatPacificDateShort()}`,
       text: 'Daily prep list for morning crew.',
       html: `<p><strong>Daily Prep List</strong></p><p>Auto-generated at 4:00 AM for morning prep cook.</p>`,
       attachments: [{
@@ -135,13 +171,6 @@ export default async function handler(req, res) {
 async function generatePrepListPDF(prepItems) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric'
-  });
-
   // Header
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
@@ -149,19 +178,13 @@ async function generatePrepListPDF(prepItems) {
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Date: ${today}`, 40, 60);
+  doc.text(`Date: ${formatPacificDate()}`, 40, 60);
   doc.text('Auto-generated at 4:00 AM', 40, 75);
 
   // Prep table data
   const tableData = prepItems.map(item => {
     const lastCounted = item.last_counted_date
-      ? new Date(item.last_counted_date).toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        })
+      ? formatPacificDateTime(new Date(item.last_counted_date))
       : 'Never';
 
     return [

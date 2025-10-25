@@ -18,6 +18,54 @@ const GMAIL_USER = 'jaynascans@gmail.com';
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const PRINTER_EMAIL = 'GSS4168CTJJA73@print.epsonconnect.com';
 
+/**
+ * PACIFIC TIMEZONE UTILITIES
+ * Server-side date/time formatting (Vercel runs in UTC, can't rely on local timezone)
+ */
+function formatPacificDateShort(dateStr) {
+  if (!dateStr) return 'N/A';
+
+  // Parse YYYY-MM-DD manually
+  const [year, month, day] = dateStr.split('-').map(Number);
+
+  // Create UTC date at noon (avoids DST edge cases)
+  const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+
+  // Format in Pacific timezone (short format)
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'America/Los_Angeles'
+  }).format(utcDate);
+}
+
+function formatPacificTime(isoTimeStr) {
+  if (!isoTimeStr) return 'N/A';
+
+  const date = new Date(isoTimeStr);
+  return new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'America/Los_Angeles'
+  }).format(date);
+}
+
+function formatPacificDateTime(dateObj) {
+  if (!dateObj) return 'N/A';
+
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'America/Los_Angeles'
+  }).format(dateObj);
+}
+
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -211,12 +259,10 @@ function generatePrepListPDF(prep, order, lineItems) {
   yPos += 15;
 
   if (order.delivery_date) {
-    const deliveryDate = new Date(order.delivery_date + 'T00:00:00');
-    doc.text(`${order.delivery_address ? 'Delivery' : 'Pickup'}: ${deliveryDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })}`, 40, yPos);
+    doc.text(`${order.delivery_address ? 'Delivery' : 'Pickup'}: ${formatPacificDateShort(order.delivery_date)}`, 40, yPos);
   }
   if (order.delivery_time) {
-    const dueTime = new Date(order.delivery_time);
-    doc.text(` at ${dueTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' })}`, 180, yPos);
+    doc.text(` at ${formatPacificTime(order.delivery_time)}`, 180, yPos);
   }
   yPos += 15;
 
@@ -541,7 +587,7 @@ function generatePrepListPDF(prep, order, lineItems) {
   // Footer
   doc.setFontSize(8);
   doc.setFont('helvetica', 'italic');
-  doc.text(`Generated: ${new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}`, 40, 770);
+  doc.text(`Generated: ${formatPacificDateTime(new Date())}`, 40, 770);
 
   // Convert to base64
   return doc.output('datauristring').split(',')[1];
