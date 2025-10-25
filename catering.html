@@ -2068,6 +2068,8 @@
         salads: [],
         dips: [],
         greekFries: [],
+        dolmas: [],
+        spanakopita: [],
         sides: [],
         desserts: [],
         pinwheels: [],
@@ -2097,8 +2099,16 @@
         else if (itemName.includes('GREEK FRIES BAR')) {
           prep.greekFries.push({ name: item.item_name, qty, modifiers });
         }
-        // SIDES
-        else if (itemName.includes('GREEK FRIES') || itemName.includes('CHICKPEA') || itemName.includes('DOLMAS') || itemName.includes('SPANAKOPITA') || itemName.includes('GRILLED PITA') || itemName.includes('VEGETABLE STICKS') || itemName.includes('MARINATED OLIVES')) {
+        // DOLMAS (separate because needs tzatziki + tong)
+        else if (itemName.includes('DOLMAS')) {
+          prep.dolmas.push({ name: item.item_name, qty, modifiers });
+        }
+        // SPANAKOPITA (separate because needs tzatziki + tong)
+        else if (itemName.includes('SPANAKOPITA')) {
+          prep.spanakopita.push({ name: item.item_name, qty, modifiers });
+        }
+        // SIDES (everything else)
+        else if (itemName.includes('GREEK FRIES') || itemName.includes('CHICKPEA') || itemName.includes('GRILLED PITA') || itemName.includes('VEGETABLE STICKS') || itemName.includes('MARINATED OLIVES')) {
           prep.sides.push({ name: item.item_name, qty, modifiers });
         }
         // DESSERTS
@@ -2204,6 +2214,34 @@
           html += `<div style="margin-left: 16px;">→ ½ pan Greek Fries topped with protein</div>`;
           html += `<div style="margin-left: 16px;">→ 16oz Spicy Aioli, 16oz Tzatziki, 16oz Crumbled Feta</div>`;
           html += `<div style="margin-left: 16px;">→ 1 tong, 3 plastic spoons</div>`;
+        });
+        html += `</div>`;
+      }
+
+      // DOLMAS
+      if (prep.dolmas.length > 0) {
+        html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">DOLMAS</h4>`;
+        html += `<div style="margin-left: 16px;">`;
+        prep.dolmas.forEach(dolma => {
+          deliContainers += dolma.qty; // 16oz tzatziki per order
+          tongs += dolma.qty; // 1 tong per order
+          html += `<div>☐ ${dolma.qty}x ${dolma.name} (½ pan or round tray with lemon wedges)</div>`;
+          html += `<div style="margin-left: 16px;">→ ${dolma.qty}x 16oz Tzatziki (with dill stripe garnish)</div>`;
+          html += `<div style="margin-left: 16px;">→ ${dolma.qty}x Tong</div>`;
+        });
+        html += `</div>`;
+      }
+
+      // SPANAKOPITA
+      if (prep.spanakopita.length > 0) {
+        html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">SPANAKOPITA</h4>`;
+        html += `<div style="margin-left: 16px;">`;
+        prep.spanakopita.forEach(span => {
+          deliContainers += span.qty; // 16oz tzatziki per order
+          tongs += span.qty; // 1 tong per order
+          html += `<div>☐ ${span.qty}x ${span.name} (round tray on bed of arugula OR ½/full pan)</div>`;
+          html += `<div style="margin-left: 16px;">→ ${span.qty}x 16oz Tzatziki (with dill stripe garnish)</div>`;
+          html += `<div style="margin-left: 16px;">→ ${span.qty}x Tong</div>`;
         });
         html += `</div>`;
       }
