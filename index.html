@@ -2918,15 +2918,24 @@
         return;
       }
 
-      console.log('✅ Homebase timecards response:', result.data);
+      console.log('✅ Full Homebase API response:', JSON.stringify(result, null, 2));
 
       // Timecards response structure: result.data.timecards (array)
-      const timecards = result.data.timecards || [];
+      const timecards = result.data.timecards || result.data || [];
+
+      console.log(`📊 Total timecards returned: ${timecards.length}`);
+
+      if (timecards.length > 0) {
+        console.log('🔍 Sample timecard:', JSON.stringify(timecards[0], null, 2));
+      }
 
       // Filter for currently clocked in (has clock_in_time but no clock_out_time)
       const clockedIn = timecards.filter(tc => {
-        // Homebase timecard structure: clock_in_time and clock_out_time
-        return tc.clock_in_time && !tc.clock_out_time;
+        const isClockedIn = tc.clock_in_time && !tc.clock_out_time;
+        if (isClockedIn) {
+          console.log('✅ Clocked in:', tc.employee?.first_name, tc.employee?.last_name, 'since', tc.clock_in_time);
+        }
+        return isClockedIn;
       });
 
       console.log(`🟢 Currently clocked in: ${clockedIn.length} employees`);
