@@ -238,11 +238,21 @@ export default async function handler(req, res) {
       // Get email
       const customerEmail = customer.email || null;
 
-      // Parse business date to readable format
-      const dateStr = order.businessDate?.toString() || '';
-      const deliveryDate = dateStr.length === 8
-        ? `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`
-        : null;
+      // EXTRACT DELIVERY DATE from promisedDate (scheduled delivery/pickup time), NOT businessDate (order creation date)
+      // promisedDate format: "2025-10-25T13:00:00.000+0000" (ISO 8601 with time)
+      // Extract just the date portion (YYYY-MM-DD)
+      let deliveryDate = null;
+      if (order.promisedDate) {
+        // Parse promisedDate to get date only (ignore time)
+        const promisedDateStr = order.promisedDate.split('T')[0]; // Get "2025-10-25" from "2025-10-25T13:00:00.000+0000"
+        deliveryDate = promisedDateStr; // Already in YYYY-MM-DD format
+      } else {
+        // Fallback to businessDate if no promisedDate (shouldn't happen for catering orders)
+        const dateStr = order.businessDate?.toString() || '';
+        deliveryDate = dateStr.length === 8
+          ? `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`
+          : null;
+      }
 
       // Build full delivery address from parts
       let deliveryAddress = null;
