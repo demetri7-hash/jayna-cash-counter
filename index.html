@@ -2893,11 +2893,11 @@
   // Update session status on page load
   document.addEventListener('DOMContentLoaded', updateSessionStatus);
 
-  // ==================== HOMEBASE CLOCKED IN DISPLAY ====================
+  // ==================== TOAST CLOCKED IN DISPLAY ====================
 
   async function fetchClockedInEmployees() {
     try {
-      // Get TODAY in Pacific timezone (not UTC!)
+      // Get TODAY in YYYY-MM-DD format (Pacific time)
       const todayPacific = new Date().toLocaleString('en-US', {
         timeZone: 'America/Los_Angeles',
         year: 'numeric',
@@ -2905,83 +2905,87 @@
         day: '2-digit'
       });
 
-      // Convert from MM/DD/YYYY to YYYY-MM-DD
       const [month, day, year] = todayPacific.split(', ')[0].split('/');
       const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
-      console.log('🏠 Fetching clocked-in employees for (Pacific time):', today);
+      console.log('🍞 Fetching clocked-in employees from Toast for:', today);
 
-      // Fetch today's timecards from Homebase (CORRECT endpoint based on manager.html)
-      const response = await fetch('/api/homebase-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          endpoint: `/locations/LOCATION_UUID/timecards?start_date=${today}&end_date=${today}`
-        })
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
-        console.error('❌ Failed to fetch timecards:', result.error);
+      // Get Toast auth token
+      const token = localStorage.getItem('toastAuthToken');
+      if (!token) {
+        console.warn('⚠️ No Toast auth token - cannot fetch clocked-in employees');
         updateClockedInDisplay([]);
         return;
       }
 
-      console.log('✅ Full Homebase API response:', JSON.stringify(result, null, 2));
+      // Fetch today's time entries from Toast Labor API
+      const response = await fetch(`/api/toast-labor-summary?startDate=${today}&endDate=${today}&token=${encodeURIComponent(token)}`);
 
-      // Timecards response structure: result.data.timecards (array)
-      const timecards = result.data.timecards || result.data || [];
-
-      console.log(`📊 Total timecards returned: ${timecards.length}`);
-
-      if (timecards.length > 0) {
-        console.log('🔍 Sample timecard:', JSON.stringify(timecards[0], null, 2));
+      if (!response.ok) {
+        console.error('❌ Failed to fetch Toast time entries:', response.status);
+        updateClockedInDisplay([]);
+        return;
       }
 
-      // CRITICAL: If no timecards today, test with last 7 days to verify API is working
-      if (timecards.length === 0) {
-        console.warn('⚠️ No timecards for today. Testing API with last week...');
-        const lastWeek = new Date();
-        lastWeek.setDate(lastWeek.getDate() - 7);
-        const lastWeekStr = lastWeek.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }).split(',')[0];
-        const [m, d, y] = lastWeekStr.split('/');
-        const weekAgo = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      const result = await response.json();
 
-        const testResp = await fetch('/api/homebase-proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            endpoint: `/locations/LOCATION_UUID/timecards?start_date=${weekAgo}&end_date=${today}`
-          })
-        });
-        const testData = await testResp.json();
-        const weekTimecards = Array.isArray(testData.data) ? testData.data : [];
-        console.log(`📊 Last 7 days: ${weekTimecards.length} total timecards`);
-        if (weekTimecards.length > 0) {
-          console.log('✅ API works! Sample:', JSON.stringify(weekTimecards[0], null, 2));
+      if (!result.success) {
+        console.error('❌ Toast labor API error:', result.error);
+        updateClockedInDisplay([]);
+        return;
+      }
+
+      console.log('✅ Toast labor data:', result);
+
+      // The labor summary gives us employees who worked, but we need raw timeEntries to see who's CURRENTLY clocked in
+      // Let me fetch timeEntries directly
+      const restaurantId = 'd3efae34-7c2e-4107-a442-49081e624706';
+      const toastApiUrl = 'https://ws-api.toasttab.com';
+
+      const startDateTime = `${today}T00:00:00.000-0000`;
+      const endDateTime = `${today}T23:59:59.999-0000`;
+
+      const timeEntriesUrl = `${toastApiUrl}/labor/v1/timeEntries?startDate=${startDateTime}&endDate=${endDateTime}`;
+
+      const timeEntriesResp = await fetch(timeEntriesUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Toast-Restaurant-External-ID': restaurantId,
+          'Content-Type': 'application/json'
         }
+      });
+
+      if (!timeEntriesResp.ok) {
+        console.error('❌ Failed to fetch Toast timeEntries:', timeEntriesResp.status);
+        updateClockedInDisplay([]);
+        return;
       }
 
-      // Filter for currently clocked in (use clock_in/clock_out like manager.html)
-      const clockedIn = timecards.filter(tc => {
-        const isClockedIn = tc.clock_in && !tc.clock_out;
+      const timeEntries = await timeEntriesResp.json();
+      console.log(`📊 Total time entries today: ${timeEntries.length}`);
+
+      if (timeEntries.length > 0) {
+        console.log('🔍 Sample time entry:', JSON.stringify(timeEntries[0], null, 2));
+      }
+
+      // Filter for currently clocked in (has inDate but no outDate)
+      const clockedIn = timeEntries.filter(entry => {
+        const isClockedIn = entry.inDate && !entry.outDate;
         if (isClockedIn) {
-          console.log('✅ Clocked in:', tc.employee?.first_name, tc.employee?.last_name, 'since', tc.clock_in);
+          console.log('✅ Clocked in:', entry.employeeReference?.firstName, entry.employeeReference?.lastName, 'since', entry.inDate);
         }
         return isClockedIn;
       });
 
       console.log(`🟢 Currently clocked in: ${clockedIn.length} employees`);
 
-      // Extract employee names from timecard objects
-      const employees = clockedIn.map(tc => {
-        // Homebase timecard includes employee object
-        const employee = tc.employee || {};
-        const firstName = employee.first_name || '';
-        const lastName = employee.last_name || '';
-        const fullName = `${firstName} ${lastName}`.trim();
-        return fullName || 'Unknown';
+      // Extract employee names
+      const employees = clockedIn.map(entry => {
+        const emp = entry.employeeReference || {};
+        const firstName = emp.firstName || '';
+        const lastName = emp.lastName || '';
+        return `${firstName} ${lastName}`.trim() || 'Unknown';
       });
 
       updateClockedInDisplay(employees);
