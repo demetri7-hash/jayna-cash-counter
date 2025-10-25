@@ -2475,26 +2475,35 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
 
-        // Open in new tab (better for mobile - allows native save/share)
-        const newWindow = window.open(url, '_blank');
+        // Download CSV file (works better on mobile than opening in tab)
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
 
-        if (!newWindow) {
-          // If popup blocked, fall back to download
-          const link = document.createElement('a');
-          link.setAttribute('href', url);
-          link.setAttribute('download', fileName);
-          link.style.visibility = 'hidden';
-          document.body.appendChild(link);
-          link.click();
+        // For iOS compatibility
+        link.style.display = 'none';
+        document.body.appendChild(link);
+
+        // Trigger download
+        link.click();
+
+        // Cleanup
+        setTimeout(() => {
           document.body.removeChild(link);
-          console.log('⚠️ Popup blocked - using download fallback');
-        } else {
-          console.log('✅ CSV opened in new tab');
-        }
+          URL.revokeObjectURL(url);
+        }, 100);
 
         hideLoading();
 
         console.log(`✅ LABELS EXPORTED! ${labels.length} labels | File: ${fileName}`);
+        console.log(`📱 Next steps:
+1. Find the downloaded CSV file in your Downloads folder or Files app
+2. Open Print Master app on your phone
+3. Create a new label template (40x30mm for M110)
+4. Click the "Excel" import button
+5. Select the downloaded CSV file: ${fileName}
+6. Map columns: Company → Line 1, Item → Line 2, Quantity → Line 3, Customer → Line 4
+7. Print your batch labels!`);
 
       } catch (error) {
         console.error('❌ Label export error:', error);
@@ -2694,16 +2703,17 @@
 
     /**
      * Generate CSV format compatible with Phomemo Print Master app
-     * Format: Line 1 = Company, Line 2 = Menu Item, Line 3 = Qty/Pan, Line 4 = Date/Customer
+     * Print Master expects: Company, Item, Quantity, Customer columns
      */
     function generateLabelsCSV(labels) {
-      let csv = 'Line 1,Line 2,Line 3,Line 4\n'; // Header row
+      // Header row with meaningful column names for Print Master
+      let csv = 'Company,Item,Quantity,Customer\n';
 
       labels.forEach(label => {
-        const line1 = 'JAYNA GYRO CATERING';
-        const line2 = label.item; // Menu item name
-        const line3 = `${label.qty} - Pan ${label.pan}`; // Quantity and pan number
-        const line4 = `${label.packDate} | ${label.customerLastName}${label.phoneNumber ? ' | ' + label.phoneNumber : ''}`.substring(0, 50); // Date and customer (truncate to fit)
+        const company = 'JAYNA GYRO CATERING';
+        const item = label.item; // Menu item name
+        const quantity = `${label.qty} - Pan ${label.pan}`; // Quantity and pan number
+        const customer = `${label.packDate} | ${label.customerLastName}${label.phoneNumber ? ' | ' + label.phoneNumber : ''}`.substring(0, 50);
 
         // Escape commas and quotes in CSV
         const escapeCsvField = (field) => {
@@ -2713,7 +2723,7 @@
           return field;
         };
 
-        csv += `${escapeCsvField(line1)},${escapeCsvField(line2)},${escapeCsvField(line3)},${escapeCsvField(line4)}\n`;
+        csv += `${escapeCsvField(company)},${escapeCsvField(item)},${escapeCsvField(quantity)},${escapeCsvField(customer)}\n`;
       });
 
       return csv;
