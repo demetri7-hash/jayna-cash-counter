@@ -257,6 +257,13 @@
     <div class="header">
       <h1>JAYNA GYRO</h1>
       <p>COST OF GOODS MANAGEMENT</p>
+
+      <!-- CURRENTLY CLOCKED IN -->
+      <div id="clockedInContainer" style="margin: 8px 0; text-align: center;">
+        <div id="clockedInList" style="color: #2e7d32; font-size: 12px; font-weight: 500;">
+          Loading...
+        </div>
+      </div>
     </div>
 
     <div class="content">
@@ -3317,6 +3324,115 @@
         alert('Error saving template: ' + error.message);
       }
     }
+
+    // ==================== TOAST CLOCKED IN DISPLAY ====================
+
+    async function fetchClockedInEmployees() {
+      try {
+        // Get TODAY in YYYY-MM-DD format (Pacific time)
+        const todayPacific = new Date().toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+
+        const [month, day, year] = todayPacific.split(', ')[0].split('/');
+        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+        console.log('🍞 Fetching clocked-in employees from Toast for:', today);
+
+        // STEP 1: Authenticate with Toast API
+        const authResponse = await fetch('/api/toast-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!authResponse.ok) {
+          console.error('❌ Failed to authenticate with Toast API');
+          updateClockedInDisplay([]);
+          return;
+        }
+
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) {
+          console.error('❌ Toast authentication failed');
+          updateClockedInDisplay([]);
+          return;
+        }
+
+        const token = authData.data.accessToken;
+        console.log('✅ Toast authenticated');
+
+        // STEP 2: Fetch clocked-in employees via serverless function
+        const clockedInUrl = `/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`;
+
+        console.log('🔍 Fetching clocked-in employees from serverless function');
+
+        const response = await fetch(clockedInUrl);
+
+        if (!response.ok) {
+          console.error('❌ Failed to fetch clocked-in employees:', response.status);
+          updateClockedInDisplay([]);
+          return;
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          console.error('❌ Clocked-in API error:', result.error);
+          updateClockedInDisplay([]);
+          return;
+        }
+
+        console.log(`📊 Total time entries today: ${result.totalTimeEntries}`);
+        console.log(`🟢 Currently clocked in: ${result.count} employees`);
+
+        if (result.clockedIn.length > 0) {
+          console.log('✅ Clocked in employees:', result.clockedIn);
+        }
+
+        // Extract employee names
+        const employees = result.clockedIn.map(emp => emp.fullName);
+
+        updateClockedInDisplay(employees);
+
+      } catch (error) {
+        console.error('❌ Error fetching clocked in employees:', error);
+        updateClockedInDisplay([]);
+      }
+    }
+
+    function updateClockedInDisplay(employees) {
+      const listDiv = document.getElementById('clockedInList');
+
+      if (!listDiv) return;
+
+      if (employees.length === 0) {
+        listDiv.innerHTML = '<span style="color: #999; font-size: 11px; font-style: italic;">No one clocked in</span>';
+        return;
+      }
+
+      // Display names in green separated by pipes with "clocked in" caption at bottom
+      const namesText = employees.join(' | ');
+      listDiv.innerHTML = `
+        <div style="color: #2e7d32; font-size: 12px; font-weight: 500;">
+          ${namesText}
+        </div>
+        <div style="color: #666; font-size: 9px; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px;">
+          Clocked In
+        </div>
+      `;
+    }
+
+    // Fetch on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      fetchClockedInEmployees();
+      // Auto-refresh every 5 minutes
+      setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
+    });
+
+    // ==================== END CLOCKED IN DISPLAY ====================
   </script>
 </body>
 </html>
