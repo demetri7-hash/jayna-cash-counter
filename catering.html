@@ -2443,12 +2443,11 @@
 
         if (!result.success) {
           hideLoading();
-          showMessage(`Failed to load order: ${result.error}`, 'error');
+          console.error('Failed to load order:', result.error);
           return;
         }
 
-        const order = result.order;
-        const lineItems = result.items || [];
+        const { order, lineItems } = result.data;
 
         // Calculate prep list
         const prep = calculatePrepList(lineItems, order);
@@ -2458,7 +2457,7 @@
 
         if (labels.length === 0) {
           hideLoading();
-          showMessage('No containers found to label for this order.', 'error');
+          console.log('No containers found to label for this order.');
           return;
         }
 
@@ -2481,14 +2480,11 @@
 
         hideLoading();
 
-        showMessage(`✅ LABELS EXPORTED! ${labels.length} labels generated. File: ${fileName}. Import into Phomemo Print Master app.`, 'success');
-
-        console.log(`✅ Exported ${labels.length} labels`);
+        console.log(`✅ LABELS EXPORTED! ${labels.length} labels | File: ${fileName}`);
 
       } catch (error) {
         console.error('❌ Label export error:', error);
         hideLoading();
-        showMessage(`❌ LABEL EXPORT FAILED! Error: ${error.message}`, 'error');
       }
     }
 
