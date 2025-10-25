@@ -3158,9 +3158,16 @@
         </div>
       `;
     } else if (!session.is_complete) {
-      // Active session - show cancel and save buttons
+      // Active session - show cancel and close buttons
       html += `
-        <div style="margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap;">
+        <!-- Auto-save disclaimer -->
+        <div style="margin-top: 24px; padding: 12px; background: var(--success-bg); border-left: 4px solid var(--success-border); text-align: center;">
+          <p style="margin: 0; font-size: 13px; font-weight: 600; color: var(--success-text); letter-spacing: 0.5px;">
+            ✓ Everything saved and up to date!
+          </p>
+        </div>
+
+        <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
           <button
             onclick="confirmCancelChecklist()"
             style="
@@ -3183,7 +3190,7 @@
           >CANCEL CHECKLIST</button>
 
           <button
-            onclick="completeChecklistSession()"
+            onclick="renderWorkflowSelector()"
             style="
               flex: 2;
               min-width: 200px;
@@ -3201,7 +3208,7 @@
             "
             onmouseover="this.style.background='#047857'"
             onmouseout="this.style.background='var(--success-border)'"
-          >💾 SAVE PROGRESS</button>
+          >CLOSE LIST</button>
         </div>
       `;
     } else {
@@ -3832,10 +3839,12 @@
   }
 
   /**
-   * Save Checklist Progress
-   * Does NOT mark session as complete - only updates timestamp
-   * Session will be marked complete when time window expires
+   * DEPRECATED: Save Checklist Progress (NO LONGER USED)
+   * Replaced with auto-save on every action (checkbox toggle, rating, photo, etc.)
+   * "CLOSE LIST" button now just returns to checklist list without saving
+   * Session auto-completes when time window expires
    */
+  /*
   async function completeChecklistSession() {
     // Safety checks
     if (!fohSystemState.currentSession || !fohSystemState.currentSession.id) {
@@ -3895,6 +3904,7 @@
       showMessage(`Error completing checklist: ${error.message}`, 'error');
     }
   }
+  */
 
   /**
    * Confirm Cancel Checklist
