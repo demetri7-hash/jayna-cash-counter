@@ -2472,7 +2472,7 @@
         const orderDate = order.delivery_date
           ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', timeZone: 'America/Los_Angeles' }).replace(/,/g, '').replace(/\s+/g, '-')
           : new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '').replace(/\s+/g, '-');
-        const fileName = `Labels_${guestName}_${orderDate}.xlsx`;
+        const fileName = `Labels_${guestName}_${orderDate}.xls`;
 
         // Create download URL
         const url = URL.createObjectURL(excelBlob);
@@ -2749,15 +2749,15 @@
       // Add to workbook
       XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-      // Write with SHARED STRINGS TABLE enabled (like manual Excel files)
+      // Write as Excel 97-2003 format (.xls) - more compatible with Print Master
+      // This is a simpler binary format that matches what Excel actually creates
       const wbout = XLSX.write(wb, {
-        bookType: 'xlsx',
-        type: 'array',
-        bookSST: true  // CRITICAL: Use shared strings table like native Excel
+        bookType: 'biff8',  // Excel 97-2003 format (more compatible)
+        type: 'array'
       });
 
       return new Blob([wbout], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        type: 'application/vnd.ms-excel'  // MIME type for .xls files
       });
     }
 
