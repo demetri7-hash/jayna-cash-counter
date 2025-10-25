@@ -2939,11 +2939,35 @@
         console.log('🔍 Sample timecard:', JSON.stringify(timecards[0], null, 2));
       }
 
-      // Filter for currently clocked in (has clock_in_time but no clock_out_time)
+      // CRITICAL: If no timecards today, test with last 7 days to verify API is working
+      if (timecards.length === 0) {
+        console.warn('⚠️ No timecards for today. Testing API with last week...');
+        const lastWeek = new Date();
+        lastWeek.setDate(lastWeek.getDate() - 7);
+        const lastWeekStr = lastWeek.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }).split(',')[0];
+        const [m, d, y] = lastWeekStr.split('/');
+        const weekAgo = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+
+        const testResp = await fetch('/api/homebase-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            endpoint: `/locations/LOCATION_UUID/timecards?start_date=${weekAgo}&end_date=${today}`
+          })
+        });
+        const testData = await testResp.json();
+        const weekTimecards = Array.isArray(testData.data) ? testData.data : [];
+        console.log(`📊 Last 7 days: ${weekTimecards.length} total timecards`);
+        if (weekTimecards.length > 0) {
+          console.log('✅ API works! Sample:', JSON.stringify(weekTimecards[0], null, 2));
+        }
+      }
+
+      // Filter for currently clocked in (use clock_in/clock_out like manager.html)
       const clockedIn = timecards.filter(tc => {
-        const isClockedIn = tc.clock_in_time && !tc.clock_out_time;
+        const isClockedIn = tc.clock_in && !tc.clock_out;
         if (isClockedIn) {
-          console.log('✅ Clocked in:', tc.employee?.first_name, tc.employee?.last_name, 'since', tc.clock_in_time);
+          console.log('✅ Clocked in:', tc.employee?.first_name, tc.employee?.last_name, 'since', tc.clock_in);
         }
         return isClockedIn;
       });
