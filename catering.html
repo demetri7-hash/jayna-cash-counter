@@ -2464,20 +2464,21 @@
           return;
         }
 
-        // Generate Excel file
-        const excelBlob = generateLabelsExcel(labels);
+        // Generate simple CSV file (more compatible than Excel)
+        const csvContent = generateSimpleCSV(labels);
 
         // Format filename for display
         const guestName = (order.customer_name || 'Customer').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
         const orderDate = order.delivery_date
           ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', timeZone: 'America/Los_Angeles' }).replace(/,/g, '').replace(/\s+/g, '-')
           : new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '').replace(/\s+/g, '-');
-        const fileName = `Labels_${guestName}_${orderDate}.xlsx`;
+        const fileName = `Labels_${guestName}_${orderDate}.csv`;
 
         // Create download URL
-        const url = URL.createObjectURL(excelBlob);
+        const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(csvBlob);
 
-        // Download Excel file
+        // Download CSV file
         const link = document.createElement('a');
         link.href = url;
         link.download = fileName;
@@ -2499,13 +2500,13 @@
 
         console.log(`✅ LABELS EXPORTED! ${labels.length} labels | File: ${fileName}`);
         console.log(`📱 Next steps:
-1. Find the downloaded Excel file in your Downloads folder or Files app
+1. Find the downloaded CSV file in your Downloads folder or Files app
 2. Open Print Master app on your phone
-3. Create a new label template (40x30mm for M110)
-4. Click the "Excel" import button
-5. Select the downloaded Excel file: ${fileName}
-6. Map columns: Company → Line 1, Item → Line 2, Quantity → Line 3, Customer → Line 4
-7. Print your batch labels!`);
+3. Create a NEW LABEL TEMPLATE first (40x30mm for M110) with 4 text fields
+4. After creating the template, click the "Excel" import button
+5. Select the downloaded CSV file: ${fileName}
+6. The app should automatically map the 4 columns to your 4 text fields
+7. Preview and print your batch labels!`);
 
       } catch (error) {
         console.error('❌ Label export error:', error);
@@ -2701,6 +2702,25 @@
       });
 
       return labels;
+    }
+
+    /**
+     * Generate ultra-simple CSV (more compatible than Excel with Print Master)
+     */
+    function generateSimpleCSV(labels) {
+      // Ultra-simple CSV - just plain text, no quotes unless absolutely necessary
+      let csv = 'Company,Item,Quantity,Customer\n';
+
+      labels.forEach(label => {
+        const company = 'JAYNA GYRO CATERING';
+        const item = String(label.item || '').replace(/,/g, ' '); // Remove commas
+        const quantity = String(label.qty + ' - Pan ' + label.pan).replace(/,/g, ' ');
+        const customer = String(label.packDate + ' ' + label.customerLastName).replace(/,/g, ' ');
+
+        csv += `${company},${item},${quantity},${customer}\n`;
+      });
+
+      return csv;
     }
 
     /**
