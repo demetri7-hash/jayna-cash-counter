@@ -2897,9 +2897,19 @@
 
   async function fetchClockedInEmployees() {
     try {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      // Get TODAY in Pacific timezone (not UTC!)
+      const todayPacific = new Date().toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
 
-      console.log('🏠 Fetching clocked-in employees for:', today);
+      // Convert from MM/DD/YYYY to YYYY-MM-DD
+      const [month, day, year] = todayPacific.split(', ')[0].split('/');
+      const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+      console.log('🏠 Fetching clocked-in employees for (Pacific time):', today);
 
       // Fetch today's timecards from Homebase (CORRECT endpoint based on manager.html)
       const response = await fetch('/api/homebase-proxy', {
