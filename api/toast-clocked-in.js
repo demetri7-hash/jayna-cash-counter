@@ -29,13 +29,44 @@ export default async function handler(req, res) {
 
     console.log(`Fetching clocked-in employees for ${date}`);
 
-    // Date format per Toast docs: yyyy-MM-dd'T'HH:mm:ss.SSS-0000
+    // STEP 1: Fetch all employees (to get names)
+    const employeesUrl = `${toastApiUrl}/labor/v1/employees`;
+
+    console.log('Fetching employees list...');
+
+    const employeesResponse = await fetch(employeesUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Toast-Restaurant-External-ID': restaurantId,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!employeesResponse.ok) {
+      const errorText = await employeesResponse.text();
+      console.error(`Failed to fetch employees: ${employeesResponse.status}`, errorText);
+      return res.status(employeesResponse.status).json({
+        error: 'Failed to fetch employees from Toast',
+        details: errorText
+      });
+    }
+
+    const employees = await employeesResponse.json();
+    console.log(`Found ${employees.length} employees`);
+
+    // Create employee map by GUID for fast lookup
+    const employeeMap = {};
+    employees.forEach(emp => {
+      employeeMap[emp.guid] = emp;
+    });
+
+    // STEP 2: Fetch time entries
     const startDateTime = `${date}T00:00:00.000-0000`;
     const endDateTime = `${date}T23:59:59.999-0000`;
-
     const timeEntriesUrl = `${toastApiUrl}/labor/v1/timeEntries?startDate=${startDateTime}&endDate=${endDateTime}`;
 
-    console.log(`Fetching from: ${timeEntriesUrl}`);
+    console.log(`Fetching time entries from: ${timeEntriesUrl}`);
 
     const timeEntriesResponse = await fetch(timeEntriesUrl, {
       method: 'GET',
@@ -58,7 +89,6 @@ export default async function handler(req, res) {
     const timeEntries = await timeEntriesResponse.json();
     console.log(`Found ${timeEntries.length} time entries`);
 
-    // Validate response structure
     if (!Array.isArray(timeEntries)) {
       console.error('timeEntries is not an array:', typeof timeEntries);
       return res.status(500).json({
@@ -67,30 +97,37 @@ export default async function handler(req, res) {
       });
     }
 
-    // Filter for currently clocked in (outDate is null)
+    // STEP 3: Filter for currently clocked in (outDate is null)
     const clockedIn = timeEntries.filter(entry => {
       return entry.inDate && entry.outDate === null;
     });
 
     console.log(`Currently clocked in: ${clockedIn.length} employees`);
 
-    // Extract employee names and details
-    const employees = clockedIn.map(entry => {
-      const emp = entry.employeeReference || {};
+    // STEP 4: Match with employee details
+    const clockedInEmployees = clockedIn.map(entry => {
+      const empGuid = entry.employeeReference?.guid;
+      const employee = employeeMap[empGuid] || {};
+
+      const firstName = employee.firstName || '';
+      const lastName = employee.lastName || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+
       return {
-        firstName: emp.firstName || '',
-        lastName: emp.lastName || '',
-        fullName: `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
+        firstName: firstName,
+        lastName: lastName,
+        fullName: fullName || 'Unknown',
         clockInTime: entry.inDate,
-        jobReference: entry.jobReference?.name || 'Unknown'
+        jobReference: entry.jobReference?.name || 'Unknown',
+        guid: empGuid
       };
     });
 
     return res.json({
       success: true,
       date: date,
-      clockedIn: employees,
-      count: employees.length,
+      clockedIn: clockedInEmployees,
+      count: clockedInEmployees.length,
       totalTimeEntries: timeEntries.length
     });
 
