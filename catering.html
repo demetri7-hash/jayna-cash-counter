@@ -644,8 +644,8 @@
     }
   </style>
 
-  <!-- SheetJS library for Excel file generation -->
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <!-- ExcelJS library for native Excel file generation -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 </head>
 <body>
   <!-- Loading Overlay -->
@@ -2464,8 +2464,8 @@
           return;
         }
 
-        // Generate simple Excel file (like manually created in Excel)
-        const excelBlob = generateLabelsExcel(labels);
+        // Generate Excel file using ExcelJS (creates native Excel format)
+        const excelBlob = await generateLabelsExcel(labels);
 
         // Format filename for display
         const guestName = (order.customer_name || 'Customer').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
@@ -2723,58 +2723,43 @@
     }
 
     /**
-     * Generate Excel file - Using aoa_to_sheet for simpler structure
+     * Generate Excel file using ExcelJS - Creates native Excel format
      */
-    function generateLabelsExcel(labels) {
-      // Create 2D array (array of arrays) - SIMPLEST Excel format
-      const data = [];
+    async function generateLabelsExcel(labels) {
+      // Create new workbook using ExcelJS
+      const workbook = new ExcelJS.Workbook();
 
-      // Row 1: Headers (UPPERCASE)
-      data.push(['COMPANY', 'ITEM', 'QUANTITY', 'CUSTOMER']);
+      // Set workbook properties
+      workbook.creator = 'Jayna Gyro';
+      workbook.lastModifiedBy = 'Jayna Gyro';
+      workbook.created = new Date();
+      workbook.modified = new Date();
 
-      // Data rows - plain text only
-      labels.forEach(label => {
-        data.push([
-          'JAYNA GYRO CATERING',
-          String(label.item || ''),
-          String(label.qty + ' - Pan ' + label.pan),
-          String((label.packDate || '') + ' ' + (label.customerLastName || ''))
-        ]);
-      });
+      // Add worksheet
+      const worksheet = workbook.addWorksheet('Sheet1');
 
-      // Create workbook with array of arrays (simpler than json_to_sheet)
-      const wb = XLSX.utils.book_new();
-
-      // Set workbook properties to mimic Excel
-      wb.Props = {
-        Title: "Labels",
-        Subject: "Catering Labels",
-        Author: "Jayna Gyro",
-        CreatedDate: new Date()
-      };
-
-      const ws = XLSX.utils.aoa_to_sheet(data);
-
-      // Set column widths (like manual Excel file)
-      ws['!cols'] = [
-        { wch: 25 },  // COMPANY column width
-        { wch: 30 },  // ITEM column width
-        { wch: 25 },  // QUANTITY column width
-        { wch: 35 }   // CUSTOMER column width
+      // Set column widths
+      worksheet.columns = [
+        { header: 'COMPANY', key: 'company', width: 25 },
+        { header: 'ITEM', key: 'item', width: 30 },
+        { header: 'QUANTITY', key: 'quantity', width: 25 },
+        { header: 'CUSTOMER', key: 'customer', width: 35 }
       ];
 
-      // Add to workbook
-      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-
-      // Write with cellDates option for better compatibility
-      const wbout = XLSX.write(wb, {
-        bookType: 'xlsx',
-        type: 'array',
-        bookSST: true,  // Use shared strings table
-        cellDates: false  // Don't use date objects
+      // Add data rows
+      labels.forEach(label => {
+        worksheet.addRow({
+          company: 'JAYNA GYRO CATERING',
+          item: String(label.item || ''),
+          quantity: String(label.qty + ' - Pan ' + label.pan),
+          customer: String((label.packDate || '') + ' ' + (label.customerLastName || ''))
+        });
       });
 
-      return new Blob([wbout], {
+      // Generate Excel file buffer
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      return new Blob([buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
     }
