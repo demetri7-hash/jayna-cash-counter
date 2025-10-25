@@ -211,7 +211,7 @@ function generatePrepListPDF(prep, order, lineItems) {
   yPos += 15;
 
   if (order.delivery_date) {
-    const deliveryDate = new Date(order.delivery_date);
+    const deliveryDate = new Date(order.delivery_date + 'T00:00:00');
     doc.text(`${order.delivery_address ? 'Delivery' : 'Pickup'}: ${deliveryDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })}`, 40, yPos);
   }
   if (order.delivery_time) {

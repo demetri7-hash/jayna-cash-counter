@@ -158,7 +158,7 @@ async function generateOrderReceiptPDF(order, lineItems) {
 
   // Delivery Date
   if (order.delivery_date) {
-    const deliveryDate = new Date(order.delivery_date);
+    const deliveryDate = new Date(order.delivery_date + 'T00:00:00');
     doc.text(`Date: ${deliveryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' })}`, 50, yPos);
     yPos += 15;
   }
