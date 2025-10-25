@@ -11,7 +11,7 @@
   <meta name="theme-color" content="#00A8E1">
 
   <!-- Bluetooth Thermal Printer Status Bar -->
-  <div id="bluetoothStatus" style="position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: var(--gray-900); color: white; padding: 8px 12px; display: none; font-size: 12px; font-weight: 600; text-align: center; letter-spacing: 0.5px;">
+  <div id="bluetoothStatus" style="position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: var(--gray-900); color: white; padding: 8px 12px; font-size: 12px; font-weight: 600; text-align: center; letter-spacing: 0.5px;">
     <span id="bluetoothStatusText">🔵 Bluetooth Printer: Not Connected</span>
     <button id="bluetoothConnectBtn" onclick="connectBluetoothPrinter()" style="margin-left: 12px; padding: 4px 12px; background: var(--primary-blue); border: none; color: white; font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">CONNECT PRINTER</button>
   </div>
@@ -45,6 +45,12 @@
       --error-bg: #fee2e2;
       --error-text: #991b1b;
       --error-border: #dc2626;
+    }
+
+    /* Animations */
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.8; }
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -3553,92 +3559,130 @@
      * Generate label data from prep list
      */
     function generateLabelsFromPrepList(prep, order) {
-      const labels = [];
       const orderNum = order.order_number || order.id;
       const customer = order.customer_name || 'Customer';
       const date = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
 
-      // BYO Gyros
+      // Create separate arrays for each category group
+      const byoGyroLabels = [];
+      const saladLabels = [];
+      const saladDressingLabels = [];
+      const dipLabels = [];
+      const dipSideLabels = [];
+      const greekFriesLabels = [];
+      const dolmaLabels = [];
+      const spanakopitaLabels = [];
+      const sideLabels = [];
+      const dessertLabels = [];
+      const pinwheelLabels = [];
+
+      // BYO Gyros - Group sauces first, then veggies/greens, then pitas
       if (prep.byoGyros.total > 0) {
         const sets = Math.ceil(prep.byoGyros.total / 10);
 
+        // All sauce labels
         for (let i = 0; i < sets; i++) {
-          labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (no dill)', qty: 1, category: 'BYO Gyros' });
-          labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Spicy Aioli', qty: 1, category: 'BYO Gyros' });
-          labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Lemon Vinaigrette', qty: 1, category: 'BYO Gyros' });
-          labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Mixed Greens', qty: 1, category: 'BYO Gyros' });
+          byoGyroLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (no dill)', qty: 1, category: 'BYO Gyros - Sauces' });
+          byoGyroLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Spicy Aioli', qty: 1, category: 'BYO Gyros - Sauces' });
+          byoGyroLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Lemon Vinaigrette', qty: 1, category: 'BYO Gyros - Sauces' });
         }
 
-        labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Diced Tomatoes', qty: prep.byoGyros.total, category: 'BYO Gyros' });
-        labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Sliced Red Onion', qty: prep.byoGyros.total, category: 'BYO Gyros' });
-        labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Pepperoncini', qty: prep.byoGyros.total, category: 'BYO Gyros' });
-        labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Grilled Pita', qty: prep.byoGyros.total + sets, category: 'BYO Gyros' });
+        // All greens labels
+        for (let i = 0; i < sets; i++) {
+          byoGyroLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'Mixed Greens', qty: 1, category: 'BYO Gyros - Greens' });
+        }
+
+        // All veggie labels
+        byoGyroLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'Diced Tomatoes', qty: prep.byoGyros.total, category: 'BYO Gyros - Veggies' });
+        byoGyroLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'Sliced Red Onion', qty: prep.byoGyros.total, category: 'BYO Gyros - Veggies' });
+        byoGyroLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'Pepperoncini', qty: prep.byoGyros.total, category: 'BYO Gyros - Veggies' });
+
+        // All pita labels
+        byoGyroLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'Grilled Pita', qty: prep.byoGyros.total + sets, category: 'BYO Gyros - Pitas' });
       }
 
-      // Salads
+      // Salads - All salad labels first, then all dressing labels
       prep.salads.forEach(salad => {
         const panType = salad.qty < 4 ? '½ Pan' : 'Full Pan';
-        labels.push({ orderNum, customer, date, container: panType, item: salad.name, qty: salad.qty, category: 'Salad' });
-        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Lemon Vinaigrette', qty: salad.qty, category: `${salad.name} Dressing` });
+        saladLabels.push({ orderNum, customer, date, container: panType, item: salad.name, qty: salad.qty, category: 'Salad' });
       });
 
-      // Dips
-      prep.dips.forEach(dip => {
-        labels.push({ orderNum, customer, date, container: '16oz Deli', item: dip.name, qty: dip.qty, category: 'Dip' });
+      prep.salads.forEach(salad => {
+        saladDressingLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Lemon Vinaigrette', qty: salad.qty, category: 'Salad - Dressings' });
+      });
 
+      // Dips - All dip labels first, then all side labels (veggies/pitas)
+      prep.dips.forEach(dip => {
+        dipLabels.push({ orderNum, customer, date, container: '16oz Deli', item: dip.name, qty: dip.qty, category: 'Dip' });
+      });
+
+      prep.dips.forEach(dip => {
         const hasVeggies = dip.modifiers.some(m => m.name && (m.name.includes('VEGGIES') || m.name.includes('VEGGIE')));
         const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
         const gfPitaMod = dip.modifiers.find(m => m.name && m.name.includes('GLUTEN FREE PITA'));
 
         if (hasVeggies) {
-          labels.push({ orderNum, customer, date, container: 'Brown Bowl', item: 'Carrots', qty: dip.qty * 24, category: `${dip.name} Side` });
-          labels.push({ orderNum, customer, date, container: 'Brown Bowl', item: 'Celery', qty: dip.qty * 24, category: `${dip.name} Side` });
+          dipSideLabels.push({ orderNum, customer, date, container: 'Brown Bowl', item: 'Carrots', qty: dip.qty * 24, category: 'Dip - Veggies' });
+          dipSideLabels.push({ orderNum, customer, date, container: 'Brown Bowl', item: 'Celery', qty: dip.qty * 24, category: 'Dip - Veggies' });
         }
         if (hasPita) {
-          labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Sliced Pita', qty: dip.qty * 6, category: `${dip.name} Side` });
+          dipSideLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'Sliced Pita', qty: dip.qty * 6, category: 'Dip - Pitas' });
         }
         if (gfPitaMod) {
           const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
-          labels.push({ orderNum, customer, date, container: '½ Pan', item: 'GF Pita (Sliced)', qty: gfQty, category: `${dip.name} Side` });
+          dipSideLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'GF Pita (Sliced)', qty: gfQty, category: 'Dip - Pitas' });
         }
       });
 
       // Greek Fries Bar
       prep.greekFries.forEach(fries => {
-        labels.push({ orderNum, customer, date, container: '½ Pan', item: 'Greek Fries + Protein', qty: fries.qty, category: 'Greek Fries Bar' });
-        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Spicy Aioli', qty: 1, category: 'Greek Fries Bar' });
-        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki', qty: 1, category: 'Greek Fries Bar' });
-        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Crumbled Feta', qty: 1, category: 'Greek Fries Bar' });
+        greekFriesLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'Greek Fries + Protein', qty: fries.qty, category: 'Greek Fries Bar' });
+        greekFriesLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Spicy Aioli', qty: 1, category: 'Greek Fries Bar - Toppings' });
+        greekFriesLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki', qty: 1, category: 'Greek Fries Bar - Toppings' });
+        greekFriesLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Crumbled Feta', qty: 1, category: 'Greek Fries Bar - Toppings' });
       });
 
       // Dolmas
       prep.dolmas.forEach(dolma => {
-        labels.push({ orderNum, customer, date, container: '½ Pan', item: dolma.name, qty: dolma.qty, category: 'Dolmas' });
-        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (dill stripe)', qty: dolma.qty, category: 'Dolmas' });
+        dolmaLabels.push({ orderNum, customer, date, container: '½ Pan', item: dolma.name, qty: dolma.qty, category: 'Dolmas' });
+        dolmaLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (dill stripe)', qty: dolma.qty, category: 'Dolmas - Sauce' });
       });
 
       // Spanakopita
       prep.spanakopita.forEach(span => {
-        labels.push({ orderNum, customer, date, container: '½ Pan', item: span.name, qty: span.qty, category: 'Spanakopita' });
-        labels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (dill stripe)', qty: span.qty, category: 'Spanakopita' });
+        spanakopitaLabels.push({ orderNum, customer, date, container: '½ Pan', item: span.name, qty: span.qty, category: 'Spanakopita' });
+        spanakopitaLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (dill stripe)', qty: span.qty, category: 'Spanakopita - Sauce' });
       });
 
       // Sides
       prep.sides.forEach(side => {
-        labels.push({ orderNum, customer, date, container: '½ Pan', item: side.name, qty: side.qty, category: 'Side' });
+        sideLabels.push({ orderNum, customer, date, container: '½ Pan', item: side.name, qty: side.qty, category: 'Side' });
       });
 
       // Desserts
       prep.desserts.forEach(dessert => {
-        labels.push({ orderNum, customer, date, container: 'Container', item: dessert.name, qty: dessert.qty, category: 'Dessert' });
+        dessertLabels.push({ orderNum, customer, date, container: 'Container', item: dessert.name, qty: dessert.qty, category: 'Dessert' });
       });
 
       // Pinwheels
       prep.pinwheels.forEach(pinwheel => {
-        labels.push({ orderNum, customer, date, container: 'Platter', item: pinwheel.name, qty: pinwheel.qty, category: 'Pinwheel' });
+        pinwheelLabels.push({ orderNum, customer, date, container: 'Platter', item: pinwheel.name, qty: pinwheel.qty, category: 'Pinwheel' });
       });
 
-      return labels;
+      // Concatenate all labels in logical category order
+      return [
+        ...byoGyroLabels,
+        ...saladLabels,
+        ...saladDressingLabels,
+        ...dipLabels,
+        ...dipSideLabels,
+        ...greekFriesLabels,
+        ...dolmaLabels,
+        ...spanakopitaLabels,
+        ...sideLabels,
+        ...dessertLabels,
+        ...pinwheelLabels
+      ];
     }
 
     /**
@@ -3648,7 +3692,14 @@
       event.preventDefault();
 
       if (!bluetoothCharacteristic) {
-        showMessage('❌ Printer not connected! Click "CONNECT PRINTER" at the top first.', 'error');
+        // Scroll to top to show the connection button
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // Flash the connect button to draw attention
+        const connectBtn = document.getElementById('bluetoothConnectBtn');
+        connectBtn.style.animation = 'pulse 1s ease-in-out 3';
+
+        showMessage('❌ Printer not connected!\n\nClick the "CONNECT PRINTER" button at the top of the page first.', 'error');
         return;
       }
 

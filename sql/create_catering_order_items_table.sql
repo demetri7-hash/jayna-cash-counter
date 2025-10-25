@@ -10,7 +10,7 @@ DROP TABLE IF EXISTS catering_order_items CASCADE;
 
 -- Create table for storing order line items
 CREATE TABLE catering_order_items (
-  id BIGSERIAL PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,C
 
   -- Link to parent order
   order_id BIGINT NOT NULL,
