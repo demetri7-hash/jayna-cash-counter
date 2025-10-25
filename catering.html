@@ -2464,24 +2464,33 @@
         // Create CSV
         const csv = generateLabelsCSV(labels);
 
-        // Download CSV file
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-
-        // Format filename: Labels_GuestName_Oct-25-2025.csv
+        // Format filename for display
         const guestName = (order.customer_name || 'Customer').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
         const orderDate = order.delivery_date
           ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', timeZone: 'America/Los_Angeles' }).replace(/,/g, '').replace(/\s+/g, '-')
           : new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '').replace(/\s+/g, '-');
         const fileName = `Labels_${guestName}_${orderDate}.csv`;
 
-        link.setAttribute('href', url);
-        link.setAttribute('download', fileName);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Create blob with CSV data
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+
+        // Open in new tab (better for mobile - allows native save/share)
+        const newWindow = window.open(url, '_blank');
+
+        if (!newWindow) {
+          // If popup blocked, fall back to download
+          const link = document.createElement('a');
+          link.setAttribute('href', url);
+          link.setAttribute('download', fileName);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          console.log('⚠️ Popup blocked - using download fallback');
+        } else {
+          console.log('✅ CSV opened in new tab');
+        }
 
         hideLoading();
 
