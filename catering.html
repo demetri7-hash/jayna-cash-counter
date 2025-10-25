@@ -2469,7 +2469,12 @@
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
 
-        const fileName = `Labels_Order${order.order_number || orderId}_${order.customer_name || 'Customer'}.csv`.replace(/[^a-zA-Z0-9_-]/g, '_');
+        // Format filename: Labels_GuestName_Oct-25-2025.csv
+        const guestName = (order.customer_name || 'Customer').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
+        const orderDate = order.delivery_date
+          ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', timeZone: 'America/Los_Angeles' }).replace(/,/g, '').replace(/\s+/g, '-')
+          : new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '').replace(/\s+/g, '-');
+        const fileName = `Labels_${guestName}_${orderDate}.csv`;
 
         link.setAttribute('href', url);
         link.setAttribute('download', fileName);
