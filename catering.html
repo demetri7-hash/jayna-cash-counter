@@ -643,6 +643,9 @@
       cursor: zoom-out;
     }
   </style>
+
+  <!-- SheetJS library for Excel file generation -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <!-- Loading Overlay -->
@@ -2461,21 +2464,20 @@
           return;
         }
 
-        // Create CSV
-        const csv = generateLabelsCSV(labels);
+        // Generate Excel file
+        const excelBlob = generateLabelsExcel(labels);
 
         // Format filename for display
         const guestName = (order.customer_name || 'Customer').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
         const orderDate = order.delivery_date
           ? new Date(order.delivery_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', timeZone: 'America/Los_Angeles' }).replace(/,/g, '').replace(/\s+/g, '-')
           : new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '').replace(/\s+/g, '-');
-        const fileName = `Labels_${guestName}_${orderDate}.csv`;
+        const fileName = `Labels_${guestName}_${orderDate}.xlsx`;
 
-        // Create blob with CSV data
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
+        // Create download URL
+        const url = URL.createObjectURL(excelBlob);
 
-        // Download CSV file (works better on mobile than opening in tab)
+        // Download Excel file
         const link = document.createElement('a');
         link.href = url;
         link.download = fileName;
@@ -2497,11 +2499,11 @@
 
         console.log(`✅ LABELS EXPORTED! ${labels.length} labels | File: ${fileName}`);
         console.log(`📱 Next steps:
-1. Find the downloaded CSV file in your Downloads folder or Files app
+1. Find the downloaded Excel file in your Downloads folder or Files app
 2. Open Print Master app on your phone
 3. Create a new label template (40x30mm for M110)
 4. Click the "Excel" import button
-5. Select the downloaded CSV file: ${fileName}
+5. Select the downloaded Excel file: ${fileName}
 6. Map columns: Company → Line 1, Item → Line 2, Quantity → Line 3, Customer → Line 4
 7. Print your batch labels!`);
 
@@ -2702,31 +2704,56 @@
     }
 
     /**
-     * Generate CSV format compatible with Phomemo Print Master app
+     * Generate Excel file compatible with Phomemo Print Master app
      * Print Master expects: Company, Item, Quantity, Customer columns
      */
-    function generateLabelsCSV(labels) {
-      // Header row with meaningful column names for Print Master
-      let csv = 'Company,Item,Quantity,Customer\n';
+    function generateLabelsExcel(labels) {
+      // Create array of rows for Excel
+      const data = [
+        // Header row
+        ['Company', 'Item', 'Quantity', 'Customer']
+      ];
 
+      // Add data rows
       labels.forEach(label => {
         const company = 'JAYNA GYRO CATERING';
         const item = label.item; // Menu item name
         const quantity = `${label.qty} - Pan ${label.pan}`; // Quantity and pan number
         const customer = `${label.packDate} | ${label.customerLastName}${label.phoneNumber ? ' | ' + label.phoneNumber : ''}`.substring(0, 50);
 
-        // Escape commas and quotes in CSV
-        const escapeCsvField = (field) => {
-          if (field.includes(',') || field.includes('"') || field.includes('\n')) {
-            return `"${field.replace(/"/g, '""')}"`;
-          }
-          return field;
-        };
-
-        csv += `${escapeCsvField(company)},${escapeCsvField(item)},${escapeCsvField(quantity)},${escapeCsvField(customer)}\n`;
+        data.push([company, item, quantity, customer]);
       });
 
-      return csv;
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(data);
+
+      // Auto-size columns
+      const colWidths = [
+        { wch: 25 }, // Company
+        { wch: 30 }, // Item
+        { wch: 25 }, // Quantity
+        { wch: 35 }  // Customer
+      ];
+      ws['!cols'] = colWidths;
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Labels');
+
+      // Generate Excel file as binary string
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+
+      // Convert to blob
+      function s2ab(s) {
+        const buf = new ArrayBuffer(s.length);
+        const view = new Uint8Array(buf);
+        for (let i = 0; i < s.length; i++) {
+          view[i] = s.charCodeAt(i) & 0xFF;
+        }
+        return buf;
+      }
+
+      return new Blob([s2ab(wbout)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     }
 
     // Print Prep List to Epson printer via Gmail
