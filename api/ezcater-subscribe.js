@@ -27,36 +27,26 @@ export default async function handler(req, res) {
 
     console.log('🔔 Setting up ezCater webhook subscriptions...');
 
-    // STEP 0: Introspect to find correct input types
+    // STEP 0: Find ALL types with "Subscriber" or "Subscription" in name
     const typeIntrospection = `
       {
-        __type(name: "CreateSubscriberPayload") {
-          name
-          fields {
+        __schema {
+          types {
             name
-            type {
+            kind
+            inputFields {
               name
-              kind
+              type {
+                name
+                kind
+              }
             }
-          }
-        }
-        subscriberInput: __type(name: "SubscriberParams") {
-          name
-          inputFields {
-            name
-            type {
+            fields {
               name
-              kind
-            }
-          }
-        }
-        subscriptionInput: __type(name: "SubscriptionParams") {
-          name
-          inputFields {
-            name
-            type {
-              name
-              kind
+              type {
+                name
+                kind
+              }
             }
           }
         }
@@ -77,11 +67,21 @@ export default async function handler(req, res) {
     });
 
     const typeData = await typeResponse.json();
-    console.log('📋 Type schema:', JSON.stringify(typeData, null, 2));
+
+    // Filter to only types related to Subscriber/Subscription
+    const allTypes = typeData.data.__schema.types;
+    const relevantTypes = allTypes.filter(t =>
+      t.name && (
+        t.name.includes('Subscri') ||
+        t.name.includes('subscri')
+      )
+    );
+
+    console.log('📋 Relevant types:', JSON.stringify(relevantTypes, null, 2));
 
     return res.status(200).json({
       success: true,
-      data: typeData,
+      data: relevantTypes,
       timestamp: new Date().toISOString()
     });
 
