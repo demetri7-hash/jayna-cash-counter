@@ -98,7 +98,9 @@ export default async function handler(req, res) {
 
     // Save line items if order was inserted/updated successfully
     if (data && data.length > 0) {
-      await saveLineItems(data[0].id, orderDetails.catererCart?.orderItems || []);
+      const savedOrderId = data[0].id;
+      const savedExternalId = data[0].external_order_id;
+      await saveLineItems(savedOrderId, savedExternalId, orderDetails.catererCart?.orderItems || []);
     }
 
     // Return success response to EZCater
@@ -295,7 +297,7 @@ function parseOrderData(order) {
 /**
  * Save order line items to database
  */
-async function saveLineItems(orderId, items) {
+async function saveLineItems(orderId, externalOrderId, items) {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_KEY;
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -311,15 +313,21 @@ async function saveLineItems(orderId, items) {
     return (subunits || 0) / 100;
   };
 
-  // Insert new line items
+  // Insert new line items - MATCH Toast schema exactly!
   const lineItems = items.map(item => ({
     order_id: orderId,
+    external_order_id: externalOrderId,
+    item_guid: item.uuid,
     item_name: item.name,
     quantity: item.quantity,
-    unit_price: subunitsToDollars(item.totalInSubunits) / (item.quantity || 1),
-    total_price: subunitsToDollars(item.totalInSubunits),
-    modifiers: item.customizations || [],
-    special_requests: item.specialInstructions || null
+    unit_price: subunitsToDollars(item.totalInSubunits?.subunits) / (item.quantity || 1),
+    total_price: subunitsToDollars(item.totalInSubunits?.subunits),
+    selection_type: 'ITEM',
+    modifiers: item.customizations && item.customizations.length > 0 ? item.customizations : null,
+    special_requests: item.specialInstructions || null,
+    menu_group: null,
+    tax_included: false,
+    item_data: item
   }));
 
   if (lineItems.length > 0) {

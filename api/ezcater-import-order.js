@@ -205,14 +205,19 @@ async function storeOrder(order, eventType) {
     status = 'CANCELLED';
   }
 
-  // Build line items
+  // Build line items - MATCH Toast schema exactly!
   const lineItems = (order.catererCart?.orderItems || []).map(item => ({
+    item_guid: item.uuid,
     item_name: item.name,
     quantity: item.quantity,
-    unit_price: subunitsToDollars(item.totalInSubunits) / item.quantity,
-    total_price: subunitsToDollars(item.totalInSubunits),
-    modifiers: item.customizations || [],
-    special_requests: item.specialInstructions || null
+    unit_price: subunitsToDollars(item.totalInSubunits?.subunits) / item.quantity,
+    total_price: subunitsToDollars(item.totalInSubunits?.subunits),
+    selection_type: 'ITEM',
+    modifiers: item.customizations && item.customizations.length > 0 ? item.customizations : null,
+    special_requests: item.specialInstructions || null,
+    menu_group: null,
+    tax_included: false,
+    item_data: item
   }));
 
   // Prepare order data - MATCH Toast schema exactly!
@@ -291,8 +296,16 @@ function buildAddress(address) {
 }
 
 async function insertLineItems(orderId, items) {
+  // Get the order's external_order_id for line items
+  const { data: orderData } = await supabase
+    .from('catering_orders')
+    .select('external_order_id')
+    .eq('id', orderId)
+    .single();
+
   const lineItems = items.map(item => ({
     order_id: orderId,
+    external_order_id: orderData?.external_order_id || null,
     ...item
   }));
 
