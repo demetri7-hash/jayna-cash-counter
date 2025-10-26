@@ -217,8 +217,9 @@ async function storeOrder(order, eventType) {
 
   // Prepare order data
   const orderData = {
-    order_number: order.orderNumber || order.uuid,
+    source_system: 'EZCATER',
     source_type: 'ezCater',
+    order_number: order.orderNumber || order.uuid,
     customer_name: order.orderCustomer?.fullName || order.event?.contact?.name || 'Guest',
     customer_phone: order.event?.contact?.phone || null,
     customer_email: null, // Not provided in response
@@ -229,7 +230,7 @@ async function storeOrder(order, eventType) {
     headcount: order.event?.headcount || null,
     total_amount: subunitsToDollars(order.totals?.customerTotalDue),
     status: status,
-    external_id: order.uuid,
+    external_order_id: order.uuid,
     raw_data: order
   };
 
@@ -237,7 +238,8 @@ async function storeOrder(order, eventType) {
   const { data: existing } = await supabase
     .from('catering_orders')
     .select('id')
-    .eq('external_id', order.uuid)
+    .eq('source_system', 'EZCATER')
+    .eq('external_order_id', order.uuid)
     .single();
 
   if (existing) {

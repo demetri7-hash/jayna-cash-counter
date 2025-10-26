@@ -63,7 +63,8 @@ export default async function handler(req, res) {
     const { data, error } = await supabase
       .from('catering_orders')
       .upsert({
-        external_id: orderData.ezcater_order_id,
+        source_system: 'EZCATER',
+        external_order_id: orderData.ezcater_order_id,
         order_number: orderData.order_number,
         source_type: 'ezCater',
         customer_name: orderData.customer_name,
@@ -83,7 +84,7 @@ export default async function handler(req, res) {
         status: orderData.status.toUpperCase(),
         raw_data: orderDetails
       }, {
-        onConflict: 'external_id'
+        onConflict: 'source_system,external_order_id'
       });
 
     if (error) {
