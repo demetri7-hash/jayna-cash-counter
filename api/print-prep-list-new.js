@@ -460,7 +460,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     // SLICED RED ONION LOGIC: 50 portions per half pan
     // COORDINATED LOGIC: If tomatoes use brown bowl, onions must also use brown bowl
     if (tomatoUsesBrownBowl) {
-      brownBowls += 1; // Brown Jayna bowl (coordinated with tomatoes)
+      brownBowls += 1; // Brown Jayna bowl
     } else if (prep.byoGyros.total < 20) {
       deliContainers += 1; // 16oz deli container
     } else if (prep.byoGyros.total <= 45) {
@@ -473,7 +473,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     // PEPPERONCINI LOGIC: 100 portions per half pan, full pans for 100+
     // COORDINATED LOGIC: If tomatoes use brown bowl, pepperoncini must also use brown bowl
     if (tomatoUsesBrownBowl) {
-      brownBowls += 1; // Brown Jayna bowl (coordinated with tomatoes)
+      brownBowls += 1; // Brown Jayna bowl
     } else if (prep.byoGyros.total < 10) {
       deliContainers += 1; // 16oz deli
     } else if (prep.byoGyros.total <= 20) {

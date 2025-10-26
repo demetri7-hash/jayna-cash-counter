@@ -2410,7 +2410,7 @@
         let onionContainer = '';
         if (tomatoUsesBrownBowl) {
           brownBowls += 1;
-          onionContainer = 'brown Jayna bowl (coordinated with tomatoes)';
+          onionContainer = 'brown Jayna bowl';
         } else if (prep.byoGyros.total < 20) {
           deliContainers += 1;
           onionContainer = '16oz deli container';
@@ -2433,7 +2433,7 @@
         let pepperonciniContainer = '';
         if (tomatoUsesBrownBowl) {
           brownBowls += 1;
-          pepperonciniContainer = 'brown Jayna bowl (coordinated with tomatoes)';
+          pepperonciniContainer = 'brown Jayna bowl';
         } else if (prep.byoGyros.total < 10) {
           deliContainers += 1;
           pepperonciniContainer = '16oz deli container';
@@ -3002,14 +3002,167 @@
           labels.push({ item: 'Mixed Greens', qty: `${prep.byoGyros.total} portions`, pan: `${i} of ${sets}`, category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
         }
 
-        // Veggies (1 each)
-        labels.push({ item: 'Diced Tomatoes', qty: `${prep.byoGyros.total} portions`, pan: '1 of 1', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: 'Sliced Red Onion', qty: `${prep.byoGyros.total} portions`, pan: '1 of 1', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: 'Whole Pepperoncini', qty: `${prep.byoGyros.total} portions`, pan: '1 of 1', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+        // DICED TOMATOES - Calculate actual container type and count
+        // 30 portions per half pan
+        // Below 10: 16oz deli container
+        // 10-20: Brown Jayna bowl
+        // 21+: Calculate half pans (30 portions per half pan)
+        let tomatoContainerType = '';
+        let tomatoContainerCount = 0;
+        let tomatoUsesBrownBowl = false; // Flag for coordinated brown bowl logic
 
-        // Pitas
-        const pitasNeeded = prep.byoGyros.total + sets;
-        labels.push({ item: 'Grilled Pita Bread', qty: `${pitasNeeded} whole pitas`, pan: '1 of 1', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+        if (prep.byoGyros.total < 10) {
+          tomatoContainerType = '16oz deli';
+          tomatoContainerCount = 1;
+        } else if (prep.byoGyros.total <= 20) {
+          tomatoContainerType = 'brown bowl';
+          tomatoContainerCount = 1;
+          tomatoUsesBrownBowl = true; // Set flag when tomatoes use brown bowl
+        } else {
+          tomatoContainerType = 'half pan';
+          tomatoContainerCount = Math.ceil(prep.byoGyros.total / 30);
+        }
+
+        // Generate tomato labels (one per container)
+        for (let i = 1; i <= tomatoContainerCount; i++) {
+          labels.push({
+            item: 'Diced Tomatoes',
+            qty: `${prep.byoGyros.total} portions`,
+            pan: tomatoContainerCount > 1 ? `${i} of ${tomatoContainerCount} ${tomatoContainerType}s` : tomatoContainerType,
+            category: 'BYO Gyros',
+            orderNum,
+            customerLastName,
+            phoneNumber,
+            packDate
+          });
+        }
+
+        // SLICED RED ONION - Calculate actual container type and count
+        // 50 portions per half pan
+        // Below 20: 16oz deli container
+        // 20-45: Brown Jayna bowl
+        // 46+: Calculate half pans (50 portions per half pan)
+        // COORDINATED LOGIC: If tomatoes use brown bowl, onions must also use brown bowl
+        let onionContainerType = '';
+        let onionContainerCount = 0;
+
+        if (tomatoUsesBrownBowl) {
+          onionContainerType = 'brown bowl';
+          onionContainerCount = 1;
+        } else if (prep.byoGyros.total < 20) {
+          onionContainerType = '16oz deli';
+          onionContainerCount = 1;
+        } else if (prep.byoGyros.total <= 45) {
+          onionContainerType = 'brown bowl';
+          onionContainerCount = 1;
+        } else {
+          onionContainerType = 'half pan';
+          onionContainerCount = Math.ceil(prep.byoGyros.total / 50);
+        }
+
+        // Generate onion labels (one per container)
+        for (let i = 1; i <= onionContainerCount; i++) {
+          labels.push({
+            item: 'Sliced Red Onion',
+            qty: `${prep.byoGyros.total} portions`,
+            pan: onionContainerCount > 1 ? `${i} of ${onionContainerCount} ${onionContainerType}s` : onionContainerType,
+            category: 'BYO Gyros',
+            orderNum,
+            customerLastName,
+            phoneNumber,
+            packDate
+          });
+        }
+
+        // WHOLE PEPPERONCINI - Calculate actual container type and count
+        // Below 10: 16oz deli container
+        // 10-20: 32oz deli container
+        // 21-99: Half pan
+        // 100+: Full pan(s) + half pan if remainder
+        // COORDINATED LOGIC: If tomatoes use brown bowl, pepperoncini must also use brown bowl
+        let pepperonciniContainerType = '';
+        let pepperonciniContainerCount = 0;
+
+        if (tomatoUsesBrownBowl) {
+          pepperonciniContainerType = 'brown bowl';
+          pepperonciniContainerCount = 1;
+        } else if (prep.byoGyros.total < 10) {
+          pepperonciniContainerType = '16oz deli';
+          pepperonciniContainerCount = 1;
+        } else if (prep.byoGyros.total <= 20) {
+          pepperonciniContainerType = '32oz deli';
+          pepperonciniContainerCount = 1;
+        } else if (prep.byoGyros.total < 100) {
+          pepperonciniContainerType = 'half pan';
+          pepperonciniContainerCount = 1;
+        } else {
+          const pepperFullPans = Math.floor(prep.byoGyros.total / 100);
+          const pepperRemainder = prep.byoGyros.total % 100;
+
+          // Generate full pan labels
+          for (let i = 1; i <= pepperFullPans; i++) {
+            labels.push({
+              item: 'Whole Pepperoncini',
+              qty: `${prep.byoGyros.total} portions`,
+              pan: `${i} of ${pepperFullPans} full pan${pepperFullPans > 1 ? 's' : ''}`,
+              category: 'BYO Gyros',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+
+          // Generate half pan label if remainder
+          if (pepperRemainder > 0) {
+            labels.push({
+              item: 'Whole Pepperoncini',
+              qty: `${prep.byoGyros.total} portions`,
+              pan: 'half pan',
+              category: 'BYO Gyros',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+
+          // Skip the normal label generation below since we handled it above
+          pepperonciniContainerCount = 0;
+        }
+
+        // Generate pepperoncini labels (one per container) - only if not 100+
+        for (let i = 1; i <= pepperonciniContainerCount; i++) {
+          labels.push({
+            item: 'Whole Pepperoncini',
+            qty: `${prep.byoGyros.total} portions`,
+            pan: pepperonciniContainerCount > 1 ? `${i} of ${pepperonciniContainerCount} ${pepperonciniContainerType}s` : pepperonciniContainerType,
+            category: 'BYO Gyros',
+            orderNum,
+            customerLastName,
+            phoneNumber,
+            packDate
+          });
+        }
+
+        // PITAS - Calculate actual pan count
+        // 25 whole pita fit in one FULL pan
+        const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
+        const pitaFullPans = Math.ceil(pitasNeeded / 25);
+
+        // Generate pita labels (one per pan)
+        for (let i = 1; i <= pitaFullPans; i++) {
+          labels.push({
+            item: 'Grilled Pita Bread',
+            qty: `${pitasNeeded} whole pitas`,
+            pan: pitaFullPans > 1 ? `${i} of ${pitaFullPans} full pans` : 'full pan',
+            category: 'BYO Gyros',
+            orderNum,
+            customerLastName,
+            phoneNumber,
+            packDate
+          });
+        }
       }
 
       // SALADS
