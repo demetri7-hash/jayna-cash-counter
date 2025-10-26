@@ -2652,25 +2652,49 @@
   }
 
   /**
-   * Start Checklist Session - Create session in database (UPDATED FOR MULTI-USER)
+   * Start Checklist Session - Create session in database (UPDATED FOR MULTI-USER + AUTO-POPULATE)
    */
   async function startChecklistSession() {
     // Collect all names from inputs
     const nameInputs = document.querySelectorAll('.staff-name-input');
-    const names = [];
+    const manualNames = [];
 
     nameInputs.forEach((input, index) => {
       const name = input.value.trim();
       if (name) {
-        names.push({
+        manualNames.push({
           name: name,
           color: getUserColor(index)
         });
       }
     });
 
+    // AUTO-POPULATE: If no manual names entered, use clocked-in employees
+    let names = manualNames;
     if (names.length === 0) {
-      showMessage('Please enter at least one team member name', 'error');
+      // Use clocked-in employees
+      let teamMembers = [...fohSystemState.clockedInEmployees];
+
+      // If no clocked-in employees, fall back to saved username
+      if (teamMembers.length === 0) {
+        const savedUsername = localStorage.getItem('foh_username');
+        if (savedUsername) {
+          teamMembers = [savedUsername];
+        }
+      }
+
+      // Set up team names with colors
+      if (teamMembers.length > 0) {
+        names = teamMembers.map((name, index) => ({
+          name: name,
+          color: getUserColor(index)
+        }));
+      }
+    }
+
+    // Final validation - must have at least one name (either manual, clocked-in, or saved)
+    if (names.length === 0) {
+      showMessage('No team members found. Please enter a name or ensure employees are clocked in.', 'error');
       return;
     }
 
@@ -2684,16 +2708,6 @@
 
     // Original logic continues below...
     const staffName = names[0].name; // Use first name for session creation
-
-    if (!staffName) {
-      showMessage('Please enter your name!', 'error');
-      document.getElementById('fohStaffName').focus();
-      return;
-    }
-
-    // Save username to localStorage for future use
-    localStorage.setItem('foh_username', staffName);
-
     const checklist = fohSystemState.currentChecklist;
 
     // Check if checklist time window has expired BEFORE starting
