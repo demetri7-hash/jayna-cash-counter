@@ -2155,10 +2155,10 @@
               `}
 
               <!-- Created Timestamp -->
-              ${order.created_in_toast_at && new Date(order.created_in_toast_at).getTime() ? `
+              ${order.created_in_toast_at ? `
               <div style="text-align: center; padding-top: 16px; border-top: 1px solid var(--gray-300);">
                 <div style="font-size: 11px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px;">
-                  Created: ${formatPacificDate(order.created_in_toast_at, true)} at ${formatPacificTime(order.created_in_toast_at)}
+                  Created: ${formatPacificDate(order.created_in_toast_at.split('T')[0].split(' ')[0], true)} at ${formatPacificTime(order.created_in_toast_at)}
                 </div>
               </div>
               ` : ''}
@@ -2176,7 +2176,12 @@
       } catch (error) {
         hideLoading();
         console.error('Error loading order details:', error);
-        alert(`Failed to load order details: ${error.message}`);
+        // Can't use alert in sandboxed iframe (Google Sites)
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #dc2626; color: white; padding: 16px 24px; border-radius: 8px; z-index: 99999; font-size: 14px; font-weight: 600;';
+        errorDiv.textContent = `Failed to load order: ${error.message}`;
+        document.body.appendChild(errorDiv);
+        setTimeout(() => errorDiv.remove(), 5000);
       }
     }
 
