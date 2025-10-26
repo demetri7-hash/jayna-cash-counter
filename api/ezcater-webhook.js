@@ -186,16 +186,16 @@ async function fetchOrderFromEZCater(orderId) {
               }
               catererCart {
                 totals {
-                  catererTotalDue {
-                    subunits
-                    currency
-                  }
+                  catererTotalDue
                 }
                 orderItems {
                   uuid
                   name
                   quantity
-                  totalInSubunits
+                  totalInSubunits {
+                    subunits
+                    currency
+                  }
                   specialInstructions
                   menuItemSizeName
                   customizations {

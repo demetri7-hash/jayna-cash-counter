@@ -115,17 +115,17 @@ async function fetchOrderDetails(orderUuid, apiToken) {
             quantity
             menuItemSizeName
             specialInstructions
-            totalInSubunits
+            totalInSubunits {
+              subunits
+              currency
+            }
             customizations {
               name
               quantity
             }
           }
           totals {
-            catererTotalDue {
-              subunits
-              currency
-            }
+            catererTotalDue
           }
         }
         totals {
@@ -209,8 +209,8 @@ async function storeOrder(order, eventType) {
   const lineItems = (order.catererCart?.orderItems || []).map(item => ({
     item_name: item.name,
     quantity: item.quantity,
-    unit_price: subunitsToDollars({ subunits: item.totalInSubunits }) / item.quantity,
-    total_price: subunitsToDollars({ subunits: item.totalInSubunits }),
+    unit_price: subunitsToDollars(item.totalInSubunits) / item.quantity,
+    total_price: subunitsToDollars(item.totalInSubunits),
     modifiers: item.customizations || [],
     special_requests: item.specialInstructions || null
   }));
