@@ -805,12 +805,27 @@ function generatePrepListPDF(prep, order, lineItems) {
         const regularPitaHalfPans = dip.qty; // 1 half pan per dip (6 pitas sliced)
         doc.text(`    - ${dip.qty * 6} pitas sliced 8 pieces (${formatPanCount(regularPitaHalfPans)}) - 1 tong`, 56, yPos); yPos += 11;
       }
-      if (hasGFPita && gfPitaMod && gfPitaMod.gfPitaQty) {
+      if (hasGFPita && gfPitaMod) {
         // GF pita is an ADDON - only prep exactly what customer paid for (no defaults!)
-        // $2 per GF pita, parsed from modifier price
-        const gfQty = gfPitaMod.gfPitaQty;
-        const gfPitaHalfPans = Math.ceil(gfQty / 6);
-        doc.text(`    - ${gfQty} GF pitas sliced 8 pieces (${formatPanCount(gfPitaHalfPans)}) - 1 tong`, 56, yPos); yPos += 11;
+        // Try to parse from modifier name, or check if there's a price/amount field
+        let gfQty = gfPitaMod.gfPitaQty;
+
+        // If parsing from name failed, try to parse from the modifier object directly
+        if (!gfQty && gfPitaMod.name) {
+          const priceMatch = gfPitaMod.name.match(/\$(\d+(?:\.\d+)?)/);
+          if (priceMatch) {
+            const totalPrice = parseFloat(priceMatch[1]);
+            gfQty = Math.round(totalPrice / 2); // $2 per GF pita
+          }
+        }
+
+        if (gfQty && gfQty > 0) {
+          const gfPitaHalfPans = Math.ceil(gfQty / 6);
+          doc.text(`    - ${gfQty} GF pitas sliced 8 pieces (${formatPanCount(gfPitaHalfPans)}) - 1 tong`, 56, yPos); yPos += 11;
+        } else {
+          // Parsing failed - show manual entry needed
+          doc.text(`    - GF Pitas (CHECK ORDER FOR QUANTITY) - 1 tong`, 56, yPos); yPos += 11;
+        }
       }
       doc.setTextColor(...black);
       yPos += 2;
