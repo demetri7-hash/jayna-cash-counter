@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manager Logs - Jayna Gyro</title>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      --white: #ffffff;
+      --gray-900: #1a1a1a;
+      --gray-700: #4a4a4a;
+      --gray-600: #6b6b6b;
+      --gray-500: #9ca3af;
+      --gray-400: #d1d5db;
+      --gray-300: #e5e7eb;
+      --gray-200: #f3f4f6;
+      --gray-100: #f9fafb;
+
+      --success-bg: #d1fae5;
+      --success-text: #065f46;
+      --success-border: #059669;
+
+      --warning-bg: #fef3c7;
+      --warning-text: #92400e;
+      --warning-border: #f59e0b;
+
+      --error-bg: #fee2e2;
+      --error-text: #991b1b;
+      --error-border: #dc2626;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-100);
+      color: var(--gray-700);
+      padding: 20px;
+      font-size: 13px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gray-900);
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gray-900);
+      margin-bottom: 16px;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-700);
+      text-decoration: none;
+      border: 2px solid var(--gray-300);
+      padding: 8px 16px;
+      background: var(--white);
+      transition: all 0.15s ease;
+    }
+
+    .back-link:hover {
+      border-color: var(--gray-700);
+      background: var(--gray-100);
+    }
+
+    .section {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-700);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      font-weight: 400;
+      background: white;
+      font-family: inherit;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--gray-700);
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    button {
+      padding: 12px 24px;
+      background: var(--gray-900);
+      border: 2px solid var(--gray-900);
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.15s ease;
+    }
+
+    button:hover {
+      background: var(--gray-700);
+      border-color: var(--gray-700);
+    }
+
+    button.secondary {
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border: 2px solid var(--gray-300);
+    }
+
+    button.danger {
+      background: #dc2626;
+      border-color: #dc2626;
+    }
+
+    button.success {
+      background: #059669;
+      border-color: #059669;
+    }
+
+    .add-link {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-700);
+      text-decoration: none;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+
+    .add-link:hover {
+      color: var(--gray-900);
+      text-decoration: underline;
+    }
+
+    .staff-entry {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+
+    .staff-entry input {
+      flex: 1;
+    }
+
+    .remove-btn {
+      padding: 8px 12px;
+      font-size: 11px;
+      background: var(--error-bg);
+      color: var(--error-text);
+      border: 2px solid var(--error-border);
+    }
+
+    .photo-upload-area {
+      border: 2px dashed var(--gray-300);
+      padding: 20px;
+      text-align: center;
+      background: var(--gray-100);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .photo-upload-area:hover {
+      border-color: var(--gray-700);
+      background: var(--gray-200);
+    }
+
+    .photo-preview {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .photo-item {
+      position: relative;
+      aspect-ratio: 1;
+      background: var(--gray-200);
+      border: 2px solid var(--gray-300);
+    }
+
+    .photo-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .photo-remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid var(--error-border);
+      padding: 4px 8px;
+      font-size: 10px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .incidents-list {
+      margin-top: 20px;
+    }
+
+    .incident-card {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .incident-card:hover {
+      border-color: var(--gray-700);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .incident-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .incident-date {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-900);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .incident-manager {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--gray-600);
+    }
+
+    .incident-preview {
+      font-size: 13px;
+      color: var(--gray-700);
+      line-height: 1.5;
+      margin-top: 8px;
+    }
+
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 24px;
+      max-width: 800px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 3px solid var(--gray-700);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--gray-300);
+    }
+
+    .modal-close {
+      background: var(--gray-200);
+      color: var(--gray-900);
+      border: 2px solid var(--gray-300);
+      padding: 8px 16px;
+      font-size: 12px;
+    }
+
+    .modal-detail-row {
+      margin-bottom: 16px;
+    }
+
+    .modal-detail-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-600);
+      margin-bottom: 4px;
+    }
+
+    .modal-detail-value {
+      font-size: 14px;
+      color: var(--gray-900);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 2px solid var(--gray-300);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--gray-600);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--gray-600);
+    }
+
+    .instructions {
+      background: var(--warning-bg);
+      border: 2px solid var(--warning-border);
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--warning-text);
+    }
+
+    .toggle-form-btn {
+      margin-bottom: 20px;
+    }
+
+    #incidentForm {
+      display: none;
+    }
+
+    #incidentForm.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="index.html" class="back-link">← Back to Main</a>
+
+    <h1>Manager Logs</h1>
+
+    <button class="toggle-form-btn" onclick="toggleForm()">+ NEW INCIDENT REPORT</button>
+
+    <!-- Incident Report Form -->
+    <div id="incidentForm" class="section">
+      <h2>Incident Report</h2>
+
+      <form id="reportForm" onsubmit="submitIncident(event)">
+        <!-- Manager Name -->
+        <div class="form-group">
+          <label for="managerName">Manager Name *</label>
+          <input type="text" id="managerName" required>
+        </div>
+
+        <!-- Date & Time -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label for="incidentDate">Incident Date *</label>
+            <input type="date" id="incidentDate" required>
+          </div>
+
+          <div class="form-group">
+            <label for="incidentTime">Incident Time *</label>
+            <input type="time" id="incidentTime" required>
+          </div>
+        </div>
+
+        <!-- Department -->
+        <div class="form-group">
+          <label for="department">Department *</label>
+          <select id="department" onchange="handleDepartmentChange()">
+            <option value="">Select Department...</option>
+            <option value="FOH">FOH</option>
+            <option value="BOH">BOH</option>
+            <option value="PREP">PREP</option>
+            <option value="MANAGEMENT">MANAGEMENT</option>
+            <option value="DELIVERY">DELIVERY</option>
+            <option value="__custom__">+ Add New Department</option>
+          </select>
+          <input type="text" id="customDepartment" style="display: none; margin-top: 8px;" placeholder="Enter new department name">
+        </div>
+
+        <!-- Staff Involved -->
+        <div class="form-group">
+          <label>Staff Involved *</label>
+          <div id="staffList">
+            <div class="staff-entry">
+              <input type="text" class="staff-name" list="employeeNames" placeholder="Enter or select staff name" required>
+            </div>
+          </div>
+          <datalist id="employeeNames"></datalist>
+          <a class="add-link" onclick="addStaffField()">+ Add Another Name</a>
+        </div>
+
+        <!-- Incident Report -->
+        <div class="form-group">
+          <label for="incidentReport">Incident Report *</label>
+          <div class="instructions">
+            Please be as detailed as possible. Include: what happened, when, where, who was involved, any damage/injury, actions taken, and any witnesses.
+          </div>
+          <textarea id="incidentReport" required placeholder="Describe the incident in detail..."></textarea>
+        </div>
+
+        <!-- Photo Upload -->
+        <div class="form-group">
+          <label>Photos (Optional - Up to 5)</label>
+          <div class="photo-upload-area" onclick="document.getElementById('photoInput').click()">
+            <div style="font-size: 13px; color: var(--gray-600); font-weight: 600;">
+              📷 Click to Upload Photos
+            </div>
+            <div style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">
+              Max 5 photos, 2MB each
+            </div>
+          </div>
+          <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" onchange="handlePhotoUpload(event)">
+          <div id="photoPreview" class="photo-preview"></div>
+        </div>
+
+        <!-- Submit Button -->
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+          <button type="button" class="secondary" onclick="cancelForm()">CANCEL</button>
+          <button type="submit" class="success">SAVE INCIDENT REPORT</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Incidents List -->
+    <div class="section">
+      <h2>Recent Incidents</h2>
+      <div id="incidentsList" class="incidents-list">
+        <div class="loading">Loading incidents...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Incident Modal -->
+  <div id="viewModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Incident Report</h2>
+        <button class="modal-close" onclick="closeModal()">CLOSE</button>
+      </div>
+
+      <div id="modalBody"></div>
+
+      <div class="modal-actions">
+        <button onclick="downloadPDF()">📥 DOWNLOAD PDF</button>
+        <button onclick="printIncident()">🖨️ SEND TO PRINTER</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Supabase client - TODO: Replace with actual Supabase credentials
+    const supabase = window.supabase.createClient(
+      'https://your-project.supabase.co',
+      'your-anon-key'
+    );
+
+    let currentIncident = null;
+    let uploadedPhotos = [];
+    let employeeList = [];
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      // Set today's date
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('incidentDate').value = today;
+
+      // Set current time
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('incidentTime').value = `${hours}:${minutes}`;
+
+      // Load Toast employees for autocomplete
+      loadEmployees();
+
+      // Load departments
+      loadDepartments();
+
+      // Load incidents
+      loadIncidents();
+    });
+
+    async function loadEmployees() {
+      try {
+        const response = await fetch('/api/toast-employees');
+        const data = await response.json();
+
+        if (data.success && data.employees) {
+          employeeList = data.employees;
+
+          // Populate datalist
+          const datalist = document.getElementById('employeeNames');
+          datalist.innerHTML = data.employees
+            .map(emp => `<option value="${emp.name}">${emp.jobTitle ? ` (${emp.jobTitle})` : ''}</option>`)
+            .join('');
+
+          console.log(`✅ Loaded ${data.employees.length} employees from Toast`);
+        }
+      } catch (error) {
+        console.error('Error loading employees:', error);
+        // Silently fail - form still works without autocomplete
+      }
+    }
+
+    function toggleForm() {
+      const form = document.getElementById('incidentForm');
+      const btn = document.querySelector('.toggle-form-btn');
+
+      if (form.classList.contains('active')) {
+        form.classList.remove('active');
+        btn.textContent = '+ NEW INCIDENT REPORT';
+      } else {
+        form.classList.add('active');
+        btn.textContent = '− HIDE FORM';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function cancelForm() {
+      document.getElementById('reportForm').reset();
+      uploadedPhotos = [];
+      document.getElementById('photoPreview').innerHTML = '';
+      toggleForm();
+    }
+
+    async function loadDepartments() {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('name')
+        .order('name');
+
+      if (!error && data) {
+        const select = document.getElementById('department');
+        const existingOptions = Array.from(select.options).map(o => o.value);
+
+        data.forEach(dept => {
+          if (!existingOptions.includes(dept.name)) {
+            const option = document.createElement('option');
+            option.value = dept.name;
+            option.textContent = dept.name;
+            select.insertBefore(option, select.options[select.options.length - 1]);
+          }
+        });
+      }
+    }
+
+    function handleDepartmentChange() {
+      const select = document.getElementById('department');
+      const customInput = document.getElementById('customDepartment');
+
+      if (select.value === '__custom__') {
+        customInput.style.display = 'block';
+        customInput.required = true;
+      } else {
+        customInput.style.display = 'none';
+        customInput.required = false;
+      }
+    }
+
+    function addStaffField() {
+      const staffList = document.getElementById('staffList');
+      const entry = document.createElement('div');
+      entry.className = 'staff-entry';
+      entry.innerHTML = `
+        <input type="text" class="staff-name" list="employeeNames" placeholder="Enter or select staff name">
+        <button type="button" class="remove-btn" onclick="this.parentElement.remove()">REMOVE</button>
+      `;
+      staffList.appendChild(entry);
+    }
+
+    async function handlePhotoUpload(event) {
+      const files = Array.from(event.target.files);
+
+      if (uploadedPhotos.length + files.length > 5) {
+        alert('Maximum 5 photos allowed');
+        return;
+      }
+
+      for (const file of files) {
+        if (file.size > 2 * 1024 * 1024) {
+          alert(`${file.name} is too large. Maximum 2MB per photo.`);
+          continue;
+        }
+
+        // Compress image
+        const compressed = await compressImage(file);
+        uploadedPhotos.push(compressed);
+      }
+
+      renderPhotoPreview();
+    }
+
+    function compressImage(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Resize to max 1200px width/height
+            let width = img.width;
+            let height = img.height;
+            const maxSize = 1200;
+
+            if (width > maxSize || height > maxSize) {
+              if (width > height) {
+                height = (height / width) * maxSize;
+                width = maxSize;
+              } else {
+                width = (width / height) * maxSize;
+                height = maxSize;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob((blob) => {
+              resolve({
+                blob: blob,
+                preview: canvas.toDataURL('image/jpeg', 0.85),
+                name: file.name
+              });
+            }, 'image/jpeg', 0.85);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function renderPhotoPreview() {
+      const preview = document.getElementById('photoPreview');
+      preview.innerHTML = uploadedPhotos.map((photo, idx) => `
+        <div class="photo-item">
+          <img src="${photo.preview}" alt="Photo ${idx + 1}">
+          <button type="button" class="photo-remove" onclick="removePhoto(${idx})">✕</button>
+        </div>
+      `).join('');
+    }
+
+    function removePhoto(index) {
+      uploadedPhotos.splice(index, 1);
+      renderPhotoPreview();
+    }
+
+    async function submitIncident(event) {
+      event.preventDefault();
+
+      const managerName = document.getElementById('managerName').value.trim();
+      const incidentDate = document.getElementById('incidentDate').value;
+      const incidentTime = document.getElementById('incidentTime').value;
+
+      let department = document.getElementById('department').value;
+      if (department === '__custom__') {
+        department = document.getElementById('customDepartment').value.trim().toUpperCase();
+
+        // Save new department
+        await supabase.from('departments').upsert({ name: department });
+      }
+
+      const staffInputs = document.querySelectorAll('.staff-name');
+      const staffInvolved = Array.from(staffInputs)
+        .map(input => input.value.trim())
+        .filter(name => name.length > 0);
+
+      const incidentReport = document.getElementById('incidentReport').value.trim();
+
+      if (staffInvolved.length === 0) {
+        alert('Please add at least one staff member');
+        return;
+      }
+
+      // Upload photos to Supabase Storage
+      const photoUrls = [];
+      for (const photo of uploadedPhotos) {
+        const fileName = `${Date.now()}_${photo.name}`;
+        const { data, error } = await supabase.storage
+          .from('incident-photos')
+          .upload(fileName, photo.blob);
+
+        if (!error) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('incident-photos')
+            .getPublicUrl(fileName);
+          photoUrls.push(publicUrl);
+        }
+      }
+
+      // Save incident to database
+      const { data, error } = await supabase
+        .from('manager_incidents')
+        .insert({
+          manager_name: managerName,
+          incident_date: incidentDate,
+          incident_time: incidentTime,
+          department: department,
+          staff_involved: staffInvolved,
+          incident_report: incidentReport,
+          photo_urls: photoUrls
+        })
+        .select()
+        .single();
+
+      if (error) {
+        alert('Error saving incident: ' + error.message);
+        return;
+      }
+
+      // Success!
+      alert('✅ Incident report saved successfully!');
+
+      // Reset form
+      document.getElementById('reportForm').reset();
+      uploadedPhotos = [];
+      document.getElementById('photoPreview').innerHTML = '';
+
+      // Reload incidents
+      await loadIncidents();
+
+      // Hide form
+      toggleForm();
+    }
+
+    async function loadIncidents() {
+      const list = document.getElementById('incidentsList');
+
+      const { data, error } = await supabase
+        .from('manager_incidents')
+        .select('*')
+        .order('incident_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        list.innerHTML = '<div class="empty-state">Error loading incidents</div>';
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        list.innerHTML = '<div class="empty-state">No incidents reported yet</div>';
+        return;
+      }
+
+      list.innerHTML = data.map(incident => {
+        const preview = incident.incident_report.substring(0, 120) + (incident.incident_report.length > 120 ? '...' : '');
+        const date = new Date(incident.incident_date).toLocaleDateString('en-US', {
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+
+        return `
+          <div class="incident-card" onclick='viewIncident(${JSON.stringify(incident)})'>
+            <div class="incident-header">
+              <div class="incident-date">${date} at ${incident.incident_time}</div>
+              <div class="incident-manager">${incident.manager_name}</div>
+            </div>
+            <div style="font-size: 11px; font-weight: 600; color: var(--gray-600); margin-bottom: 4px;">
+              ${incident.department} • ${incident.staff_involved.length} staff involved
+            </div>
+            <div class="incident-preview">${preview}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function viewIncident(incident) {
+      currentIncident = incident;
+
+      const date = new Date(incident.incident_date).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const staffList = incident.staff_involved.join(', ');
+
+      const photos = incident.photo_urls && incident.photo_urls.length > 0
+        ? `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px;">
+            ${incident.photo_urls.map(url => `<img src="${url}" style="width: 100%; border: 2px solid var(--gray-300);" />`).join('')}
+           </div>`
+        : '';
+
+      document.getElementById('modalBody').innerHTML = `
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Date & Time</div>
+          <div class="modal-detail-value">${date} at ${incident.incident_time}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Reported By</div>
+          <div class="modal-detail-value">${incident.manager_name}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Department</div>
+          <div class="modal-detail-value">${incident.department}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Staff Involved</div>
+          <div class="modal-detail-value">${staffList}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Incident Report</div>
+          <div class="modal-detail-value" style="white-space: pre-wrap; line-height: 1.6;">${incident.incident_report}</div>
+        </div>
+
+        ${photos ? `<div class="modal-detail-row">
+          <div class="modal-detail-label">Photos</div>
+          ${photos}
+        </div>` : ''}
+      `;
+
+      document.getElementById('viewModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('viewModal').classList.remove('active');
+      currentIncident = null;
+    }
+
+    async function downloadPDF() {
+      if (!currentIncident) return;
+
+      const response = await fetch('/api/print-incident', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incident_id: currentIncident.id })
+      });
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Incident_Report_${currentIncident.incident_date}_${currentIncident.id}.pdf`;
+      a.click();
+    }
+
+    async function printIncident() {
+      if (!currentIncident) return;
+
+      const response = await fetch('/api/print-incident?print=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incident_id: currentIncident.id })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showSuccessMessage('✅ REPORT SENT TO PRINTER!', 'The incident report has been emailed to the Epson printer successfully.');
+      } else {
+        alert('Error printing report: ' + result.error);
+      }
+    }
+
+    function showSuccessMessage(title, message) {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+        padding: 20px;
+      `;
+
+      const messageBox = document.createElement('div');
+      messageBox.style.cssText = `
+        background: white;
+        padding: 32px;
+        max-width: 500px;
+        width: 100%;
+        border: 3px solid #059669;
+        text-align: center;
+      `;
+
+      messageBox.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+        <h2 style="font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #059669; margin: 0 0 16px 0;">
+          ${title}
+        </h2>
+        <p style="font-size: 14px; color: var(--gray-700); margin: 0 0 24px 0; line-height: 1.6;">
+          ${message}
+        </p>
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="padding: 12px 32px; background: #059669; border: 2px solid #059669; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+          OK
+        </button>
+      `;
+
+      overlay.appendChild(messageBox);
+      document.body.appendChild(overlay);
+
+      setTimeout(() => {
+        if (overlay.parentElement) {
+          overlay.remove();
+        }
+      }, 4000);
+
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          overlay.remove();
+        }
+      });
+    }
+
+    // Close modal on ESC
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    });
+  </script>
+</body>
+</html>
