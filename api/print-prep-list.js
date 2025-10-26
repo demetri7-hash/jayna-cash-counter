@@ -296,6 +296,25 @@ function toTitleCase(str) {
 }
 
 /**
+ * Helper: Convert 1/2 pan count to full pans + 1/2 pan format
+ * Example: 9 half pans → "4 full pans + 1 1/2 pan"
+ * Example: 8 half pans → "4 full pans"
+ * Example: 1 half pan → "1 1/2 pan"
+ */
+function formatPanCount(halfPanCount) {
+  const fullPans = Math.floor(halfPanCount / 2);
+  const remainingHalfPans = halfPanCount % 2;
+
+  if (fullPans > 0 && remainingHalfPans > 0) {
+    return `${fullPans} full pan${fullPans > 1 ? 's' : ''} + 1 1/2 pan`;
+  } else if (fullPans > 0) {
+    return `${fullPans} full pan${fullPans > 1 ? 's' : ''}`;
+  } else {
+    return `1 1/2 pan`;
+  }
+}
+
+/**
  * Generate prep list PDF - Modern, clean design
  * All caps, grayscale with blue accents, checkboxes, handwriting space
  */
@@ -577,12 +596,21 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.text(`[ ] ${sets}x 16oz Tzatziki (no dill) - 1 small spoon`, 50, yPos); yPos += 12;
     doc.text(`[ ] ${sets}x 16oz Spicy Aioli - 1 small spoon`, 50, yPos); yPos += 12;
     doc.text(`[ ] ${sets}x 16oz Lemon Vinaigrette - 1 small spoon`, 50, yPos); yPos += 12;
-    doc.text(`[ ] ${sets}x 1/2 pan Mixed Greens - 1 tong`, 50, yPos); yPos += 12;
-    doc.text(`[ ] ${prep.byoGyros.total} portions Diced Tomatoes (${prep.byoGyros.total < 10 ? 'brown bowls' : '1/2 pans'}) - 1 large serving spoon`, 50, yPos); yPos += 12;
-    doc.text(`[ ] ${prep.byoGyros.total} portions Sliced Red Onion (${prep.byoGyros.total < 10 ? 'brown bowls' : '1/2 pans'}) - 1 tong`, 50, yPos); yPos += 12;
-    doc.text(`[ ] ${prep.byoGyros.total} whole Pepperoncini (${prep.byoGyros.total < 10 ? 'brown bowls' : '1/2 pans'}) - 1 tong`, 50, yPos); yPos += 12;
+    doc.text(`[ ] ${formatPanCount(sets)} Mixed Greens - 1 tong`, 50, yPos); yPos += 12;
+
+    // Calculate pan counts for vegetables (1 half pan per 10 portions if >= 10, brown bowls if < 10)
+    if (prep.byoGyros.total < 10) {
+      doc.text(`[ ] ${prep.byoGyros.total} portions Diced Tomatoes (brown bowls) - 1 large serving spoon`, 50, yPos); yPos += 12;
+      doc.text(`[ ] ${prep.byoGyros.total} portions Sliced Red Onion (brown bowls) - 1 tong`, 50, yPos); yPos += 12;
+      doc.text(`[ ] ${prep.byoGyros.total} whole Pepperoncini (brown bowls) - 1 tong`, 50, yPos); yPos += 12;
+    } else {
+      doc.text(`[ ] ${prep.byoGyros.total} portions Diced Tomatoes (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) - 1 large serving spoon`, 50, yPos); yPos += 12;
+      doc.text(`[ ] ${prep.byoGyros.total} portions Sliced Red Onion (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) - 1 tong`, 50, yPos); yPos += 12;
+      doc.text(`[ ] ${prep.byoGyros.total} whole Pepperoncini (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) - 1 tong`, 50, yPos); yPos += 12;
+    }
+
     const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
-    doc.text(`[ ] ${pitasNeeded} whole Grilled Pita (1/2 pan) - 1 tong`, 50, yPos); yPos += 18;
+    doc.text(`[ ] ${pitasNeeded} whole Grilled Pita (${formatPanCount(1)}) - 1 tong`, 50, yPos); yPos += 18;
   }
 
   // SALADS
@@ -612,7 +640,9 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.salads.forEach(salad => {
-      doc.text(`[ ] ${salad.qty}x ${toTitleCase(salad.name)} (${salad.qty < 4 ? '1/2 pans' : 'full pans'}) - 1 tong`, 50, yPos); yPos += 11;
+      // Calculate pan count: 1/2 pan each if < 4, or 2 half pans per salad if >= 4
+      const halfPans = salad.qty < 4 ? salad.qty : salad.qty * 2;
+      doc.text(`[ ] ${salad.qty}x ${toTitleCase(salad.name)} (${formatPanCount(halfPans)}) - 1 tong`, 50, yPos); yPos += 11;
       doc.setTextColor(...darkGray);
       doc.text(`    - ${salad.qty}x 16oz Lemon Vinaigrette - 1 small spoon`, 56, yPos);
       doc.setTextColor(...black);
@@ -663,11 +693,14 @@ function generatePrepListPDF(prep, order, lineItems) {
         doc.text(`    - ${dip.qty * 24} carrots + ${dip.qty * 24} celery (brown bowls) - 2 tongs total`, 56, yPos); yPos += 11;
       }
       if (hasPita) {
-        doc.text(`    - ${dip.qty * 6} pitas sliced 8 pieces (1/2 pans) - 1 tong`, 56, yPos); yPos += 11;
+        const regularPitaHalfPans = dip.qty; // 1 half pan per dip (6 pitas sliced)
+        doc.text(`    - ${dip.qty * 6} pitas sliced 8 pieces (${formatPanCount(regularPitaHalfPans)}) - 1 tong`, 56, yPos); yPos += 11;
       }
       if (hasGFPita && gfPitaMod) {
         const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
-        doc.text(`    - ${gfQty} GF pitas sliced 8 pieces (1/2 pans) - 1 tong`, 56, yPos); yPos += 11;
+        // Assume each GF pita needs roughly same pan space as regular (1 half pan per 6 pitas)
+        const gfPitaHalfPans = Math.ceil(gfQty / 6);
+        doc.text(`    - ${gfQty} GF pitas sliced 8 pieces (${formatPanCount(gfPitaHalfPans)}) - 1 tong`, 56, yPos); yPos += 11;
       }
       doc.setTextColor(...black);
       yPos += 2;
@@ -694,9 +727,11 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.greekFries.forEach(fries => {
+      // Greek fries: 1 half pan if qty < 2, or 2 half pans per order if >= 2
+      const friesHalfPans = fries.qty < 2 ? fries.qty : fries.qty * 2;
       doc.text(`[ ] ${fries.qty}x ${toTitleCase(fries.name)} - 1 tong`, 50, yPos); yPos += 11;
       doc.setTextColor(...darkGray);
-      doc.text(`    - 1/2 pan fries + 16oz Aioli + 16oz Tzatziki + 16oz Feta`, 56, yPos); yPos += 11;
+      doc.text(`    - ${formatPanCount(friesHalfPans)} fries + 16oz Aioli + 16oz Tzatziki + 16oz Feta`, 56, yPos); yPos += 11;
       doc.text(`    - 3 small spoons (Aioli, Tzatziki, Feta)`, 56, yPos);
       doc.setTextColor(...black);
       yPos += 13;
