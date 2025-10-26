@@ -84,6 +84,7 @@ export default async function handler(req, res) {
 
   try {
     const { order_id } = req.body;
+    const downloadMode = req.query.download === 'true';
 
     if (!order_id) {
       return res.status(400).json({
@@ -92,7 +93,7 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`🖨️ Printing Toast order ${order_id}...`);
+    console.log(`${downloadMode ? '📥' : '🖨️'} Generating Toast order ${order_id}...`);
 
     // Fetch order details
     const { data: order, error: orderError } = await supabase
@@ -118,9 +119,24 @@ export default async function handler(req, res) {
 
     // Generate PDF receipt
     const pdfBase64 = await generateOrderReceiptPDF(order, lineItems || []);
-    const filename = `Toast_Order_${order.order_number || order_id}_${new Date().toISOString().split('T')[0]}.pdf`;
+    // Use sequential order number with zero-padding (e.g., "000067")
+    const orderNum = order.sequential_order_number ? String(order.sequential_order_number).padStart(6, '0') : (order.order_number || order_id);
+    const filename = `Toast_Order_${orderNum}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    // Send to printer via Gmail
+    // DOWNLOAD MODE: Return PDF as blob for download
+    if (downloadMode) {
+      console.log(`✅ Order PDF generated for download`);
+
+      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+
+      return res.status(200).send(pdfBuffer);
+    }
+
+    // PRINT MODE: Send to printer via Gmail
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -132,7 +148,7 @@ export default async function handler(req, res) {
     const mailOptions = {
       from: `Jayna Catering <${GMAIL_USER}>`,
       to: PRINTER_EMAIL,
-      subject: `Print: Order ${order.order_number || order_id} - ${order.customer_name || 'Customer'}`,
+      subject: `Print: Order #${orderNum} - ${order.customer_name || 'Customer'}`,
       text: '',  // Empty text body - only print PDF attachment
       html: '',  // Empty HTML body - only print PDF attachment
       attachments: [{
@@ -176,17 +192,42 @@ async function generateOrderReceiptPDF(order, lineItems) {
   doc.text('JAYNA GYRO', 40, yPos);
   yPos += 25;
 
-  // Order title
+  // Order title with sequential number
   doc.setFontSize(16);
-  doc.text(`CATERING ORDER #${order.order_number || 'N/A'}`, 40, yPos);
+  const orderNum = order.sequential_order_number ? String(order.sequential_order_number).padStart(6, '0') : (order.order_number || 'N/A');
+  doc.text(`CATERING ORDER #${orderNum}`, 40, yPos);
   yPos += 20;
 
+  // BEO Fields row (Check #, Payment Status, Utensils)
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Source: ${order.source_type || 'Toast POS'}`, 40, yPos);
+  let beoInfoLine = `Source: ${order.source_type || 'Toast POS'}`;
+  if (order.check_number) {
+    beoInfoLine += ` • Check #${order.check_number}`;
+  }
+  if (order.payment_status) {
+    beoInfoLine += ` • ${order.payment_status.toUpperCase()}`;
+  }
+  if (order.utensils_required !== null && order.utensils_required !== undefined) {
+    beoInfoLine += ` • Utensils: ${order.utensils_required ? 'Yes' : 'No'}`;
+  }
+  doc.text(beoInfoLine, 40, yPos);
   yPos += 15;
+
   doc.text(`Status: ${(order.status || 'CONFIRMED').toUpperCase()}`, 40, yPos);
-  yPos += 25;
+  yPos += 15;
+
+  // Created timestamp if available
+  if (order.created_in_toast_at) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.text(`Created in Toast: ${formatPacificDateTime(new Date(order.created_in_toast_at))}`, 40, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    yPos += 15;
+  }
+
+  yPos += 10;
 
   // Delivery/Pickup Information Box
   const isPickup = !order.delivery_address; // No delivery address = pickup
@@ -368,6 +409,53 @@ async function generateOrderReceiptPDF(order, lineItems) {
     });
 
     yPos = doc.lastAutoTable.finalY + 10;
+  }
+
+  // FINANCIAL BREAKDOWN (if BEO fields available)
+  if (order.subtotal !== null && order.subtotal !== undefined) {
+    yPos += 15;
+    doc.setFillColor(250, 250, 250);
+    doc.rect(40, yPos, 515, 90, 'F');
+    doc.setDrawColor(150, 150, 150);
+    doc.rect(40, yPos, 515, 90, 'S');
+
+    yPos += 18;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('FINANCIAL BREAKDOWN', 50, yPos);
+    yPos += 15;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+
+    // Subtotal
+    doc.text('Subtotal:', 50, yPos);
+    doc.text(`$${parseFloat(order.subtotal || 0).toFixed(2)}`, 520, yPos, { align: 'right' });
+    yPos += 14;
+
+    // Delivery Fee
+    if (order.delivery_fee && parseFloat(order.delivery_fee) > 0) {
+      doc.text('Delivery Fee:', 50, yPos);
+      doc.text(`$${parseFloat(order.delivery_fee).toFixed(2)}`, 520, yPos, { align: 'right' });
+      yPos += 14;
+    }
+
+    // Tax
+    if (order.tax !== null && order.tax !== undefined) {
+      doc.text('Tax:', 50, yPos);
+      doc.text(`$${parseFloat(order.tax || 0).toFixed(2)}`, 520, yPos, { align: 'right' });
+      yPos += 14;
+    }
+
+    // Tip
+    if (order.tip && parseFloat(order.tip) > 0) {
+      doc.text('Tip:', 50, yPos);
+      doc.text(`$${parseFloat(order.tip).toFixed(2)}`, 520, yPos, { align: 'right' });
+      yPos += 14;
+    }
+
+    yPos += 10;
   }
 
   // ORDER TOTAL

@@ -2015,6 +2015,9 @@
                   <button onclick="printToastOrder(event, ${order.id})" style="background: var(--primary-blue); border: 2px solid var(--primary-blue); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
                     PRINT ORDER
                   </button>
+                  <button onclick="downloadToastOrderPDF(event, ${order.id})" style="background: #047857; border: 2px solid #047857; color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                    DOWNLOAD PDF ORDER
+                  </button>
                   <button onclick="closeToastOrderModal()" style="background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
                     CLOSE
                   </button>
@@ -2781,6 +2784,75 @@
         setTimeout(() => {
           printBtn.textContent = originalText;
           printBtn.style.background = 'var(--primary-blue)';
+        }, 3000);
+      }
+    }
+
+    // Download Toast Order PDF (for testing/verification)
+    async function downloadToastOrderPDF(event, orderId) {
+      try {
+        console.log(`📥 Downloading Toast order PDF for order ${orderId}...`);
+        showLoading('GENERATING PDF', 'Creating order PDF...');
+
+        const response = await fetch('/api/print-toast-order?download=true', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ order_id: orderId })
+        });
+
+        hideLoading();
+
+        if (!response.ok) {
+          const result = await response.json();
+          console.error(`❌ Failed to generate order PDF: ${result.error}`);
+          const downloadBtn = event.target;
+          const originalText = downloadBtn.textContent;
+          downloadBtn.textContent = 'DOWNLOAD FAILED';
+          downloadBtn.style.background = '#dc2626';
+          setTimeout(() => {
+            downloadBtn.textContent = originalText;
+            downloadBtn.style.background = '#047857';
+          }, 3000);
+          return;
+        }
+
+        // Get the PDF blob
+        const blob = await response.blob();
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Toast_Order_${orderId}_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        console.log(`✅ Order PDF downloaded successfully`);
+
+        // Show success feedback in button
+        const downloadBtn = event.target;
+        const originalText = downloadBtn.textContent;
+        downloadBtn.textContent = '✓ DOWNLOADED';
+        downloadBtn.style.background = '#047857';
+        setTimeout(() => {
+          downloadBtn.textContent = originalText;
+          downloadBtn.style.background = '#047857';
+        }, 2000);
+
+      } catch (error) {
+        hideLoading();
+        console.error('❌ Error downloading order PDF:', error);
+        const downloadBtn = event.target;
+        const originalText = downloadBtn.textContent;
+        downloadBtn.textContent = 'DOWNLOAD ERROR';
+        downloadBtn.style.background = '#dc2626';
+        setTimeout(() => {
+          downloadBtn.textContent = originalText;
+          downloadBtn.style.background = '#047857';
         }, 3000);
       }
     }
