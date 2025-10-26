@@ -59,33 +59,31 @@ export default async function handler(req, res) {
     // Parse order data for database storage
     const orderData = parseOrderData(orderDetails);
 
-    // Upsert order in database (insert or update if exists)
+    // Use existing catering_orders table (same as Toast)
     const { data, error } = await supabase
-      .from('ezcater_orders')
+      .from('catering_orders')
       .upsert({
-        ezcater_order_id: orderData.ezcater_order_id,
+        external_id: orderData.ezcater_order_id,
         order_number: orderData.order_number,
+        source_type: 'ezCater',
         customer_name: orderData.customer_name,
         customer_email: orderData.customer_email,
         customer_phone: orderData.customer_phone,
         delivery_date: orderData.delivery_date,
-        delivery_time: orderData.delivery_time,
-        delivery_address_street: orderData.delivery_address_street,
-        delivery_address_city: orderData.delivery_address_city,
-        delivery_address_state: orderData.delivery_address_state,
-        delivery_address_zip: orderData.delivery_address_zip,
-        delivery_instructions: orderData.delivery_instructions,
+        delivery_time: orderData.delivery_time ? new Date(orderData.delivery_date + 'T' + orderData.delivery_time).toISOString() : null,
+        delivery_address: [
+          orderData.delivery_address_street,
+          orderData.delivery_address_city,
+          orderData.delivery_address_state,
+          orderData.delivery_address_zip
+        ].filter(Boolean).join(', '),
+        delivery_notes: orderData.delivery_instructions,
         headcount: orderData.headcount,
-        special_instructions: orderData.special_instructions,
-        subtotal: orderData.subtotal,
-        tax: orderData.tax,
-        tip: orderData.tip,
-        total: orderData.total,
-        status: orderData.status,
-        order_data: orderDetails,  // Store full object for detail view
-        last_synced_at: new Date().toISOString()
+        total_amount: orderData.total,
+        status: orderData.status.toUpperCase(),
+        raw_data: orderDetails
       }, {
-        onConflict: 'ezcater_order_id'
+        onConflict: 'external_id'
       });
 
     if (error) {
@@ -94,6 +92,11 @@ export default async function handler(req, res) {
     }
 
     console.log('✅ Order saved to database:', orderData.ezcater_order_id);
+
+    // Save line items if order was inserted/updated successfully
+    if (data && data.length > 0) {
+      await saveLineItems(data[0].id, orderDetails.catererCart?.orderItems || []);
+    }
 
     // Return success response to EZCater
     return res.status(200).json({
@@ -164,14 +167,29 @@ async function fetchOrderFromEZCater(orderId) {
                 timeZoneIdentifier
               }
               totals {
-                customerTotalDue
-                tip
-                salesTax
-                subTotal
+                customerTotalDue {
+                  subunits
+                  currency
+                }
+                tip {
+                  subunits
+                  currency
+                }
+                salesTax {
+                  subunits
+                  currency
+                }
+                subTotal {
+                  subunits
+                  currency
+                }
               }
               catererCart {
                 totals {
-                  catererTotalDue
+                  catererTotalDue {
+                    subunits
+                    currency
+                  }
                 }
                 orderItems {
                   uuid
@@ -233,12 +251,17 @@ function parseOrderData(order) {
   // Extract delivery address (nested under event.address, not top-level)
   const address = order.event?.address;
 
-  // Extract totals (nested under totals object, not top-level)
+  // Extract totals (Money type has subunits field - convert pennies to dollars)
+  const subunitsToDollars = (money) => {
+    if (!money || !money.subunits) return 0;
+    return money.subunits / 100;
+  };
+
   const totals = order.totals || {};
-  const subtotal = totals.subTotal || 0;
-  const tax = totals.salesTax || 0;
-  const tip = totals.tip || 0;
-  const total = totals.customerTotalDue || 0;
+  const subtotal = subunitsToDollars(totals.subTotal);
+  const tax = subunitsToDollars(totals.salesTax);
+  const tip = subunitsToDollars(totals.tip);
+  const total = subunitsToDollars(totals.customerTotalDue);
 
   // Extract status (lifecycle.orderIsCurrently, not "status")
   const status = parseStatus(order.lifecycle?.orderIsCurrently);
@@ -264,6 +287,49 @@ function parseOrderData(order) {
     total: total,
     status: status
   };
+}
+
+/**
+ * Save order line items to database
+ */
+async function saveLineItems(orderId, items) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_KEY;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  // Delete existing line items for this order
+  await supabase
+    .from('catering_order_items')
+    .delete()
+    .eq('order_id', orderId);
+
+  // Convert subunits (pennies) to dollars
+  const subunitsToDollars = (subunits) => {
+    return (subunits || 0) / 100;
+  };
+
+  // Insert new line items
+  const lineItems = items.map(item => ({
+    order_id: orderId,
+    item_name: item.name,
+    quantity: item.quantity,
+    unit_price: subunitsToDollars(item.totalInSubunits) / (item.quantity || 1),
+    total_price: subunitsToDollars(item.totalInSubunits),
+    modifiers: item.customizations || [],
+    special_requests: item.specialInstructions || null
+  }));
+
+  if (lineItems.length > 0) {
+    const { error } = await supabase
+      .from('catering_order_items')
+      .insert(lineItems);
+
+    if (error) {
+      console.error('❌ Error saving line items:', error);
+    } else {
+      console.log(`✅ Saved ${lineItems.length} line items`);
+    }
+  }
 }
 
 /**

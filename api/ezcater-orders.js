@@ -19,7 +19,8 @@ export default async function handler(req, res) {
 
   try {
     const EZCATER_API_TOKEN = process.env.EZCATER_API_TOKEN;
-    const CATERER_ID = '332390'; // Jayna Gyro-Sacramento
+    const CATERER_ID = '332390'; // Store Number
+    const CATERER_UUID = 'c78c7e31-fe7c-40eb-8490-3468c99b1b68'; // Jayna Gyro-Sacramento UUID
 
     if (!EZCATER_API_TOKEN) {
       throw new Error('EZCATER_API_TOKEN not configured');
