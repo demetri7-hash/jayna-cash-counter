@@ -239,39 +239,66 @@ function calculatePrepList(lineItems, order) {
 }
 
 /**
- * Generate prep list PDF (single page, large font)
+ * Generate prep list PDF - Modern, clean design
+ * All caps, grayscale with blue accents, checkboxes, handwriting space
  */
 function generatePrepListPDF(prep, order, lineItems) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
-  let yPos = 30;
+  // Jayna Blue
+  const jaynaBlue = [30, 64, 175]; // #1e40af
+  const lightGray = [243, 244, 246]; // #f3f4f6
+  const mediumGray = [156, 163, 175]; // #9ca3af
+  const darkGray = [55, 65, 81]; // #374151
 
-  // Header - PREP LIST
-  doc.setFontSize(20);
+  let yPos = 50;
+
+  // ===== HEADER =====
+  doc.setFillColor(...jaynaBlue);
+  doc.rect(0, 0, 612, 80, 'F');
+
+  doc.setFontSize(28);
   doc.setFont('helvetica', 'bold');
-  doc.text('PREP LIST', 40, yPos);
+  doc.setTextColor(255, 255, 255);
+  doc.text('PREP LIST', 40, 50);
+
+  // Reset text color
+  doc.setTextColor(0, 0, 0);
+  yPos = 90;
+
+  // ===== ORDER INFO BOX =====
+  doc.setFillColor(...lightGray);
+  doc.rect(40, yPos, 532, 60, 'F');
+  doc.setDrawColor(...mediumGray);
+  doc.setLineWidth(1);
+  doc.rect(40, yPos, 532, 60, 'S');
+
   yPos += 20;
-
-  // Order info
-  doc.setFontSize(11);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...darkGray);
+  doc.text(`ORDER #${order.order_number || 'N/A'}`, 50, yPos);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Order #${order.order_number || 'N/A'} - ${order.customer_name || 'Customer'}`, 40, yPos);
-  yPos += 15;
+  doc.text(`${order.customer_name || 'Customer'}`.toUpperCase(), 150, yPos);
+  yPos += 16;
 
-  if (order.delivery_date) {
-    doc.text(`${order.delivery_address ? 'Delivery' : 'Pickup'}: ${formatPacificDateShort(order.delivery_date)}`, 40, yPos);
+  if (order.delivery_date && order.delivery_time) {
+    doc.setFont('helvetica', 'bold');
+    doc.text(order.delivery_address ? 'DELIVERY:' : 'PICKUP:', 50, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${formatPacificDateShort(order.delivery_date).toUpperCase()} AT ${formatPacificTime(order.delivery_time).toUpperCase()}`, 120, yPos);
   }
-  if (order.delivery_time) {
-    doc.text(` at ${formatPacificTime(order.delivery_time)}`, 180, yPos);
-  }
-  yPos += 15;
+  yPos += 16;
 
   if (order.headcount) {
-    doc.text(`Headcount: ${order.headcount} guests`, 40, yPos);
-    yPos += 15;
+    doc.setFont('helvetica', 'bold');
+    doc.text('HEADCOUNT:', 50, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${order.headcount} GUESTS`, 120, yPos);
   }
 
-  yPos += 5;
+  doc.setTextColor(0, 0, 0);
+  yPos += 30;
 
   // Containers summary
   let halfPans = 0, deliContainers = 0, brownBowls = 0, tongs = 0, spoons = 0;
@@ -354,46 +381,52 @@ function generatePrepListPDF(prep, order, lineItems) {
     tongs += pinwheel.qty; // 1 tong per pinwheel
   });
 
-  // CONTAINERS NEEDED (blue box)
-  doc.setFillColor(220, 240, 255);
-  doc.rect(40, yPos, 520, 40, 'F');
-  doc.setDrawColor(100, 150, 200);
-  doc.rect(40, yPos, 520, 40, 'S');
+  // ===== CONTAINERS NEEDED =====
+  doc.setFillColor(...lightGray);
+  doc.rect(40, yPos, 532, 45, 'F');
+  doc.setDrawColor(...mediumGray);
+  doc.setLineWidth(1);
+  doc.rect(40, yPos, 532, 45, 'S');
 
-  yPos += 15;
-  doc.setFontSize(11);
+  yPos += 18;
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...jaynaBlue);
   doc.text('CONTAINERS NEEDED:', 50, yPos);
-  yPos += 13;
+  yPos += 15;
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  let containerLine = '';
-  if (halfPans > 0) containerLine += `${halfPans}x ½ Pans  `;
-  if (deliContainers > 0) containerLine += `${deliContainers}x 16oz Delis  `;
-  if (brownBowls > 0) containerLine += `${brownBowls}x Brown Bowls`;
-  doc.text(containerLine, 50, yPos);
+  doc.setTextColor(0, 0, 0);
+  let containerParts = [];
+  if (halfPans > 0) containerParts.push(`${halfPans}x ½ PANS`);
+  if (deliContainers > 0) containerParts.push(`${deliContainers}x 16OZ DELIS`);
+  if (brownBowls > 0) containerParts.push(`${brownBowls}x BROWN BOWLS`);
+  doc.text(containerParts.join('  •  '), 50, yPos);
 
   yPos += 20;
 
-  // UTENSILS TO PACK (yellow box)
-  doc.setFillColor(254, 243, 199); // #fef3c7
-  doc.rect(40, yPos, 520, 40, 'F');
-  doc.setDrawColor(245, 158, 11); // #f59e0b
-  doc.rect(40, yPos, 520, 40, 'S');
+  // ===== UTENSILS TO PACK =====
+  doc.setFillColor(...lightGray);
+  doc.rect(40, yPos, 532, 45, 'F');
+  doc.setDrawColor(...mediumGray);
+  doc.setLineWidth(1);
+  doc.rect(40, yPos, 532, 45, 'S');
 
-  yPos += 15;
-  doc.setFontSize(11);
+  yPos += 18;
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...jaynaBlue);
   doc.text('UTENSILS TO PACK:', 50, yPos);
-  yPos += 13;
+  yPos += 15;
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  let utensilsLine = '';
-  if (tongs > 0) utensilsLine += `${tongs}x Tongs  `;
-  if (spoons > 0) utensilsLine += `${spoons}x Small Spoons`;
-  doc.text(utensilsLine, 50, yPos);
+  doc.setTextColor(0, 0, 0);
+  let utensilParts = [];
+  if (tongs > 0) utensilParts.push(`${tongs}x TONGS`);
+  if (spoons > 0) utensilParts.push(`${spoons}x SMALL SPOONS`);
+  doc.text(utensilParts.join('  •  '), 50, yPos);
 
   yPos += 25;
 
@@ -403,18 +436,42 @@ function generatePrepListPDF(prep, order, lineItems) {
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text(`BYO GYRO PITAS (${prep.byoGyros.total} portions)`, 40, yPos);
+    doc.setTextColor(...jaynaBlue);
+    doc.text(`BYO GYRO PITAS (${prep.byoGyros.total} TOTAL PORTIONS)`, 40, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 15;
 
-    doc.setFontSize(11);
+    // PROTEIN BREAKDOWN - Show each BYO gyro type
+    if (prep.byoGyros.items && prep.byoGyros.items.length > 0) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...darkGray);
+      doc.text('PROTEIN BREAKDOWN:', 50, yPos);
+      yPos += 13;
+
+      doc.setFont('helvetica', 'normal');
+      prep.byoGyros.items.forEach(item => {
+        doc.text(`  • ${item.qty}x ${item.name.toUpperCase()}`, 50, yPos);
+        yPos += 12;
+      });
+      yPos += 6;
+    }
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PREP ITEMS:', 50, yPos);
+    yPos += 13;
+
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`☐ ${sets}x 16oz Tzatziki (no dill) - ${sets} SPOON${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 14;
-    doc.text(`☐ ${sets}x 16oz Spicy Aioli - ${sets} SPOON${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 14;
-    doc.text(`☐ ${sets}x 16oz Lemon Vinaigrette - ${sets} SPOON${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 14;
-    doc.text(`☐ ${sets}x ½ pan Mixed Greens - ${sets} TONG${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 14;
-    doc.text(`☐ ${prep.byoGyros.total} portions Diced Tomatoes (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) - 1 LARGE SERVING SPOON`, 50, yPos); yPos += 14;
-    doc.text(`☐ ${prep.byoGyros.total} portions Sliced Red Onion (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) - 1 TONG`, 50, yPos); yPos += 14;
-    doc.text(`☐ ${prep.byoGyros.total} Whole Pepperoncini (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) - 1 TONG`, 50, yPos); yPos += 14;
+    doc.text(`☐ ${sets}x 16oz Tzatziki (no dill) - ${sets} SPOON${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${sets}x 16oz Spicy Aioli - ${sets} SPOON${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${sets}x 16oz Lemon Vinaigrette - ${sets} SPOON${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${sets}x ½ pan Mixed Greens - ${sets} TONG${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${prep.byoGyros.total} portions Diced Tomatoes (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) - 1 SPOON`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${prep.byoGyros.total} portions Sliced Red Onion (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) - 1 TONG`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${prep.byoGyros.total} Whole Pepperoncini (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) - 1 TONG`, 50, yPos); yPos += 13;
     const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
     doc.text(`☐ ${pitasNeeded} Whole Grilled Pita (½ pan) - 1 TONG`, 50, yPos); yPos += 18;
   }
@@ -423,171 +480,241 @@ function generatePrepListPDF(prep, order, lineItems) {
   if (prep.salads.length > 0) {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...jaynaBlue);
     doc.text('SALADS', 40, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 15;
 
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.salads.forEach(salad => {
-      doc.text(`☐ ${salad.qty}x ${salad.name} (${salad.qty < 4 ? '½ pans' : 'full pans'}) - ${salad.qty} TONG${salad.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
-      doc.text(`   → ${salad.qty}x 16oz Lemon Vinaigrette - ${salad.qty} SPOON${salad.qty > 1 ? 'S' : ''}`, 60, yPos); yPos += 14;
+      doc.text(`☐ ${salad.qty}x ${salad.name.toUpperCase()} (${salad.qty < 4 ? '½ PANS' : 'FULL PANS'}) - ${salad.qty} TONG${salad.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+      doc.setTextColor(...darkGray);
+      doc.text(`   → ${salad.qty}x 16OZ LEMON VINAIGRETTE - ${salad.qty} SPOON${salad.qty > 1 ? 'S' : ''}`, 60, yPos);
+      doc.setTextColor(0, 0, 0);
+      yPos += 14;
     });
-    yPos += 4;
+    yPos += 6;
   }
 
   // DIPS
   if (prep.dips.length > 0 && yPos < 700) {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...jaynaBlue);
     doc.text('DIPS', 40, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 15;
 
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.dips.forEach(dip => {
-      doc.text(`☐ ${dip.qty}x 16oz ${dip.name} (garnish) - ${dip.qty} SMALL SPOON${dip.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+      doc.text(`☐ ${dip.qty}x 16OZ ${dip.name.toUpperCase()} (GARNISH) - ${dip.qty} SMALL SPOON${dip.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
 
       const hasVeggies = dip.modifiers.some(m => m.name && (m.name.includes('VEGGIES') || m.name.includes('VEGGIE')));
       const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
       const gfPitaMod = dip.modifiers.find(m => m.name && m.name.includes('GLUTEN FREE PITA'));
       const hasGFPita = !!gfPitaMod;
 
+      doc.setTextColor(...darkGray);
       if (hasVeggies) {
-        doc.text(`   → ${dip.qty * 24} Carrots + ${dip.qty * 24} Celery (brown bowls) - 2 TONGS (1 each veg)`, 60, yPos); yPos += 12;
+        doc.text(`   → ${dip.qty * 24} CARROTS + ${dip.qty * 24} CELERY (BROWN BOWLS) - 2 TONGS`, 60, yPos); yPos += 12;
       }
       if (hasPita) {
-        doc.text(`   → ${dip.qty * 6} Pitas sliced 8 pieces (½ pans) - ${dip.qty} TONG${dip.qty > 1 ? 'S' : ''}`, 60, yPos); yPos += 12;
+        doc.text(`   → ${dip.qty * 6} PITAS SLICED 8 PIECES (½ PANS) - ${dip.qty} TONG${dip.qty > 1 ? 'S' : ''}`, 60, yPos); yPos += 12;
       }
       if (hasGFPita && gfPitaMod) {
-        const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6); // Use parsed qty or fallback
-        doc.text(`   → ${gfQty} GF Pitas sliced 8 pieces (½ pans) - ${dip.qty} TONG${dip.qty > 1 ? 'S' : ''}`, 60, yPos); yPos += 12;
+        const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
+        doc.text(`   → ${gfQty} GF PITAS SLICED 8 PIECES (½ PANS) - ${dip.qty} TONG${dip.qty > 1 ? 'S' : ''}`, 60, yPos); yPos += 12;
       }
-      yPos += 2;
+      doc.setTextColor(0, 0, 0);
+      yPos += 3;
     });
-    yPos += 4;
+    yPos += 6;
   }
 
   // GREEK FRIES BAR
   if (prep.greekFries.length > 0 && yPos < 700) {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...jaynaBlue);
     doc.text('GREEK FRIES BAR', 40, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 15;
 
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.greekFries.forEach(fries => {
-      doc.text(`☐ ${fries.qty}x ${fries.name}`, 50, yPos); yPos += 12;
-      doc.text(`   → ½ pan fries + 16oz Aioli + 16oz Tzatziki + 16oz Feta`, 60, yPos); yPos += 12;
-      doc.text(`   → 1 tong, 3 spoons`, 60, yPos); yPos += 14;
+      doc.text(`☐ ${fries.qty}x ${fries.name.toUpperCase()}`, 50, yPos); yPos += 12;
+      doc.setTextColor(...darkGray);
+      doc.text(`   → ½ PAN FRIES + 16OZ AIOLI + 16OZ TZATZIKI + 16OZ FETA`, 60, yPos); yPos += 12;
+      doc.text(`   → ${fries.qty} TONG${fries.qty > 1 ? 'S' : ''}, 3 SPOONS`, 60, yPos);
+      doc.setTextColor(0, 0, 0);
+      yPos += 14;
     });
+    yPos += 6;
   }
 
   // DOLMAS
   if (prep.dolmas.length > 0 && yPos < 700) {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...jaynaBlue);
     doc.text('DOLMAS', 40, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 15;
 
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.dolmas.forEach(dolma => {
       if (yPos < 720) {
-        doc.text(`☐ ${dolma.qty}x ${dolma.name} (½ pan or round tray + lemon wedges) - ${dolma.qty} TONG${dolma.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
-        doc.text(`   → ${dolma.qty}x 16oz Tzatziki (dill stripe) - ${dolma.qty} SMALL SPOON${dolma.qty > 1 ? 'S' : ''}`, 60, yPos); yPos += 14;
+        doc.text(`☐ ${dolma.qty}x ${dolma.name.toUpperCase()} (½ PAN OR ROUND TRAY + LEMON WEDGES) - ${dolma.qty} TONG${dolma.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+        doc.setTextColor(...darkGray);
+        doc.text(`   → ${dolma.qty}x 16OZ TZATZIKI (DILL STRIPE) - ${dolma.qty} SMALL SPOON${dolma.qty > 1 ? 'S' : ''}`, 60, yPos);
+        doc.setTextColor(0, 0, 0);
+        yPos += 14;
       }
     });
+    yPos += 6;
   }
 
   // SPANAKOPITA
   if (prep.spanakopita.length > 0 && yPos < 700) {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...jaynaBlue);
     doc.text('SPANAKOPITA', 40, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 15;
 
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.spanakopita.forEach(span => {
       if (yPos < 720) {
-        doc.text(`☐ ${span.qty}x ${span.name} (round tray on arugula OR ½/full pan) - ${span.qty} TONG${span.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
-        doc.text(`   → ${span.qty}x 16oz Tzatziki (dill stripe) - ${span.qty} SMALL SPOON${span.qty > 1 ? 'S' : ''}`, 60, yPos); yPos += 14;
+        doc.text(`☐ ${span.qty}x ${span.name.toUpperCase()} (ROUND TRAY ON ARUGULA OR ½/FULL PAN) - ${span.qty} TONG${span.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+        doc.setTextColor(...darkGray);
+        doc.text(`   → ${span.qty}x 16OZ TZATZIKI (DILL STRIPE) - ${span.qty} SMALL SPOON${span.qty > 1 ? 'S' : ''}`, 60, yPos);
+        doc.setTextColor(0, 0, 0);
+        yPos += 14;
       }
     });
+    yPos += 6;
   }
 
   // SIDES
   if (prep.sides.length > 0 && yPos < 700) {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...jaynaBlue);
     doc.text('SIDES', 40, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 15;
 
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.sides.forEach(side => {
       if (yPos < 720) {
-        doc.text(`☐ ${side.qty}x ${side.name} - ${side.qty} TONG${side.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 14;
+        doc.text(`☐ ${side.qty}x ${side.name.toUpperCase()} - ${side.qty} TONG${side.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
       }
     });
+    yPos += 6;
   }
 
   // DESSERTS
   if (prep.desserts.length > 0 && yPos < 700) {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...jaynaBlue);
     doc.text('DESSERTS', 40, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 15;
 
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.desserts.forEach(dessert => {
       if (yPos < 720) {
-        doc.text(`☐ ${dessert.qty}x ${dessert.name} - ${dessert.qty} TONG${dessert.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 14;
+        doc.text(`☐ ${dessert.qty}x ${dessert.name.toUpperCase()} - ${dessert.qty} TONG${dessert.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
       }
     });
+    yPos += 6;
   }
 
   // PINWHEELS
   if (prep.pinwheels.length > 0 && yPos < 700) {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...jaynaBlue);
     doc.text('PINWHEELS', 40, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 15;
 
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.pinwheels.forEach(pinwheel => {
       if (yPos < 720) {
-        doc.text(`☐ ${pinwheel.qty}x ${pinwheel.name} - ${pinwheel.qty} TONG${pinwheel.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 14;
+        doc.text(`☐ ${pinwheel.qty}x ${pinwheel.name.toUpperCase()} - ${pinwheel.qty} TONG${pinwheel.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
       }
     });
+    yPos += 6;
   }
 
   // SPECIAL NOTES
-  if (order.delivery_notes && yPos < 700) {
-    yPos += 5;
-    doc.setFontSize(12);
+  if (order.delivery_notes && yPos < 680) {
+    yPos += 8;
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...jaynaBlue);
     doc.text('SPECIAL NOTES:', 40, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 15;
 
-    doc.setFontSize(11);
+    // Notes box with background
+    doc.setFillColor(255, 250, 240);
+    const noteLines = doc.splitTextToSize(order.delivery_notes.toUpperCase(), 510);
+    const notesHeight = Math.min(noteLines.length * 13 + 16, 80);
+    doc.rect(40, yPos - 10, 532, notesHeight, 'F');
+    doc.setDrawColor(...mediumGray);
+    doc.setLineWidth(1);
+    doc.rect(40, yPos - 10, 532, notesHeight, 'S');
+
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    const notes = doc.splitTextToSize(order.delivery_notes, 500);
-    notes.forEach(line => {
-      if (yPos < 750) {
+    noteLines.forEach((line, idx) => {
+      if (idx < 5 && yPos < 750) {  // Limit to 5 lines
         doc.text(line, 50, yPos);
-        yPos += 14;
+        yPos += 13;
       }
     });
+    yPos += 15;
+  }
+
+  // HANDWRITTEN NOTES SECTION
+  if (yPos < 700) {
+    yPos += 10;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...darkGray);
+    doc.text('PREP NOTES:', 40, yPos);
+    doc.setTextColor(0, 0, 0);
+    yPos += 8;
+
+    // Draw lines for handwritten notes
+    for (let i = 0; i < 3; i++) {
+      if (yPos < 740) {
+        doc.setDrawColor(...lightGray);
+        doc.setLineWidth(0.5);
+        doc.line(40, yPos, 572, yPos);
+        yPos += 18;
+      }
+    }
   }
 
   // Footer
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'italic');
-  doc.text(`Generated: ${formatPacificDateTime(new Date())}`, 40, 770);
+  doc.setTextColor(...mediumGray);
+  doc.text(`Generated: ${formatPacificDateTime(new Date())} PST`, 40, 782);
+  doc.setTextColor(0, 0, 0);
 
   // Convert to base64
   return doc.output('datauristring').split(',')[1];
