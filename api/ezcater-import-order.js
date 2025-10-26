@@ -40,10 +40,12 @@ export default async function handler(req, res) {
     console.log(`📥 Manually importing ezCater order: ${orderId}`);
 
     // Fetch order details from ezCater API (accepts both UUID and order number)
-    const orderDetails = await fetchOrderDetails(orderId, EZCATER_API_TOKEN);
-
-    if (!orderDetails) {
-      throw new Error('Failed to fetch order from ezCater API');
+    let orderDetails;
+    try {
+      orderDetails = await fetchOrderDetails(orderId, EZCATER_API_TOKEN);
+    } catch (fetchError) {
+      console.error('❌ Error fetching from ezCater:', fetchError);
+      throw new Error(`Failed to fetch order from ezCater: ${fetchError.message}`);
     }
 
     // Store in database using same logic as webhook
@@ -166,12 +168,19 @@ async function fetchOrderDetails(orderUuid, apiToken) {
 
   const data = await response.json();
 
+  console.log('ezCater API Response:', JSON.stringify(data, null, 2));
+
   if (data.errors) {
-    console.error('GraphQL errors:', data.errors);
-    return null;
+    console.error('GraphQL errors:', JSON.stringify(data.errors, null, 2));
+    throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
   }
 
-  return data.data?.order;
+  if (!data.data?.order) {
+    console.error('No order found in response:', data);
+    throw new Error('Order not found - check if order number is correct');
+  }
+
+  return data.data.order;
 }
 
 /**
