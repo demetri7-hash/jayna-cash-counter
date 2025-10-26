@@ -66,31 +66,16 @@ export default async function handler(req, res) {
       })
     });
 
-    const typeData = await typeResponse.json();
-
-    // Filter to only types related to Subscriber/Subscription
-    const allTypes = typeData.data.__schema.types;
-    const relevantTypes = allTypes.filter(t =>
-      t.name && (
-        t.name.includes('Subscri') ||
-        t.name.includes('subscri')
-      )
-    );
-
-    console.log('📋 Relevant types:', JSON.stringify(relevantTypes, null, 2));
-
-    return res.status(200).json({
-      success: true,
-      data: relevantTypes,
-      timestamp: new Date().toISOString()
-    });
-
     // STEP 1: Create Subscriber (register webhook URL)
     const createSubscriberMutation = `
-      mutation CreateSubscriber($subscriberParams: SubscriberInput!) {
+      mutation CreateSubscriber($subscriberParams: CreateSubscriberFields!) {
         createSubscriber(subscriberParams: $subscriberParams) {
-          id
-          url
+          subscriber {
+            id
+            name
+            webhookUrl
+            webhookSecret
+          }
         }
       }
     `;
@@ -107,7 +92,8 @@ export default async function handler(req, res) {
         query: createSubscriberMutation,
         variables: {
           subscriberParams: {
-            url: WEBHOOK_URL
+            name: 'Jayna Gyro Sacramento',
+            webhookUrl: WEBHOOK_URL
           }
         }
       })
@@ -120,18 +106,21 @@ export default async function handler(req, res) {
       throw new Error(`Failed to create subscriber: ${JSON.stringify(subscriberData.errors)}`);
     }
 
-    console.log('✅ Subscriber created:', subscriberData.data.createSubscriber);
+    console.log('✅ Subscriber created:', subscriberData.data.createSubscriber.subscriber);
 
-    const subscriberId = subscriberData.data.createSubscriber.id;
+    const subscriberId = subscriberData.data.createSubscriber.subscriber.id;
 
     // STEP 2: Create Subscription for Order events
     const createSubscriptionMutation = `
-      mutation CreateSubscription($subscriptionParams: SubscriptionInput!) {
+      mutation CreateSubscription($subscriptionParams: CreateSubscriptionFields!) {
         createSubscription(subscriptionParams: $subscriptionParams) {
-          id
-          eventEntity
-          eventKey
-          subscriberId
+          subscription {
+            eventEntity
+            eventKey
+            parentEntity
+            parentId
+            subscriberId
+          }
         }
       }
     `;
@@ -169,14 +158,14 @@ export default async function handler(req, res) {
         console.error(`❌ Subscription failed for ${eventKey}:`, subscriptionData.errors);
       } else {
         console.log(`✅ Subscribed to order.${eventKey}`);
-        subscriptions.push(subscriptionData.data.createSubscription);
+        subscriptions.push(subscriptionData.data.createSubscription.subscription);
       }
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Webhook subscriptions created successfully',
-      subscriber: subscriberData.data.createSubscriber,
+      message: 'Webhook subscriptions created successfully! 🎉',
+      subscriber: subscriberData.data.createSubscriber.subscriber,
       subscriptions: subscriptions,
       timestamp: new Date().toISOString()
     });
