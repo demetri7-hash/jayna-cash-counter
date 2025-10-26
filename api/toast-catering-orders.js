@@ -267,24 +267,59 @@ export default async function handler(req, res) {
         deliveryAddress = parts.join(', ');
       }
 
-      // Calculate TOTAL from checks - use totalAmount (includes tip & fees), NOT amount
-      // IMPORTANT: Toast returns amounts in DOLLARS (e.g. 303.55), NOT cents!
+      // ============================================
+      // EXTRACT BEO FINANCIAL BREAKDOWN FROM CHECKS
+      // ============================================
       let total = 0;
+      let subtotal = 0;
+      let tax = 0;
+      let tip = 0;
+      let checkNumber = null;
+      let paymentStatus = null;
+      let paidDate = null;
+      let deliveryFee = 0;
+
       if (order.checks && Array.isArray(order.checks)) {
-        total = order.checks.reduce((sum, check) => {
-          // Use totalAmount (includes tip/service charges) - ALREADY IN DOLLARS
-          return sum + (check.totalAmount || check.amount || 0);
-        }, 0);
+        // Process all checks (usually just 1 for catering orders)
+        for (const check of order.checks) {
+          // Financial totals
+          total += (check.totalAmount || check.amount || 0);
+          subtotal += (check.amount || 0); // amount = subtotal (before tax)
+          tax += (check.taxAmount || 0);
+
+          // Extract tip from payments array
+          if (check.payments && Array.isArray(check.payments)) {
+            for (const payment of check.payments) {
+              tip += (payment.tipAmount || 0);
+            }
+          }
+
+          // Check number and payment status (from first check)
+          if (!checkNumber) {
+            checkNumber = check.displayNumber || check.checkNumber || null;
+            paymentStatus = check.paymentStatus || null; // "OPEN", "PAID", "CLOSED"
+            paidDate = check.paidDate || (check.payments && check.payments[0]?.paidDate) || null;
+          }
+
+          // Extract delivery fee from selections
+          if (check.selections && Array.isArray(check.selections)) {
+            for (const selection of check.selections) {
+              const itemName = (selection.name || selection.displayName || '').toLowerCase();
+              if (itemName.includes('delivery') || itemName.includes('in house delivery')) {
+                deliveryFee += (selection.price || 0);
+              }
+            }
+          }
+        }
       }
 
-      console.log(`💰 Order ${order.guid?.substring(0, 8)} total: $${total.toFixed(2)}`);
+      console.log(`💰 Order ${order.guid?.substring(0, 8)}: Total=$${total.toFixed(2)}, Subtotal=$${subtotal.toFixed(2)}, Tax=$${tax.toFixed(2)}, Tip=$${tip.toFixed(2)}, Delivery=$${deliveryFee.toFixed(2)}`);
 
       return {
         // Order IDs
         toast_order_id: order.guid,
-        // CRITICAL: Use orderNumber (unique Toast order #), NOT displayNumber (daily sequential 1,2,3...)
-        // Fallback to entityId (Toast's unique order number) or first 8 chars of GUID
-        order_number: order.orderNumber || order.entityId || `T-${order.guid?.substring(0, 8)}`,
+        // CRITICAL: Use displayNumber for UI display (Toast GUID will be replaced by sequential_order_number in DB)
+        order_number: order.displayNumber || order.guid?.substring(0, 8) || null,
 
         // Customer info (from check.customer)
         customer_name: customerName,
@@ -302,6 +337,17 @@ export default async function handler(req, res) {
         business_date: order.businessDate,
         headcount: order.numberOfGuests || null,
         total: total, // Already in dollars!
+
+        // NEW: BEO Financial Breakdown
+        check_number: checkNumber,
+        payment_status: paymentStatus,
+        paid_date: paidDate,
+        subtotal: subtotal,
+        tax: tax,
+        tip: tip,
+        delivery_fee: deliveryFee,
+        utensils_required: true, // Default true for catering orders
+        created_in_toast_at: order.createdDate || order.openedDate || null,
 
         // Status
         status: parseOrderStatus(order),
@@ -337,6 +383,17 @@ export default async function handler(req, res) {
       total_amount: order.total,
       business_date: order.business_date,
       status: order.status,
+      // NEW: BEO Fields
+      check_number: order.check_number,
+      payment_status: order.payment_status,
+      paid_date: order.paid_date,
+      subtotal: order.subtotal,
+      tax: order.tax,
+      tip: order.tip,
+      delivery_fee: order.delivery_fee,
+      utensils_required: order.utensils_required,
+      created_in_toast_at: order.created_in_toast_at,
+      // Data
       order_data: order.order_data,
       last_synced_at: new Date().toISOString()
     }));
