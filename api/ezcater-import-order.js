@@ -25,21 +25,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { orderUuid } = req.body;
+    const { orderUuid, orderNumber } = req.body;
+    const orderId = orderUuid || orderNumber;
 
-    if (!orderUuid) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
-        error: 'orderUuid is required'
+        error: 'orderUuid or orderNumber is required'
       });
     }
 
     const EZCATER_API_TOKEN = process.env.EZCATER_API_TOKEN;
 
-    console.log(`📥 Manually importing ezCater order: ${orderUuid}`);
+    console.log(`📥 Manually importing ezCater order: ${orderId}`);
 
-    // Fetch order details from ezCater API
-    const orderDetails = await fetchOrderDetails(orderUuid, EZCATER_API_TOKEN);
+    // Fetch order details from ezCater API (accepts both UUID and order number)
+    const orderDetails = await fetchOrderDetails(orderId, EZCATER_API_TOKEN);
 
     if (!orderDetails) {
       throw new Error('Failed to fetch order from ezCater API');

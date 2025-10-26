@@ -163,17 +163,21 @@
           IMPORT EXISTING ORDER
         </h3>
         <p style="margin: 0 0 12px 0; font-size: 13px; color: var(--gray-600);">
-          Import an order that was placed before webhook setup:
+          Import an order that was placed before webhook setup. Find the order number from the ezCater URL:
         </p>
+        <div style="margin-bottom: 12px; padding: 12px; background: var(--blue-bg); border: 2px solid #1e40af; font-size: 12px; color: #1e40af;">
+          <strong>Example URL:</strong> https://ezmanage.ezcater.com/orders/<strong style="background: yellow; padding: 2px 4px;">284323829</strong><br>
+          <strong>Copy the number</strong> at the end of the URL
+        </div>
         <div style="display: flex; gap: 12px; align-items: flex-end;">
           <div style="flex: 1;">
             <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700);">
-              ORDER UUID (from ezCater)
+              ORDER NUMBER (from URL)
             </label>
             <input
               id="orderUuidInput"
               type="text"
-              placeholder="e.g., 550e8400-e29b-41d4-a716-446655440000"
+              placeholder="e.g., 284323829"
               style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 13px; box-sizing: border-box;">
           </div>
           <button onclick="importOrder()">
@@ -199,15 +203,15 @@
 
   <script>
     async function importOrder() {
-      const orderUuid = document.getElementById('orderUuidInput').value.trim();
+      const orderNumber = document.getElementById('orderUuidInput').value.trim();
       const loading = document.getElementById('loading');
       const status = document.getElementById('status');
       const results = document.getElementById('results');
       const jsonOutput = document.getElementById('jsonOutput');
 
-      if (!orderUuid) {
+      if (!orderNumber) {
         status.className = 'status error';
-        status.textContent = '❌ Please enter an order UUID';
+        status.textContent = '❌ Please enter an order number';
         return;
       }
 
@@ -217,7 +221,7 @@
       results.style.display = 'none';
 
       try {
-        console.log('📥 Importing order:', orderUuid);
+        console.log('📥 Importing order:', orderNumber);
 
         const response = await fetch('/api/ezcater-import-order', {
           method: 'POST',
@@ -225,7 +229,7 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            orderUuid: orderUuid
+            orderNumber: orderNumber
           })
         });
 
