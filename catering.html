@@ -2344,7 +2344,7 @@
       let html = '<div style="font-size: 13px; line-height: 1.6;">';
 
       // CONTAINERS SUMMARY
-      let halfPans = 0, deliContainers = 0, brownBowls = 0, tongs = 0;
+      let halfPans = 0, fullPans = 0, deliContainers = 0, deli32ozContainers = 0, brownBowls = 0, tongs = 0;
       let largeServingSpoons = 0, smallSpoons = 0;
 
       // BYO Gyros
@@ -2352,11 +2352,11 @@
         const sets = Math.ceil(prep.byoGyros.total / 10);
         deliContainers += sets * 3; // tzatziki, aioli, lemon vin
         halfPans += sets; // mixed greens
-        halfPans += 3; // tomatoes, onions, pepperoncini
-        halfPans += 1; // pitas
         smallSpoons += 3; // tzatziki (no dill), spicy aioli, lemon vinaigrette
         largeServingSpoons += 1; // diced tomatoes
-        tongs += 5; // 1 each: greens, tomatoes, onions, pepperoncini, pitas
+
+        // Calculate tongs (1 each: greens, tomatoes, onions, pepperoncini, pitas)
+        let byoTongs = 5;
 
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">BYO GYRO PITAS (${prep.byoGyros.total} TOTAL PORTIONS)</h4>`;
 
@@ -2377,20 +2377,81 @@
         html += `<div>☐ ${sets}x 16oz Lemon Vinaigrette – 1 SMALL SPOON</div>`;
         html += `<div>☐ ${formatPanCount(sets)} Mixed Greens – 1 TONG</div>`;
 
-        // Calculate pan counts for vegetables (1 half pan per 10 portions if >= 10, brown bowls if < 10)
+        // DICED TOMATO LOGIC
+        // 30 portions per half pan
+        // Below 10: 16oz deli container
+        // 10-20: Brown Jayna bowl
+        // 21+: Calculate half pans (30 portions per half pan)
+        let tomatoContainer = '';
         if (prep.byoGyros.total < 10) {
-          html += `<div>☐ ${prep.byoGyros.total} portions Diced Tomatoes (brown bowls) – 1 LARGE SERVING SPOON</div>`;
-          html += `<div>☐ ${prep.byoGyros.total} portions Sliced Red Onion (brown bowls) – 1 TONG</div>`;
-          html += `<div>☐ ${prep.byoGyros.total} Whole Pepperoncini (brown bowls) – 1 TONG</div>`;
+          deliContainers += 1;
+          tomatoContainer = '16oz deli container';
+        } else if (prep.byoGyros.total <= 20) {
+          brownBowls += 1;
+          tomatoContainer = 'brown Jayna bowl';
         } else {
-          html += `<div>☐ ${prep.byoGyros.total} portions Diced Tomatoes (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) – 1 LARGE SERVING SPOON</div>`;
-          html += `<div>☐ ${prep.byoGyros.total} portions Sliced Red Onion (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) – 1 TONG</div>`;
-          html += `<div>☐ ${prep.byoGyros.total} Whole Pepperoncini (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) – 1 TONG</div>`;
+          const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 30);
+          halfPans += tomatoHalfPans;
+          tomatoContainer = formatPanCount(tomatoHalfPans);
         }
+        html += `<div>☐ ${prep.byoGyros.total} portions Diced Tomatoes (${tomatoContainer}) – 1 LARGE SERVING SPOON</div>`;
 
+        // SLICED RED ONION LOGIC
+        // 50 portions per half pan
+        // Below 20: 16oz deli container
+        // 20-45: Brown Jayna bowl
+        // 46+: Calculate half pans (50 portions per half pan)
+        let onionContainer = '';
+        if (prep.byoGyros.total < 20) {
+          deliContainers += 1;
+          onionContainer = '16oz deli container';
+        } else if (prep.byoGyros.total <= 45) {
+          brownBowls += 1;
+          onionContainer = 'brown Jayna bowl';
+        } else {
+          const onionHalfPans = Math.ceil(prep.byoGyros.total / 50);
+          halfPans += onionHalfPans;
+          onionContainer = formatPanCount(onionHalfPans);
+        }
+        html += `<div>☐ ${prep.byoGyros.total} portions Sliced Red Onion (${onionContainer}) – 1 TONG</div>`;
+
+        // PEPPERONCINI LOGIC
+        // Below 10: 16oz deli container
+        // 10-20: 32oz deli container
+        // 21-99: Half pan
+        // 100+: Full pan(s) + half pan if remainder
+        let pepperonciniContainer = '';
+        if (prep.byoGyros.total < 10) {
+          deliContainers += 1;
+          pepperonciniContainer = '16oz deli container';
+        } else if (prep.byoGyros.total <= 20) {
+          deli32ozContainers += 1;
+          pepperonciniContainer = '32oz deli container';
+        } else if (prep.byoGyros.total < 100) {
+          halfPans += 1;
+          pepperonciniContainer = '1 half pan';
+        } else {
+          const pepperFullPans = Math.floor(prep.byoGyros.total / 100);
+          const pepperRemainder = prep.byoGyros.total % 100;
+          fullPans += pepperFullPans;
+          if (pepperRemainder > 0) {
+            halfPans += 1;
+            pepperonciniContainer = `${pepperFullPans} full pan${pepperFullPans > 1 ? 's' : ''} + 1 half pan`;
+          } else {
+            pepperonciniContainer = `${pepperFullPans} full pan${pepperFullPans > 1 ? 's' : ''}`;
+          }
+        }
+        html += `<div>☐ ${prep.byoGyros.total} Whole Pepperoncini (${pepperonciniContainer}) – 1 TONG</div>`;
+
+        // PITA LOGIC
+        // 25 whole pita fit in one FULL pan
         const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
-        html += `<div>☐ ${pitasNeeded} Whole Grilled Pita (${formatPanCount(1)}) – 1 TONG</div>`;
+        const pitaFullPans = Math.ceil(pitasNeeded / 25);
+        fullPans += pitaFullPans;
+        html += `<div>☐ ${pitasNeeded} Whole Grilled Pita (${pitaFullPans} full pan${pitaFullPans > 1 ? 's' : ''}) – 1 TONG</div>`;
         html += `</div>`;
+
+        tongs += byoTongs;
       }
 
       // SALADS
@@ -2575,12 +2636,16 @@
       }
 
       // Add containers summary at the top
+      // Combine full pans and half pans into a single formatted count
+      const totalHalfPanEquivalent = (fullPans * 2) + halfPans;
+
       const containerSummary = `
         <div style="margin-bottom: 16px; padding: 16px; background: var(--blue-bg); border: 2px solid var(--primary-blue);">
           <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--primary-blue);">CONTAINERS NEEDED</h3>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
-            ${halfPans > 0 ? `<div>• ${formatPanCount(halfPans)} Pans</div>` : ''}
+            ${totalHalfPanEquivalent > 0 ? `<div>• ${formatPanCount(totalHalfPanEquivalent)}</div>` : ''}
             ${deliContainers > 0 ? `<div>• ${deliContainers}x 16oz Deli Containers</div>` : ''}
+            ${deli32ozContainers > 0 ? `<div>• ${deli32ozContainers}x 32oz Deli Containers</div>` : ''}
             ${brownBowls > 0 ? `<div>• ${brownBowls}x Brown Jayna Bowls</div>` : ''}
           </div>
         </div>
