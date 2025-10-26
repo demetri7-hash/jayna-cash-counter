@@ -2465,6 +2465,24 @@
 
       html += '</div>';
 
+      // Add ORDER MUST BE READY AT (40 minutes before delivery)
+      let readyBySection = '';
+      if (order.delivery_time) {
+        const deliveryTime = new Date(order.delivery_time);
+        const readyByTime = new Date(deliveryTime.getTime() - 40 * 60000); // 40 minutes before
+        const readyByStr = readyByTime.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'America/Los_Angeles'
+        });
+        readyBySection = `
+          <div style="margin-bottom: 16px; padding: 16px; background: #fff3cd; border: 3px solid #ff9800; border-radius: 4px;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; color: #e65100;">⚠️ ORDER MUST BE READY AT EXACTLY: ${readyByStr}</h3>
+          </div>
+        `;
+      }
+
       // Add containers summary at the top
       const containerSummary = `
         <div style="margin-bottom: 16px; padding: 16px; background: var(--blue-bg); border: 2px solid var(--primary-blue);">
@@ -2489,7 +2507,7 @@
         </div>
       `;
 
-      return containerSummary + utensilsSummary + html;
+      return readyBySection + containerSummary + utensilsSummary + html;
     }
 
     /**
