@@ -120,7 +120,9 @@ export default async function handler(req, res) {
 
     // Generate PDF prep list
     const pdfBase64 = generatePrepListPDF(prep, order, lineItems || []);
-    const filename = `Prep_List_Order_${order.order_number || order_id}_${new Date().toISOString().split('T')[0]}.pdf`;
+    // Use sequential order number with zero-padding (e.g., "000002")
+    const orderNum = order.sequential_order_number ? String(order.sequential_order_number).padStart(6, '0') : (order.order_number || order_id);
+    const filename = `Prep_List_Order_${orderNum}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     // DOWNLOAD MODE: Return PDF as blob for download
     if (downloadMode) {
@@ -147,7 +149,7 @@ export default async function handler(req, res) {
     const mailOptions = {
       from: `Jayna Catering <${GMAIL_USER}>`,
       to: PRINTER_EMAIL,
-      subject: `Print: Prep List - Order ${order.order_number || order_id}`,
+      subject: `Print: Prep List - Order #${orderNum}`,
       text: '',  // Empty text body - only print PDF attachment
       html: '',  // Empty HTML body - only print PDF attachment
       attachments: [{
@@ -342,7 +344,9 @@ function generatePrepListPDF(prep, order, lineItems) {
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
-  doc.text(`ORDER #${order.order_number || 'N/A'}`, 40, yPos);
+  // Use sequential order number with zero-padding (e.g., "000002")
+  const orderNum = order.sequential_order_number ? String(order.sequential_order_number).padStart(6, '0') : (order.order_number || 'N/A');
+  doc.text(`ORDER #${orderNum}`, 40, yPos);
   doc.setFont('helvetica', 'normal');
   doc.text(`${order.customer_name || 'Customer'}`, 140, yPos);
   yPos += 14;

@@ -1992,11 +1992,16 @@
               <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px solid var(--gray-300);">
                 <div>
                   <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900);">
-                    ORDER ${order.order_number || 'N/A'}
+                    ORDER #${order.sequential_order_number ? String(order.sequential_order_number).padStart(6, '0') : (order.order_number || 'N/A')}${order.check_number ? ` • CHECK #${order.check_number}` : ''}
                   </h2>
                   <div style="font-size: 13px; color: var(--gray-600);">
-                    ${order.delivery_address ? 'DELIVERY' : 'PICK UP'} - ${order.status?.toUpperCase() || 'CONFIRMED'}
+                    ${order.delivery_address ? 'DELIVERY' : 'PICK UP'} • ${order.status?.toUpperCase() || 'CONFIRMED'}${order.payment_status ? ` • <span style="color: ${order.payment_status === 'PAID' ? '#059669' : '#f59e0b'}; font-weight: 700;">${order.payment_status}</span>` : ''}
                   </div>
+                  ${order.headcount || order.utensils_required ? `
+                  <div style="font-size: 12px; color: var(--gray-600); margin-top: 8px;">
+                    ${order.headcount ? `<span style="font-weight: 600;">Guest Count:</span> ${order.headcount}` : ''}${order.headcount && order.utensils_required ? ' • ' : ''}${order.utensils_required ? '<span style="font-weight: 600;">Utensils:</span> Yes' : ''}
+                  </div>
+                  ` : ''}
                 </div>
                 <div style="display: flex; gap: 12px; flex-wrap: wrap;">
                   ${order.status !== 'completed' && order.status !== 'delivered' ? `
@@ -2024,7 +2029,6 @@
                 ${order.customer_phone ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Phone:</strong> ${order.customer_phone}</div>` : ''}
                 ${order.customer_email ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Email:</strong> ${order.customer_email}</div>` : ''}
                 ${order.delivery_address ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Address:</strong> ${order.delivery_address}</div>` : ''}
-                ${order.headcount ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Headcount:</strong> ${order.headcount} guests</div>` : ''}
               </div>
               ` : ''}
 
@@ -2106,13 +2110,58 @@
                 `}
               </div>
 
-              <!-- Order Total -->
+              <!-- Financial Breakdown (BEO Format) -->
+              ${order.subtotal !== null && order.subtotal !== undefined ? `
+              <div style="margin-bottom: 24px; padding: 20px; background: white; border: 3px solid var(--gray-700);">
+                <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-900); padding-bottom: 12px; border-bottom: 2px solid var(--gray-300);">FINANCIAL BREAKDOWN</h3>
+
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px;">
+                  <span style="color: var(--gray-700);">Subtotal:</span>
+                  <span style="font-weight: 600; color: var(--gray-900);">$${parseFloat(order.subtotal).toFixed(2)}</span>
+                </div>
+
+                ${order.delivery_fee && parseFloat(order.delivery_fee) > 0 ? `
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px;">
+                  <span style="color: var(--gray-700);">Delivery Fee:</span>
+                  <span style="font-weight: 600; color: var(--gray-900);">$${parseFloat(order.delivery_fee).toFixed(2)}</span>
+                </div>
+                ` : ''}
+
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px;">
+                  <span style="color: var(--gray-700);">Tax:</span>
+                  <span style="font-weight: 600; color: var(--gray-900);">$${parseFloat(order.tax || 0).toFixed(2)}</span>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px;">
+                  <span style="color: var(--gray-700);">Tip:</span>
+                  <span style="font-weight: 600; color: var(--gray-900);">$${parseFloat(order.tip || 0).toFixed(2)}</span>
+                </div>
+
+                <div style="border-top: 2px solid var(--gray-900); margin-top: 12px; padding-top: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-900);">TOTAL:</span>
+                    <span style="font-size: 24px; font-weight: 700; color: var(--gray-900);">$${parseFloat(order.total_amount || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+              ` : `
+              <!-- Simple Order Total (for orders without breakdown) -->
               <div style="padding: 16px; background: var(--success-bg); border: 2px solid var(--success-border);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <div style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--success-text);">ORDER TOTAL</div>
                   <div style="font-size: 24px; font-weight: 700; color: var(--success-text);">$${parseFloat(order.total_amount || 0).toFixed(2)}</div>
                 </div>
               </div>
+              `}
+
+              <!-- Created Timestamp -->
+              ${order.created_in_toast_at ? `
+              <div style="text-align: center; padding-top: 16px; border-top: 1px solid var(--gray-300);">
+                <div style="font-size: 11px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px;">
+                  Created: ${formatPacificDate(order.created_in_toast_at, true)} at ${formatPacificTime(order.created_in_toast_at)}
+                </div>
+              </div>
+              ` : ''}
 
             </div>
           </div>
