@@ -184,8 +184,10 @@ function calculatePrepList(lineItems, order) {
     const qty = parseFloat(item.quantity || 1);
     const modifiers = item.modifiers || [];
 
-    // BYO GYRO PITAS (all types combined)
-    if (itemName.includes('GYRO PITA') && itemName.includes('MAKE YOUR OWN')) {
+    // BYO GYRO PITAS + FALAFEL + ROASTED CHICKPEAS (all proteins)
+    if ((itemName.includes('GYRO PITA') && itemName.includes('MAKE YOUR OWN')) ||
+        itemName.includes('FALAFEL') ||
+        (itemName.includes('CHICKPEA') && itemName.includes('GYRO'))) {
       prep.byoGyros.total += qty;
       prep.byoGyros.items.push({ name: item.item_name, qty });
     }
@@ -251,20 +253,17 @@ function generatePrepListPDF(prep, order, lineItems) {
   const mediumGray = [156, 163, 175]; // #9ca3af
   const darkGray = [55, 65, 81]; // #374151
 
-  let yPos = 50;
+  let yPos = 40;
 
-  // ===== HEADER =====
-  doc.setFillColor(...jaynaBlue);
-  doc.rect(0, 0, 612, 80, 'F');
-
+  // ===== HEADER (No blue banner - saves ink) =====
   doc.setFontSize(28);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text('PREP LIST', 40, 50);
+  doc.setTextColor(...jaynaBlue);
+  doc.text('PREP LIST', 40, yPos);
 
   // Reset text color
   doc.setTextColor(0, 0, 0);
-  yPos = 90;
+  yPos = 60;
 
   // ===== ORDER INFO BOX =====
   doc.setFillColor(...lightGray);
@@ -301,7 +300,8 @@ function generatePrepListPDF(prep, order, lineItems) {
   yPos += 30;
 
   // Containers summary
-  let halfPans = 0, deliContainers = 0, brownBowls = 0, tongs = 0, spoons = 0;
+  let halfPans = 0, deliContainers = 0, brownBowls = 0, tongs = 0;
+  let largeServingSpoons = 0, smallSpoons = 0;
 
   // BYO Gyros
   if (prep.byoGyros.total > 0) {
@@ -310,76 +310,92 @@ function generatePrepListPDF(prep, order, lineItems) {
     halfPans += sets; // mixed greens
     halfPans += 3; // tomatoes, onions, pepperoncini
     halfPans += 1; // pitas
-    spoons += sets * 3; // 1 spoon per sauce
-    tongs += sets + 3 + 1; // greens, tomatoes, onions, pepperoncini, pitas
+    largeServingSpoons += 3; // 1 per sauce type (tzatziki, aioli, lemon vin)
+    tongs += 5; // 1 each: greens, tomatoes, onions, pepperoncini, pitas
   }
 
-  // Salads
-  prep.salads.forEach(salad => {
-    halfPans += salad.qty < 4 ? salad.qty : Math.ceil(salad.qty / 2);
-    deliContainers += salad.qty; // lemon vinaigrette
-    tongs += salad.qty; // 1 tong per salad
-    spoons += salad.qty; // 1 spoon for vinaigrette per salad
-  });
+  // Salads - 1 tong and 1 spoon per SALAD TYPE (not per qty)
+  if (prep.salads.length > 0) {
+    prep.salads.forEach(salad => {
+      halfPans += salad.qty < 4 ? salad.qty : Math.ceil(salad.qty / 2);
+      deliContainers += salad.qty; // lemon vinaigrette
+    });
+    tongs += prep.salads.length; // 1 tong per salad type
+    largeServingSpoons += prep.salads.length; // 1 spoon per salad type for vinaigrette
+  }
 
-  // Dips
-  prep.dips.forEach(dip => {
-    deliContainers += dip.qty;
-    spoons += dip.qty; // 1 small spoon per dip
+  // Dips - 1 small spoon per DIP TYPE (not per qty)
+  if (prep.dips.length > 0) {
+    let hasVeggiesInAnyDip = false;
+    let hasPitaInAnyDip = false;
 
-    const hasVeggies = dip.modifiers.some(m => m.name && (m.name.includes('VEGGIES') || m.name.includes('VEGGIE')));
-    const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
-    const hasGFPita = dip.modifiers.some(m => m.name && m.name.includes('GLUTEN FREE PITA'));
+    prep.dips.forEach(dip => {
+      deliContainers += dip.qty;
 
-    if (hasVeggies) {
-      brownBowls += dip.qty * 2; // carrots + celery
-      tongs += 2; // 1 for carrots, 1 for celery (per order, not per qty)
-    }
-    if (hasPita || hasGFPita) {
-      halfPans += dip.qty;
-      tongs += dip.qty; // 1 tong per pita side
-    }
-    if (!hasVeggies && !hasPita && !hasGFPita) {
-      halfPans += dip.qty;
-    }
-  });
+      const hasVeggies = dip.modifiers.some(m => m.name && (m.name.includes('VEGGIES') || m.name.includes('VEGGIE')));
+      const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
+      const hasGFPita = dip.modifiers.some(m => m.name && m.name.includes('GLUTEN FREE PITA'));
 
-  // Greek Fries Bar
-  prep.greekFries.forEach(fries => {
-    halfPans += fries.qty < 2 ? fries.qty : fries.qty * 2;
-    deliContainers += 3; // aioli, tzatziki, feta per order
-    tongs += fries.qty;
-    spoons += 3; // per order
-  });
+      if (hasVeggies) {
+        brownBowls += dip.qty * 2; // carrots + celery
+        hasVeggiesInAnyDip = true;
+      }
+      if (hasPita || hasGFPita) {
+        halfPans += dip.qty;
+        hasPitaInAnyDip = true;
+      }
+      if (!hasVeggies && !hasPita && !hasGFPita) {
+        halfPans += dip.qty;
+      }
+    });
 
-  // Dolmas
-  prep.dolmas.forEach(dolma => {
-    deliContainers += dolma.qty; // 16oz tzatziki per order
-    tongs += dolma.qty; // 1 tong per order
-    spoons += dolma.qty; // 1 spoon for tzatziki
-  });
+    smallSpoons += prep.dips.length; // 1 small spoon per dip type
+    if (hasVeggiesInAnyDip) tongs += 2; // 1 for carrots, 1 for celery
+    if (hasPitaInAnyDip) tongs += 1; // 1 for pita
+  }
 
-  // Spanakopita
-  prep.spanakopita.forEach(span => {
-    deliContainers += span.qty; // 16oz tzatziki per order
-    tongs += span.qty; // 1 tong per order
-    spoons += span.qty; // 1 spoon for tzatziki
-  });
+  // Greek Fries Bar - 1 tong per ITEM TYPE
+  if (prep.greekFries.length > 0) {
+    prep.greekFries.forEach(fries => {
+      halfPans += fries.qty < 2 ? fries.qty : fries.qty * 2;
+      deliContainers += 3; // aioli, tzatziki, feta per order
+    });
+    tongs += prep.greekFries.length; // 1 tong per greek fries type
+    smallSpoons += 3; // aioli, tzatziki, feta (3 types total, not per order)
+  }
 
-  // Sides
-  prep.sides.forEach(side => {
-    tongs += side.qty; // 1 tong per side
-  });
+  // Dolmas - 1 tong and 1 spoon per ITEM TYPE
+  if (prep.dolmas.length > 0) {
+    prep.dolmas.forEach(dolma => {
+      deliContainers += dolma.qty;
+    });
+    tongs += prep.dolmas.length; // 1 tong per dolma type
+    smallSpoons += prep.dolmas.length; // 1 spoon per dolma type for tzatziki
+  }
 
-  // Desserts
-  prep.desserts.forEach(dessert => {
-    tongs += dessert.qty; // 1 tong per dessert
-  });
+  // Spanakopita - 1 tong and 1 spoon per ITEM TYPE
+  if (prep.spanakopita.length > 0) {
+    prep.spanakopita.forEach(span => {
+      deliContainers += span.qty;
+    });
+    tongs += prep.spanakopita.length; // 1 tong per spanakopita type
+    smallSpoons += prep.spanakopita.length; // 1 spoon per spanakopita type for tzatziki
+  }
 
-  // Pinwheels
-  prep.pinwheels.forEach(pinwheel => {
-    tongs += pinwheel.qty; // 1 tong per pinwheel
-  });
+  // Sides - 1 tong per ITEM TYPE
+  if (prep.sides.length > 0) {
+    tongs += prep.sides.length;
+  }
+
+  // Desserts - 1 tong per ITEM TYPE
+  if (prep.desserts.length > 0) {
+    tongs += prep.desserts.length;
+  }
+
+  // Pinwheels - 1 tong per ITEM TYPE
+  if (prep.pinwheels.length > 0) {
+    tongs += prep.pinwheels.length;
+  }
 
   // ===== CONTAINERS NEEDED =====
   doc.setFillColor(...lightGray);
@@ -425,19 +441,20 @@ function generatePrepListPDF(prep, order, lineItems) {
   doc.setTextColor(0, 0, 0);
   let utensilParts = [];
   if (tongs > 0) utensilParts.push(`${tongs}x TONGS`);
-  if (spoons > 0) utensilParts.push(`${spoons}x SMALL SPOONS`);
+  if (largeServingSpoons > 0) utensilParts.push(`${largeServingSpoons}x LARGE SERVING SPOONS`);
+  if (smallSpoons > 0) utensilParts.push(`${smallSpoons}x SMALL SPOONS`);
   doc.text(utensilParts.join('  •  '), 50, yPos);
 
   yPos += 25;
 
-  // BYO GYROS
+  // PROTEINS (BYO GYROS, FALAFEL, ROASTED CHICKPEAS)
   if (prep.byoGyros.total > 0) {
     const sets = Math.ceil(prep.byoGyros.total / 10);
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...jaynaBlue);
-    doc.text(`BYO GYRO PITAS (${prep.byoGyros.total} TOTAL PORTIONS)`, 40, yPos);
+    doc.text(`PROTEINS (${prep.byoGyros.total} TOTAL PORTIONS)`, 40, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 15;
 
@@ -465,15 +482,15 @@ function generatePrepListPDF(prep, order, lineItems) {
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`☐ ${sets}x 16oz Tzatziki (no dill) - ${sets} SPOON${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 13;
-    doc.text(`☐ ${sets}x 16oz Spicy Aioli - ${sets} SPOON${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 13;
-    doc.text(`☐ ${sets}x 16oz Lemon Vinaigrette - ${sets} SPOON${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 13;
-    doc.text(`☐ ${sets}x ½ pan Mixed Greens - ${sets} TONG${sets > 1 ? 'S' : ''}`, 50, yPos); yPos += 13;
-    doc.text(`☐ ${prep.byoGyros.total} portions Diced Tomatoes (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) - 1 SPOON`, 50, yPos); yPos += 13;
-    doc.text(`☐ ${prep.byoGyros.total} portions Sliced Red Onion (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) - 1 TONG`, 50, yPos); yPos += 13;
-    doc.text(`☐ ${prep.byoGyros.total} Whole Pepperoncini (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) - 1 TONG`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${sets}x 16OZ TZATZIKI (NO DILL) - 1 LARGE SERVING SPOON`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${sets}x 16OZ SPICY AIOLI - 1 LARGE SERVING SPOON`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${sets}x 16OZ LEMON VINAIGRETTE - 1 LARGE SERVING SPOON`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${sets}x ½ PAN MIXED GREENS - 1 TONG`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${prep.byoGyros.total} PORTIONS DICED TOMATOES (${prep.byoGyros.total < 10 ? 'BROWN BOWLS' : '½ PANS'}) - 1 TONG`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${prep.byoGyros.total} PORTIONS SLICED RED ONION (${prep.byoGyros.total < 10 ? 'BROWN BOWLS' : '½ PANS'}) - 1 TONG`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${prep.byoGyros.total} WHOLE PEPPERONCINI (${prep.byoGyros.total < 10 ? 'BROWN BOWLS' : '½ PANS'}) - 1 TONG`, 50, yPos); yPos += 13;
     const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
-    doc.text(`☐ ${pitasNeeded} Whole Grilled Pita (½ pan) - 1 TONG`, 50, yPos); yPos += 18;
+    doc.text(`☐ ${pitasNeeded} WHOLE GRILLED PITA (½ PAN) - 1 TONG`, 50, yPos); yPos += 18;
   }
 
   // SALADS
@@ -488,9 +505,9 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.salads.forEach(salad => {
-      doc.text(`☐ ${salad.qty}x ${salad.name.toUpperCase()} (${salad.qty < 4 ? '½ PANS' : 'FULL PANS'}) - ${salad.qty} TONG${salad.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+      doc.text(`☐ ${salad.qty}x ${salad.name.toUpperCase()} (${salad.qty < 4 ? '½ PANS' : 'FULL PANS'}) - 1 TONG`, 50, yPos); yPos += 12;
       doc.setTextColor(...darkGray);
-      doc.text(`   → ${salad.qty}x 16OZ LEMON VINAIGRETTE - ${salad.qty} SPOON${salad.qty > 1 ? 'S' : ''}`, 60, yPos);
+      doc.text(`   → ${salad.qty}x 16OZ LEMON VINAIGRETTE - 1 LARGE SERVING SPOON`, 60, yPos);
       doc.setTextColor(0, 0, 0);
       yPos += 14;
     });
@@ -509,7 +526,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.dips.forEach(dip => {
-      doc.text(`☐ ${dip.qty}x 16OZ ${dip.name.toUpperCase()} (GARNISH) - ${dip.qty} SMALL SPOON${dip.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+      doc.text(`☐ ${dip.qty}x 16OZ ${dip.name.toUpperCase()} (GARNISH) - 1 SMALL SPOON`, 50, yPos); yPos += 12;
 
       const hasVeggies = dip.modifiers.some(m => m.name && (m.name.includes('VEGGIES') || m.name.includes('VEGGIE')));
       const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
@@ -518,14 +535,14 @@ function generatePrepListPDF(prep, order, lineItems) {
 
       doc.setTextColor(...darkGray);
       if (hasVeggies) {
-        doc.text(`   → ${dip.qty * 24} CARROTS + ${dip.qty * 24} CELERY (BROWN BOWLS) - 2 TONGS`, 60, yPos); yPos += 12;
+        doc.text(`   → ${dip.qty * 24} CARROTS + ${dip.qty * 24} CELERY (BROWN BOWLS) - 2 TONGS TOTAL`, 60, yPos); yPos += 12;
       }
       if (hasPita) {
-        doc.text(`   → ${dip.qty * 6} PITAS SLICED 8 PIECES (½ PANS) - ${dip.qty} TONG${dip.qty > 1 ? 'S' : ''}`, 60, yPos); yPos += 12;
+        doc.text(`   → ${dip.qty * 6} PITAS SLICED 8 PIECES (½ PANS) - 1 TONG`, 60, yPos); yPos += 12;
       }
       if (hasGFPita && gfPitaMod) {
         const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
-        doc.text(`   → ${gfQty} GF PITAS SLICED 8 PIECES (½ PANS) - ${dip.qty} TONG${dip.qty > 1 ? 'S' : ''}`, 60, yPos); yPos += 12;
+        doc.text(`   → ${gfQty} GF PITAS SLICED 8 PIECES (½ PANS) - 1 TONG`, 60, yPos); yPos += 12;
       }
       doc.setTextColor(0, 0, 0);
       yPos += 3;
@@ -545,10 +562,10 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.greekFries.forEach(fries => {
-      doc.text(`☐ ${fries.qty}x ${fries.name.toUpperCase()}`, 50, yPos); yPos += 12;
+      doc.text(`☐ ${fries.qty}x ${fries.name.toUpperCase()} - 1 TONG`, 50, yPos); yPos += 12;
       doc.setTextColor(...darkGray);
       doc.text(`   → ½ PAN FRIES + 16OZ AIOLI + 16OZ TZATZIKI + 16OZ FETA`, 60, yPos); yPos += 12;
-      doc.text(`   → ${fries.qty} TONG${fries.qty > 1 ? 'S' : ''}, 3 SPOONS`, 60, yPos);
+      doc.text(`   → 3 SMALL SPOONS (AIOLI, TZATZIKI, FETA)`, 60, yPos);
       doc.setTextColor(0, 0, 0);
       yPos += 14;
     });
@@ -568,9 +585,9 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.dolmas.forEach(dolma => {
       if (yPos < 720) {
-        doc.text(`☐ ${dolma.qty}x ${dolma.name.toUpperCase()} (½ PAN OR ROUND TRAY + LEMON WEDGES) - ${dolma.qty} TONG${dolma.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+        doc.text(`☐ ${dolma.qty}x ${dolma.name.toUpperCase()} (½ PAN OR ROUND TRAY + LEMON WEDGES) - 1 TONG`, 50, yPos); yPos += 12;
         doc.setTextColor(...darkGray);
-        doc.text(`   → ${dolma.qty}x 16OZ TZATZIKI (DILL STRIPE) - ${dolma.qty} SMALL SPOON${dolma.qty > 1 ? 'S' : ''}`, 60, yPos);
+        doc.text(`   → ${dolma.qty}x 16OZ TZATZIKI (DILL STRIPE) - 1 SMALL SPOON`, 60, yPos);
         doc.setTextColor(0, 0, 0);
         yPos += 14;
       }
@@ -591,9 +608,9 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.spanakopita.forEach(span => {
       if (yPos < 720) {
-        doc.text(`☐ ${span.qty}x ${span.name.toUpperCase()} (ROUND TRAY ON ARUGULA OR ½/FULL PAN) - ${span.qty} TONG${span.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+        doc.text(`☐ ${span.qty}x ${span.name.toUpperCase()} (ROUND TRAY ON ARUGULA OR ½/FULL PAN) - 1 TONG`, 50, yPos); yPos += 12;
         doc.setTextColor(...darkGray);
-        doc.text(`   → ${span.qty}x 16OZ TZATZIKI (DILL STRIPE) - ${span.qty} SMALL SPOON${span.qty > 1 ? 'S' : ''}`, 60, yPos);
+        doc.text(`   → ${span.qty}x 16OZ TZATZIKI (DILL STRIPE) - 1 SMALL SPOON`, 60, yPos);
         doc.setTextColor(0, 0, 0);
         yPos += 14;
       }
@@ -614,7 +631,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.sides.forEach(side => {
       if (yPos < 720) {
-        doc.text(`☐ ${side.qty}x ${side.name.toUpperCase()} - ${side.qty} TONG${side.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+        doc.text(`☐ ${side.qty}x ${side.name.toUpperCase()} - 1 TONG`, 50, yPos); yPos += 12;
       }
     });
     yPos += 6;
@@ -633,7 +650,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.desserts.forEach(dessert => {
       if (yPos < 720) {
-        doc.text(`☐ ${dessert.qty}x ${dessert.name.toUpperCase()} - ${dessert.qty} TONG${dessert.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+        doc.text(`☐ ${dessert.qty}x ${dessert.name.toUpperCase()} - 1 TONG`, 50, yPos); yPos += 12;
       }
     });
     yPos += 6;
@@ -652,7 +669,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.pinwheels.forEach(pinwheel => {
       if (yPos < 720) {
-        doc.text(`☐ ${pinwheel.qty}x ${pinwheel.name.toUpperCase()} - ${pinwheel.qty} TONG${pinwheel.qty > 1 ? 'S' : ''}`, 50, yPos); yPos += 12;
+        doc.text(`☐ ${pinwheel.qty}x ${pinwheel.name.toUpperCase()} - 1 TONG`, 50, yPos); yPos += 12;
       }
     });
     yPos += 6;
