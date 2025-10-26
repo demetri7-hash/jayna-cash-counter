@@ -265,16 +265,19 @@ function calculatePrepList(lineItems, order) {
     }
   });
 
-  // Consolidate duplicates in all categories
-  prep.byoGyros.items = consolidateItems(prep.byoGyros.items);
-  prep.salads = consolidateItems(prep.salads);
-  prep.dips = consolidateItems(prep.dips);
-  prep.greekFries = consolidateItems(prep.greekFries);
-  prep.dolmas = consolidateItems(prep.dolmas);
-  prep.spanakopita = consolidateItems(prep.spanakopita);
-  prep.sides = consolidateItems(prep.sides);
-  prep.desserts = consolidateItems(prep.desserts);
-  prep.pinwheels = consolidateItems(prep.pinwheels);
+  // TEMPORARILY DISABLED: Consolidate duplicates in all categories
+  // prep.byoGyros.items = consolidateItems(prep.byoGyros.items);
+  // prep.salads = consolidateItems(prep.salads);
+  // prep.dips = consolidateItems(prep.dips);
+  // prep.greekFries = consolidateItems(prep.greekFries);
+  // prep.dolmas = consolidateItems(prep.dolmas);
+  // prep.spanakopita = consolidateItems(prep.spanakopita);
+  // prep.sides = consolidateItems(prep.sides);
+  // prep.desserts = consolidateItems(prep.desserts);
+  // prep.pinwheels = consolidateItems(prep.pinwheels);
+
+  console.log('🔍 BEFORE CONSOLIDATION - BYO Items:', prep.byoGyros.items.length, 'items');
+  console.log('🔍 BEFORE CONSOLIDATION - Desserts:', prep.desserts.length, 'items');
 
   return prep;
 }
