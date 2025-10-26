@@ -2804,6 +2804,9 @@
           printBtn.style.background = 'var(--primary-blue)';
         }, 2000);
 
+        // Show prominent success modal
+        showSuccessMessage('✅ ORDER SENT TO PRINTER!', 'The order has been emailed to the Epson printer successfully.');
+
       } catch (error) {
         hideLoading();
         console.error('❌ Error printing order:', error);
@@ -3647,6 +3650,9 @@
           printBtn.style.background = 'var(--gray-900)';
         }, 2000);
 
+        // Show prominent success modal
+        showSuccessMessage('✅ PREP LIST SENT TO PRINTER!', 'The prep list has been emailed to the Epson printer successfully.');
+
       } catch (error) {
         hideLoading();
         console.error('❌ Error printing prep list:', error);
@@ -4172,6 +4178,68 @@
       if (overlay) {
         overlay.style.display = 'none';
       }
+    }
+
+    /**
+     * Show a prominent success message modal with auto-dismiss
+     */
+    function showSuccessMessage(title, message) {
+      // Create modal overlay
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+        padding: 20px;
+      `;
+
+      // Create success message box
+      const messageBox = document.createElement('div');
+      messageBox.style.cssText = `
+        background: white;
+        padding: 32px;
+        max-width: 500px;
+        width: 100%;
+        border: 3px solid #059669;
+        text-align: center;
+      `;
+
+      messageBox.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+        <h2 style="font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #059669; margin: 0 0 16px 0;">
+          ${title}
+        </h2>
+        <p style="font-size: 14px; color: var(--gray-700); margin: 0 0 24px 0; line-height: 1.6;">
+          ${message}
+        </p>
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="padding: 12px 32px; background: #059669; border: 2px solid #059669; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+          OK
+        </button>
+      `;
+
+      overlay.appendChild(messageBox);
+      document.body.appendChild(overlay);
+
+      // Auto-dismiss after 4 seconds
+      setTimeout(() => {
+        if (overlay.parentElement) {
+          overlay.remove();
+        }
+      }, 4000);
+
+      // Click overlay to dismiss
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          overlay.remove();
+        }
+      });
     }
 
     // ============================================
