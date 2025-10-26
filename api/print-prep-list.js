@@ -308,21 +308,23 @@ function generatePrepListPDF(prep, order, lineItems) {
     halfPans += sets; // mixed greens
     halfPans += 3; // tomatoes, onions, pepperoncini
     halfPans += 1; // pitas
-    largeServingSpoons += 3; // 1 per sauce type (tzatziki, aioli, lemon vin)
+    smallSpoons += 3; // tzatziki (no dill), spicy aioli, lemon vinaigrette
+    largeServingSpoons += 1; // diced tomatoes
     tongs += 5; // 1 each: greens, tomatoes, onions, pepperoncini, pitas
   }
 
-  // Salads - 1 tong and 1 spoon per SALAD TYPE (not per qty)
+  // Salads - 1 tong per type, 1 small spoon per type for lemon vin, 2 large serving spoons total
   if (prep.salads.length > 0) {
     prep.salads.forEach(salad => {
       halfPans += salad.qty < 4 ? salad.qty : Math.ceil(salad.qty / 2);
       deliContainers += salad.qty; // lemon vinaigrette
     });
     tongs += prep.salads.length; // 1 tong per salad type
-    largeServingSpoons += prep.salads.length; // 1 spoon per salad type for vinaigrette
+    smallSpoons += prep.salads.length; // 1 small spoon per salad type for lemon vinaigrette
+    largeServingSpoons += 2; // 2 large serving spoons for all salads
   }
 
-  // Dips - 1 small spoon per DIP TYPE (not per qty)
+  // Dips - 1 small spoon per DIP TYPE (hummus, baba ghanoush, tzatziki, chimichurri)
   if (prep.dips.length > 0) {
     let hasVeggiesInAnyDip = false;
     let hasPitaInAnyDip = false;
@@ -352,7 +354,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     if (hasPitaInAnyDip) tongs += 1; // 1 for pita
   }
 
-  // Greek Fries Bar - 1 tong per ITEM TYPE
+  // Greek Fries Bar - 1 tong per type, small spoons for toppings
   if (prep.greekFries.length > 0) {
     prep.greekFries.forEach(fries => {
       halfPans += fries.qty < 2 ? fries.qty : fries.qty * 2;
@@ -362,27 +364,33 @@ function generatePrepListPDF(prep, order, lineItems) {
     smallSpoons += 3; // aioli, tzatziki, feta (3 types total, not per order)
   }
 
-  // Dolmas - 1 tong and 1 spoon per ITEM TYPE
+  // Dolmas - 1 tong and 1 small spoon per ITEM TYPE (tzatziki)
   if (prep.dolmas.length > 0) {
     prep.dolmas.forEach(dolma => {
       deliContainers += dolma.qty;
     });
     tongs += prep.dolmas.length; // 1 tong per dolma type
-    smallSpoons += prep.dolmas.length; // 1 spoon per dolma type for tzatziki
+    smallSpoons += prep.dolmas.length; // 1 small spoon per dolma type for tzatziki
   }
 
-  // Spanakopita - 1 tong and 1 spoon per ITEM TYPE
+  // Spanakopita - 1 tong and 1 small spoon per ITEM TYPE (tzatziki)
   if (prep.spanakopita.length > 0) {
     prep.spanakopita.forEach(span => {
       deliContainers += span.qty;
     });
     tongs += prep.spanakopita.length; // 1 tong per spanakopita type
-    smallSpoons += prep.spanakopita.length; // 1 spoon per spanakopita type for tzatziki
+    smallSpoons += prep.spanakopita.length; // 1 small spoon per spanakopita type for tzatziki
   }
 
-  // Sides - 1 tong per ITEM TYPE
+  // Sides - 1 tong per ITEM TYPE, check for rice (needs large serving spoon)
   if (prep.sides.length > 0) {
     tongs += prep.sides.length;
+    prep.sides.forEach(side => {
+      const sideName = (side.name || '').toUpperCase();
+      if (sideName.includes('RICE')) {
+        largeServingSpoons += 1; // 1 large serving spoon for rice
+      }
+    });
   }
 
   // Desserts - 1 tong per ITEM TYPE
@@ -480,11 +488,11 @@ function generatePrepListPDF(prep, order, lineItems) {
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`☐ ${sets}x 16OZ TZATZIKI (NO DILL) - 1 LARGE SERVING SPOON`, 50, yPos); yPos += 13;
-    doc.text(`☐ ${sets}x 16OZ SPICY AIOLI - 1 LARGE SERVING SPOON`, 50, yPos); yPos += 13;
-    doc.text(`☐ ${sets}x 16OZ LEMON VINAIGRETTE - 1 LARGE SERVING SPOON`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${sets}x 16OZ TZATZIKI (NO DILL) - 1 SMALL SPOON`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${sets}x 16OZ SPICY AIOLI - 1 SMALL SPOON`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${sets}x 16OZ LEMON VINAIGRETTE - 1 SMALL SPOON`, 50, yPos); yPos += 13;
     doc.text(`☐ ${sets}x ½ PAN MIXED GREENS - 1 TONG`, 50, yPos); yPos += 13;
-    doc.text(`☐ ${prep.byoGyros.total} PORTIONS DICED TOMATOES (${prep.byoGyros.total < 10 ? 'BROWN BOWLS' : '½ PANS'}) - 1 TONG`, 50, yPos); yPos += 13;
+    doc.text(`☐ ${prep.byoGyros.total} PORTIONS DICED TOMATOES (${prep.byoGyros.total < 10 ? 'BROWN BOWLS' : '½ PANS'}) - 1 LARGE SERVING SPOON`, 50, yPos); yPos += 13;
     doc.text(`☐ ${prep.byoGyros.total} PORTIONS SLICED RED ONION (${prep.byoGyros.total < 10 ? 'BROWN BOWLS' : '½ PANS'}) - 1 TONG`, 50, yPos); yPos += 13;
     doc.text(`☐ ${prep.byoGyros.total} WHOLE PEPPERONCINI (${prep.byoGyros.total < 10 ? 'BROWN BOWLS' : '½ PANS'}) - 1 TONG`, 50, yPos); yPos += 13;
     const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
@@ -500,12 +508,20 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setTextColor(0, 0, 0);
     yPos += 15;
 
+    // Note about large serving spoons
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...darkGray);
+    doc.text('(2 LARGE SERVING SPOONS TOTAL FOR ALL SALADS)', 50, yPos);
+    doc.setTextColor(0, 0, 0);
+    yPos += 15;
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     prep.salads.forEach(salad => {
       doc.text(`☐ ${salad.qty}x ${salad.name.toUpperCase()} (${salad.qty < 4 ? '½ PANS' : 'FULL PANS'}) - 1 TONG`, 50, yPos); yPos += 12;
       doc.setTextColor(...darkGray);
-      doc.text(`   → ${salad.qty}x 16OZ LEMON VINAIGRETTE - 1 LARGE SERVING SPOON`, 60, yPos);
+      doc.text(`   → ${salad.qty}x 16OZ LEMON VINAIGRETTE - 1 SMALL SPOON`, 60, yPos);
       doc.setTextColor(0, 0, 0);
       yPos += 14;
     });
@@ -629,7 +645,9 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.sides.forEach(side => {
       if (yPos < 720) {
-        doc.text(`☐ ${side.qty}x ${side.name.toUpperCase()} - 1 TONG`, 50, yPos); yPos += 12;
+        const sideName = (side.name || '').toUpperCase();
+        const isRice = sideName.includes('RICE');
+        doc.text(`☐ ${side.qty}x ${sideName} - 1 TONG${isRice ? ' + 1 LARGE SERVING SPOON' : ''}`, 50, yPos); yPos += 12;
       }
     });
     yPos += 6;
