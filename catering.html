@@ -2267,6 +2267,25 @@
     /**
      * Generate prep list HTML for display in modal
      */
+    /**
+     * Helper: Convert 1/2 pan count to full pans + 1/2 pan format
+     * Example: 9 half pans → "4 full pans + 1 1/2 pan"
+     * Example: 8 half pans → "4 full pans"
+     * Example: 1 half pan → "1 1/2 pan"
+     */
+    function formatPanCount(halfPanCount) {
+      const fullPans = Math.floor(halfPanCount / 2);
+      const remainingHalfPans = halfPanCount % 2;
+
+      if (fullPans > 0 && remainingHalfPans > 0) {
+        return `${fullPans} full pan${fullPans > 1 ? 's' : ''} + 1 1/2 pan`;
+      } else if (fullPans > 0) {
+        return `${fullPans} full pan${fullPans > 1 ? 's' : ''}`;
+      } else {
+        return `1 1/2 pan`;
+      }
+    }
+
     function generatePrepListHTML(prep, order) {
       let html = '<div style="font-size: 13px; line-height: 1.6;">';
 
@@ -2302,12 +2321,21 @@
         html += `<div>☐ ${sets}x 16oz Tzatziki (no dill) – 1 SMALL SPOON</div>`;
         html += `<div>☐ ${sets}x 16oz Spicy Aioli – 1 SMALL SPOON</div>`;
         html += `<div>☐ ${sets}x 16oz Lemon Vinaigrette – 1 SMALL SPOON</div>`;
-        html += `<div>☐ ${sets}x ½ pan Mixed Greens – 1 TONG</div>`;
-        html += `<div>☐ ${prep.byoGyros.total} portions Diced Tomatoes (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) – 1 LARGE SERVING SPOON</div>`;
-        html += `<div>☐ ${prep.byoGyros.total} portions Sliced Red Onion (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) – 1 TONG</div>`;
-        html += `<div>☐ ${prep.byoGyros.total} Whole Pepperoncini (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) – 1 TONG</div>`;
+        html += `<div>☐ ${formatPanCount(sets)} Mixed Greens – 1 TONG</div>`;
+
+        // Calculate pan counts for vegetables (1 half pan per 10 portions if >= 10, brown bowls if < 10)
+        if (prep.byoGyros.total < 10) {
+          html += `<div>☐ ${prep.byoGyros.total} portions Diced Tomatoes (brown bowls) – 1 LARGE SERVING SPOON</div>`;
+          html += `<div>☐ ${prep.byoGyros.total} portions Sliced Red Onion (brown bowls) – 1 TONG</div>`;
+          html += `<div>☐ ${prep.byoGyros.total} Whole Pepperoncini (brown bowls) – 1 TONG</div>`;
+        } else {
+          html += `<div>☐ ${prep.byoGyros.total} portions Diced Tomatoes (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) – 1 LARGE SERVING SPOON</div>`;
+          html += `<div>☐ ${prep.byoGyros.total} portions Sliced Red Onion (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) – 1 TONG</div>`;
+          html += `<div>☐ ${prep.byoGyros.total} Whole Pepperoncini (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) – 1 TONG</div>`;
+        }
+
         const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
-        html += `<div>☐ ${pitasNeeded} Whole Grilled Pita (½ pan) – 1 TONG</div>`;
+        html += `<div>☐ ${pitasNeeded} Whole Grilled Pita (${formatPanCount(1)}) – 1 TONG</div>`;
         html += `</div>`;
       }
 
@@ -2317,9 +2345,11 @@
         html += `<div style="margin-left: 16px; font-style: italic; color: var(--gray-600); margin-bottom: 8px;">(2 LARGE SERVING SPOONS TOTAL FOR ALL SALADS)</div>`;
         html += `<div style="margin-left: 16px;">`;
         prep.salads.forEach(salad => {
-          halfPans += salad.qty < 4 ? salad.qty : Math.ceil(salad.qty / 2);
+          // Calculate pan count: 1/2 pan each if < 4, or 2 half pans per salad if >= 4
+          const saladHalfPans = salad.qty < 4 ? salad.qty : salad.qty * 2;
+          halfPans += saladHalfPans;
           deliContainers += salad.qty; // lemon vinaigrette
-          html += `<div>☐ ${salad.qty}x ${salad.name} (${salad.qty < 4 ? '½ pans' : 'full pans if 4+'}) – 1 TONG</div>`;
+          html += `<div>☐ ${salad.qty}x ${salad.name} (${formatPanCount(saladHalfPans)}) – 1 TONG</div>`;
           html += `<div style="margin-left: 16px;">→ ${salad.qty}x 16oz Lemon Vinaigrette – 1 SMALL SPOON</div>`;
         });
         html += `</div>`;
@@ -2352,15 +2382,18 @@
             html += `<div style="margin-left: 16px;">→ ${dip.qty * 24} Carrots + ${dip.qty * 24} Celery (brown bowls) – 2 TONGS TOTAL</div>`;
           }
           if (hasPita) {
-            halfPans += dip.qty;
+            const regularPitaHalfPans = dip.qty; // 1 half pan per dip (6 pitas sliced)
+            halfPans += regularPitaHalfPans;
             hasPitaInAnyDip = true;
-            html += `<div style="margin-left: 16px;">→ ${dip.qty * 6} Pitas sliced 8 pieces (½ pans) – 1 TONG</div>`;
+            html += `<div style="margin-left: 16px;">→ ${dip.qty * 6} Pitas sliced 8 pieces (${formatPanCount(regularPitaHalfPans)}) – 1 TONG</div>`;
           }
           if (hasGFPita && gfPitaMod) {
-            halfPans += dip.qty;
-            hasPitaInAnyDip = true;
             const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
-            html += `<div style="margin-left: 16px;">→ ${gfQty} GF Pitas sliced 8 pieces (½ pans) – 1 TONG</div>`;
+            // Assume each GF pita needs roughly same pan space as regular (1 half pan per 6 pitas)
+            const gfPitaHalfPans = Math.ceil(gfQty / 6);
+            halfPans += gfPitaHalfPans;
+            hasPitaInAnyDip = true;
+            html += `<div style="margin-left: 16px;">→ ${gfQty} GF Pitas sliced 8 pieces (${formatPanCount(gfPitaHalfPans)}) – 1 TONG</div>`;
           }
           if (!hasVeggies && !hasPita && !hasGFPita) {
             halfPans += dip.qty;
@@ -2379,10 +2412,12 @@
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">GREEK FRIES BAR</h4>`;
         html += `<div style="margin-left: 16px;">`;
         prep.greekFries.forEach(fries => {
-          halfPans += fries.qty < 2 ? fries.qty : fries.qty * 2;
+          // Greek fries: 1 half pan if qty < 2, or 2 half pans per order if >= 2
+          const friesHalfPans = fries.qty < 2 ? fries.qty : fries.qty * 2;
+          halfPans += friesHalfPans;
           deliContainers += 3; // aioli, tzatziki, feta per order
           html += `<div>☐ ${fries.qty}x ${fries.name} – 1 TONG</div>`;
-          html += `<div style="margin-left: 16px;">→ ½ pan Greek Fries topped with protein</div>`;
+          html += `<div style="margin-left: 16px;">→ ${formatPanCount(friesHalfPans)} Greek Fries topped with protein</div>`;
           html += `<div style="margin-left: 16px;">→ 16oz Spicy Aioli, 16oz Tzatziki, 16oz Crumbled Feta</div>`;
           html += `<div style="margin-left: 16px;">→ 3 SMALL SPOONS (Aioli, Tzatziki, Feta)</div>`;
         });
