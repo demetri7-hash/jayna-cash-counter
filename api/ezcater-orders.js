@@ -28,9 +28,10 @@ export default async function handler(req, res) {
     console.log('🍽️ Fetching ezCater orders...');
 
     // GraphQL query to fetch caterer info
+    // 332390 is the STORE NUMBER (not UUID), so we use 'ids' parameter
     const query = `
       query GetCaterers($catererId: ID!) {
-        caterers(uuids: [$catererId]) {
+        caterers(ids: [$catererId]) {
           name
           storeNumber
           uuid
