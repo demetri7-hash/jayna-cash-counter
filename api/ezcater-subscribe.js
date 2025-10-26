@@ -27,29 +27,17 @@ export default async function handler(req, res) {
 
     console.log('🔔 Setting up ezCater webhook subscriptions...');
 
-    // STEP 1: Use introspection to find mutation names
-    const introspectionQuery = `
-      {
-        __schema {
-          mutationType {
-            fields {
-              name
-              description
-              args {
-                name
-                description
-                type {
-                  name
-                  kind
-                }
-              }
-            }
-          }
+    // STEP 1: Create Subscriber (register webhook URL)
+    const createSubscriberMutation = `
+      mutation CreateSubscriber($subscriberParams: SubscriberInput!) {
+        createSubscriber(subscriberParams: $subscriberParams) {
+          id
+          url
         }
       }
     `;
 
-    const introspectionResponse = await fetch('https://api.ezcater.com/graphql', {
+    const subscriberResponse = await fetch('https://api.ezcater.com/graphql', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -58,17 +46,80 @@ export default async function handler(req, res) {
         'Apollographql-client-version': '1.0.0'
       },
       body: JSON.stringify({
-        query: introspectionQuery
+        query: createSubscriberMutation,
+        variables: {
+          subscriberParams: {
+            url: WEBHOOK_URL
+          }
+        }
       })
     });
 
-    const introspectionData = await introspectionResponse.json();
+    const subscriberData = await subscriberResponse.json();
 
-    console.log('📋 Available mutations:', JSON.stringify(introspectionData, null, 2));
+    if (subscriberData.errors) {
+      console.error('❌ Subscriber creation failed:', subscriberData.errors);
+      throw new Error(`Failed to create subscriber: ${JSON.stringify(subscriberData.errors)}`);
+    }
+
+    console.log('✅ Subscriber created:', subscriberData.data.createSubscriber);
+
+    const subscriberId = subscriberData.data.createSubscriber.id;
+
+    // STEP 2: Create Subscription for Order events
+    const createSubscriptionMutation = `
+      mutation CreateSubscription($subscriptionParams: SubscriptionInput!) {
+        createSubscription(subscriptionParams: $subscriptionParams) {
+          id
+          eventEntity
+          eventKey
+          subscriberId
+        }
+      }
+    `;
+
+    // Subscribe to all order events: submitted, accepted, rejected, cancelled
+    const eventKeys = ['submitted', 'accepted', 'rejected', 'cancelled'];
+    const subscriptions = [];
+
+    for (const eventKey of eventKeys) {
+      const subscriptionResponse = await fetch('https://api.ezcater.com/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': EZCATER_API_TOKEN,
+          'Apollographql-client-name': 'Jayna-Gyro-Sacramento',
+          'Apollographql-client-version': '1.0.0'
+        },
+        body: JSON.stringify({
+          query: createSubscriptionMutation,
+          variables: {
+            subscriptionParams: {
+              eventEntity: 'Order',
+              eventKey: eventKey,
+              parentEntity: 'Caterer',
+              parentId: CATERER_UUID,
+              subscriberId: subscriberId
+            }
+          }
+        })
+      });
+
+      const subscriptionData = await subscriptionResponse.json();
+
+      if (subscriptionData.errors) {
+        console.error(`❌ Subscription failed for ${eventKey}:`, subscriptionData.errors);
+      } else {
+        console.log(`✅ Subscribed to order.${eventKey}`);
+        subscriptions.push(subscriptionData.data.createSubscription);
+      }
+    }
 
     return res.status(200).json({
       success: true,
-      data: introspectionData,
+      message: 'Webhook subscriptions created successfully',
+      subscriber: subscriberData.data.createSubscriber,
+      subscriptions: subscriptions,
       timestamp: new Date().toISOString()
     });
 
