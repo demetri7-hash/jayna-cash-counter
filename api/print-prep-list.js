@@ -227,8 +227,8 @@ function calculatePrepList(lineItems, order) {
       prep.byoGyros.total += qty;
       prep.byoGyros.items.push({ name: item.item_name, qty });
     }
-    // SALADS
-    else if (itemName.includes('SALAD') && !itemName.includes('HOUSE SALAD')) {
+    // SALADS (including House Salad)
+    else if (itemName.includes('SALAD')) {
       prep.salads.push({ name: item.item_name, qty, modifiers });
     }
     // DIPS
