@@ -154,6 +154,10 @@
         🍽️ FETCH EZCATER DATA
       </button>
 
+      <button onclick="subscribeWebhooks()" style="margin-left: 12px;">
+        🔔 SETUP WEBHOOKS
+      </button>
+
       <div id="loading" class="loading">
         Loading ezCater data...
       </div>
@@ -170,6 +174,58 @@
   </div>
 
   <script>
+    async function subscribeWebhooks() {
+      const loading = document.getElementById('loading');
+      const status = document.getElementById('status');
+      const results = document.getElementById('results');
+      const jsonOutput = document.getElementById('jsonOutput');
+
+      loading.classList.add('active');
+      status.className = 'status';
+      status.style.display = 'none';
+      results.style.display = 'none';
+
+      try {
+        console.log('🔔 Setting up webhooks...');
+
+        const response = await fetch('/api/ezcater-subscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+
+        console.log('Response:', data);
+
+        results.style.display = 'block';
+        jsonOutput.textContent = JSON.stringify(data, null, 2);
+
+        if (data.success) {
+          status.className = 'status success';
+          status.textContent = '✅ Found mutation schema!';
+        } else {
+          status.className = 'status error';
+          status.textContent = `❌ Error: ${data.error || 'Unknown error'}`;
+        }
+
+      } catch (error) {
+        console.error('Subscription error:', error);
+
+        status.className = 'status error';
+        status.textContent = `❌ Request failed: ${error.message}`;
+
+        results.style.display = 'block';
+        jsonOutput.textContent = JSON.stringify({
+          error: error.message,
+          stack: error.stack
+        }, null, 2);
+      } finally {
+        loading.classList.remove('active');
+      }
+    }
+
     async function testEzCaterAPI() {
       const testBtn = document.getElementById('testBtn');
       const loading = document.getElementById('loading');
