@@ -119,9 +119,18 @@ export default async function handler(req, res) {
 
     // Generate PDF receipt
     const pdfBase64 = await generateOrderReceiptPDF(order, lineItems || []);
-    // Use sequential order number with zero-padding (e.g., "000067")
-    const orderNum = order.sequential_order_number ? String(order.sequential_order_number).padStart(6, '0') : (order.order_number || order_id);
-    const filename = `Toast_Order_${orderNum}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    // Use REAL order number from ezCater or Toast (NO sequential numbers)
+    let orderNum;
+    if (order.source_system === 'EZCATER') {
+      // For ezCater: Use the actual ezCater order number
+      orderNum = order.order_number || order_id;
+    } else {
+      // For Toast: Use the check number or order number
+      orderNum = order.check_number || order.order_number || order_id;
+    }
+
+    const filename = `${order.source_system}_Order_${orderNum}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     // DOWNLOAD MODE: Return PDF as blob for download
     if (downloadMode) {
@@ -192,10 +201,22 @@ async function generateOrderReceiptPDF(order, lineItems) {
   doc.text('JAYNA GYRO', 40, yPos);
   yPos += 25;
 
-  // Order title with sequential number
+  // Order title with REAL order number (ezCater or Toast)
   doc.setFontSize(16);
-  const orderNum = order.sequential_order_number ? String(order.sequential_order_number).padStart(6, '0') : (order.order_number || 'N/A');
-  doc.text(`CATERING ORDER #${orderNum}`, 40, yPos);
+  let orderNum;
+  let orderLabel;
+
+  if (order.source_system === 'EZCATER') {
+    // For ezCater: Show ezCater order number
+    orderNum = order.order_number || 'N/A';
+    orderLabel = 'EZCATER ORDER';
+  } else {
+    // For Toast: Show check number
+    orderNum = order.check_number || order.order_number || 'N/A';
+    orderLabel = 'TOAST ORDER';
+  }
+
+  doc.text(`${orderLabel} #${orderNum}`, 40, yPos);
   yPos += 20;
 
   // BEO Fields row (Check #, Payment Status, Utensils)

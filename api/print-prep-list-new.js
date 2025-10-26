@@ -120,9 +120,18 @@ export default async function handler(req, res) {
 
     // Generate PDF prep list
     const pdfBase64 = generatePrepListPDF(prep, order, lineItems || []);
-    // Use sequential order number with zero-padding (e.g., "000002")
-    const orderNum = order.sequential_order_number ? String(order.sequential_order_number).padStart(6, '0') : (order.order_number || order_id);
-    const filename = `Prep_List_Order_${orderNum}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    // Use REAL order number from ezCater or Toast (NO sequential numbers)
+    let orderNum;
+    if (order.source_system === 'EZCATER') {
+      // For ezCater: Use the actual ezCater order number
+      orderNum = order.order_number || order_id;
+    } else {
+      // For Toast: Use the check number or order number
+      orderNum = order.check_number || order.order_number || order_id;
+    }
+
+    const filename = `Prep_List_${order.source_system}_${orderNum}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     // DOWNLOAD MODE: Return PDF as blob for download
     if (downloadMode) {
@@ -357,9 +366,22 @@ function generatePrepListPDF(prep, order, lineItems) {
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
-  // Use sequential order number with zero-padding (e.g., "000002")
-  const orderNum = order.sequential_order_number ? String(order.sequential_order_number).padStart(6, '0') : (order.order_number || 'N/A');
-  doc.text(`ORDER #${orderNum}`, 40, yPos);
+
+  // Use REAL order number from ezCater or Toast (NO sequential numbers)
+  let orderNum;
+  let orderLabel;
+
+  if (order.source_system === 'EZCATER') {
+    // For ezCater: Show ezCater order number
+    orderNum = order.order_number || 'N/A';
+    orderLabel = 'EZCATER ORDER';
+  } else {
+    // For Toast: Show check number
+    orderNum = order.check_number || order.order_number || 'N/A';
+    orderLabel = 'TOAST CHECK';
+  }
+
+  doc.text(`${orderLabel} #${orderNum}`, 40, yPos);
   doc.setFont('helvetica', 'normal');
   doc.text(`${order.customer_name || 'Customer'}`, 140, yPos);
   yPos += 14;
