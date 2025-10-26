@@ -2042,9 +2042,12 @@
               <div id="prepListSection" style="display: none; margin-bottom: 24px; padding: 20px; background: var(--success-bg); border: 3px solid var(--success-border);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid var(--success-border);">
                   <h3 style="margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--success-text);">🍽️ PREP LIST</h3>
-                  <div style="display: flex; gap: 8px;">
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <button onclick="exportLabelsCSV(event, ${order.id})" style="background: var(--primary-blue); border: 2px solid var(--primary-blue); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
                       🏷️ EXPORT LABELS
+                    </button>
+                    <button onclick="downloadPrepListPDF(event, ${order.id})" style="background: #059669; border: 2px solid #059669; color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                      📥 DOWNLOAD PDF
                     </button>
                     <button onclick="printPrepList(event, ${order.id})" style="background: var(--gray-900); border: 2px solid var(--gray-900); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
                       🖨️ PRINT PREP LIST
@@ -2916,6 +2919,75 @@
       return new Blob([buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
+    }
+
+    // Download Prep List PDF (for testing without printing)
+    async function downloadPrepListPDF(event, orderId) {
+      try {
+        console.log(`📥 Downloading prep list PDF for order ${orderId}...`);
+        showLoading('GENERATING PDF', 'Creating prep list...');
+
+        const response = await fetch('/api/print-prep-list?download=true', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ order_id: orderId })
+        });
+
+        hideLoading();
+
+        if (!response.ok) {
+          const result = await response.json();
+          console.error(`❌ Failed to generate prep list PDF: ${result.error}`);
+          const downloadBtn = event.target;
+          const originalText = downloadBtn.textContent;
+          downloadBtn.textContent = 'DOWNLOAD FAILED';
+          downloadBtn.style.background = '#dc2626';
+          setTimeout(() => {
+            downloadBtn.textContent = originalText;
+            downloadBtn.style.background = '#059669';
+          }, 3000);
+          return;
+        }
+
+        // Get the PDF blob
+        const blob = await response.blob();
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Prep_List_Order_${orderId}_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        console.log(`✅ Prep list PDF downloaded successfully`);
+
+        // Show success feedback in button
+        const downloadBtn = event.target;
+        const originalText = downloadBtn.textContent;
+        downloadBtn.textContent = '✓ DOWNLOADED';
+        downloadBtn.style.background = '#047857';
+        setTimeout(() => {
+          downloadBtn.textContent = originalText;
+          downloadBtn.style.background = '#059669';
+        }, 2000);
+
+      } catch (error) {
+        hideLoading();
+        console.error('❌ Error downloading prep list PDF:', error);
+        const downloadBtn = event.target;
+        const originalText = downloadBtn.textContent;
+        downloadBtn.textContent = 'DOWNLOAD ERROR';
+        downloadBtn.style.background = '#dc2626';
+        setTimeout(() => {
+          downloadBtn.textContent = originalText;
+          downloadBtn.style.background = '#059669';
+        }, 3000);
+      }
     }
 
     // Print Prep List to Epson printer via Gmail

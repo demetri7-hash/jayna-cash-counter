@@ -82,6 +82,7 @@ export default async function handler(req, res) {
 
   try {
     const { order_id } = req.body;
+    const downloadMode = req.query.download === 'true';
 
     if (!order_id) {
       return res.status(400).json({
@@ -90,7 +91,7 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`🖨️ Generating prep list for order ${order_id}...`);
+    console.log(`${downloadMode ? '📥' : '🖨️'} Generating prep list for order ${order_id}...`);
 
     // Fetch order details
     const { data: order, error: orderError } = await supabase
@@ -121,7 +122,20 @@ export default async function handler(req, res) {
     const pdfBase64 = generatePrepListPDF(prep, order, lineItems || []);
     const filename = `Prep_List_Order_${order.order_number || order_id}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    // Send to printer via Gmail
+    // DOWNLOAD MODE: Return PDF as blob for download
+    if (downloadMode) {
+      console.log(`✅ Prep list PDF generated for download`);
+
+      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+
+      return res.status(200).send(pdfBuffer);
+    }
+
+    // PRINT MODE: Send to printer via Gmail
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
