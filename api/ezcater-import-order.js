@@ -215,23 +215,27 @@ async function storeOrder(order, eventType) {
     special_requests: item.specialInstructions || null
   }));
 
-  // Prepare order data
+  // Prepare order data - MATCH Toast schema exactly!
+  const deliveryDate = order.event?.timestamp ? new Date(order.event.timestamp).toISOString().split('T')[0] : null;
+
   const orderData = {
     source_system: 'EZCATER',
     source_type: 'ezCater',
+    external_order_id: order.uuid,
     order_number: order.orderNumber || order.uuid,
     customer_name: order.orderCustomer?.fullName || order.event?.contact?.name || 'Guest',
-    customer_phone: order.event?.contact?.phone || null,
     customer_email: null, // Not provided in response
-    delivery_date: order.event?.timestamp ? new Date(order.event.timestamp).toISOString().split('T')[0] : null,
+    customer_phone: order.event?.contact?.phone || null,
+    delivery_date: deliveryDate,
     delivery_time: order.event?.timestamp || null,
     delivery_address: buildAddress(order.event?.address),
     delivery_notes: order.event?.address?.deliveryInstructions || null,
     headcount: order.event?.headcount || null,
     total_amount: subunitsToDollars(order.totals?.customerTotalDue),
+    business_date: deliveryDate ? parseInt(deliveryDate.replace(/-/g, '')) : null,
     status: status,
-    external_order_id: order.uuid,
-    raw_data: order
+    order_data: order,
+    last_synced_at: new Date().toISOString()
   };
 
   // Check if order already exists

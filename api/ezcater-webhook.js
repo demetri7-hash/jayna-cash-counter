@@ -64,9 +64,9 @@ export default async function handler(req, res) {
       .from('catering_orders')
       .upsert({
         source_system: 'EZCATER',
+        source_type: 'ezCater',
         external_order_id: orderData.ezcater_order_id,
         order_number: orderData.order_number,
-        source_type: 'ezCater',
         customer_name: orderData.customer_name,
         customer_email: orderData.customer_email,
         customer_phone: orderData.customer_phone,
@@ -81,8 +81,10 @@ export default async function handler(req, res) {
         delivery_notes: orderData.delivery_instructions,
         headcount: orderData.headcount,
         total_amount: orderData.total,
+        business_date: orderData.delivery_date ? parseInt(orderData.delivery_date.replace(/-/g, '')) : null,
         status: orderData.status.toUpperCase(),
-        raw_data: orderDetails
+        order_data: orderDetails,
+        last_synced_at: new Date().toISOString()
       }, {
         onConflict: 'source_system,external_order_id'
       });
