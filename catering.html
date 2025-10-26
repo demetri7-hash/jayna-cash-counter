@@ -2265,7 +2265,8 @@
       let html = '<div style="font-size: 13px; line-height: 1.6;">';
 
       // CONTAINERS SUMMARY
-      let halfPans = 0, deliContainers = 0, brownBowls = 0, tongs = 0, spoons = 0;
+      let halfPans = 0, deliContainers = 0, brownBowls = 0, tongs = 0;
+      let largeServingSpoons = 0, smallSpoons = 0;
 
       // BYO Gyros
       if (prep.byoGyros.total > 0) {
@@ -2274,15 +2275,28 @@
         halfPans += sets; // mixed greens
         halfPans += 3; // tomatoes, onions, pepperoncini
         halfPans += 1; // pitas
-        spoons += sets * 3; // 1 spoon per sauce
-        tongs += sets + 3 + 1; // greens, tomatoes, onions, pepperoncini, pitas
+        smallSpoons += 3; // tzatziki (no dill), spicy aioli, lemon vinaigrette
+        largeServingSpoons += 1; // diced tomatoes
+        tongs += 5; // 1 each: greens, tomatoes, onions, pepperoncini, pitas
 
-        html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">BYO GYRO PITAS (${prep.byoGyros.total} portions)</h4>`;
+        html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">BYO GYRO PITAS (${prep.byoGyros.total} TOTAL PORTIONS)</h4>`;
+
+        // Protein breakdown
+        if (prep.byoGyros.items && prep.byoGyros.items.length > 0) {
+          html += `<div style="margin-left: 16px; margin-bottom: 12px;">`;
+          html += `<div style="font-weight: 700; margin-bottom: 8px;">PROTEIN BREAKDOWN:</div>`;
+          prep.byoGyros.items.forEach(item => {
+            html += `<div style="margin-left: 16px;">• ${item.qty}x ${item.name}</div>`;
+          });
+          html += `</div>`;
+        }
+
+        html += `<div style="margin-left: 16px; font-weight: 700; margin-bottom: 8px;">PREP ITEMS:</div>`;
         html += `<div style="margin-left: 16px;">`;
-        html += `<div>☐ ${sets}x 16oz Tzatziki (no dill stripe) – ${sets} SPOON${sets > 1 ? 'S' : ''}</div>`;
-        html += `<div>☐ ${sets}x 16oz Spicy Aioli – ${sets} SPOON${sets > 1 ? 'S' : ''}</div>`;
-        html += `<div>☐ ${sets}x 16oz Lemon Vinaigrette – ${sets} SPOON${sets > 1 ? 'S' : ''}</div>`;
-        html += `<div>☐ ${sets}x ½ pan Mixed Greens – ${sets} TONG${sets > 1 ? 'S' : ''}</div>`;
+        html += `<div>☐ ${sets}x 16oz Tzatziki (no dill) – 1 SMALL SPOON</div>`;
+        html += `<div>☐ ${sets}x 16oz Spicy Aioli – 1 SMALL SPOON</div>`;
+        html += `<div>☐ ${sets}x 16oz Lemon Vinaigrette – 1 SMALL SPOON</div>`;
+        html += `<div>☐ ${sets}x ½ pan Mixed Greens – 1 TONG</div>`;
         html += `<div>☐ ${prep.byoGyros.total} portions Diced Tomatoes (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) – 1 LARGE SERVING SPOON</div>`;
         html += `<div>☐ ${prep.byoGyros.total} portions Sliced Red Onion (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) – 1 TONG</div>`;
         html += `<div>☐ ${prep.byoGyros.total} Whole Pepperoncini (${prep.byoGyros.total < 10 ? 'brown bowls' : '½ pans'}) – 1 TONG</div>`;
@@ -2294,48 +2308,53 @@
       // SALADS
       if (prep.salads.length > 0) {
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">SALADS</h4>`;
+        html += `<div style="margin-left: 16px; font-style: italic; color: var(--gray-600); margin-bottom: 8px;">(2 LARGE SERVING SPOONS TOTAL FOR ALL SALADS)</div>`;
         html += `<div style="margin-left: 16px;">`;
         prep.salads.forEach(salad => {
           halfPans += salad.qty < 4 ? salad.qty : Math.ceil(salad.qty / 2);
           deliContainers += salad.qty; // lemon vinaigrette
-          tongs += salad.qty; // 1 tong per salad
-          spoons += salad.qty; // 1 spoon for vinaigrette per salad
-          html += `<div>☐ ${salad.qty}x ${salad.name} (${salad.qty < 4 ? '½ pans' : 'full pans if 4+'}) – ${salad.qty} TONG${salad.qty > 1 ? 'S' : ''}</div>`;
-          html += `<div style="margin-left: 16px;">→ ${salad.qty}x 16oz Lemon Vinaigrette – ${salad.qty} SPOON${salad.qty > 1 ? 'S' : ''}</div>`;
+          html += `<div>☐ ${salad.qty}x ${salad.name} (${salad.qty < 4 ? '½ pans' : 'full pans if 4+'}) – 1 TONG</div>`;
+          html += `<div style="margin-left: 16px;">→ ${salad.qty}x 16oz Lemon Vinaigrette – 1 SMALL SPOON</div>`;
         });
         html += `</div>`;
+        tongs += prep.salads.length; // 1 tong per salad type
+        smallSpoons += prep.salads.length; // 1 small spoon per salad type for lemon vinaigrette
+        largeServingSpoons += 2; // 2 large serving spoons for all salads
       }
 
       // DIPS
       if (prep.dips.length > 0) {
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">DIPS</h4>`;
         html += `<div style="margin-left: 16px;">`;
+
+        let hasVeggiesInAnyDip = false;
+        let hasPitaInAnyDip = false;
+
         prep.dips.forEach(dip => {
           deliContainers += dip.qty;
-          spoons += dip.qty; // 1 small spoon per dip
 
           const hasVeggies = dip.modifiers.some(m => m.name && (m.name.includes('VEGGIES') || m.name.includes('VEGGIE')));
           const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
           const gfPitaMod = dip.modifiers.find(m => m.name && m.name.includes('GLUTEN FREE PITA'));
           const hasGFPita = !!gfPitaMod;
 
-          html += `<div>☐ ${dip.qty}x 16oz ${dip.name} (garnish as specified) – ${dip.qty} SMALL SPOON${dip.qty > 1 ? 'S' : ''}</div>`;
+          html += `<div>☐ ${dip.qty}x 16oz ${dip.name} (garnish) – 1 SMALL SPOON</div>`;
 
           if (hasVeggies) {
             brownBowls += dip.qty * 2; // carrots + celery
-            tongs += 2; // 1 for carrots, 1 for celery (per order, not per qty)
-            html += `<div style="margin-left: 16px;">→ ${dip.qty * 24} Carrots + ${dip.qty * 24} Celery (brown bowls) – 2 TONGS (1 each veg)</div>`;
+            hasVeggiesInAnyDip = true;
+            html += `<div style="margin-left: 16px;">→ ${dip.qty * 24} Carrots + ${dip.qty * 24} Celery (brown bowls) – 2 TONGS TOTAL</div>`;
           }
           if (hasPita) {
             halfPans += dip.qty;
-            tongs += dip.qty; // 1 tong per pita side
-            html += `<div style="margin-left: 16px;">→ ${dip.qty * 6} Pitas sliced 8 pieces (½ pans) – ${dip.qty} TONG${dip.qty > 1 ? 'S' : ''}</div>`;
+            hasPitaInAnyDip = true;
+            html += `<div style="margin-left: 16px;">→ ${dip.qty * 6} Pitas sliced 8 pieces (½ pans) – 1 TONG</div>`;
           }
           if (hasGFPita && gfPitaMod) {
             halfPans += dip.qty;
-            const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6); // Use parsed qty or fallback to default
-            tongs += dip.qty; // 1 tong per pita side
-            html += `<div style="margin-left: 16px;">→ ${gfQty} Gluten Free Pitas sliced 8 pieces (½ pans) – ${dip.qty} TONG${dip.qty > 1 ? 'S' : ''}</div>`;
+            hasPitaInAnyDip = true;
+            const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
+            html += `<div style="margin-left: 16px;">→ ${gfQty} GF Pitas sliced 8 pieces (½ pans) – 1 TONG</div>`;
           }
           if (!hasVeggies && !hasPita && !hasGFPita) {
             halfPans += dip.qty;
@@ -2343,6 +2362,10 @@
           }
         });
         html += `</div>`;
+
+        smallSpoons += prep.dips.length; // 1 small spoon per dip type
+        if (hasVeggiesInAnyDip) tongs += 2; // 1 for carrots, 1 for celery
+        if (hasPitaInAnyDip) tongs += 1; // 1 for pita
       }
 
       // GREEK FRIES BAR
@@ -2352,14 +2375,14 @@
         prep.greekFries.forEach(fries => {
           halfPans += fries.qty < 2 ? fries.qty : fries.qty * 2;
           deliContainers += 3; // aioli, tzatziki, feta per order
-          tongs += fries.qty;
-          spoons += 3; // per order
-          html += `<div>☐ ${fries.qty}x ${fries.name}</div>`;
+          html += `<div>☐ ${fries.qty}x ${fries.name} – 1 TONG</div>`;
           html += `<div style="margin-left: 16px;">→ ½ pan Greek Fries topped with protein</div>`;
           html += `<div style="margin-left: 16px;">→ 16oz Spicy Aioli, 16oz Tzatziki, 16oz Crumbled Feta</div>`;
-          html += `<div style="margin-left: 16px;">→ 1 tong, 3 plastic spoons</div>`;
+          html += `<div style="margin-left: 16px;">→ 3 SMALL SPOONS (Aioli, Tzatziki, Feta)</div>`;
         });
         html += `</div>`;
+        tongs += prep.greekFries.length; // 1 tong per greek fries type
+        smallSpoons += 3; // aioli, tzatziki, feta (3 types total, not per order)
       }
 
       // DOLMAS
@@ -2368,12 +2391,12 @@
         html += `<div style="margin-left: 16px;">`;
         prep.dolmas.forEach(dolma => {
           deliContainers += dolma.qty; // 16oz tzatziki per order
-          tongs += dolma.qty; // 1 tong per order
-          spoons += dolma.qty; // 1 spoon for tzatziki
-          html += `<div>☐ ${dolma.qty}x ${dolma.name} (½ pan or round tray with lemon wedges) – ${dolma.qty} TONG${dolma.qty > 1 ? 'S' : ''}</div>`;
-          html += `<div style="margin-left: 16px;">→ ${dolma.qty}x 16oz Tzatziki (with dill stripe garnish) – ${dolma.qty} SMALL SPOON${dolma.qty > 1 ? 'S' : ''}</div>`;
+          html += `<div>☐ ${dolma.qty}x ${dolma.name} (½ pan or round tray with lemon wedges) – 1 TONG</div>`;
+          html += `<div style="margin-left: 16px;">→ ${dolma.qty}x 16oz Tzatziki (dill stripe) – 1 SMALL SPOON</div>`;
         });
         html += `</div>`;
+        tongs += prep.dolmas.length; // 1 tong per dolma type
+        smallSpoons += prep.dolmas.length; // 1 small spoon per dolma type for tzatziki
       }
 
       // SPANAKOPITA
@@ -2382,12 +2405,12 @@
         html += `<div style="margin-left: 16px;">`;
         prep.spanakopita.forEach(span => {
           deliContainers += span.qty; // 16oz tzatziki per order
-          tongs += span.qty; // 1 tong per order
-          spoons += span.qty; // 1 spoon for tzatziki
-          html += `<div>☐ ${span.qty}x ${span.name} (round tray on bed of arugula OR ½/full pan) – ${span.qty} TONG${span.qty > 1 ? 'S' : ''}</div>`;
-          html += `<div style="margin-left: 16px;">→ ${span.qty}x 16oz Tzatziki (with dill stripe garnish) – ${span.qty} SMALL SPOON${span.qty > 1 ? 'S' : ''}</div>`;
+          html += `<div>☐ ${span.qty}x ${span.name} (round tray on arugula OR ½/full pan) – 1 TONG</div>`;
+          html += `<div style="margin-left: 16px;">→ ${span.qty}x 16oz Tzatziki (dill stripe) – 1 SMALL SPOON</div>`;
         });
         html += `</div>`;
+        tongs += prep.spanakopita.length; // 1 tong per spanakopita type
+        smallSpoons += prep.spanakopita.length; // 1 small spoon per spanakopita type for tzatziki
       }
 
       // SIDES
@@ -2395,10 +2418,15 @@
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">SIDES</h4>`;
         html += `<div style="margin-left: 16px;">`;
         prep.sides.forEach(side => {
-          tongs += side.qty; // 1 tong per side
-          html += `<div>☐ ${side.qty}x ${side.name} – ${side.qty} TONG${side.qty > 1 ? 'S' : ''}</div>`;
+          const sideName = (side.name || '').toUpperCase();
+          const isRice = sideName.includes('RICE');
+          html += `<div>☐ ${side.qty}x ${side.name} – 1 TONG${isRice ? ' + 1 LARGE SERVING SPOON' : ''}</div>`;
+          if (isRice) {
+            largeServingSpoons += 1; // 1 large serving spoon for rice
+          }
         });
         html += `</div>`;
+        tongs += prep.sides.length; // 1 tong per side type
       }
 
       // DESSERTS
@@ -2406,10 +2434,10 @@
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">DESSERTS</h4>`;
         html += `<div style="margin-left: 16px;">`;
         prep.desserts.forEach(dessert => {
-          tongs += dessert.qty; // 1 tong per dessert
-          html += `<div>☐ ${dessert.qty}x ${dessert.name} – ${dessert.qty} TONG${dessert.qty > 1 ? 'S' : ''}</div>`;
+          html += `<div>☐ ${dessert.qty}x ${dessert.name} – 1 TONG</div>`;
         });
         html += `</div>`;
+        tongs += prep.desserts.length; // 1 tong per dessert type
       }
 
       // PINWHEELS
@@ -2417,11 +2445,10 @@
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">PINWHEELS</h4>`;
         html += `<div style="margin-left: 16px;">`;
         prep.pinwheels.forEach(pinwheel => {
-          tongs += pinwheel.qty; // 1 tong per pinwheel
-          html += `<div>☐ ${pinwheel.qty}x ${pinwheel.name} – ${pinwheel.qty} TONG${pinwheel.qty > 1 ? 'S' : ''}</div>`;
+          html += `<div>☐ ${pinwheel.qty}x ${pinwheel.name} – 1 TONG</div>`;
         });
-        html += `<div style="margin-top: 8px; font-style: italic; color: var(--gray-600);">No prep list items - construction instructions will come later</div>`;
         html += `</div>`;
+        tongs += prep.pinwheels.length; // 1 tong per pinwheel type
       }
 
       // SPECIAL NOTES
@@ -2452,7 +2479,8 @@
           <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: #92400e;">UTENSILS TO PACK</h3>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
             ${tongs > 0 ? `<div>• ${tongs}x Tongs</div>` : ''}
-            ${spoons > 0 ? `<div>• ${spoons}x Small Spoons</div>` : ''}
+            ${largeServingSpoons > 0 ? `<div>• ${largeServingSpoons}x Large Serving Spoons</div>` : ''}
+            ${smallSpoons > 0 ? `<div>• ${smallSpoons}x Small Spoons</div>` : ''}
           </div>
         </div>
       `;

@@ -245,6 +245,9 @@ function calculatePrepList(lineItems, order) {
 function generatePrepListPDF(prep, order, lineItems) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
+  // Set normal character spacing (no extra spacing)
+  doc.setCharSpace(0);
+
   // Jayna Blue
   const jaynaBlue = [30, 64, 175]; // #1e40af
   const lightGray = [243, 244, 246]; // #f3f4f6
