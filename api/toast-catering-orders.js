@@ -282,7 +282,9 @@ export default async function handler(req, res) {
       return {
         // Order IDs
         toast_order_id: order.guid,
-        order_number: order.displayNumber || order.guid?.substring(0, 8),
+        // CRITICAL: Use orderNumber (unique Toast order #), NOT displayNumber (daily sequential 1,2,3...)
+        // Fallback to entityId (Toast's unique order number) or first 8 chars of GUID
+        order_number: order.orderNumber || order.entityId || `T-${order.guid?.substring(0, 8)}`,
 
         // Customer info (from check.customer)
         customer_name: customerName,
