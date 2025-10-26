@@ -233,12 +233,14 @@ function calculatePrepList(lineItems, order) {
     else if (itemName.includes('HUMMUS') || itemName.includes('BABA GHANOUSH') || itemName.includes('TZATZIKI')) {
       const dipMods = modifiers.map(m => {
         const modName = (m.name || '').toUpperCase();
-        // Parse GF pita quantity from dollar amount (e.g., "+ Gluten Free Pita $4.00" → 4)
+        // Parse GF pita quantity from dollar amount
+        // Example: "+ Gluten Free Pita ($4.00)" → $4.00 / $2.00 per pita = 2 pitas
         let gfPitaQty = null;
         if (modName.includes('GLUTEN FREE PITA') && m.name) {
           const priceMatch = m.name.match(/\$(\d+(?:\.\d+)?)/);
           if (priceMatch) {
-            gfPitaQty = parseFloat(priceMatch[1]);
+            const totalPrice = parseFloat(priceMatch[1]);
+            gfPitaQty = Math.round(totalPrice / 2); // GF pitas cost $2 each
           }
         }
         return { name: modName, gfPitaQty };
