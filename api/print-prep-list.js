@@ -114,16 +114,8 @@ export default async function handler(req, res) {
       throw new Error('Failed to fetch order line items');
     }
 
-    // DEBUG: Log what we fetched
-    console.log('🔍 FETCHED LINE ITEMS:', JSON.stringify(lineItems, null, 2));
-    console.log('🔢 Total line items fetched:', lineItems?.length || 0);
-
     // Calculate prep list
     const prep = calculatePrepList(lineItems || [], order);
-
-    // DEBUG: Log what was calculated
-    console.log('📋 CALCULATED PREP - BYO Items:', JSON.stringify(prep.byoGyros.items, null, 2));
-    console.log('📋 CALCULATED PREP - Desserts:', JSON.stringify(prep.desserts, null, 2));
 
     // Generate PDF prep list
     const pdfBase64 = generatePrepListPDF(prep, order, lineItems || []);
@@ -142,8 +134,8 @@ export default async function handler(req, res) {
       from: `Jayna Catering <${GMAIL_USER}>`,
       to: PRINTER_EMAIL,
       subject: `Print: Prep List - Order ${order.order_number || order_id}`,
-      text: `Prep list for ${order.customer_name || 'Customer'} - ${order.delivery_date}`,
-      html: `<p><strong>PREP LIST</strong></p><p>Order #${order.order_number || order_id}</p><p>${order.customer_name || 'Customer'}</p>`,
+      text: '',  // Empty text body - only print PDF attachment
+      html: '',  // Empty HTML body - only print PDF attachment
       attachments: [{
         filename: filename,
         content: Buffer.from(pdfBase64, 'base64'),
@@ -265,19 +257,16 @@ function calculatePrepList(lineItems, order) {
     }
   });
 
-  // TEMPORARILY DISABLED: Consolidate duplicates in all categories
-  // prep.byoGyros.items = consolidateItems(prep.byoGyros.items);
-  // prep.salads = consolidateItems(prep.salads);
-  // prep.dips = consolidateItems(prep.dips);
-  // prep.greekFries = consolidateItems(prep.greekFries);
-  // prep.dolmas = consolidateItems(prep.dolmas);
-  // prep.spanakopita = consolidateItems(prep.spanakopita);
-  // prep.sides = consolidateItems(prep.sides);
-  // prep.desserts = consolidateItems(prep.desserts);
-  // prep.pinwheels = consolidateItems(prep.pinwheels);
-
-  console.log('🔍 BEFORE CONSOLIDATION - BYO Items:', prep.byoGyros.items.length, 'items');
-  console.log('🔍 BEFORE CONSOLIDATION - Desserts:', prep.desserts.length, 'items');
+  // Consolidate duplicates in all categories (combines duplicate item names with summed quantities)
+  prep.byoGyros.items = consolidateItems(prep.byoGyros.items);
+  prep.salads = consolidateItems(prep.salads);
+  prep.dips = consolidateItems(prep.dips);
+  prep.greekFries = consolidateItems(prep.greekFries);
+  prep.dolmas = consolidateItems(prep.dolmas);
+  prep.spanakopita = consolidateItems(prep.spanakopita);
+  prep.sides = consolidateItems(prep.sides);
+  prep.desserts = consolidateItems(prep.desserts);
+  prep.pinwheels = consolidateItems(prep.pinwheels);
 
   return prep;
 }

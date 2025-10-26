@@ -133,8 +133,8 @@ export default async function handler(req, res) {
       from: `Jayna Catering <${GMAIL_USER}>`,
       to: PRINTER_EMAIL,
       subject: `Print: Order ${order.order_number || order_id} - ${order.customer_name || 'Customer'}`,
-      text: `Catering order for ${order.delivery_date}`,
-      html: `<p><strong>Catering Order Receipt</strong></p><p>Order #${order.order_number || order_id}</p>`,
+      text: '',  // Empty text body - only print PDF attachment
+      html: '',  // Empty HTML body - only print PDF attachment
       attachments: [{
         filename: filename,
         content: Buffer.from(pdfBase64, 'base64'),
