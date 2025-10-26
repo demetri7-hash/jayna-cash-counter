@@ -27,29 +27,27 @@ export default async function handler(req, res) {
 
     console.log('🍽️ Fetching ezCater orders...');
 
-    // GraphQL INTROSPECTION query to discover available queries
+    // GraphQL query to fetch caterer info
     const query = `
-      {
-        __schema {
-          queryType {
-            fields {
-              name
-              description
-              args {
-                name
-                description
-                type {
-                  name
-                  kind
-                }
-              }
-            }
+      query GetCaterers($catererId: ID!) {
+        caterers(uuids: [$catererId]) {
+          name
+          storeNumber
+          uuid
+          address {
+            street
+            city
+            state
+            zip
           }
+          live
         }
       }
     `;
 
-    const variables = {};
+    const variables = {
+      catererId: CATERER_ID
+    };
 
     // Make GraphQL request
     const response = await fetch('https://api.ezcater.com/graphql', {
