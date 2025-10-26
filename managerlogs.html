@@ -405,20 +405,49 @@
 </head>
 <body>
   <div class="container">
-    <!-- Header -->
-    <div class="header" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; text-align: center; padding: 20px;">
+    <div class="header" style="background: var(--white); color: var(--gray-900); text-align: center; padding: 12px; border-radius: 0; border-bottom: 1px solid var(--gray-300);">
       <img src="jayna-logo.png" alt="Jayna Gyro Logo" style="width: 80px; height: 80px; margin-bottom: 12px;">
-      <h1 style="margin-bottom: 4px; font-size: 24px; font-weight: 700;">JAYNA GYRO</h1>
+      <h1 style="margin-bottom: 4px; font-size: 18px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">JAYNA GYRO</h1>
       <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 4px; letter-spacing: 1.5px;">MANAGER LOGS</h2>
       <p style="font-size: 11px; font-weight: 500; letter-spacing: 1px; margin-bottom: 8px;">FOR AUTHORIZED USE ONLY</p>
-      <p style="opacity: 0.7; font-size: 14px;">Incident Reporting & Documentation</p>
 
-      <div style="margin-top: 16px;">
-        <a href="index.html" style="color: white; text-decoration: none; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; background: rgba(255,255,255,0.1); display: inline-block; transition: all 0.3s ease;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">← Back to Main</a>
+      <!-- CURRENTLY CLOCKED IN -->
+      <div id="clockedInContainer" style="margin: 8px 0; text-align: center;">
+        <div id="clockedInList" style="color: #2e7d32; font-size: 12px; font-weight: 500;">
+          Loading...
+        </div>
+      </div>
+
+      <p style="opacity: 0.7;">App created by Demetri Gregorakis</p>
+      <div style="font-size: 12px; color: #666; margin-top: 5px;">
+        <span id="sessionStatus"></span>
+        <button id="logoutBtn" onclick="logoutManager()" style="
+          background: #f44336;
+          color: white;
+          border: none;
+          padding: 2px 8px;
+          border-radius: 0;
+          font-size: 10px;
+          margin-left: 10px;
+          cursor: pointer;
+          display: none;
+        ">Logout Manager</button>
       </div>
     </div>
 
-    <div class="content" style="padding: 20px;">
+    <div class="content" style="padding: 12px;">
+      <div id="messageArea"></div>
+
+      <!-- Main Menu -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+        <a href="index.html" class="menu-btn primary" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-300); border-radius: 0; background: var(--gray-100); font-size: 11px; font-weight: 700; color: var(--gray-900); cursor: pointer; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; transition: all 0.15s ease;">Cash</a>
+        <a href="index.html" class="menu-btn" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-700); border-radius: 0; background: var(--gray-700); font-size: 11px; font-weight: 700; color: white; cursor: pointer; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; transition: all 0.15s ease;">Orders & Prep</a>
+        <a href="foh-checklists.html" class="menu-btn primary" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-300); border-radius: 0; background: var(--gray-100); font-size: 11px; font-weight: 700; color: var(--gray-900); cursor: pointer; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; transition: all 0.15s ease;">FOH</a>
+        <a href="boh.html" class="menu-btn" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-700); border-radius: 0; background: var(--gray-700); font-size: 11px; font-weight: 700; color: white; cursor: pointer; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; transition: all 0.15s ease;">BOH</a>
+        <a href="catering.html" class="menu-btn primary" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-300); border-radius: 0; background: var(--gray-100); font-size: 11px; font-weight: 700; color: var(--gray-900); cursor: pointer; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; transition: all 0.15s ease;">Catering</a>
+        <a href="manager.html" class="menu-btn" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-900); border-radius: 0; background: var(--gray-900); font-size: 11px; font-weight: 700; color: white; cursor: pointer; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; transition: all 0.15s ease;">Manager</a>
+      </div>
+
       <button class="toggle-form-btn" onclick="toggleForm()">+ NEW INCIDENT REPORT</button>
 
     <!-- Incident Report Form -->
@@ -1005,6 +1034,160 @@
       if (e.key === 'Escape') {
         closeModal();
       }
+    });
+
+    // ==================== CLOCKED IN DISPLAY ====================
+    async function fetchClockedInEmployees() {
+      try {
+        // Get TODAY in YYYY-MM-DD format (Pacific time)
+        const todayPacific = new Date().toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+
+        const [month, day, year] = todayPacific.split(', ')[0].split('/');
+        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+        console.log('🍞 Fetching clocked-in employees from Toast for:', today);
+
+        // STEP 1: Authenticate with Toast API
+        const authResponse = await fetch('/api/toast-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!authResponse.ok) {
+          console.error('❌ Failed to authenticate with Toast API');
+          updateClockedInDisplay([]);
+          return;
+        }
+
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) {
+          console.error('❌ Toast authentication failed');
+          updateClockedInDisplay([]);
+          return;
+        }
+
+        const token = authData.data.accessToken;
+        console.log('✅ Toast authenticated');
+
+        // STEP 2: Fetch clocked-in employees
+        const clockedInUrl = `/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`;
+        const response = await fetch(clockedInUrl);
+
+        if (!response.ok) {
+          console.error('❌ Failed to fetch clocked-in employees:', response.status);
+          updateClockedInDisplay([]);
+          return;
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          console.error('❌ Clocked-in API error:', result.error);
+          updateClockedInDisplay([]);
+          return;
+        }
+
+        console.log(`📊 Total time entries today: ${result.totalTimeEntries}`);
+        console.log(`🟢 Currently clocked in: ${result.count} employees`);
+
+        if (result.clockedIn.length > 0) {
+          console.log('✅ Clocked in employees:', result.clockedIn);
+        }
+
+        // Extract employee names
+        const employees = result.clockedIn.map(emp => emp.fullName);
+        updateClockedInDisplay(employees);
+
+      } catch (error) {
+        console.error('❌ Error fetching clocked in employees:', error);
+        updateClockedInDisplay([]);
+      }
+    }
+
+    function updateClockedInDisplay(employees) {
+      const listDiv = document.getElementById('clockedInList');
+
+      if (!listDiv) return;
+
+      if (employees.length === 0) {
+        listDiv.innerHTML = '<span style="color: #999; font-size: 11px; font-style: italic;">No one clocked in</span>';
+        return;
+      }
+
+      // Display names in green separated by pipes
+      const namesText = employees.join(' | ');
+      listDiv.innerHTML = `
+        <div style="color: #2e7d32; font-size: 12px; font-weight: 500;">
+          ${namesText}
+        </div>
+        <div style="color: #666; font-size: 9px; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px;">
+          Clocked In
+        </div>
+      `;
+    }
+
+    // ==================== SESSION MANAGEMENT ====================
+    function isManagerSessionValid() {
+      const sessionExpiry = localStorage.getItem('managerSession');
+      if (!sessionExpiry) return false;
+
+      const now = new Date().getTime();
+      const expiryTime = parseInt(sessionExpiry);
+
+      if (now > expiryTime) {
+        localStorage.removeItem('managerSession');
+        return false;
+      }
+
+      return true;
+    }
+
+    function clearManagerSession() {
+      localStorage.removeItem('managerSession');
+    }
+
+    function logoutManager() {
+      clearManagerSession();
+      updateSessionStatus();
+      alert('Manager session ended');
+    }
+
+    function updateSessionStatus() {
+      const statusElement = document.getElementById('sessionStatus');
+      const logoutBtn = document.getElementById('logoutBtn');
+
+      if (!statusElement || !logoutBtn) return;
+
+      if (isManagerSessionValid()) {
+        const sessionExpiry = localStorage.getItem('managerSession');
+        const expiryTime = parseInt(sessionExpiry);
+        const now = new Date().getTime();
+        const remainingMinutes = Math.ceil((expiryTime - now) / (60 * 1000));
+
+        statusElement.textContent = `Manager access: ${remainingMinutes} min remaining`;
+        statusElement.style.color = '#28a745';
+        logoutBtn.style.display = 'inline-block';
+      } else {
+        statusElement.textContent = '';
+        statusElement.style.color = '#666';
+        logoutBtn.style.display = 'none';
+      }
+    }
+
+    // Update session status every minute
+    setInterval(updateSessionStatus, 60000);
+
+    // Initialize on page load
+    window.addEventListener('load', function() {
+      setTimeout(updateSessionStatus, 100);
+      fetchClockedInEmployees();
+      // Auto-refresh clocked in every 5 minutes
+      setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
     });
   </script>
 </body>
