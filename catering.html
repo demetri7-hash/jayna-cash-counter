@@ -1317,7 +1317,7 @@
             </div>
             <div class="detail-item">
               <div class="detail-label">Phone</div>
-              <div class="detail-value">${order.customer_phone || 'N/A'}</div>
+              <div class="detail-value">${formatPhoneNumber(order.customer_phone)}</div>
             </div>
             <div class="detail-item">
               <div class="detail-label">Headcount</div>
@@ -1392,6 +1392,26 @@
     function formatTime(timeStr) {
       // Use Pacific timezone utility (device-independent)
       return formatPacificTime(timeStr);
+    }
+
+    function formatPhoneNumber(phone) {
+      if (!phone) return 'N/A';
+
+      // Remove all non-digit characters
+      const cleaned = phone.replace(/\D/g, '');
+
+      // Handle 10-digit US phone numbers
+      if (cleaned.length === 10) {
+        return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+      }
+
+      // Handle 11-digit numbers (with country code 1)
+      if (cleaned.length === 11 && cleaned[0] === '1') {
+        return `(${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+      }
+
+      // Return original if format doesn't match
+      return phone;
     }
 
     function viewOrderDetails(orderId) {
@@ -2029,7 +2049,7 @@
               <div style="margin-bottom: 24px; padding: 16px; background: var(--gray-100); border: 2px solid var(--gray-300);">
                 <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-900);">CUSTOMER INFORMATION</h3>
                 ${order.customer_name ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Name:</strong> ${order.customer_name}</div>` : ''}
-                ${order.customer_phone ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Phone:</strong> ${order.customer_phone}</div>` : ''}
+                ${order.customer_phone ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Phone:</strong> ${formatPhoneNumber(order.customer_phone)}</div>` : ''}
                 ${order.customer_email ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Email:</strong> ${order.customer_email}</div>` : ''}
                 ${order.delivery_address ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Address:</strong> ${order.delivery_address}</div>` : ''}
               </div>

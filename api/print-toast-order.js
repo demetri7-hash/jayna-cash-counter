@@ -68,6 +68,26 @@ function formatPacificDateTime(dateObj) {
   }).format(dateObj);
 }
 
+function formatPhoneNumber(phone) {
+  if (!phone) return 'N/A';
+
+  // Remove all non-digit characters
+  const cleaned = phone.replace(/\D/g, '');
+
+  // Handle 10-digit US phone numbers
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+
+  // Handle 11-digit numbers (with country code 1)
+  if (cleaned.length === 11 && cleaned[0] === '1') {
+    return `(${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+  }
+
+  // Return original if format doesn't match
+  return phone;
+}
+
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -330,7 +350,7 @@ async function generateOrderReceiptPDF(order, lineItems) {
   doc.setFont('helvetica', 'normal');
 
   if (order.customer_phone) {
-    doc.text(`Phone: ${order.customer_phone}`, 50, yPos);
+    doc.text(`Phone: ${formatPhoneNumber(order.customer_phone)}`, 50, yPos);
     yPos += 15;
   }
 
