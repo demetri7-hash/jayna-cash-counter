@@ -2344,7 +2344,7 @@
       let html = '<div style="font-size: 13px; line-height: 1.6;">';
 
       // CONTAINERS SUMMARY
-      let halfPans = 0, fullPans = 0, deliContainers = 0, deli32ozContainers = 0, brownBowls = 0, tongs = 0;
+      let halfPans = 0, fullPans = 0, deliContainers = 0, deli32ozContainers = 0, brownBowls = 0, roundTrays = 0, bambooPicks = 0, tongs = 0;
       let largeServingSpoons = 0, smallSpoons = 0;
 
       // BYO Gyros
@@ -2542,14 +2542,59 @@
       }
 
       // DOLMAS
+      // 1 order = 12 dolmas
+      // Tzatziki: 1x 16oz per 2 orders (round up)
       if (prep.dolmas.length > 0) {
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">DOLMAS</h4>`;
         html += `<div style="margin-left: 16px;">`;
+
         prep.dolmas.forEach(dolma => {
-          deliContainers += dolma.qty; // 16oz tzatziki per order
-          html += `<div>☐ ${dolma.qty}x ${dolma.name} (½ pan or round tray with lemon wedges) – 1 TONG</div>`;
-          html += `<div style="margin-left: 16px;">→ ${dolma.qty}x 16oz Tzatziki (dill stripe) – 1 SMALL SPOON</div>`;
+          const totalOrders = dolma.qty;
+          const totalPieces = totalOrders * 12;
+
+          // Calculate tzatziki: 1x 16oz per 2 orders (round up)
+          const tzatzikiCount = Math.ceil(totalOrders / 2);
+          deliContainers += tzatzikiCount;
+
+          // Container logic based on order quantity
+          let containerInfo = '';
+          let dolmaInstructions = '';
+
+          if (totalOrders === 1) {
+            // 1 order (12 pieces)
+            brownBowls += 1;
+            containerInfo = 'Brown Jayna bowl';
+            dolmaInstructions = `
+              <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
+                → If WHOLE dolmas: Brown Jayna bowl + bed of arugula + 8 lemon wedges
+              </div>
+              <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
+                → If CUT IN HALF (24 pieces): Round tray with dome lid + bed of arugula + 10-15 smaller lemon wedges + bamboo picks in half+ pieces
+              </div>`;
+            // Note: We can't track round trays here since we don't know cut preference
+          } else if (totalOrders >= 2 && totalOrders <= 4) {
+            // 2-4 orders (24-48 pieces)
+            roundTrays += totalOrders; // estimate 1 tray per order for stacking
+            containerInfo = `${totalOrders}x Round trays with dome lids (stack neatly)`;
+            dolmaInstructions = `
+              <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
+                → Bed of arugula on each tray + lemon wedges
+              </div>`;
+          } else {
+            // 5+ orders (60+ pieces)
+            halfPans += 1;
+            containerInfo = 'Half pan';
+            dolmaInstructions = `
+              <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
+                → Bed of arugula + lemon wedges
+              </div>`;
+          }
+
+          html += `<div>☐ ${totalOrders}x ${dolma.name} (${totalPieces} pieces total) – ${containerInfo} – 1 TONG</div>`;
+          html += dolmaInstructions;
+          html += `<div style="margin-left: 16px;">→ ${tzatzikiCount}x 16oz Tzatziki (with dill garnish) – 1 SMALL SPOON</div>`;
         });
+
         html += `</div>`;
         tongs += prep.dolmas.length; // 1 tong per dolma type
         smallSpoons += prep.dolmas.length; // 1 small spoon per dolma type for tzatziki
@@ -2644,9 +2689,11 @@
           <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--primary-blue);">CONTAINERS NEEDED</h3>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
             ${totalHalfPanEquivalent > 0 ? `<div>• ${formatPanCount(totalHalfPanEquivalent)}</div>` : ''}
+            ${roundTrays > 0 ? `<div>• ${roundTrays}x Round Trays with Dome Lids</div>` : ''}
             ${deliContainers > 0 ? `<div>• ${deliContainers}x 16oz Deli Containers</div>` : ''}
             ${deli32ozContainers > 0 ? `<div>• ${deli32ozContainers}x 32oz Deli Containers</div>` : ''}
             ${brownBowls > 0 ? `<div>• ${brownBowls}x Brown Jayna Bowls</div>` : ''}
+            ${bambooPicks > 0 ? `<div>• Bamboo picks (for dolmas)</div>` : ''}
           </div>
         </div>
       `;
