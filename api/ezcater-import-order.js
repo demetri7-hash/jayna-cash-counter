@@ -206,19 +206,24 @@ async function storeOrder(order, eventType) {
   }
 
   // Build line items - MATCH Toast schema exactly!
-  const lineItems = (order.catererCart?.orderItems || []).map(item => ({
-    item_guid: item.uuid,
-    item_name: item.name,
-    quantity: item.quantity,
-    unit_price: subunitsToDollars(item.totalInSubunits?.subunits) / item.quantity,
-    total_price: subunitsToDollars(item.totalInSubunits?.subunits),
-    selection_type: 'ITEM',
-    modifiers: item.customizations && item.customizations.length > 0 ? item.customizations : null,
-    special_requests: item.specialInstructions || null,
-    menu_group: null,
-    tax_included: false,
-    item_data: item
-  }));
+  const lineItems = (order.catererCart?.orderItems || []).map(item => {
+    const totalPrice = subunitsToDollars(item.totalInSubunits);
+    const unitPrice = item.quantity > 0 ? totalPrice / item.quantity : 0;
+
+    return {
+      item_guid: item.uuid,
+      item_name: item.name,
+      quantity: item.quantity,
+      unit_price: unitPrice,
+      total_price: totalPrice,
+      selection_type: 'ITEM',
+      modifiers: item.customizations && item.customizations.length > 0 ? item.customizations : null,
+      special_requests: item.specialInstructions || null,
+      menu_group: null,
+      tax_included: false,
+      item_data: item
+    };
+  });
 
   // Prepare order data - MATCH Toast schema exactly!
   const deliveryDate = order.event?.timestamp ? new Date(order.event.timestamp).toISOString().split('T')[0] : null;
@@ -236,7 +241,14 @@ async function storeOrder(order, eventType) {
     delivery_address: buildAddress(order.event?.address),
     delivery_notes: order.event?.address?.deliveryInstructions || null,
     headcount: order.event?.headcount || null,
+
+    // Financial breakdown
+    subtotal: subunitsToDollars(order.totals?.subTotal),
+    tax: subunitsToDollars(order.totals?.salesTax),
+    tip: subunitsToDollars(order.totals?.tip),
+    delivery_fee: null, // ezCater doesn't provide delivery fee separately in this response
     total_amount: subunitsToDollars(order.totals?.customerTotalDue),
+
     business_date: deliveryDate ? parseInt(deliveryDate.replace(/-/g, '')) : null,
     status: status,
     order_data: order,

@@ -80,7 +80,14 @@ export default async function handler(req, res) {
         ].filter(Boolean).join(', '),
         delivery_notes: orderData.delivery_instructions,
         headcount: orderData.headcount,
+
+        // Financial breakdown
+        subtotal: orderData.subtotal,
+        tax: orderData.tax,
+        tip: orderData.tip,
+        delivery_fee: null, // ezCater doesn't provide delivery fee separately
         total_amount: orderData.total,
+
         business_date: orderData.delivery_date ? parseInt(orderData.delivery_date.replace(/-/g, '')) : null,
         status: orderData.status.toUpperCase(),
         order_data: orderDetails,
@@ -314,21 +321,27 @@ async function saveLineItems(orderId, externalOrderId, items) {
   };
 
   // Insert new line items - MATCH Toast schema exactly!
-  const lineItems = items.map(item => ({
-    order_id: orderId,
-    external_order_id: externalOrderId,
-    item_guid: item.uuid,
-    item_name: item.name,
-    quantity: item.quantity,
-    unit_price: subunitsToDollars(item.totalInSubunits?.subunits) / (item.quantity || 1),
-    total_price: subunitsToDollars(item.totalInSubunits?.subunits),
-    selection_type: 'ITEM',
-    modifiers: item.customizations && item.customizations.length > 0 ? item.customizations : null,
-    special_requests: item.specialInstructions || null,
-    menu_group: null,
-    tax_included: false,
-    item_data: item
-  }));
+  const lineItems = items.map(item => {
+    // totalInSubunits is an object with { subunits, currency }, not nested .subunits
+    const totalPrice = subunitsToDollars(item.totalInSubunits?.subunits);
+    const unitPrice = (item.quantity || 1) > 0 ? totalPrice / (item.quantity || 1) : 0;
+
+    return {
+      order_id: orderId,
+      external_order_id: externalOrderId,
+      item_guid: item.uuid,
+      item_name: item.name,
+      quantity: item.quantity,
+      unit_price: unitPrice,
+      total_price: totalPrice,
+      selection_type: 'ITEM',
+      modifiers: item.customizations && item.customizations.length > 0 ? item.customizations : null,
+      special_requests: item.specialInstructions || null,
+      menu_group: null,
+      tax_included: false,
+      item_data: item
+    };
+  });
 
   if (lineItems.length > 0) {
     const { error } = await supabase
