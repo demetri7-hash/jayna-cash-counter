@@ -27,6 +27,64 @@ export default async function handler(req, res) {
 
     console.log('🔔 Setting up ezCater webhook subscriptions...');
 
+    // STEP 0: Introspect to find correct input types
+    const typeIntrospection = `
+      {
+        __type(name: "CreateSubscriberPayload") {
+          name
+          fields {
+            name
+            type {
+              name
+              kind
+            }
+          }
+        }
+        subscriberInput: __type(name: "SubscriberParams") {
+          name
+          inputFields {
+            name
+            type {
+              name
+              kind
+            }
+          }
+        }
+        subscriptionInput: __type(name: "SubscriptionParams") {
+          name
+          inputFields {
+            name
+            type {
+              name
+              kind
+            }
+          }
+        }
+      }
+    `;
+
+    const typeResponse = await fetch('https://api.ezcater.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': EZCATER_API_TOKEN,
+        'Apollographql-client-name': 'Jayna-Gyro-Sacramento',
+        'Apollographql-client-version': '1.0.0'
+      },
+      body: JSON.stringify({
+        query: typeIntrospection
+      })
+    });
+
+    const typeData = await typeResponse.json();
+    console.log('📋 Type schema:', JSON.stringify(typeData, null, 2));
+
+    return res.status(200).json({
+      success: true,
+      data: typeData,
+      timestamp: new Date().toISOString()
+    });
+
     // STEP 1: Create Subscriber (register webhook URL)
     const createSubscriberMutation = `
       mutation CreateSubscriber($subscriberParams: SubscriberInput!) {
