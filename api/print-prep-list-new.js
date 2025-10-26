@@ -238,14 +238,27 @@ function calculatePrepList(lineItems, order) {
         // Parse GF pita quantity from dollar amount
         // Example: "+ Gluten Free Pita ($4.00)" → $4.00 / $2.00 per pita = 2 pitas
         let gfPitaQty = null;
-        if (modName.includes('GLUTEN FREE PITA') && m.name) {
-          const priceMatch = m.name.match(/\$(\d+(?:\.\d+)?)/);
-          if (priceMatch) {
-            const totalPrice = parseFloat(priceMatch[1]);
-            gfPitaQty = Math.round(totalPrice / 2); // GF pitas cost $2 each
+        if (modName.includes('GLUTEN FREE PITA')) {
+          // Try multiple methods to get GF pita quantity
+
+          // Method 1: Check if modifier has a price field directly
+          if (m.price && typeof m.price === 'number') {
+            gfPitaQty = Math.round(m.price / 200); // Price in cents, GF pitas are 200 cents ($2) each
+          }
+          // Method 2: Parse from name string (e.g., "+ Gluten Free Pita ($4.00)")
+          else if (m.name) {
+            const priceMatch = m.name.match(/\$(\d+(?:\.\d{1,2})?)/);
+            if (priceMatch) {
+              const totalPrice = parseFloat(priceMatch[1]);
+              gfPitaQty = Math.round(totalPrice / 2); // GF pitas cost $2 each
+            }
+          }
+          // Method 3: Check for quantity field directly
+          if (!gfPitaQty && m.quantity && typeof m.quantity === 'number') {
+            gfPitaQty = m.quantity;
           }
         }
-        return { name: modName, gfPitaQty };
+        return { name: modName, gfPitaQty, originalModifier: m };
       });
       prep.dips.push({ name: item.item_name, qty, modifiers: dipMods });
     }
@@ -357,6 +370,23 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     doc.text(`${formatPacificDateShort(order.delivery_date)} at ${formatPacificTime(order.delivery_time)}`, 110, yPos);
     yPos += 14;
+
+    // Add delivery address if available
+    if (order.delivery_address) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('ADDRESS:', 40, yPos);
+      doc.setFont('helvetica', 'normal');
+      const addressLines = doc.splitTextToSize(order.delivery_address, 450);
+      addressLines.forEach((line, idx) => {
+        if (idx === 0) {
+          doc.text(line, 110, yPos);
+        } else {
+          yPos += 12;
+          doc.text(line, 110, yPos);
+        }
+      });
+      yPos += 14;
+    }
   }
 
   if (order.headcount) {
@@ -1006,7 +1036,7 @@ function generatePrepListPDF(prep, order, lineItems) {
 
   // SPECIAL NOTES
   if (order.delivery_notes && yPos < 680) {
-    yPos += 8;
+    yPos += 25;  // Extra spacing before special notes section
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
