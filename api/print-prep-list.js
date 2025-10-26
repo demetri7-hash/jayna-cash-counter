@@ -308,11 +308,11 @@ function formatPanCount(halfPanCount) {
   const remainingHalfPans = halfPanCount % 2;
 
   if (fullPans > 0 && remainingHalfPans > 0) {
-    return `${fullPans} full pan${fullPans > 1 ? 's' : ''} + 1 1/2 pan`;
+    return `${fullPans} full pan${fullPans > 1 ? 's' : ''} + 1 half pan`;
   } else if (fullPans > 0) {
     return `${fullPans} full pan${fullPans > 1 ? 's' : ''}`;
   } else {
-    return `1 1/2 pan`;
+    return `1 half pan`;
   }
 }
 
@@ -526,7 +526,7 @@ function generatePrepListPDF(prep, order, lineItems) {
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   let containerParts = [];
-  if (halfPans > 0) containerParts.push(`${halfPans}x 1/2 Sheet Pans`);
+  if (halfPans > 0) containerParts.push(formatPanCount(halfPans));
   if (deliContainers > 0) containerParts.push(`${deliContainers}x 16oz Deli Containers`);
   if (brownBowls > 0) containerParts.push(`${brownBowls}x Brown Jayna Bowls`);
   doc.text(`* ${containerParts.join('  *  ')}`, 50, yPos);
