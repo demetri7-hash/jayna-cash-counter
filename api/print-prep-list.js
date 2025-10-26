@@ -164,6 +164,28 @@ export default async function handler(req, res) {
 }
 
 /**
+ * Helper: Consolidate duplicate items by name (combine quantities)
+ */
+function consolidateItems(items) {
+  const consolidated = [];
+  const itemMap = new Map();
+
+  items.forEach(item => {
+    const key = item.name.toUpperCase();
+    if (itemMap.has(key)) {
+      // Add quantity to existing item
+      itemMap.get(key).qty += item.qty;
+    } else {
+      // New item
+      itemMap.set(key, { ...item });
+      consolidated.push(itemMap.get(key));
+    }
+  });
+
+  return consolidated;
+}
+
+/**
  * Calculate prep requirements from line items
  */
 function calculatePrepList(lineItems, order) {
@@ -234,6 +256,17 @@ function calculatePrepList(lineItems, order) {
       prep.pinwheels.push({ name: item.item_name, qty });
     }
   });
+
+  // Consolidate duplicates in all categories
+  prep.byoGyros.items = consolidateItems(prep.byoGyros.items);
+  prep.salads = consolidateItems(prep.salads);
+  prep.dips = consolidateItems(prep.dips);
+  prep.greekFries = consolidateItems(prep.greekFries);
+  prep.dolmas = consolidateItems(prep.dolmas);
+  prep.spanakopita = consolidateItems(prep.spanakopita);
+  prep.sides = consolidateItems(prep.sides);
+  prep.desserts = consolidateItems(prep.desserts);
+  prep.pinwheels = consolidateItems(prep.pinwheels);
 
   return prep;
 }
