@@ -446,17 +446,22 @@ function generatePrepListPDF(prep, order, lineItems) {
     let byoTongs = 5; // greens, tomatoes, onions, pepperoncini, pitas
 
     // DICED TOMATO LOGIC: 30 portions per half pan
+    let tomatoUsesBrownBowl = false;
     if (prep.byoGyros.total < 10) {
       deliContainers += 1; // 16oz deli container
     } else if (prep.byoGyros.total <= 20) {
       brownBowls += 1; // Brown Jayna bowl
+      tomatoUsesBrownBowl = true; // Flag for coordinated brown bowl logic
     } else {
       const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 30);
       halfPans += tomatoHalfPans;
     }
 
     // SLICED RED ONION LOGIC: 50 portions per half pan
-    if (prep.byoGyros.total < 20) {
+    // COORDINATED LOGIC: If tomatoes use brown bowl, onions must also use brown bowl
+    if (tomatoUsesBrownBowl) {
+      brownBowls += 1; // Brown Jayna bowl (coordinated with tomatoes)
+    } else if (prep.byoGyros.total < 20) {
       deliContainers += 1; // 16oz deli container
     } else if (prep.byoGyros.total <= 45) {
       brownBowls += 1; // Brown Jayna bowl
@@ -466,7 +471,10 @@ function generatePrepListPDF(prep, order, lineItems) {
     }
 
     // PEPPERONCINI LOGIC: 100 portions per half pan, full pans for 100+
-    if (prep.byoGyros.total < 10) {
+    // COORDINATED LOGIC: If tomatoes use brown bowl, pepperoncini must also use brown bowl
+    if (tomatoUsesBrownBowl) {
+      brownBowls += 1; // Brown Jayna bowl (coordinated with tomatoes)
+    } else if (prep.byoGyros.total < 10) {
       deliContainers += 1; // 16oz deli
     } else if (prep.byoGyros.total <= 20) {
       deli32ozContainers += 1; // 32oz deli
@@ -698,10 +706,12 @@ function generatePrepListPDF(prep, order, lineItems) {
     // 10-20: Brown Jayna bowl
     // 21+: Calculate half pans (30 portions per half pan)
     let tomatoContainer = '';
+    let tomatoUsesBrownBowlDisplay = false;
     if (prep.byoGyros.total < 10) {
       tomatoContainer = '16oz deli container';
     } else if (prep.byoGyros.total <= 20) {
       tomatoContainer = 'brown Jayna bowl';
+      tomatoUsesBrownBowlDisplay = true; // Flag for coordinated display logic
     } else {
       const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 30);
       tomatoContainer = formatPanCount(tomatoHalfPans);
@@ -709,11 +719,11 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.text(`[ ] ${prep.byoGyros.total} portions Diced Tomatoes (${tomatoContainer}) - 1 large serving spoon`, 50, yPos); yPos += 12;
 
     // SLICED RED ONION LOGIC: 50 portions per half pan
-    // Below 20: 16oz deli container
-    // 20-45: Brown Jayna bowl
-    // 46+: Calculate half pans (50 portions per half pan)
+    // COORDINATED LOGIC: If tomatoes use brown bowl, onions must also use brown bowl
     let onionContainer = '';
-    if (prep.byoGyros.total < 20) {
+    if (tomatoUsesBrownBowlDisplay) {
+      onionContainer = 'brown Jayna bowl';
+    } else if (prep.byoGyros.total < 20) {
       onionContainer = '16oz deli container';
     } else if (prep.byoGyros.total <= 45) {
       onionContainer = 'brown Jayna bowl';
@@ -724,12 +734,11 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.text(`[ ] ${prep.byoGyros.total} portions Sliced Red Onion (${onionContainer}) - 1 tong`, 50, yPos); yPos += 12;
 
     // PEPPERONCINI LOGIC: 100 portions per half pan
-    // Below 10: 16oz deli container
-    // 10-20: 32oz deli container
-    // 21-99: Half pan
-    // 100+: Full pan(s) + half pan if remainder
+    // COORDINATED LOGIC: If tomatoes use brown bowl, pepperoncini must also use brown bowl
     let pepperonciniContainer = '';
-    if (prep.byoGyros.total < 10) {
+    if (tomatoUsesBrownBowlDisplay) {
+      pepperonciniContainer = 'brown Jayna bowl';
+    } else if (prep.byoGyros.total < 10) {
       pepperonciniContainer = '16oz deli container';
     } else if (prep.byoGyros.total <= 20) {
       pepperonciniContainer = '32oz deli container';

@@ -2386,12 +2386,14 @@
         // 10-20: Brown Jayna bowl
         // 21+: Calculate half pans (30 portions per half pan)
         let tomatoContainer = '';
+        let tomatoUsesBrownBowl = false; // Flag for coordinated brown bowl logic
         if (prep.byoGyros.total < 10) {
           deliContainers += 1;
           tomatoContainer = '16oz deli container';
         } else if (prep.byoGyros.total <= 20) {
           brownBowls += 1;
           tomatoContainer = 'brown Jayna bowl';
+          tomatoUsesBrownBowl = true; // Set flag when tomatoes use brown bowl
         } else {
           const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 30);
           halfPans += tomatoHalfPans;
@@ -2404,8 +2406,12 @@
         // Below 20: 16oz deli container
         // 20-45: Brown Jayna bowl
         // 46+: Calculate half pans (50 portions per half pan)
+        // COORDINATED LOGIC: If tomatoes use brown bowl, onions must also use brown bowl
         let onionContainer = '';
-        if (prep.byoGyros.total < 20) {
+        if (tomatoUsesBrownBowl) {
+          brownBowls += 1;
+          onionContainer = 'brown Jayna bowl (coordinated with tomatoes)';
+        } else if (prep.byoGyros.total < 20) {
           deliContainers += 1;
           onionContainer = '16oz deli container';
         } else if (prep.byoGyros.total <= 45) {
@@ -2423,8 +2429,12 @@
         // 10-20: 32oz deli container
         // 21-99: Half pan
         // 100+: Full pan(s) + half pan if remainder
+        // COORDINATED LOGIC: If tomatoes use brown bowl, pepperoncini must also use brown bowl
         let pepperonciniContainer = '';
-        if (prep.byoGyros.total < 10) {
+        if (tomatoUsesBrownBowl) {
+          brownBowls += 1;
+          pepperonciniContainer = 'brown Jayna bowl (coordinated with tomatoes)';
+        } else if (prep.byoGyros.total < 10) {
           deliContainers += 1;
           pepperonciniContainer = '16oz deli container';
         } else if (prep.byoGyros.total <= 20) {
