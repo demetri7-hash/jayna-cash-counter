@@ -460,7 +460,7 @@ function generatePrepListPDF(prep, order, lineItems) {
 
   // BYO Gyros
   if (prep.byoGyros.total > 0) {
-    const sets = Math.ceil(prep.byoGyros.total / 10);
+    const sets = Math.ceil(prep.byoGyros.total / 15);
     deliContainers += sets * 3; // tzatziki, aioli, lemon vin
     halfPans += sets; // mixed greens
     smallSpoons += 3; // tzatziki (no dill), spicy aioli, lemon vinaigrette
@@ -679,7 +679,7 @@ function generatePrepListPDF(prep, order, lineItems) {
 
   // BYO GYRO PITAS (Beef & Lamb, Chicken, Roasted Chickpeas, Falafel)
   if (prep.byoGyros.total > 0) {
-    const sets = Math.ceil(prep.byoGyros.total / 10);
+    const sets = Math.ceil(prep.byoGyros.total / 15);
 
     // Calculate box height dynamically
     const proteinLines = prep.byoGyros.items?.length || 0;
