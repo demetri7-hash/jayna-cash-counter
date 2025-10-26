@@ -184,10 +184,8 @@ function calculatePrepList(lineItems, order) {
     const qty = parseFloat(item.quantity || 1);
     const modifiers = item.modifiers || [];
 
-    // BYO GYRO PITAS + FALAFEL + ROASTED CHICKPEAS (all proteins)
-    if ((itemName.includes('GYRO PITA') && itemName.includes('MAKE YOUR OWN')) ||
-        itemName.includes('FALAFEL') ||
-        (itemName.includes('CHICKPEA') && itemName.includes('GYRO'))) {
+    // BYO GYRO PITAS (all protein options: Beef & Lamb, Chicken, Roasted Chickpeas, Falafel)
+    if (itemName.includes('MAKE YOUR OWN') || itemName.includes('BYO')) {
       prep.byoGyros.total += qty;
       prep.byoGyros.items.push({ name: item.item_name, qty });
     }
@@ -447,14 +445,14 @@ function generatePrepListPDF(prep, order, lineItems) {
 
   yPos += 25;
 
-  // PROTEINS (BYO GYROS, FALAFEL, ROASTED CHICKPEAS)
+  // BYO GYRO PITAS (Beef & Lamb, Chicken, Roasted Chickpeas, Falafel)
   if (prep.byoGyros.total > 0) {
     const sets = Math.ceil(prep.byoGyros.total / 10);
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...jaynaBlue);
-    doc.text(`PROTEINS (${prep.byoGyros.total} TOTAL PORTIONS)`, 40, yPos);
+    doc.text(`BYO GYRO PITAS (${prep.byoGyros.total} TOTAL PORTIONS)`, 40, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 15;
 
