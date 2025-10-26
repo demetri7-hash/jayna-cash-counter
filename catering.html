@@ -2990,16 +2990,18 @@
       if (prep.byoGyros.total > 0) {
         const sets = Math.ceil(prep.byoGyros.total / 10);
 
-        // Sauce containers (3 per set)
+        // Sauce containers (16oz deli, 3 per set)
         for (let i = 1; i <= sets; i++) {
-          labels.push({ item: 'Tzatziki Sauce', qty: `${prep.byoGyros.total} portions`, pan: `${i} of ${sets}`, category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
-          labels.push({ item: 'Spicy Aioli Sauce', qty: `${prep.byoGyros.total} portions`, pan: `${i} of ${sets}`, category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
-          labels.push({ item: 'Lemon Vinaigrette', qty: `${prep.byoGyros.total} portions`, pan: `${i} of ${sets}`, category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: 'Tzatziki Sauce', qty: sets > 1 ? `16OZ DELI - ${i} OF ${sets}` : `16OZ DELI - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: 'Spicy Aioli Sauce', qty: sets > 1 ? `16OZ DELI - ${i} OF ${sets}` : `16OZ DELI - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: 'Lemon Vinaigrette', qty: sets > 1 ? `16OZ DELI - ${i} OF ${sets}` : `16OZ DELI - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
         }
 
-        // Greens (1 per set)
-        for (let i = 1; i <= sets; i++) {
-          labels.push({ item: 'Mixed Greens', qty: `${prep.byoGyros.total} portions`, pan: `${i} of ${sets}`, category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+        // Mixed Greens (half pan per set, but label should indicate full pan usage)
+        const greensHalfPans = sets;
+        const greensFullPans = Math.ceil(sets / 2);
+        for (let i = 1; i <= greensFullPans; i++) {
+          labels.push({ item: 'Mixed Greens', qty: greensFullPans > 1 ? `FULL PAN - ${i} OF ${greensFullPans}` : `FULL PAN - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
         }
 
         // DICED TOMATOES - Calculate actual container type and count
@@ -3025,10 +3027,11 @@
 
         // Generate tomato labels (one per container)
         for (let i = 1; i <= tomatoContainerCount; i++) {
+          const containerLabel = tomatoContainerType.toUpperCase();
           labels.push({
             item: 'Diced Tomatoes',
-            qty: `${prep.byoGyros.total} portions`,
-            pan: tomatoContainerCount > 1 ? `${i} of ${tomatoContainerCount} ${tomatoContainerType}s` : tomatoContainerType,
+            qty: tomatoContainerCount > 1 ? `${containerLabel} - ${i} OF ${tomatoContainerCount}` : `${containerLabel} - 1 OF 1`,
+            pan: '',
             category: 'BYO Gyros',
             orderNum,
             customerLastName,
@@ -3062,10 +3065,11 @@
 
         // Generate onion labels (one per container)
         for (let i = 1; i <= onionContainerCount; i++) {
+          const containerLabel = onionContainerType.toUpperCase();
           labels.push({
             item: 'Sliced Red Onion',
-            qty: `${prep.byoGyros.total} portions`,
-            pan: onionContainerCount > 1 ? `${i} of ${onionContainerCount} ${onionContainerType}s` : onionContainerType,
+            qty: onionContainerCount > 1 ? `${containerLabel} - ${i} OF ${onionContainerCount}` : `${containerLabel} - 1 OF 1`,
+            pan: '',
             category: 'BYO Gyros',
             orderNum,
             customerLastName,
@@ -3103,8 +3107,8 @@
           for (let i = 1; i <= pepperFullPans; i++) {
             labels.push({
               item: 'Whole Pepperoncini',
-              qty: `${prep.byoGyros.total} portions`,
-              pan: `${i} of ${pepperFullPans} full pan${pepperFullPans > 1 ? 's' : ''}`,
+              qty: pepperFullPans > 1 ? `FULL PAN - ${i} OF ${pepperFullPans}` : `FULL PAN - 1 OF 1`,
+              pan: '',
               category: 'BYO Gyros',
               orderNum,
               customerLastName,
@@ -3117,8 +3121,8 @@
           if (pepperRemainder > 0) {
             labels.push({
               item: 'Whole Pepperoncini',
-              qty: `${prep.byoGyros.total} portions`,
-              pan: 'half pan',
+              qty: `HALF PAN - 1 OF 1`,
+              pan: '',
               category: 'BYO Gyros',
               orderNum,
               customerLastName,
@@ -3133,10 +3137,11 @@
 
         // Generate pepperoncini labels (one per container) - only if not 100+
         for (let i = 1; i <= pepperonciniContainerCount; i++) {
+          const containerLabel = pepperonciniContainerType.toUpperCase();
           labels.push({
             item: 'Whole Pepperoncini',
-            qty: `${prep.byoGyros.total} portions`,
-            pan: pepperonciniContainerCount > 1 ? `${i} of ${pepperonciniContainerCount} ${pepperonciniContainerType}s` : pepperonciniContainerType,
+            qty: pepperonciniContainerCount > 1 ? `${containerLabel} - ${i} OF ${pepperonciniContainerCount}` : `${containerLabel} - 1 OF 1`,
+            pan: '',
             category: 'BYO Gyros',
             orderNum,
             customerLastName,
@@ -3154,8 +3159,8 @@
         for (let i = 1; i <= pitaFullPans; i++) {
           labels.push({
             item: 'Grilled Pita Bread',
-            qty: `${pitasNeeded} whole pitas`,
-            pan: pitaFullPans > 1 ? `${i} of ${pitaFullPans} full pans` : 'full pan',
+            qty: pitaFullPans > 1 ? `FULL PAN - ${i} OF ${pitaFullPans}` : `FULL PAN - 1 OF 1`,
+            pan: '',
             category: 'BYO Gyros',
             orderNum,
             customerLastName,
@@ -3167,14 +3172,15 @@
 
       // SALADS
       prep.salads.forEach(salad => {
-        const panCount = salad.qty < 4 ? salad.qty : Math.ceil(salad.qty / 4);
+        // Calculate pan count: 1/2 pan each if < 4, or 2 half pans per salad if >= 4
+        const saladHalfPans = salad.qty < 4 ? salad.qty : salad.qty * 2;
 
         // Salad pans
-        for (let i = 1; i <= panCount; i++) {
+        for (let i = 1; i <= saladHalfPans; i++) {
           labels.push({
             item: salad.name,
-            qty: `${salad.qty} portions`,
-            pan: `${i} of ${panCount}`,
+            qty: saladHalfPans > 1 ? `HALF PAN - ${i} OF ${saladHalfPans}` : `HALF PAN - 1 OF 1`,
+            pan: '',
             category: 'Salad',
             orderNum,
             customerLastName,
@@ -3183,12 +3189,12 @@
           });
         }
 
-        // Dressing containers (1 per portion)
+        // Dressing containers (16oz deli, 1 per portion)
         for (let i = 1; i <= salad.qty; i++) {
           labels.push({
             item: `${salad.name} - Lemon Vinaigrette`,
-            qty: '1 dressing',
-            pan: `${i} of ${salad.qty}`,
+            qty: salad.qty > 1 ? `16OZ DELI - ${i} OF ${salad.qty}` : `16OZ DELI - 1 OF 1`,
+            pan: '',
             category: 'Salad Dressing',
             orderNum,
             customerLastName,
@@ -3200,12 +3206,12 @@
 
       // DIPS
       prep.dips.forEach(dip => {
-        // Dip containers (16oz each)
+        // Dip containers (16oz deli, one per order)
         for (let i = 1; i <= dip.qty; i++) {
           labels.push({
             item: dip.name,
-            qty: '16oz container',
-            pan: `${i} of ${dip.qty}`,
+            qty: dip.qty > 1 ? `16OZ DELI - ${i} OF ${dip.qty}` : `16OZ DELI - 1 OF 1`,
+            pan: '',
             category: 'Dip',
             orderNum,
             customerLastName,
@@ -3221,7 +3227,7 @@
             labels.push({
               item: `${dip.name} - Veggie Sticks (Carrots)`,
               qty: `${24 * dip.qty} pieces`,
-              pan: `${i} of ${dip.qty}`,
+              pan: '',
               category: 'Dip Side',
               orderNum,
               customerLastName,
@@ -3231,7 +3237,7 @@
             labels.push({
               item: `${dip.name} - Veggie Sticks (Celery)`,
               qty: `${24 * dip.qty} pieces`,
-              pan: `${i} of ${dip.qty}`,
+              pan: '',
               category: 'Dip Side',
               orderNum,
               customerLastName,
@@ -3248,7 +3254,7 @@
             labels.push({
               item: `${dip.name} - Sliced Pita Bread`,
               qty: `${6 * dip.qty} pitas`,
-              pan: `${i} of ${dip.qty}`,
+              pan: '',
               category: 'Dip Side',
               orderNum,
               customerLastName,
@@ -3266,7 +3272,7 @@
             labels.push({
               item: `${dip.name} - GF Pita Bread`,
               qty: `${gfQty} GF pitas`,
-              pan: `${i} of ${dip.qty}`,
+              pan: '',
               category: 'Dip Side',
               orderNum,
               customerLastName,
@@ -3279,37 +3285,37 @@
 
       // GREEK FRIES BAR
       prep.greekFries.forEach(fries => {
-        labels.push({ item: 'Greek Fries + Protein', qty: `${fries.qty} portions`, pan: '1 of 1', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: 'Greek Fries - Spicy Aioli', qty: '16oz sauce', pan: '1 of 1', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: 'Greek Fries - Tzatziki', qty: '16oz sauce', pan: '1 of 1', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: 'Greek Fries - Crumbled Feta', qty: '16oz feta', pan: '1 of 1', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: 'Greek Fries + Protein', qty: `${fries.qty} portions`, pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: 'Greek Fries - Spicy Aioli', qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: 'Greek Fries - Tzatziki', qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: 'Greek Fries - Crumbled Feta', qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       // DOLMAS
       prep.dolmas.forEach(dolma => {
-        labels.push({ item: dolma.name, qty: `${dolma.qty} portions`, pan: '1 of 1', category: 'Dolmas', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: `${dolma.name} - Tzatziki Sauce`, qty: `${dolma.qty} portions`, pan: '1 of 1', category: 'Dolmas', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: dolma.name, qty: `${dolma.qty} portions`, pan: '', category: 'Dolmas', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: `${dolma.name} - Tzatziki Sauce`, qty: `${dolma.qty} portions`, pan: '', category: 'Dolmas', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       // SPANAKOPITA
       prep.spanakopita.forEach(span => {
-        labels.push({ item: span.name, qty: `${span.qty} portions`, pan: '1 of 1', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: `${span.name} - Tzatziki Sauce`, qty: `${span.qty} portions`, pan: '1 of 1', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: span.name, qty: `${span.qty} portions`, pan: '', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: `${span.name} - Tzatziki Sauce`, qty: `${span.qty} portions`, pan: '', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       // SIDES
       prep.sides.forEach(side => {
-        labels.push({ item: side.name, qty: `${side.qty} portions`, pan: '1 of 1', category: 'Side', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: side.name, qty: `${side.qty} portions`, pan: '', category: 'Side', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       // DESSERTS
       prep.desserts.forEach(dessert => {
-        labels.push({ item: dessert.name, qty: `${dessert.qty} pieces`, pan: '1 of 1', category: 'Dessert', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: dessert.name, qty: `${dessert.qty} pieces`, pan: '', category: 'Dessert', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       // PINWHEELS
       prep.pinwheels.forEach(pinwheel => {
-        labels.push({ item: pinwheel.name, qty: `${pinwheel.qty} portions`, pan: '1 of 1', category: 'Pinwheel', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: pinwheel.name, qty: `${pinwheel.qty} portions`, pan: '', category: 'Pinwheel', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       return labels;
@@ -3363,7 +3369,7 @@
         worksheet.addRow({
           company: 'JAYNA GYRO CATERING',
           item: String(label.item || ''),
-          quantity: String(label.qty + ' - Pan ' + label.pan),
+          quantity: String(label.qty || ''),
           customer: String((label.packDate || '') + ' ' + (label.customerLastName || ''))
         });
       });
