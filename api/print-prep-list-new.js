@@ -361,9 +361,9 @@ function generatePrepListPDF(prep, order, lineItems) {
 
   if (order.headcount) {
     doc.setFont('helvetica', 'bold');
-    doc.text('HEADCOUNT:', 40, yPos);
+    doc.text('HEADCOUNT: ', 40, yPos);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${order.headcount} guests`, 110, yPos);
+    doc.text(`${order.headcount} guests`, 115, yPos);
     yPos += 14;
   }
 
@@ -663,19 +663,63 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.text(`[ ] ${sets}x 16oz Lemon Vinaigrette - 1 small spoon`, 50, yPos); yPos += 12;
     doc.text(`[ ] ${formatPanCount(sets)} Mixed Greens - 1 tong`, 50, yPos); yPos += 12;
 
-    // Calculate pan counts for vegetables (1 half pan per 10 portions if >= 10, brown bowls if < 10)
+    // DICED TOMATO LOGIC: 30 portions per half pan
+    // Below 10: 16oz deli container
+    // 10-20: Brown Jayna bowl
+    // 21+: Calculate half pans (30 portions per half pan)
+    let tomatoContainer = '';
     if (prep.byoGyros.total < 10) {
-      doc.text(`[ ] ${prep.byoGyros.total} portions Diced Tomatoes (brown bowls) - 1 large serving spoon`, 50, yPos); yPos += 12;
-      doc.text(`[ ] ${prep.byoGyros.total} portions Sliced Red Onion (brown bowls) - 1 tong`, 50, yPos); yPos += 12;
-      doc.text(`[ ] ${prep.byoGyros.total} whole Pepperoncini (brown bowls) - 1 tong`, 50, yPos); yPos += 12;
+      tomatoContainer = '16oz deli container';
+    } else if (prep.byoGyros.total <= 20) {
+      tomatoContainer = 'brown Jayna bowl';
     } else {
-      doc.text(`[ ] ${prep.byoGyros.total} portions Diced Tomatoes (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) - 1 large serving spoon`, 50, yPos); yPos += 12;
-      doc.text(`[ ] ${prep.byoGyros.total} portions Sliced Red Onion (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) - 1 tong`, 50, yPos); yPos += 12;
-      doc.text(`[ ] ${prep.byoGyros.total} whole Pepperoncini (${formatPanCount(Math.ceil(prep.byoGyros.total / 10))}) - 1 tong`, 50, yPos); yPos += 12;
+      const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 30);
+      tomatoContainer = formatPanCount(tomatoHalfPans);
     }
+    doc.text(`[ ] ${prep.byoGyros.total} portions Diced Tomatoes (${tomatoContainer}) - 1 large serving spoon`, 50, yPos); yPos += 12;
 
+    // SLICED RED ONION LOGIC: 50 portions per half pan
+    // Below 20: 16oz deli container
+    // 20-45: Brown Jayna bowl
+    // 46+: Calculate half pans (50 portions per half pan)
+    let onionContainer = '';
+    if (prep.byoGyros.total < 20) {
+      onionContainer = '16oz deli container';
+    } else if (prep.byoGyros.total <= 45) {
+      onionContainer = 'brown Jayna bowl';
+    } else {
+      const onionHalfPans = Math.ceil(prep.byoGyros.total / 50);
+      onionContainer = formatPanCount(onionHalfPans);
+    }
+    doc.text(`[ ] ${prep.byoGyros.total} portions Sliced Red Onion (${onionContainer}) - 1 tong`, 50, yPos); yPos += 12;
+
+    // PEPPERONCINI LOGIC: 100 portions per half pan
+    // Below 10: 16oz deli container
+    // 10-20: 32oz deli container
+    // 21-99: Half pan
+    // 100+: Full pan(s) + half pan if remainder
+    let pepperonciniContainer = '';
+    if (prep.byoGyros.total < 10) {
+      pepperonciniContainer = '16oz deli container';
+    } else if (prep.byoGyros.total <= 20) {
+      pepperonciniContainer = '32oz deli container';
+    } else if (prep.byoGyros.total < 100) {
+      pepperonciniContainer = '1 half pan';
+    } else {
+      const pepperFullPans = Math.floor(prep.byoGyros.total / 100);
+      const pepperRemainder = prep.byoGyros.total % 100;
+      if (pepperRemainder > 0) {
+        pepperonciniContainer = `${pepperFullPans} full pan${pepperFullPans > 1 ? 's' : ''} + 1 half pan`;
+      } else {
+        pepperonciniContainer = `${pepperFullPans} full pan${pepperFullPans > 1 ? 's' : ''}`;
+      }
+    }
+    doc.text(`[ ] ${prep.byoGyros.total} whole Pepperoncini (${pepperonciniContainer}) - 1 tong`, 50, yPos); yPos += 12;
+
+    // PITA LOGIC: 25 whole pita fit in one FULL pan
     const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
-    doc.text(`[ ] ${pitasNeeded} whole Grilled Pita (${formatPanCount(1)}) - 1 tong`, 50, yPos); yPos += 18;
+    const pitaFullPans = Math.ceil(pitasNeeded / 25);
+    doc.text(`[ ] ${pitasNeeded} whole Grilled Pita (${pitaFullPans} full pan${pitaFullPans > 1 ? 's' : ''}) - 1 tong`, 50, yPos); yPos += 18;
   }
 
   // SALADS
@@ -761,9 +805,10 @@ function generatePrepListPDF(prep, order, lineItems) {
         const regularPitaHalfPans = dip.qty; // 1 half pan per dip (6 pitas sliced)
         doc.text(`    - ${dip.qty * 6} pitas sliced 8 pieces (${formatPanCount(regularPitaHalfPans)}) - 1 tong`, 56, yPos); yPos += 11;
       }
-      if (hasGFPita && gfPitaMod) {
-        const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
-        // Assume each GF pita needs roughly same pan space as regular (1 half pan per 6 pitas)
+      if (hasGFPita && gfPitaMod && gfPitaMod.gfPitaQty) {
+        // GF pita is an ADDON - only prep exactly what customer paid for (no defaults!)
+        // $2 per GF pita, parsed from modifier price
+        const gfQty = gfPitaMod.gfPitaQty;
         const gfPitaHalfPans = Math.ceil(gfQty / 6);
         doc.text(`    - ${gfQty} GF pitas sliced 8 pieces (${formatPanCount(gfPitaHalfPans)}) - 1 tong`, 56, yPos); yPos += 11;
       }
