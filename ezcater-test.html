@@ -158,6 +158,30 @@
         🔔 SETUP WEBHOOKS
       </button>
 
+      <div style="margin-top: 30px; padding: 20px; background: var(--gray-100); border: 2px solid var(--gray-300);">
+        <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">
+          IMPORT EXISTING ORDER
+        </h3>
+        <p style="margin: 0 0 12px 0; font-size: 13px; color: var(--gray-600);">
+          Import an order that was placed before webhook setup:
+        </p>
+        <div style="display: flex; gap: 12px; align-items: flex-end;">
+          <div style="flex: 1;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700);">
+              ORDER UUID (from ezCater)
+            </label>
+            <input
+              id="orderUuidInput"
+              type="text"
+              placeholder="e.g., 550e8400-e29b-41d4-a716-446655440000"
+              style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 13px; box-sizing: border-box;">
+          </div>
+          <button onclick="importOrder()">
+            📥 IMPORT ORDER
+          </button>
+        </div>
+      </div>
+
       <div id="loading" class="loading">
         Loading ezCater data...
       </div>
@@ -174,6 +198,69 @@
   </div>
 
   <script>
+    async function importOrder() {
+      const orderUuid = document.getElementById('orderUuidInput').value.trim();
+      const loading = document.getElementById('loading');
+      const status = document.getElementById('status');
+      const results = document.getElementById('results');
+      const jsonOutput = document.getElementById('jsonOutput');
+
+      if (!orderUuid) {
+        status.className = 'status error';
+        status.textContent = '❌ Please enter an order UUID';
+        return;
+      }
+
+      loading.classList.add('active');
+      status.className = 'status';
+      status.style.display = 'none';
+      results.style.display = 'none';
+
+      try {
+        console.log('📥 Importing order:', orderUuid);
+
+        const response = await fetch('/api/ezcater-import-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            orderUuid: orderUuid
+          })
+        });
+
+        const data = await response.json();
+
+        console.log('Response:', data);
+
+        results.style.display = 'block';
+        jsonOutput.textContent = JSON.stringify(data, null, 2);
+
+        if (data.success) {
+          status.className = 'status success';
+          status.textContent = `✅ Order imported! ${data.orderNumber} - ${data.customerName}`;
+          document.getElementById('orderUuidInput').value = '';
+        } else {
+          status.className = 'status error';
+          status.textContent = `❌ Error: ${data.error || 'Unknown error'}`;
+        }
+
+      } catch (error) {
+        console.error('Import error:', error);
+
+        status.className = 'status error';
+        status.textContent = `❌ Request failed: ${error.message}`;
+
+        results.style.display = 'block';
+        jsonOutput.textContent = JSON.stringify({
+          error: error.message,
+          stack: error.stack
+        }, null, 2);
+      } finally {
+        loading.classList.remove('active');
+      }
+    }
+
     async function subscribeWebhooks() {
       const loading = document.getElementById('loading');
       const status = document.getElementById('status');
