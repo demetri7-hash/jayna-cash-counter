@@ -2955,6 +2955,123 @@
     }
 
     /**
+     * Map old label names to new ALL CAPS names
+     * Based on user-provided mapping in LABEL_NAME_MAPPING.xlsx
+     */
+    function getLabelName(currentName, context = {}) {
+      // Name mapping dictionary
+      const nameMap = {
+        // BYO GYROS
+        'Tzatziki Sauce': 'TZATZIKI',
+        'Spicy Aioli Sauce': 'SPICY AIOLI',
+        'Lemon Vinaigrette': 'LEMON VINAIGRETTE',
+        'Mixed Greens': 'MIXED GREENS',
+        'Diced Tomatoes': 'DICED TOMATOES',
+        'Sliced Red Onion': 'RED ONIONS',
+        'Whole Pepperoncini': 'PEPPERONCINI',
+        'Grilled Pita Bread': 'GRILLED PITA',
+
+        // SALADS
+        'Jayna House Salad': 'JAYNA HOUSE SALAD',
+        'Greek Salad': 'GREEK SALAD',
+        'Mediterranean Chopped Salad': 'MEDITERRANEAN CHOPPED SALAD',
+
+        // DIPS
+        'Hummus': 'HUMMUS',
+        'Tzatziki': 'TZATZIKI',
+        'Baba Ganoush': 'BABA GANOUSH',
+
+        // GREEK FRIES BAR
+        'Greek Fries + Protein': 'GREEK FRIES + PROTEIN', // Will be replaced dynamically
+
+        // SIDES
+        'Greek Fries (side)': 'GREEK FRIES',
+        'Rice Pilaf': 'RICE WITH CHICKPEAS',
+
+        // DESSERTS
+        'WALNUT Baklava': 'WALNUT BAKLAVA',
+        'Walnut Baklava': 'WALNUT BAKLAVA',
+        'PISTACHIO Baklava': 'PISTACHIO BAKLAVA',
+        'Pistachio Baklava': 'PISTACHIO BAKLAVA',
+        'BAKLAVA CHOCOLATE': 'CHOCOLATE BAKLAVA',
+        'Chocolate Baklava': 'CHOCOLATE BAKLAVA',
+        'Baklava': 'BAKLAVA', // Generic fallback
+
+        // PINWHEELS
+        'Chicken Pinwheels': 'CHICKEN GYRO PINWHEELS',
+        'BEEF & LAMB PINWHEELS': 'BEEF & LAMB GYRO PINWHEELS',
+        'Beef & Lamb Pinwheels': 'BEEF & LAMB GYRO PINWHEELS'
+      };
+
+      // Handle salad dressings: "Salad Name - Lemon Vinaigrette" → "LEMON VINAIGRETTE (SALAD NAME)"
+      if (currentName.includes(' - Lemon Vinaigrette')) {
+        const saladName = currentName.replace(' - Lemon Vinaigrette', '');
+        const mappedSaladName = getLabelName(saladName, context);
+
+        // Shorten salad names for dressing labels
+        const shortName = mappedSaladName
+          .replace('JAYNA HOUSE SALAD', 'HOUSE SALAD')
+          .replace('MEDITERRANEAN CHOPPED SALAD', 'MED CHOP SALAD');
+
+        return `LEMON VINAIGRETTE (${shortName})`;
+      }
+
+      // Handle dip sides
+      if (currentName.includes(' - Veggie Sticks (Carrots)')) {
+        return 'VEGGIE STICKS (CARROTS)';
+      }
+      if (currentName.includes(' - Veggie Sticks (Celery)')) {
+        return 'VEGGIE STICKS (CELERY)';
+      }
+      if (currentName.includes(' - Sliced Pita Bread')) {
+        const dipName = currentName.split(' - ')[0];
+        const mappedDipName = getLabelName(dipName, context);
+        return `SLICED PITA - ${mappedDipName}`;
+      }
+      if (currentName.includes(' - GF Pita Bread')) {
+        return 'SLICED GF PITA';
+      }
+
+      // Handle Greek Fries Bar toppings
+      if (currentName === 'Greek Fries - Spicy Aioli') {
+        return 'SPICY AIOLI (GREEK FRIES BAR)';
+      }
+      if (currentName === 'Greek Fries - Tzatziki') {
+        return 'TZATZIKI (GREEK FRIES BAR)';
+      }
+      if (currentName === 'Greek Fries - Crumbled Feta') {
+        return 'CRUMBLED FETA (GREEK FRIES BAR)';
+      }
+
+      // Handle Dolmas
+      if (currentName.includes('Dolmas')) {
+        if (currentName.includes('Tzatziki')) {
+          return 'TZATZIKI (DOLMAS)';
+        }
+        return 'DOLMAS (1 DOZEN)';
+      }
+
+      // Handle Spanakopita
+      if (currentName.includes('Spanakopita')) {
+        if (currentName.includes('Tzatziki')) {
+          return 'TZATZIKI (SPANAKOPITA)';
+        }
+        if (currentName.includes('CUT IN HALF')) {
+          return 'SPANAKOPITA (CUT IN HALF)';
+        }
+        return 'SPANAKOPITA';
+      }
+
+      // Check name map
+      if (nameMap[currentName]) {
+        return nameMap[currentName];
+      }
+
+      // Fallback: Convert to uppercase
+      return currentName.toUpperCase();
+    }
+
+    /**
      * Generate label data from prep list
      * Each label includes: company header, menu item, quantity, pan number, date, customer info
      */
@@ -2992,16 +3109,16 @@
 
         // Sauce containers (16oz deli, 3 per set)
         for (let i = 1; i <= sets; i++) {
-          labels.push({ item: 'Tzatziki Sauce', qty: sets > 1 ? `16OZ DELI - ${i} OF ${sets}` : `16OZ DELI - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
-          labels.push({ item: 'Spicy Aioli Sauce', qty: sets > 1 ? `16OZ DELI - ${i} OF ${sets}` : `16OZ DELI - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
-          labels.push({ item: 'Lemon Vinaigrette', qty: sets > 1 ? `16OZ DELI - ${i} OF ${sets}` : `16OZ DELI - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: getLabelName('Tzatziki Sauce'), qty: sets > 1 ? `16OZ DELI - ${i} OF ${sets}` : `16OZ DELI - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: getLabelName('Spicy Aioli Sauce'), qty: sets > 1 ? `16OZ DELI - ${i} OF ${sets}` : `16OZ DELI - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: getLabelName('Lemon Vinaigrette'), qty: sets > 1 ? `16OZ DELI - ${i} OF ${sets}` : `16OZ DELI - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
         }
 
         // Mixed Greens (half pan per set, but label should indicate full pan usage)
         const greensHalfPans = sets;
         const greensFullPans = Math.ceil(sets / 2);
         for (let i = 1; i <= greensFullPans; i++) {
-          labels.push({ item: 'Mixed Greens', qty: greensFullPans > 1 ? `FULL PAN - ${i} OF ${greensFullPans}` : `FULL PAN - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: getLabelName('Mixed Greens'), qty: greensFullPans > 1 ? `FULL PAN - ${i} OF ${greensFullPans}` : `FULL PAN - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
         }
 
         // DICED TOMATOES - Calculate actual container type and count
@@ -3029,7 +3146,7 @@
         for (let i = 1; i <= tomatoContainerCount; i++) {
           const containerLabel = tomatoContainerType.toUpperCase();
           labels.push({
-            item: 'Diced Tomatoes',
+            item: getLabelName('Diced Tomatoes'),
             qty: tomatoContainerCount > 1 ? `${containerLabel} - ${i} OF ${tomatoContainerCount}` : `${containerLabel} - 1 OF 1`,
             pan: '',
             category: 'BYO Gyros',
@@ -3067,7 +3184,7 @@
         for (let i = 1; i <= onionContainerCount; i++) {
           const containerLabel = onionContainerType.toUpperCase();
           labels.push({
-            item: 'Sliced Red Onion',
+            item: getLabelName('Sliced Red Onion'),
             qty: onionContainerCount > 1 ? `${containerLabel} - ${i} OF ${onionContainerCount}` : `${containerLabel} - 1 OF 1`,
             pan: '',
             category: 'BYO Gyros',
@@ -3106,7 +3223,7 @@
           // Generate full pan labels
           for (let i = 1; i <= pepperFullPans; i++) {
             labels.push({
-              item: 'Whole Pepperoncini',
+              item: getLabelName('Whole Pepperoncini'),
               qty: pepperFullPans > 1 ? `FULL PAN - ${i} OF ${pepperFullPans}` : `FULL PAN - 1 OF 1`,
               pan: '',
               category: 'BYO Gyros',
@@ -3120,7 +3237,7 @@
           // Generate half pan label if remainder
           if (pepperRemainder > 0) {
             labels.push({
-              item: 'Whole Pepperoncini',
+              item: getLabelName('Whole Pepperoncini'),
               qty: `HALF PAN - 1 OF 1`,
               pan: '',
               category: 'BYO Gyros',
@@ -3139,7 +3256,7 @@
         for (let i = 1; i <= pepperonciniContainerCount; i++) {
           const containerLabel = pepperonciniContainerType.toUpperCase();
           labels.push({
-            item: 'Whole Pepperoncini',
+            item: getLabelName('Whole Pepperoncini'),
             qty: pepperonciniContainerCount > 1 ? `${containerLabel} - ${i} OF ${pepperonciniContainerCount}` : `${containerLabel} - 1 OF 1`,
             pan: '',
             category: 'BYO Gyros',
@@ -3158,7 +3275,7 @@
         // Generate pita labels (one per pan)
         for (let i = 1; i <= pitaFullPans; i++) {
           labels.push({
-            item: 'Grilled Pita Bread',
+            item: getLabelName('Grilled Pita Bread'),
             qty: pitaFullPans > 1 ? `FULL PAN - ${i} OF ${pitaFullPans}` : `FULL PAN - 1 OF 1`,
             pan: '',
             category: 'BYO Gyros',
@@ -3178,7 +3295,7 @@
         // Salad pans
         for (let i = 1; i <= saladHalfPans; i++) {
           labels.push({
-            item: salad.name,
+            item: getLabelName(salad.name),
             qty: saladHalfPans > 1 ? `HALF PAN - ${i} OF ${saladHalfPans}` : `HALF PAN - 1 OF 1`,
             pan: '',
             category: 'Salad',
@@ -3192,7 +3309,7 @@
         // Dressing containers (16oz deli, 1 per portion)
         for (let i = 1; i <= salad.qty; i++) {
           labels.push({
-            item: `${salad.name} - Lemon Vinaigrette`,
+            item: getLabelName(`${salad.name} - Lemon Vinaigrette`),
             qty: salad.qty > 1 ? `16OZ DELI - ${i} OF ${salad.qty}` : `16OZ DELI - 1 OF 1`,
             pan: '',
             category: 'Salad Dressing',
@@ -3209,7 +3326,7 @@
         // Dip containers (16oz deli, one per order)
         for (let i = 1; i <= dip.qty; i++) {
           labels.push({
-            item: dip.name,
+            item: getLabelName(dip.name),
             qty: dip.qty > 1 ? `16OZ DELI - ${i} OF ${dip.qty}` : `16OZ DELI - 1 OF 1`,
             pan: '',
             category: 'Dip',
@@ -3225,7 +3342,7 @@
         if (hasVeggies) {
           for (let i = 1; i <= dip.qty; i++) {
             labels.push({
-              item: `${dip.name} - Veggie Sticks (Carrots)`,
+              item: getLabelName(`${dip.name} - Veggie Sticks (Carrots)`),
               qty: `${24 * dip.qty} pieces`,
               pan: '',
               category: 'Dip Side',
@@ -3235,7 +3352,7 @@
               packDate
             });
             labels.push({
-              item: `${dip.name} - Veggie Sticks (Celery)`,
+              item: getLabelName(`${dip.name} - Veggie Sticks (Celery)`),
               qty: `${24 * dip.qty} pieces`,
               pan: '',
               category: 'Dip Side',
@@ -3252,7 +3369,7 @@
         if (hasPita) {
           for (let i = 1; i <= dip.qty; i++) {
             labels.push({
-              item: `${dip.name} - Sliced Pita Bread`,
+              item: getLabelName(`${dip.name} - Sliced Pita Bread`),
               qty: `${6 * dip.qty} pitas`,
               pan: '',
               category: 'Dip Side',
@@ -3270,7 +3387,7 @@
           const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
           for (let i = 1; i <= dip.qty; i++) {
             labels.push({
-              item: `${dip.name} - GF Pita Bread`,
+              item: getLabelName(`${dip.name} - GF Pita Bread`),
               qty: `${gfQty} GF pitas`,
               pan: '',
               category: 'Dip Side',
@@ -3285,37 +3402,52 @@
 
       // GREEK FRIES BAR
       prep.greekFries.forEach(fries => {
-        labels.push({ item: 'Greek Fries + Protein', qty: `${fries.qty} portions`, pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: 'Greek Fries - Spicy Aioli', qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: 'Greek Fries - Tzatziki', qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: 'Greek Fries - Crumbled Feta', qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        // Detect protein type from fries.name (e.g., "Greek Fries + Chicken Gyro" → "CHICKEN GYRO")
+        let itemName = 'GREEK FRIES + PROTEIN';
+        if (fries.name && fries.name.includes('+')) {
+          const protein = fries.name.split('+')[1].trim().toUpperCase();
+          itemName = `GREEK FRIES + ${protein}`;
+        }
+
+        labels.push({ item: itemName, qty: `${fries.qty} portions`, pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: getLabelName('Greek Fries - Spicy Aioli'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: getLabelName('Greek Fries - Tzatziki'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: getLabelName('Greek Fries - Crumbled Feta'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       // DOLMAS
       prep.dolmas.forEach(dolma => {
-        labels.push({ item: dolma.name, qty: `${dolma.qty} portions`, pan: '', category: 'Dolmas', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: `${dolma.name} - Tzatziki Sauce`, qty: `${dolma.qty} portions`, pan: '', category: 'Dolmas', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: getLabelName(dolma.name), qty: `${dolma.qty} portions`, pan: '', category: 'Dolmas', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: getLabelName(`${dolma.name} - Tzatziki Sauce`), qty: `${dolma.qty} portions`, pan: '', category: 'Dolmas', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       // SPANAKOPITA
       prep.spanakopita.forEach(span => {
-        labels.push({ item: span.name, qty: `${span.qty} portions`, pan: '', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: `${span.name} - Tzatziki Sauce`, qty: `${span.qty} portions`, pan: '', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: getLabelName(span.name), qty: `${span.qty} portions`, pan: '', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: getLabelName(`${span.name} - Tzatziki Sauce`), qty: `${span.qty} portions`, pan: '', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       // SIDES
       prep.sides.forEach(side => {
-        labels.push({ item: side.name, qty: `${side.qty} portions`, pan: '', category: 'Side', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: getLabelName(side.name), qty: `${side.qty} portions`, pan: '', category: 'Side', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       // DESSERTS
       prep.desserts.forEach(dessert => {
-        labels.push({ item: dessert.name, qty: `${dessert.qty} pieces`, pan: '', category: 'Dessert', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: getLabelName(dessert.name), qty: `${dessert.qty} pieces`, pan: '', category: 'Dessert', orderNum, customerLastName, phoneNumber, packDate });
       });
 
       // PINWHEELS
       prep.pinwheels.forEach(pinwheel => {
-        labels.push({ item: pinwheel.name, qty: `${pinwheel.qty} portions`, pan: '', category: 'Pinwheel', orderNum, customerLastName, phoneNumber, packDate });
+        labels.push({ item: getLabelName(pinwheel.name), qty: `${pinwheel.qty} portions`, pan: '', category: 'Pinwheel', orderNum, customerLastName, phoneNumber, packDate });
+      });
+
+      // SORT LABELS ALPHABETICALLY BY ITEM NAME
+      // This groups all labels for the same item together for batch printing
+      labels.sort((a, b) => {
+        const itemA = (a.item || '').toString().toUpperCase();
+        const itemB = (b.item || '').toString().toUpperCase();
+        return itemA.localeCompare(itemB);
       });
 
       return labels;
@@ -4642,7 +4774,7 @@
 
         // All veggie labels
         byoGyroLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'Diced Tomatoes', qty: prep.byoGyros.total, category: 'BYO Gyros - Veggies' });
-        byoGyroLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'Sliced Red Onion', qty: prep.byoGyros.total, category: 'BYO Gyros - Veggies' });
+        byoGyroLabels.push({ orderNum, customer, date, container: '½ Pan', item: getLabelName('Sliced Red Onion'), qty: prep.byoGyros.total, category: 'BYO Gyros - Veggies' });
         byoGyroLabels.push({ orderNum, customer, date, container: '½ Pan', item: 'Pepperoncini', qty: prep.byoGyros.total, category: 'BYO Gyros - Veggies' });
 
         // All pita labels
@@ -4652,7 +4784,7 @@
       // Salads - All salad labels first, then all dressing labels
       prep.salads.forEach(salad => {
         const panType = salad.qty < 4 ? '½ Pan' : 'Full Pan';
-        saladLabels.push({ orderNum, customer, date, container: panType, item: salad.name, qty: salad.qty, category: 'Salad' });
+        saladLabels.push({ orderNum, customer, date, container: panType, item: getLabelName(salad.name), qty: salad.qty, category: 'Salad' });
       });
 
       prep.salads.forEach(salad => {
@@ -4661,7 +4793,7 @@
 
       // Dips - All dip labels first, then all side labels (veggies/pitas)
       prep.dips.forEach(dip => {
-        dipLabels.push({ orderNum, customer, date, container: '16oz Deli', item: dip.name, qty: dip.qty, category: 'Dip' });
+        dipLabels.push({ orderNum, customer, date, container: '16oz Deli', item: getLabelName(dip.name), qty: dip.qty, category: 'Dip' });
       });
 
       prep.dips.forEach(dip => {
@@ -4692,29 +4824,29 @@
 
       // Dolmas
       prep.dolmas.forEach(dolma => {
-        dolmaLabels.push({ orderNum, customer, date, container: '½ Pan', item: dolma.name, qty: dolma.qty, category: 'Dolmas' });
+        dolmaLabels.push({ orderNum, customer, date, container: '½ Pan', item: getLabelName(dolma.name), qty: dolma.qty, category: 'Dolmas' });
         dolmaLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (dill stripe)', qty: dolma.qty, category: 'Dolmas - Sauce' });
       });
 
       // Spanakopita
       prep.spanakopita.forEach(span => {
-        spanakopitaLabels.push({ orderNum, customer, date, container: '½ Pan', item: span.name, qty: span.qty, category: 'Spanakopita' });
+        spanakopitaLabels.push({ orderNum, customer, date, container: '½ Pan', item: getLabelName(span.name), qty: span.qty, category: 'Spanakopita' });
         spanakopitaLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (dill stripe)', qty: span.qty, category: 'Spanakopita - Sauce' });
       });
 
       // Sides
       prep.sides.forEach(side => {
-        sideLabels.push({ orderNum, customer, date, container: '½ Pan', item: side.name, qty: side.qty, category: 'Side' });
+        sideLabels.push({ orderNum, customer, date, container: '½ Pan', item: getLabelName(side.name), qty: side.qty, category: 'Side' });
       });
 
       // Desserts
       prep.desserts.forEach(dessert => {
-        dessertLabels.push({ orderNum, customer, date, container: 'Container', item: dessert.name, qty: dessert.qty, category: 'Dessert' });
+        dessertLabels.push({ orderNum, customer, date, container: 'Container', item: getLabelName(dessert.name), qty: dessert.qty, category: 'Dessert' });
       });
 
       // Pinwheels
       prep.pinwheels.forEach(pinwheel => {
-        pinwheelLabels.push({ orderNum, customer, date, container: 'Platter', item: pinwheel.name, qty: pinwheel.qty, category: 'Pinwheel' });
+        pinwheelLabels.push({ orderNum, customer, date, container: 'Platter', item: getLabelName(pinwheel.name), qty: pinwheel.qty, category: 'Pinwheel' });
       });
 
       // Concatenate all labels in logical category order
