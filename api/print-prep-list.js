@@ -114,8 +114,16 @@ export default async function handler(req, res) {
       throw new Error('Failed to fetch order line items');
     }
 
+    // DEBUG: Log what we fetched
+    console.log('🔍 FETCHED LINE ITEMS:', JSON.stringify(lineItems, null, 2));
+    console.log('🔢 Total line items fetched:', lineItems?.length || 0);
+
     // Calculate prep list
     const prep = calculatePrepList(lineItems || [], order);
+
+    // DEBUG: Log what was calculated
+    console.log('📋 CALCULATED PREP - BYO Items:', JSON.stringify(prep.byoGyros.items, null, 2));
+    console.log('📋 CALCULATED PREP - Desserts:', JSON.stringify(prep.desserts, null, 2));
 
     // Generate PDF prep list
     const pdfBase64 = generatePrepListPDF(prep, order, lineItems || []);
