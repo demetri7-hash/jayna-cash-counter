@@ -421,6 +421,29 @@
       line-height: 1;
     }
 
+    .modal-edit-icon {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .modal-edit-icon:hover {
+      background: var(--gray-200);
+    }
+
+    .modal-edit-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--gray-700);
+    }
+
     .modal-actions {
       display: flex;
       gap: 12px;
@@ -632,7 +655,14 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2 style="margin: 0;">RECEIPT DETAILS</h2>
-        <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="modal-edit-icon" id="modalEditBtn" onclick="enableEditing()" title="Edit Receipt">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+            </svg>
+          </button>
+          <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+        </div>
       </div>
 
       <div id="detailContent"></div>
@@ -1234,6 +1264,10 @@
                 `<option value="${opt.value}" ${opt.value === receipt.category ? 'selected' : ''}>${opt.textContent}</option>`
               ).join('')}
             </select>
+            <div id="editNewCategoryContainer" style="margin-top: 12px; display: none;">
+              <input type="text" id="editNewCategory" placeholder="Enter new category" style="margin-bottom: 8px; text-transform: uppercase; width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px;">
+              <button class="btn btn-secondary" onclick="addNewCategoryFromEdit()" style="width: 100%;">ADD CATEGORY</button>
+            </div>
           </div>
           <div class="form-group">
             <label>DETAILS</label>
@@ -1282,6 +1316,34 @@
 
       content.innerHTML = html;
 
+      // If editable, setup category dropdown handler
+      if (editable) {
+        const editCategorySelect = document.getElementById('editCategory');
+        const editNewCategoryContainer = document.getElementById('editNewCategoryContainer');
+        const editNewCategoryInput = document.getElementById('editNewCategory');
+
+        editCategorySelect.addEventListener('change', () => {
+          if (editCategorySelect.value === 'ADD_NEW') {
+            editNewCategoryContainer.style.display = 'block';
+            editNewCategoryInput.focus();
+          } else {
+            editNewCategoryContainer.style.display = 'none';
+            editNewCategoryInput.value = '';
+          }
+        });
+
+        // Auto-uppercase input
+        editNewCategoryInput.addEventListener('input', (e) => {
+          e.target.value = e.target.value.toUpperCase();
+        });
+      }
+
+      // Show/hide edit icon button based on mode
+      const editIconBtn = document.getElementById('modalEditBtn');
+      if (editIconBtn) {
+        editIconBtn.style.display = editable ? 'none' : 'flex';
+      }
+
       // Update actions
       const actions = document.getElementById('detailModalActions');
       if (editable) {
@@ -1293,7 +1355,6 @@
       } else {
         actions.innerHTML = `
           <button class="btn btn-secondary" onclick="closeDetailModal()">CLOSE</button>
-          <button class="btn btn-primary" onclick="enableEditing()">EDIT</button>
         `;
       }
     }
@@ -1330,11 +1391,69 @@
       displayReceiptDetails(currentReceipt, true);
     }
 
+    // Add new category from edit modal
+    async function addNewCategoryFromEdit() {
+      const input = document.getElementById('editNewCategory');
+      const name = input.value.trim().toUpperCase();
+
+      if (!name) {
+        alert('Please enter a category name');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('amex_categories')
+        .insert({ name })
+        .select();
+
+      if (error && !error.message.includes('duplicate')) {
+        alert('Error adding category: ' + error.message);
+        return;
+      }
+
+      input.value = '';
+      document.getElementById('editNewCategoryContainer').style.display = 'none';
+      await loadCategories();
+      document.getElementById('editCategory').value = name;
+      console.log(`Added category from edit: ${name}`);
+    }
+
     async function saveEdit() {
       const date = document.getElementById('editDate').value;
       const amount = parseFloat(document.getElementById('editAmount').value);
-      const category = document.getElementById('editCategory').value;
+      let category = document.getElementById('editCategory').value;
       const details = document.getElementById('editDetails').value.trim();
+
+      // CRITICAL FIX: Same as saveReceipt - handle ADD_NEW category
+      if (category === 'ADD_NEW') {
+        const editNewCategoryInput = document.getElementById('editNewCategory');
+        const newCategoryName = editNewCategoryInput.value.trim().toUpperCase();
+
+        if (!newCategoryName) {
+          alert('Please enter a category name or select an existing category');
+          editNewCategoryInput.focus();
+          return;
+        }
+
+        // Create the new category automatically
+        const { data: categoryData, error: categoryError } = await supabase
+          .from('amex_categories')
+          .insert({ name: newCategoryName })
+          .select();
+
+        if (categoryError && !categoryError.message.includes('duplicate')) {
+          alert('Error creating category: ' + categoryError.message);
+          return;
+        }
+
+        // Update category variable to the new category name
+        category = newCategoryName;
+
+        // Reload categories
+        await loadCategories();
+
+        console.log(`Auto-created category from edit: ${newCategoryName}`);
+      }
 
       const { error } = await supabase
         .from('amex_receipts')
