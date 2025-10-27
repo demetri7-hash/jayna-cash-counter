@@ -1704,6 +1704,248 @@
     };
   }
 
+  /**
+   * DYNAMIC Role-Based Password Protection
+   * Checks user's role against feature's required role from database
+   */
+  async function requirePasswordForFeature(featureId, featureName, callback) {
+    // Check if manager session is still valid
+    if (isManagerSessionValid()) {
+      const userRole = localStorage.getItem('manager_role') || 'Editor';
+
+      // Check if user has required access level for this feature
+      const hasAccess = await checkFeatureAccess(featureId, userRole);
+
+      if (hasAccess) {
+        const remainingMinutes = getRemainingSessionMinutes();
+        console.log(`✓ ${userRole} session valid (${remainingMinutes} min remaining) - Access granted to ${featureId}`);
+        callback();
+        return;
+      } else {
+        // Session valid but insufficient role
+        showMessage(`❌ Access Denied: ${featureName} requires a higher access level than your current ${userRole} role.`, 'error');
+        return;
+      }
+    }
+
+    // No valid session - show password modal
+    showPasswordModalForFeature(featureId, featureName, callback);
+  }
+
+  /**
+   * Show password modal with dynamic role checking
+   */
+  function showPasswordModalForFeature(featureId, featureName, callback) {
+    // Create password modal overlay
+    const modal = document.createElement('div');
+    modal.id = 'passwordModal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      padding: 20px;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+      background: white;
+      padding: 32px;
+      max-width: 450px;
+      width: 100%;
+      border: 3px solid var(--gray-700);
+      border-radius: 0;
+    `;
+
+    modalContent.innerHTML = `
+      <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #d32f2f; text-transform: uppercase; letter-spacing: 1px;">
+        🔒 PASSWORD REQUIRED
+      </h3>
+      <p style="margin: 0 0 20px 0; font-size: 14px; color: var(--gray-700); line-height: 1.6;">
+        <strong>${featureName}</strong> requires manager authorization.
+        <br><br>
+        Enter your password to verify access:
+      </p>
+      <input
+        type="password"
+        id="passwordInput"
+        placeholder="Enter your password"
+        style="
+          width: 100%;
+          padding: 14px;
+          border: 2px solid var(--gray-300);
+          border-radius: 0;
+          font-size: 16px;
+          margin-bottom: 20px;
+          box-sizing: border-box;
+        "
+      />
+      <div style="display: flex; gap: 12px;">
+        <button
+          id="passwordCancelBtn"
+          style="
+            flex: 1;
+            padding: 14px 24px;
+            background: var(--gray-100);
+            color: var(--gray-900);
+            border: 2px solid var(--gray-300);
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+        >CANCEL</button>
+        <button
+          id="passwordSubmitBtn"
+          style="
+            flex: 1;
+            padding: 14px 24px;
+            background: var(--gray-900);
+            color: white;
+            border: 2px solid var(--gray-900);
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+        >ACCESS</button>
+      </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    const passwordInput = document.getElementById('passwordInput');
+    const submitBtn = document.getElementById('passwordSubmitBtn');
+    const cancelBtn = document.getElementById('passwordCancelBtn');
+
+    // Focus password input
+    setTimeout(() => passwordInput.focus(), 100);
+
+    // Handle submit with dynamic role checking
+    const handleSubmit = async () => {
+      const enteredPassword = passwordInput.value;
+
+      // 1. Get master password from Supabase
+      let masterPassword = ADMIN_PASSWORD;
+      try {
+        const { data: masterPwdData } = await supabase
+          .from('manager_passwords')
+          .select('*')
+          .eq('username', 'SYSTEM_MASTER_PASSWORD')
+          .eq('is_active', true)
+          .limit(1)
+          .single();
+
+        if (masterPwdData && masterPwdData.full_name) {
+          masterPassword = masterPwdData.full_name;
+        }
+      } catch (error) {
+        console.log('Using default master password');
+      }
+
+      // 2. Check if entered password is master password
+      if (enteredPassword === masterPassword) {
+        // Master password always grants access
+        setManagerSession();
+        localStorage.setItem('manager_role', 'Master');
+        localStorage.setItem('manager_username', 'Master');
+        document.body.removeChild(modal);
+        showMessage('✅ Master session active (60 minutes) - Full System Access', 'success');
+        callback();
+        return;
+      }
+
+      // 3. Check against database passwords
+      try {
+        const passwordHash = simpleHash(enteredPassword);
+
+        const { data: passwords, error } = await supabase
+          .from('manager_passwords')
+          .select('*')
+          .eq('password_hash', passwordHash)
+          .eq('is_active', true)
+          .limit(1);
+
+        if (error) {
+          console.error('Error checking password:', error);
+        }
+
+        if (passwords && passwords.length > 0) {
+          const user = passwords[0];
+          const userRole = user.role || 'Editor';
+
+          // Check if user has required role for this feature
+          const hasAccess = await checkFeatureAccess(featureId, userRole);
+
+          if (!hasAccess) {
+            // Valid password but insufficient role
+            showMessage(`❌ Access Denied: Your ${userRole} role cannot access ${featureName}. Contact an administrator.`, 'error');
+            passwordInput.value = '';
+            passwordInput.focus();
+            return;
+          }
+
+          // Access granted!
+          setManagerSession();
+          localStorage.setItem('manager_role', userRole);
+          localStorage.setItem('manager_username', user.username);
+          document.body.removeChild(modal);
+
+          const roleEmoji = {
+            'Master': '🔴',
+            'Admin': '🟠',
+            'Manager': '🟡',
+            'Editor': '🟢'
+          }[userRole] || '🔵';
+
+          showMessage(`✅ ${roleEmoji} ${userRole} session active (60 minutes) - ${user.username}`, 'success');
+          callback();
+          return;
+        }
+
+        // No match found
+        showMessage('❌ Incorrect password. Please try again.', 'error');
+        passwordInput.value = '';
+        passwordInput.focus();
+
+      } catch (error) {
+        console.error('Error verifying password:', error);
+        showMessage('Error verifying password. Please try again.', 'error');
+      }
+    };
+
+    const handleCancel = () => {
+      document.body.removeChild(modal);
+    };
+
+    submitBtn.onclick = handleSubmit;
+    cancelBtn.onclick = handleCancel;
+    passwordInput.onkeypress = (e) => {
+      if (e.key === 'Enter') {
+        handleSubmit();
+      }
+    };
+
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        handleCancel();
+      }
+    };
+  }
+
   // Pacific time helpers
   function getPacificHour(date) {
     const pacificTime = new Date(date.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
@@ -7509,14 +7751,38 @@
                         ${pwd.full_name}
                       </p>
                     ` : ''}
-                    <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--gray-500);">
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--gray-500); align-items: center;">
                       <span>📅 Created ${formatPacificDateDisplay(new Date(pwd.created_at), {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric'
                       })}</span>
                       ${pwd.created_by ? `<span>👤 by ${pwd.created_by}</span>` : ''}
-                      ${pwd.role ? `<span>🎭 Role: ${pwd.role}</span>` : ''}
+                      ${pwd.role ? `
+                        <span style="
+                          display: inline-block;
+                          padding: 3px 8px;
+                          background: ${
+                            pwd.role === 'Master' ? '#dc2626' :
+                            pwd.role === 'Admin' ? '#f59e0b' :
+                            pwd.role === 'Manager' ? '#0891b2' :
+                            '#10b981'
+                          };
+                          color: white;
+                          border-radius: 0;
+                          font-size: 10px;
+                          font-weight: 700;
+                          text-transform: uppercase;
+                          letter-spacing: 0.5px;
+                        ">
+                          ${
+                            pwd.role === 'Master' ? '🔴 MASTER (L4)' :
+                            pwd.role === 'Admin' ? '🟠 ADMIN (L3)' :
+                            pwd.role === 'Manager' ? '🟡 MANAGER (L2)' :
+                            '🟢 EDITOR (L1)'
+                          }
+                        </span>
+                      ` : ''}
                     </div>
                   </div>
                   <div>
@@ -7718,7 +7984,7 @@
 
           <div style="margin-bottom: 20px;">
             <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
-              Role *
+              Role (Access Level) *
             </label>
             <select
               id="new_role"
@@ -7728,16 +7994,18 @@
                 border: 2px solid var(--gray-300);
                 border-radius: 0;
                 font-size: 14px;
+                font-weight: 600;
                 box-sizing: border-box;
               "
             >
               <option value="">Select role...</option>
-              <option value="Admin">Admin (Full Access - All Password-Protected Areas)</option>
-              <option value="Manager">Manager (Checklist Editing Only - FOH & BOH)</option>
-              <option value="User">User (Checklist Editing Only - FOH & BOH)</option>
+              <option value="Master">🔴 Master (Level 4) - Full System Access</option>
+              <option value="Admin">🟠 Admin (Level 3) - High-Level Features</option>
+              <option value="Manager">🟡 Manager (Level 2) - Operational Features</option>
+              <option value="Editor">🟢 Editor (Level 1) - Basic Features Only</option>
             </select>
-            <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--gray-500);">
-              Admin = Full access to all areas. Manager/User = Only checklist editing permissions.
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--gray-500); line-height: 1.6;">
+              Higher roles have access to ALL lower-level features. Access levels are configured in the Access Control tab.
             </p>
           </div>
 
