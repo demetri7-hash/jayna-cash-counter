@@ -1080,11 +1080,13 @@
     // ============================================
     // LOAD ORDERS FROM DATABASE (FAST - DEFAULT)
     // ============================================
-    async function loadOrdersFromDatabase() {
+    async function loadOrdersFromDatabase(showLoadingSpinner = true) {
       const container = document.getElementById('upcomingContent');
 
       try {
-        showLoading('LOADING ORDERS', 'Loading catering orders from database...');
+        if (showLoadingSpinner) {
+          showLoading('LOADING ORDERS', 'Loading catering orders from database...');
+        }
 
         // Calculate date range (today + 14 days)
         const today = new Date();
@@ -1110,11 +1112,13 @@
         console.log(`✅ Found ${data.data.totalOrders} orders in database`);
 
         // Display orders (hideLoading called in displayUpcomingOrders after render)
-        displayUpcomingOrders(data.data.orders || []);
+        displayUpcomingOrders(data.data.orders || [], showLoadingSpinner);
 
       } catch (error) {
         console.error('Error loading orders:', error);
-        hideLoading();
+        if (showLoadingSpinner) {
+          hideLoading();
+        }
         container.innerHTML = `
           <div class="error-message">
             ❌ Error loading orders from database: ${error.message}
@@ -1232,7 +1236,7 @@
     // ============================================
     // DISPLAY UPCOMING ORDERS
     // ============================================
-    function displayUpcomingOrders(orders) {
+    function displayUpcomingOrders(orders, showLoadingSpinner = true) {
       const container = document.getElementById('upcomingContent');
 
       if (!orders || orders.length === 0) {
@@ -1247,7 +1251,9 @@
             </p>
           </div>
         `;
-        hideLoading();
+        if (showLoadingSpinner) {
+          hideLoading();
+        }
         return;
       }
 
@@ -1286,7 +1292,9 @@
       });
 
       container.innerHTML = html;
-      hideLoading();
+      if (showLoadingSpinner) {
+        hideLoading();
+      }
     }
 
     // ============================================
@@ -4368,12 +4376,12 @@
     document.addEventListener('DOMContentLoaded', () => {
       console.log('🍽️ Jayna Catering Management System loaded');
 
-      // Load photos on Photos tab
+      // Load photos on Photos tab (shows loading spinner)
       loadPhotos();
 
-      // Load orders for Beta tab (but don't show loading state on Photos tab)
-      console.log('📂 Pre-loading orders for Beta tab...');
-      loadOrdersFromDatabase();
+      // Load orders for Beta tab in background (NO loading spinner - runs silently)
+      console.log('📂 Pre-loading orders for Beta tab in background...');
+      loadOrdersFromDatabase(false);
 
       // Load archived photos for Past tab
       loadArchivedPhotos();
