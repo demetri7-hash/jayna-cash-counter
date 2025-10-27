@@ -250,10 +250,12 @@ async function fetchOrderFromEZCater(orderId) {
  * Based on official EZCater API schema (October 2025)
  */
 function parseOrderData(order) {
-  // Extract timestamp and convert to date/time
-  const eventTimestamp = order.event?.timestamp ? new Date(order.event.timestamp) : null;
-  const deliveryDate = eventTimestamp ? eventTimestamp.toISOString().split('T')[0] : null;
-  const deliveryTime = eventTimestamp ? eventTimestamp.toISOString().split('T')[1].substring(0, 8) : null;
+  // Extract DELIVERY timestamp (catererHandoffFoodTime) - NOT order placement timestamp!
+  // Use catererHandoffFoodTime (actual delivery time) with fallback to timestamp (order placement)
+  const deliveryTimestamp = order.event?.catererHandoffFoodTime ? new Date(order.event.catererHandoffFoodTime) :
+                           (order.event?.timestamp ? new Date(order.event.timestamp) : null);
+  const deliveryDate = deliveryTimestamp ? deliveryTimestamp.toISOString().split('T')[0] : null;
+  const deliveryTime = deliveryTimestamp ? deliveryTimestamp.toISOString().split('T')[1].substring(0, 8) : null;
 
   // Extract customer info (orderCustomer in actual schema, not "customer")
   const customerName = order.orderCustomer?.fullName ||
