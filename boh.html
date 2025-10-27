@@ -8246,12 +8246,29 @@
     });
   }
 
-  function submitManagerPassword() {
+  async function submitManagerPassword() {
     const password = document.getElementById('passwordInput').value;
     const modal = document.getElementById('passwordModal');
 
-    // Check master password (custom or default)
-    const masterPassword = localStorage.getItem('masterPassword') || ADMIN_PASSWORD;
+    // Get master password from Supabase (cloud-based, works across ALL devices)
+    let masterPassword = ADMIN_PASSWORD;
+    try {
+      const { data: masterPwdData } = await supabase
+        .from('manager_passwords')
+        .select('*')
+        .eq('username', 'SYSTEM_MASTER_PASSWORD')
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      if (masterPwdData && masterPwdData.full_name) {
+        masterPassword = masterPwdData.full_name;
+      }
+    } catch (error) {
+      // No custom master password set, use default
+      console.log('Using default master password');
+    }
+
     const customPasswords = JSON.parse(localStorage.getItem('customPasswords') || '[]');
     const validPasswords = [masterPassword, ...customPasswords];
 

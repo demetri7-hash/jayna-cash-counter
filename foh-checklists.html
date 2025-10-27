@@ -1604,8 +1604,25 @@
     const handleSubmit = async () => {
       const enteredPassword = passwordInput.value;
 
-      // Check master password (custom or default)
-      const masterPassword = localStorage.getItem('masterPassword') || ADMIN_PASSWORD;
+      // Get master password from Supabase (cloud-based)
+      let masterPassword = ADMIN_PASSWORD;
+      try {
+        const { data: masterPwdData } = await supabase
+          .from('manager_passwords')
+          .select('*')
+          .eq('username', 'SYSTEM_MASTER_PASSWORD')
+          .eq('is_active', true)
+          .limit(1)
+          .single();
+
+        if (masterPwdData && masterPwdData.full_name) {
+          masterPassword = masterPwdData.full_name;
+        }
+      } catch (error) {
+        // No custom master password set, use default
+        console.log('Using default master password');
+      }
+
       if (enteredPassword === masterPassword) {
         setManagerSession(); // Set 60-minute session
         localStorage.setItem('manager_role', 'Admin'); // Store role as Admin
@@ -7311,9 +7328,27 @@
 
       hideLoading();
 
-      // Get current master password from localStorage or default
-      const currentMasterPassword = localStorage.getItem('masterPassword') || 'JaynaGyro2025!';
-      const masterPasswordStatus = localStorage.getItem('masterPassword') ? 'CUSTOM' : 'DEFAULT';
+      // Get current master password from Supabase or default
+      let currentMasterPassword = 'JaynaGyro2025!';
+      let masterPasswordStatus = 'DEFAULT';
+
+      try {
+        const { data: masterPwdData } = await supabase
+          .from('manager_passwords')
+          .select('*')
+          .eq('username', 'SYSTEM_MASTER_PASSWORD')
+          .eq('is_active', true)
+          .limit(1)
+          .single();
+
+        if (masterPwdData && masterPwdData.full_name) {
+          currentMasterPassword = masterPwdData.full_name; // Store actual password in full_name field
+          masterPasswordStatus = 'CUSTOM';
+        }
+      } catch (error) {
+        // No custom password set, use default
+        console.log('Using default master password');
+      }
 
       let html = `
         <div style="margin-bottom: 24px; padding: 20px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
@@ -8191,7 +8226,7 @@
   /**
    * Save Master Password
    */
-  function saveMasterPassword() {
+  async function saveMasterPassword() {
     const newPassword = document.getElementById('new_master_password').value;
     const confirmPassword = document.getElementById('confirm_master_password').value;
 
@@ -8214,17 +8249,66 @@
       return;
     }
 
-    // Save to localStorage
-    localStorage.setItem('masterPassword', newPassword);
-    localStorage.removeItem('managerSession'); // Force re-login
+    showLoading('Saving Master Password', 'Updating across all devices...');
 
-    hideChangeMasterPasswordForm();
-    showMessage('✅ Master password updated successfully! Old password no longer works.', 'success');
+    try {
+      const createdBy = localStorage.getItem('foh_username') || 'System';
 
-    // Reload password management to update status
-    setTimeout(() => {
-      loadPasswordManagement();
-    }, 1500);
+      // Check if SYSTEM_MASTER_PASSWORD already exists
+      const { data: existing } = await supabase
+        .from('manager_passwords')
+        .select('*')
+        .eq('username', 'SYSTEM_MASTER_PASSWORD')
+        .limit(1)
+        .single();
+
+      if (existing) {
+        // Update existing record
+        const { error } = await supabase
+          .from('manager_passwords')
+          .update({
+            full_name: newPassword, // Store actual password in full_name field
+            password_hash: simpleHash(newPassword), // Hash for consistency
+            is_active: true,
+            updated_by: createdBy,
+            updated_at: new Date().toISOString()
+          })
+          .eq('username', 'SYSTEM_MASTER_PASSWORD');
+
+        if (error) throw error;
+      } else {
+        // Create new record
+        const { error } = await supabase
+          .from('manager_passwords')
+          .insert([{
+            username: 'SYSTEM_MASTER_PASSWORD',
+            full_name: newPassword, // Store actual password in full_name field
+            password_hash: simpleHash(newPassword),
+            role: 'Admin',
+            is_active: true,
+            created_by: createdBy,
+            created_at: new Date().toISOString()
+          }]);
+
+        if (error) throw error;
+      }
+
+      localStorage.removeItem('managerSession'); // Force re-login on all devices
+
+      hideLoading();
+      hideChangeMasterPasswordForm();
+      showMessage('✅ Master password updated successfully! Works on ALL devices now. Old password no longer works.', 'success');
+
+      // Reload password management to update status
+      setTimeout(() => {
+        loadPasswordManagement();
+      }, 1500);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error saving master password:', error);
+      showMessage(`Error saving master password: ${error.message}`, 'error');
+    }
   }
 
   /**
@@ -8312,15 +8396,33 @@
     const confirmBtn = document.getElementById('resetPasswordConfirmBtn');
     const cancelBtn = document.getElementById('resetPasswordCancelBtn');
 
-    const handleConfirm = () => {
-      localStorage.removeItem('masterPassword');
-      localStorage.removeItem('managerSession'); // Force re-login
+    const handleConfirm = async () => {
       document.body.removeChild(modal);
-      showMessage('✅ Master password reset to default: JaynaGyro2025!', 'success');
+      showLoading('Resetting Password', 'Reverting to default across all devices...');
 
-      setTimeout(() => {
-        loadPasswordManagement();
-      }, 1500);
+      try {
+        // Delete SYSTEM_MASTER_PASSWORD record from Supabase
+        const { error } = await supabase
+          .from('manager_passwords')
+          .delete()
+          .eq('username', 'SYSTEM_MASTER_PASSWORD');
+
+        if (error) throw error;
+
+        localStorage.removeItem('managerSession'); // Force re-login
+
+        hideLoading();
+        showMessage('✅ Master password reset to default: JaynaGyro2025! Works on ALL devices now.', 'success');
+
+        setTimeout(() => {
+          loadPasswordManagement();
+        }, 1500);
+
+      } catch (error) {
+        hideLoading();
+        console.error('Error resetting master password:', error);
+        showMessage(`Error resetting master password: ${error.message}`, 'error');
+      }
     };
 
     const handleCancel = () => {
@@ -8756,12 +8858,29 @@
     });
   }
 
-  function submitManagerPassword() {
+  async function submitManagerPassword() {
     const password = document.getElementById('passwordInput').value;
     const modal = document.getElementById('passwordModal');
 
-    // Check master password (custom or default)
-    const masterPassword = localStorage.getItem('masterPassword') || ADMIN_PASSWORD;
+    // Get master password from Supabase (cloud-based)
+    let masterPassword = ADMIN_PASSWORD;
+    try {
+      const { data: masterPwdData } = await supabase
+        .from('manager_passwords')
+        .select('*')
+        .eq('username', 'SYSTEM_MASTER_PASSWORD')
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      if (masterPwdData && masterPwdData.full_name) {
+        masterPassword = masterPwdData.full_name;
+      }
+    } catch (error) {
+      // No custom master password set, use default
+      console.log('Using default master password');
+    }
+
     const customPasswords = JSON.parse(localStorage.getItem('customPasswords') || '[]');
     const validPasswords = [masterPassword, ...customPasswords];
 
