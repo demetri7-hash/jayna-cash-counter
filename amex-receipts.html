@@ -642,10 +642,8 @@
 
   <script src="shared-header.js"></script>
   <script>
-    // Initialize Supabase
-    const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Use Supabase from shared-header.js
+    let supabase;
 
     const ADMIN_PASSWORD = 'JaynaGyro2025!';
 
@@ -656,25 +654,28 @@
     let pageSize = 10;
     let allReceipts = [];
 
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-      initializeSharedHeader();
-      initializeFileUpload();
-      loadCategories();
-      loadReceipts();
-      setTodayDate();
-    });
+    // Toggle Add Receipt Form (MUST be global for onclick)
+    function toggleAddReceiptForm() {
+      const form = document.getElementById('addReceiptForm');
+      form.classList.toggle('open');
+    }
 
     function setTodayDate() {
       const today = new Date().toISOString().split('T')[0];
       document.getElementById('purchaseDate').value = today;
     }
 
-    // Toggle Add Receipt Form
-    function toggleAddReceiptForm() {
-      const form = document.getElementById('addReceiptForm');
-      form.classList.toggle('open');
-    }
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize Supabase from shared header
+      supabase = supabaseClient;
+
+      initializeSharedHeader();
+      initializeFileUpload();
+      loadCategories();
+      loadReceipts();
+      setTodayDate();
+    });
 
     // Tab Switching
     function switchTab(tab) {
