@@ -245,6 +245,24 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.text('RECEIPT DETAILS', 0.5, yPos);
   yPos += 0.25;
 
+  // Calculate how many pages the receipt list will take (estimate)
+  const receiptsPerPage = 25; // Conservative estimate
+  const listPages = Math.ceil(receipts.length / receiptsPerPage);
+
+  // Calculate where image pages will start (after list pages + current page)
+  const imagePageStart = doc.internal.getCurrentPageInfo().pageNumber + listPages;
+
+  // Track receipts with images and their future page numbers
+  const receiptImagePages = new Map();
+  let imagePageCounter = imagePageStart;
+
+  receipts.forEach(receipt => {
+    if (receipt.image_urls && receipt.image_urls.length > 0) {
+      receiptImagePages.set(receipt.id, imagePageCounter);
+      imagePageCounter += receipt.image_urls.length; // One page per image
+    }
+  });
+
   // Table header
   doc.setFillColor(66, 66, 66);
   doc.rect(0.5, yPos - 0.05, 7.5, 0.2, 'F');
@@ -255,7 +273,8 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.text('DATE', 0.6, yPos + 0.08);
   doc.text('AMOUNT', 1.8, yPos + 0.08);
   doc.text('CATEGORY', 2.8, yPos + 0.08);
-  doc.text('DETAILS', 4.5, yPos + 0.08);
+  doc.text('DETAILS', 4.2, yPos + 0.08);
+  doc.text('IMAGE', 7.3, yPos + 0.08);
 
   yPos += 0.25;
 
@@ -283,29 +302,84 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
 
     // Category (with wrapping)
     const categoryText = receipt.category || 'N/A';
-    const wrappedCategory = doc.splitTextToSize(categoryText, 1.5);
+    const wrappedCategory = doc.splitTextToSize(categoryText, 1.2);
     doc.text(wrappedCategory, 2.8, yPos + 0.08);
 
     // Details (with wrapping)
     const detailsText = receipt.details || 'N/A';
-    const wrappedDetails = doc.splitTextToSize(detailsText, 3.3);
-    doc.text(wrappedDetails.slice(0, 2), 4.5, yPos + 0.08); // Max 2 lines
+    const wrappedDetails = doc.splitTextToSize(detailsText, 2.8);
+    doc.text(wrappedDetails.slice(0, 2), 4.2, yPos + 0.08); // Max 2 lines
+
+    // Image page reference
+    if (receiptImagePages.has(receipt.id)) {
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(59, 130, 246); // Jayna blue
+      doc.setFontSize(8);
+      doc.text(`Pg ${receiptImagePages.get(receipt.id)}`, 7.3, yPos + 0.08);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(66, 66, 66);
+      doc.setFontSize(9);
+    }
 
     yPos += 0.3;
+  }
 
-    // Show thumbnail if images exist
+  // Add image appendix pages
+  for (const receipt of receipts) {
     if (receipt.image_urls && receipt.image_urls.length > 0) {
-      try {
-        // Fetch first image
-        const imageUrl = receipt.image_urls[0];
-        const imageResponse = await fetch(imageUrl);
-        const imageBuffer = await imageResponse.buffer();
-        const imageBase64 = imageBuffer.toString('base64');
+      for (const imageUrl of receipt.image_urls) {
+        try {
+          // Fetch image
+          const imageResponse = await fetch(imageUrl);
+          const imageBuffer = await imageResponse.buffer();
+          const imageBase64 = imageBuffer.toString('base64');
 
-        // Add small thumbnail
-        doc.addImage(`data:image/jpeg;base64,${imageBase64}`, 'JPEG', 6.8, yPos - 0.25, 0.4, 0.4);
-      } catch (err) {
-        console.warn('Could not load image for receipt:', receipt.id);
+          // Add new page for image
+          doc.addPage();
+
+          // Add header with receipt details
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(33, 33, 33);
+          doc.text('RECEIPT IMAGE', 4.25, 0.5, { align: 'center' });
+
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(100, 100, 100);
+          doc.text(`${receipt.purchase_date} | ${receipt.category} | $${parseFloat(receipt.amount).toFixed(2)}`, 4.25, 0.75, { align: 'center' });
+
+          if (receipt.details) {
+            doc.setFontSize(9);
+            const wrappedDetails = doc.splitTextToSize(receipt.details, 7);
+            doc.text(wrappedDetails, 4.25, 0.95, { align: 'center' });
+          }
+
+          // Add image (centered, maximum size while maintaining aspect ratio)
+          const imgProps = doc.getImageProperties(`data:image/jpeg;base64,${imageBase64}`);
+          const imgWidth = imgProps.width;
+          const imgHeight = imgProps.height;
+          const ratio = imgWidth / imgHeight;
+
+          // Max dimensions (leave margins)
+          const maxWidth = 7;
+          const maxHeight = 9;
+
+          let finalWidth = maxWidth;
+          let finalHeight = maxWidth / ratio;
+
+          if (finalHeight > maxHeight) {
+            finalHeight = maxHeight;
+            finalWidth = maxHeight * ratio;
+          }
+
+          const xPos = (8.5 - finalWidth) / 2;
+          const yPos = 1.5;
+
+          doc.addImage(`data:image/jpeg;base64,${imageBase64}`, 'JPEG', xPos, yPos, finalWidth, finalHeight);
+
+        } catch (err) {
+          console.warn('Could not load image for receipt:', receipt.id, err);
+        }
       }
     }
   }
