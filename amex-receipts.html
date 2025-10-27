@@ -603,9 +603,10 @@
           </div>
         </div>
 
-        <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-          <button class="btn btn-success" onclick="acceptAndClear()">ACCEPT AND CLEAR</button>
-          <button class="btn btn-secondary" onclick="downloadSelectedPDF()">DOWNLOAD</button>
+        <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+          <button class="btn btn-success" id="acceptClearBtn" onclick="acceptAndClear()" disabled style="opacity: 0.5; cursor: not-allowed;">ACCEPT AND CLEAR</button>
+          <button class="btn btn-secondary" id="downloadBtn" onclick="downloadSelectedPDF()" disabled style="opacity: 0.5; cursor: not-allowed;">DOWNLOAD</button>
+          <button class="btn btn-danger" id="deleteSelectedBtn" onclick="deleteSelected()" style="display: none;">DELETE SELECTED</button>
         </div>
 
         <div id="receiptListContainer"></div>
@@ -633,7 +634,7 @@
 
       <div id="detailContent"></div>
 
-      <div class="modal-actions">
+      <div class="modal-actions" id="detailModalActions">
         <button class="btn btn-secondary" onclick="closeDetailModal()">CLOSE</button>
         <button class="btn btn-primary" onclick="enableEditing()">EDIT</button>
       </div>
@@ -675,6 +676,50 @@
       <div class="modal-actions">
         <button class="btn btn-secondary" onclick="closeConfirmModal()">CANCEL</button>
         <button class="btn btn-success" id="confirmButton" onclick="confirmAction()">CONFIRM</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accept and Clear Confirmation Modal -->
+  <div id="acceptClearModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2 style="margin: 0;">CONFIRM ARCHIVE</h2>
+        <button class="modal-close" onclick="closeAcceptClearModal()">&times;</button>
+      </div>
+
+      <div style="padding: 20px 0;">
+        <div style="background: var(--warning-bg); padding: 16px; margin-bottom: 20px; border-left: 4px solid var(--warning-border);">
+          <p style="font-size: 14px; color: var(--warning-text); font-weight: 600; margin-bottom: 8px;">YOU ARE ABOUT TO:</p>
+          <ul style="margin-left: 20px; color: var(--warning-text); font-size: 13px; line-height: 1.8;">
+            <li>Archive <strong id="acceptClearCount">0</strong> selected receipt(s)</li>
+            <li>Generate a PDF summary (saved to database)</li>
+            <li>Email PDF to Epson printer</li>
+            <li>Permanently delete these entries from active receipts</li>
+          </ul>
+          <p style="font-size: 12px; color: var(--warning-text); margin-top: 12px; font-style: italic;">This action cannot be undone. Receipts will be archived and no longer editable.</p>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label style="display: flex; align-items: center; cursor: pointer; font-size: 13px; color: var(--gray-700);">
+            <input type="checkbox" id="acceptClearCheckbox" style="width: 18px; height: 18px; margin-right: 10px; cursor: pointer;">
+            I understand this action is permanent
+          </label>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label style="font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">YOUR INITIALS</label>
+          <input type="text" id="acceptClearInitials" placeholder="Enter your initials" maxlength="4" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; text-transform: uppercase;">
+        </div>
+
+        <div style="font-size: 11px; color: var(--gray-500); margin-top: 12px;">
+          <p>Timestamp: <span id="acceptClearTimestamp"></span></p>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeAcceptClearModal()">CANCEL</button>
+        <button class="btn btn-success" id="acceptClearConfirmBtn" onclick="confirmAcceptClear()" disabled style="opacity: 0.5; cursor: not-allowed;">CONFIRM</button>
       </div>
     </div>
   </div>
@@ -1007,7 +1052,7 @@
       pageReceipts.forEach(receipt => {
         html += `
           <div class="list-item" onclick="viewReceipt(${receipt.id}, event)">
-            <input type="checkbox" class="receipt-checkbox" data-id="${receipt.id}" onclick="event.stopPropagation()">
+            <input type="checkbox" class="receipt-checkbox" data-id="${receipt.id}" onclick="event.stopPropagation(); updateButtonStates();">
             <span>${receipt.purchase_date}</span>
             <span>$${parseFloat(receipt.amount).toFixed(2)}</span>
             <span><span class="category-badge">${receipt.category}</span></span>
@@ -1066,6 +1111,41 @@
     function toggleSelectAll() {
       const checked = document.getElementById('selectAll').checked;
       document.querySelectorAll('.receipt-checkbox').forEach(cb => cb.checked = checked);
+      updateButtonStates();
+    }
+
+    // Update button states based on selection
+    function updateButtonStates() {
+      const selectedCount = document.querySelectorAll('.receipt-checkbox:checked').length;
+      const acceptClearBtn = document.getElementById('acceptClearBtn');
+      const downloadBtn = document.getElementById('downloadBtn');
+      const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+
+      if (selectedCount > 0) {
+        // Enable buttons
+        acceptClearBtn.disabled = false;
+        acceptClearBtn.style.opacity = '1';
+        acceptClearBtn.style.cursor = 'pointer';
+
+        downloadBtn.disabled = false;
+        downloadBtn.style.opacity = '1';
+        downloadBtn.style.cursor = 'pointer';
+
+        // Show red delete button
+        deleteSelectedBtn.style.display = 'inline-block';
+      } else {
+        // Disable buttons
+        acceptClearBtn.disabled = true;
+        acceptClearBtn.style.opacity = '0.5';
+        acceptClearBtn.style.cursor = 'not-allowed';
+
+        downloadBtn.disabled = true;
+        downloadBtn.style.opacity = '0.5';
+        downloadBtn.style.cursor = 'not-allowed';
+
+        // Hide red delete button
+        deleteSelectedBtn.style.display = 'none';
+      }
     }
 
     // View Receipt
@@ -1159,9 +1239,10 @@
       content.innerHTML = html;
 
       // Update actions
-      const actions = document.querySelector('.modal-actions');
+      const actions = document.getElementById('detailModalActions');
       if (editable) {
         actions.innerHTML = `
+          <button class="btn btn-danger" onclick="deleteReceipt()">DELETE</button>
           <button class="btn btn-secondary" onclick="closeDetailModal()">CANCEL</button>
           <button class="btn btn-primary" onclick="saveEdit()">SAVE</button>
         `;
@@ -1231,6 +1312,35 @@
       loadReceipts();
     }
 
+    // Delete individual receipt
+    async function deleteReceipt() {
+      if (!currentReceipt) return;
+
+      showConfirmModal(
+        `Delete this receipt ($${parseFloat(currentReceipt.amount).toFixed(2)} - ${currentReceipt.category})? This action cannot be undone.`,
+        async () => {
+          const { error } = await supabase
+            .from('amex_receipts')
+            .delete()
+            .eq('id', currentReceipt.id);
+
+          if (error) {
+            showStatus('Error deleting receipt: ' + error.message, 'error');
+            return;
+          }
+
+          // Show success popup for 2 seconds
+          showStatus('Receipt deleted successfully', 'success');
+          closeDetailModal();
+
+          // Reload list after brief delay
+          setTimeout(() => {
+            loadReceipts();
+          }, 500);
+        }
+      );
+    }
+
     function closeDetailModal() {
       document.getElementById('detailModal').classList.remove('active');
       currentReceipt = null;
@@ -1258,8 +1368,8 @@
       closeConfirmModal();
     }
 
-    // Accept and Clear
-    async function acceptAndClear() {
+    // Accept and Clear Modal
+    function acceptAndClear() {
       const selectedIds = getSelectedReceiptIds();
 
       if (selectedIds.length === 0) {
@@ -1267,35 +1377,86 @@
         return;
       }
 
-      // Use custom confirm modal instead of window.confirm (Google Sites sandbox)
-      showConfirmModal(
-        `Archive ${selectedIds.length} receipts and email PDF to printer?`,
-        async () => {
-          showStatus('Generating PDF and emailing...', 'success');
+      // Show enhanced confirmation modal
+      const modal = document.getElementById('acceptClearModal');
+      const count = document.getElementById('acceptClearCount');
+      const checkbox = document.getElementById('acceptClearCheckbox');
+      const initialsInput = document.getElementById('acceptClearInitials');
+      const confirmBtn = document.getElementById('acceptClearConfirmBtn');
+      const timestamp = document.getElementById('acceptClearTimestamp');
 
-          try {
-            const response = await fetch('/api/archive-amex-receipts', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                receiptIds: selectedIds,
-                emailToPrinter: true,
-                approvedBy: 'Yusuf Topal'
-              })
-            });
+      count.textContent = selectedIds.length;
+      checkbox.checked = false;
+      initialsInput.value = '';
+      confirmBtn.disabled = true;
+      confirmBtn.style.opacity = '0.5';
+      confirmBtn.style.cursor = 'not-allowed';
 
-            if (!response.ok) {
-              throw new Error('Archive failed');
-            }
+      // Set timestamp
+      const now = new Date().toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      timestamp.textContent = now;
 
-            const result = await response.json();
-            showStatus(`Archived ${result.entryCount} receipts. PDF emailed to printer.`, 'success');
-            loadReceipts();
-          } catch (error) {
-            showStatus('Error archiving receipts: ' + error.message, 'error');
-          }
+      // Watch checkbox and initials for enabling confirm button
+      const updateConfirmBtn = () => {
+        if (checkbox.checked && initialsInput.value.trim().length > 0) {
+          confirmBtn.disabled = false;
+          confirmBtn.style.opacity = '1';
+          confirmBtn.style.cursor = 'pointer';
+        } else {
+          confirmBtn.disabled = true;
+          confirmBtn.style.opacity = '0.5';
+          confirmBtn.style.cursor = 'not-allowed';
         }
-      );
+      };
+
+      checkbox.onchange = updateConfirmBtn;
+      initialsInput.oninput = updateConfirmBtn;
+
+      modal.classList.add('active');
+    }
+
+    function closeAcceptClearModal() {
+      document.getElementById('acceptClearModal').classList.remove('active');
+    }
+
+    async function confirmAcceptClear() {
+      const selectedIds = getSelectedReceiptIds();
+      const initials = document.getElementById('acceptClearInitials').value.trim().toUpperCase();
+      const timestamp = document.getElementById('acceptClearTimestamp').textContent;
+
+      closeAcceptClearModal();
+      showStatus('Generating PDF and emailing...', 'success');
+
+      try {
+        const response = await fetch('/api/archive-amex-receipts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            receiptIds: selectedIds,
+            emailToPrinter: true,
+            approvedBy: initials,
+            timestamp: timestamp
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Archive failed');
+        }
+
+        const result = await response.json();
+        showStatus(`Archived ${result.entryCount} receipts. PDF emailed to printer.`, 'success');
+        loadReceipts();
+      } catch (error) {
+        showStatus('Error archiving receipts: ' + error.message, 'error');
+      }
     }
 
     async function downloadSelectedPDF() {
@@ -1334,6 +1495,64 @@
     function getSelectedReceiptIds() {
       const checkboxes = document.querySelectorAll('.receipt-checkbox:checked');
       return Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+    }
+
+    // Delete selected with password protection
+    function deleteSelected() {
+      const selectedIds = getSelectedReceiptIds();
+
+      if (selectedIds.length === 0) {
+        showStatus('Please select receipts to delete', 'error');
+        return;
+      }
+
+      // Show password modal first
+      document.getElementById('passwordModal').classList.add('active');
+      document.getElementById('passwordInput').value = '';
+      document.getElementById('passwordError').style.display = 'none';
+
+      // Override checkPassword for delete action
+      const originalCheckPassword = window.checkPassword;
+      window.checkPassword = async function() {
+        const password = document.getElementById('passwordInput').value;
+        if (password !== ADMIN_PASSWORD) {
+          document.getElementById('passwordError').style.display = 'block';
+          document.getElementById('passwordInput').select();
+          return;
+        }
+
+        closePasswordModal();
+
+        // Now show confirm modal
+        showConfirmModal(
+          `Delete ${selectedIds.length} selected receipt(s)? This action cannot be undone.`,
+          async () => {
+            showStatus('Deleting receipts...', 'success');
+
+            try {
+              const { error } = await supabase
+                .from('amex_receipts')
+                .delete()
+                .in('id', selectedIds);
+
+              if (error) {
+                showStatus('Error deleting receipts: ' + error.message, 'error');
+                return;
+              }
+
+              showStatus(`Deleted ${selectedIds.length} receipt(s) successfully`, 'success');
+              setTimeout(() => loadReceipts(), 500);
+            } catch (error) {
+              showStatus('Error: ' + error.message, 'error');
+            }
+          }
+        );
+
+        // Restore original checkPassword
+        window.checkPassword = originalCheckPassword;
+      };
+
+      setTimeout(() => document.getElementById('passwordInput').focus(), 100);
     }
 
     // Archive
