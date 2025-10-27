@@ -7872,6 +7872,56 @@
     updateCalculateButtonState();
   }
 
+  /**
+   * Auto-fetch ezCater tips from database for selected date range
+   */
+  async function autoFetchEzCaterTips(startDate, endDate) {
+    console.log('Auto-fetching ezCater tips from database for date range:', startDate, 'to', endDate);
+
+    try {
+      // Query catering_orders table for ezCater orders in date range
+      const { data: ezCaterOrders, error } = await supabase
+        .from('catering_orders')
+        .select('tip, order_number, delivery_date, customer_name')
+        .eq('source_system', 'EZCATER')
+        .gte('delivery_date', startDate)
+        .lte('delivery_date', endDate)
+        .order('delivery_date', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      // Calculate total tips
+      const totalTips = ezCaterOrders.reduce((sum, order) => {
+        const tip = parseFloat(order.tip) || 0;
+        return sum + tip;
+      }, 0);
+
+      const orderCount = ezCaterOrders.length;
+
+      // Auto-populate the ezCater tips field
+      document.getElementById('ezcaterTips').value = totalTips.toFixed(2);
+
+      // Show success message in console
+      console.log(`✅ ezCater tips auto-fetched: $${totalTips.toFixed(2)} from ${orderCount} orders`);
+
+      if (orderCount > 0) {
+        console.log('ezCater orders found:');
+        ezCaterOrders.forEach(order => {
+          console.log(`  - Order #${order.order_number} (${order.delivery_date}): $${parseFloat(order.tip).toFixed(2)} tip`);
+        });
+      } else {
+        console.log('No ezCater orders found in this date range');
+      }
+
+    } catch (error) {
+      console.error('Error fetching ezCater tips:', error);
+      // Don't block the flow - just set to 0 if fetch fails
+      document.getElementById('ezcaterTips').value = '0.00';
+    }
+  }
+
   // Handle file upload - show status and clear API data
   function handleFileUpload() {
     const laborFile = document.getElementById('laborFile').files[0];
@@ -7914,12 +7964,15 @@
     const hasFiles = laborFile && salesFile;
 
     if (hasFiles) {
-      console.log('Files already uploaded - skipping sales/labor auto-fetch, but still fetching TDS driver tips');
+      console.log('Files already uploaded - skipping sales/labor auto-fetch, but still fetching TDS driver tips and ezCater tips');
       const statusDiv = document.getElementById('autoFetchStatus');
       statusDiv.innerHTML = '<span style="color: #28a745;">Using uploaded files (will bypass database and API)</span>';
 
       // CRITICAL FIX: Still need to fetch TDS Driver tips (not in manual files!)
       await autoFetchTdsDriverTips(startDate, endDate);
+
+      // Auto-fetch ezCater tips from database (not in manual files!)
+      await autoFetchEzCaterTips(startDate, endDate);
       return;
     }
 
@@ -8039,6 +8092,9 @@
 
       // Auto-fetch TDS Driver tips
       await autoFetchTdsDriverTips(startDate, endDate);
+
+      // Auto-fetch ezCater tips from database
+      await autoFetchEzCaterTips(startDate, endDate);
 
       // Hide loading overlay on success
       loadingOverlay.style.display = 'none';
