@@ -640,6 +640,45 @@
     </div>
   </div>
 
+  <!-- Password Modal -->
+  <div id="passwordModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h2 style="margin: 0;">ENTER PASSWORD</h2>
+        <button class="modal-close" onclick="closePasswordModal()">&times;</button>
+      </div>
+
+      <div style="padding: 20px 0;">
+        <input type="password" id="passwordInput" placeholder="Admin password" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px;">
+        <p id="passwordError" style="color: var(--error-text); font-size: 12px; margin-top: 8px; display: none;">Incorrect password</p>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closePasswordModal()">CANCEL</button>
+        <button class="btn btn-primary" onclick="checkPassword()">SUBMIT</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2 style="margin: 0;">CONFIRM ACTION</h2>
+        <button class="modal-close" onclick="closeConfirmModal()">&times;</button>
+      </div>
+
+      <div style="padding: 20px 0;">
+        <p id="confirmMessage" style="font-size: 14px; color: var(--gray-700);"></p>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeConfirmModal()">CANCEL</button>
+        <button class="btn btn-success" id="confirmButton" onclick="confirmAction()">CONFIRM</button>
+      </div>
+    </div>
+  </div>
+
   <script src="shared-header.js"></script>
   <script>
     // Initialize Supabase for this page
@@ -1135,11 +1174,34 @@
     }
 
     function enableEditing() {
-      const password = prompt('ENTER ADMIN PASSWORD:');
+      // Show password modal instead of prompt (Google Sites sandbox)
+      document.getElementById('passwordModal').classList.add('active');
+      document.getElementById('passwordInput').value = '';
+      document.getElementById('passwordError').style.display = 'none';
+      setTimeout(() => {
+        const input = document.getElementById('passwordInput');
+        input.focus();
+        // Allow Enter key to submit
+        input.onkeypress = (e) => {
+          if (e.key === 'Enter') checkPassword();
+        };
+      }, 100);
+    }
+
+    function closePasswordModal() {
+      document.getElementById('passwordModal').classList.remove('active');
+      document.getElementById('passwordInput').value = '';
+      document.getElementById('passwordError').style.display = 'none';
+    }
+
+    function checkPassword() {
+      const password = document.getElementById('passwordInput').value;
       if (password !== ADMIN_PASSWORD) {
-        showStatus('Incorrect password', 'error');
+        document.getElementById('passwordError').style.display = 'block';
+        document.getElementById('passwordInput').select();
         return;
       }
+      closePasswordModal();
       displayReceiptDetails(currentReceipt, true);
     }
 
@@ -1174,6 +1236,28 @@
       currentReceipt = null;
     }
 
+    // Confirm Modal Handlers
+    let confirmCallback = null;
+
+    function showConfirmModal(message, callback) {
+      document.getElementById('confirmMessage').textContent = message;
+      document.getElementById('confirmModal').classList.add('active');
+      confirmCallback = callback;
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('confirmModal').classList.remove('active');
+      confirmCallback = null;
+    }
+
+    function confirmAction() {
+      if (confirmCallback) {
+        confirmCallback();
+        confirmCallback = null;
+      }
+      closeConfirmModal();
+    }
+
     // Accept and Clear
     async function acceptAndClear() {
       const selectedIds = getSelectedReceiptIds();
@@ -1183,33 +1267,35 @@
         return;
       }
 
-      if (!confirm(`Archive ${selectedIds.length} receipts and email PDF to printer?`)) {
-        return;
-      }
+      // Use custom confirm modal instead of window.confirm (Google Sites sandbox)
+      showConfirmModal(
+        `Archive ${selectedIds.length} receipts and email PDF to printer?`,
+        async () => {
+          showStatus('Generating PDF and emailing...', 'success');
 
-      showStatus('Generating PDF and emailing...', 'success');
+          try {
+            const response = await fetch('/api/archive-amex-receipts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                receiptIds: selectedIds,
+                emailToPrinter: true,
+                approvedBy: 'Yusuf Topal'
+              })
+            });
 
-      try {
-        const response = await fetch('/api/archive-amex-receipts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            receiptIds: selectedIds,
-            emailToPrinter: true,
-            approvedBy: 'Yusuf Topal'
-          })
-        });
+            if (!response.ok) {
+              throw new Error('Archive failed');
+            }
 
-        if (!response.ok) {
-          throw new Error('Archive failed');
+            const result = await response.json();
+            showStatus(`Archived ${result.entryCount} receipts. PDF emailed to printer.`, 'success');
+            loadReceipts();
+          } catch (error) {
+            showStatus('Error archiving receipts: ' + error.message, 'error');
+          }
         }
-
-        const result = await response.json();
-        showStatus(`Archived ${result.entryCount} receipts. PDF emailed to printer.`, 'success');
-        loadReceipts();
-      } catch (error) {
-        showStatus('Error archiving receipts: ' + error.message, 'error');
-      }
+      );
     }
 
     async function downloadSelectedPDF() {
