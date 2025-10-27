@@ -3279,35 +3279,17 @@
             </h3>
             <div style="font-size: 13px; color: var(--success-text); line-height: 1.6;">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span>👤 ${[session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).join(', ') || 'Not set'}</span>
-                ${!fohSystemState.reviewMode ? `
-                <button
-                  onclick="changeUsername()"
-                  style="
-                    padding: 4px 8px;
-                    background: var(--success-border);
-                    color: white;
-                    border: none;
-                    border-radius: 0;
-                    font-size: 10px;
-                    font-weight: 700;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                    cursor: pointer;
-                    transition: all 0.15s ease;
-                  "
-                  onmouseover="this.style.background='#047857'"
-                  onmouseout="this.style.background='var(--success-border)'"
-                >Change Name</button>
-                ` : ''}
+                <span style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; color: var(--gray-700);">TIME STARTED:</span>
+                <span>${formatPacificDateDisplay(new Date(session.started_at), {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                })}</span>
               </div>
-              <div>📅 ${formatPacificDateDisplay(new Date(session.started_at), {
+              <div style="font-size: 11px; color: var(--gray-600);">${formatPacificDateDisplay(new Date(session.started_at), {
                 month: 'short',
                 day: 'numeric',
-                year: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
+                year: 'numeric'
               })}</div>
             </div>
           </div>
@@ -4369,154 +4351,6 @@
   }
 
   /**
-   * Change Username - Allows changing username mid-session
-   */
-  function changeUsername() {
-    const currentUsername = fohSystemState.staffName || '';
-
-    const modal = document.createElement('div');
-    modal.id = 'changeUsernameModal';
-    modal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
-      padding: 20px;
-    `;
-
-    const modalContent = document.createElement('div');
-    modalContent.style.cssText = `
-      background: white;
-      padding: 32px;
-      max-width: 400px;
-      width: 100%;
-      border: 3px solid var(--gray-700);
-      border-radius: 0;
-    `;
-
-    modalContent.innerHTML = `
-      <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
-        Change Your Name
-      </h3>
-      <p style="margin: 0 0 20px 0; font-size: 13px; color: var(--gray-600);">
-        Update your name for future checklist actions
-      </p>
-      <input
-        type="text"
-        id="newUsernameInput"
-        value="${currentUsername}"
-        placeholder="Enter your name"
-        style="
-          width: 100%;
-          padding: 14px;
-          border: 2px solid var(--gray-300);
-          border-radius: 0;
-          font-size: 14px;
-          margin-bottom: 20px;
-          box-sizing: border-box;
-        "
-      />
-      <div style="display: flex; gap: 12px;">
-        <button
-          id="changeUsernameCancelBtn"
-          style="
-            flex: 1;
-            padding: 14px 24px;
-            background: var(--gray-100);
-            color: var(--gray-900);
-            border: 2px solid var(--gray-300);
-            border-radius: 0;
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-          "
-        >CANCEL</button>
-        <button
-          id="changeUsernameSubmitBtn"
-          style="
-            flex: 1;
-            padding: 14px 24px;
-            background: var(--gray-900);
-            color: white;
-            border: 2px solid var(--gray-900);
-            border-radius: 0;
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-          "
-        >SAVE</button>
-      </div>
-    `;
-
-    modal.appendChild(modalContent);
-    document.body.appendChild(modal);
-
-    const usernameInput = document.getElementById('newUsernameInput');
-    const submitBtn = document.getElementById('changeUsernameSubmitBtn');
-    const cancelBtn = document.getElementById('changeUsernameCancelBtn');
-
-    // Focus and select input
-    setTimeout(() => {
-      usernameInput.focus();
-      usernameInput.select();
-    }, 100);
-
-    // Handle submit
-    const handleSubmit = () => {
-      const newUsername = usernameInput.value.trim();
-      if (!newUsername) {
-        showMessage('Please enter your name!', 'error');
-        usernameInput.focus();
-        return;
-      }
-
-      // Save to localStorage and update state
-      localStorage.setItem('foh_username', newUsername);
-      fohSystemState.staffName = newUsername;
-
-      // Remove modal
-      document.body.removeChild(modal);
-
-      // Re-render checklist to show new name
-      renderChecklist();
-
-      showMessage(`Name updated to: ${newUsername}`, 'success');
-    };
-
-    // Handle cancel
-    const handleCancel = () => {
-      document.body.removeChild(modal);
-    };
-
-    submitBtn.onclick = handleSubmit;
-    cancelBtn.onclick = handleCancel;
-    usernameInput.onkeypress = (e) => {
-      if (e.key === 'Enter') {
-        handleSubmit();
-      }
-    };
-
-    // Click outside to close
-    modal.onclick = (e) => {
-      if (e.target === modal) {
-        handleCancel();
-      }
-    };
-  }
-
-  /**
    * Open Review Tab - View completed checklists
    */
   async function openFOHReview(evt) {
@@ -5379,7 +5213,7 @@
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+          <div style="margin-bottom: 20px;">
             <div>
               <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
                 Time Range Display (for staff)
@@ -5401,28 +5235,6 @@
                 onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
               />
               <p style="margin: 4px 0 0 0; font-size: 10px; color: var(--gray-500);">Display text only, not actual time logic</p>
-            </div>
-            <div>
-              <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
-                Staff Count
-              </label>
-              <input
-                type="number"
-                id="edit_staffCount"
-                value="${checklist.staffCount}"
-                min="1"
-                max="10"
-                style="
-                  width: 100%;
-                  padding: 12px;
-                  border: 2px solid var(--gray-300);
-                  border-radius: 0;
-                  font-size: 14px;
-                  box-sizing: border-box;
-                "
-                onfocus="this.style.borderColor='var(--gray-700)'"
-                onblur="this.style.borderColor='var(--gray-300)'; autoSaveChecklist('${currentChecklistType}')"
-              />
             </div>
           </div>
 

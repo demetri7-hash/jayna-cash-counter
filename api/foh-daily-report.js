@@ -199,10 +199,15 @@ function calculateAnalytics(sessions, expectedChecklists, definitionsMap) {
     }
   });
 
-  // Analyze staff performance
+  // Analyze staff performance - aggregate from completed tasks
   sessions.forEach(session => {
-    const staffNames = [session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4]
-      .filter(name => name);
+    // Get unique staff names from completed tasks (not from session)
+    const tasks = session.foh_checklist_tasks || [];
+    const staffNames = [...new Set(
+      tasks
+        .filter(t => t.completed_by)
+        .map(t => t.completed_by)
+    )];
 
     staffNames.forEach(staffName => {
       if (!analytics.staffPerformance[staffName]) {
@@ -572,9 +577,13 @@ async function generateChecklistsPDF(sessions, definitionsMap, reportDate, analy
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
 
-    const staffNames = [session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4]
-      .filter(name => name)
-      .join(', ');
+    // Get unique staff names from completed tasks
+    const tasks = session.foh_checklist_tasks || [];
+    const staffNames = [...new Set(
+      tasks
+        .filter(t => t.completed_by)
+        .map(t => t.completed_by)
+    )].join(', ') || 'No tasks completed';
 
     doc.setFont('helvetica', 'bold');
     doc.text('STAFF: ', 0.5, yPos);
