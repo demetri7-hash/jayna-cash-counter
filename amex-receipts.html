@@ -725,8 +725,18 @@
 
   <script src="shared-header.js"></script>
   <script>
-    // Use shared Supabase client from shared-header.js to avoid multiple instances
-    let supabase;
+    // Create single Supabase client for this page (shared storage key with header)
+    const supabase = (() => {
+      if (window._amexSupabaseClient) {
+        return window._amexSupabaseClient;
+      }
+      window._amexSupabaseClient = window.supabase.createClient(
+        'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg',
+        { db: { schema: 'public' }, auth: { persistSession: false } }
+      );
+      return window._amexSupabaseClient;
+    })();
 
     const ADMIN_PASSWORD = 'JaynaGyro2025!';
 
@@ -750,9 +760,6 @@
 
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
-      // Use shared Supabase client (avoids multiple GoTrueClient instances warning)
-      supabase = supabaseClient;
-
       initializeSharedHeader();
       initializeFileUpload();
       loadCategories();
