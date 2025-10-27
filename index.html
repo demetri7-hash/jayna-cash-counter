@@ -10267,21 +10267,70 @@
       return;
     }
 
-    // Get cashbox count from tip pool form (optional feature)
-    const cashboxData = getTipPoolCashboxData();
-    const cashboxTotal = cashboxData ? cashboxData.total : null; // CRITICAL FIX: Extract total
+    // SMART CASHBOX DATA LOOKUP
+    // Priority 1: Check if cashbox fields are filled in current flow
+    let cashboxData = getTipPoolCashboxData();
+    let cashboxTotal = cashboxData ? cashboxData.total : null;
 
     console.log('📦 Cashbox data from form:', cashboxData);
 
     try {
       showLoading('Generating Combined Report', 'Fetching cash count data and combining with tip pool...');
 
-      // Save cashbox count to database if provided
-      if (cashboxData !== null) {
-        console.log('💾 Saving cashbox count to database...');
+      // Priority 2: If no data in form, check database for cashbox count
+      if (cashboxData === null) {
+        console.log('⚠️ No cashbox data in form - checking database...');
+
+        // Calculate the Monday AFTER the week ends (endDate + 1 day)
+        // Week runs Monday-Sunday, cashbox counted on Monday after
+        // Example: Week 10/20-10/26 (Mon-Sun) → Cashbox counted 10/27 (Monday)
+        const weekEndDate = new Date(endDate + 'T12:00:00');
+        const mondayAfter = new Date(weekEndDate);
+        mondayAfter.setDate(mondayAfter.getDate() + 1); // Add 1 day to Sunday = Monday
+        const cashboxCountDate = mondayAfter.toISOString().split('T')[0];
+
+        console.log(`🔍 Looking for cashbox count from ${cashboxCountDate} (Monday after ${endDate})`);
+
+        // Query database for cashbox count from that Monday
+        const { data: dbCashboxData, error: dbCashboxError } = await supabase
+          .from('cashbox_counts')
+          .select('*')
+          .eq('date', cashboxCountDate)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (dbCashboxError) {
+          if (dbCashboxError.code === 'PGRST116') {
+            // No data found - this is OK
+            console.log('ℹ️ No cashbox count found in database for', cashboxCountDate);
+          } else {
+            console.error('❌ Error querying cashbox data:', dbCashboxError);
+          }
+        } else if (dbCashboxData) {
+          console.log('✅ Found cashbox count in database:', dbCashboxData);
+          cashboxTotal = dbCashboxData.total;
+
+          // Reconstruct cashboxData object for saving logic (even though it's already in DB)
+          cashboxData = {
+            counter: dbCashboxData.counter,
+            total: dbCashboxData.total,
+            denominations: dbCashboxData.denominations,
+            date: dbCashboxData.date
+          };
+
+          console.log(`💰 Using database cashbox total: $${cashboxTotal.toFixed(2)}`);
+        }
+      }
+
+      // Save cashbox count to database if provided from form (not from DB)
+      if (cashboxData !== null && !cashboxData.fromDatabase) {
+        console.log('💾 Saving NEW cashbox count to database...');
         await saveCashboxCountFromTipPool(cashboxData);
+      } else if (cashboxData === null) {
+        console.log('⚠️ No cashbox count available (not in form, not in database)');
       } else {
-        console.log('⚠️ No cashbox count provided - reconciliation will be skipped');
+        console.log('ℹ️ Using existing cashbox count from database (not saving duplicate)');
       }
 
       // Fetch cash count data for the date range (reusing existing logic)
