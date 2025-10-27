@@ -284,52 +284,70 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.setTextColor(66, 66, 66);
 
   for (const receipt of receipts) {
-    if (yPos > 10) {
+    if (yPos > 9.5) {
       doc.addPage();
       yPos = 0.7;
     }
 
+    // Pre-calculate wrapped text to determine row height
+    const vendorText = receipt.vendor || 'N/A';
+    const wrappedVendor = doc.splitTextToSize(vendorText, 1.0);
+    const categoryText = receipt.category || 'N/A';
+    const wrappedCategory = doc.splitTextToSize(categoryText, 0.9);
+    const detailsText = receipt.details || 'N/A';
+    const wrappedDetails = doc.splitTextToSize(detailsText, 2.3);
+
+    // Calculate max lines needed (determines row height)
+    const maxLines = Math.max(
+      Math.min(wrappedVendor.length, 2),
+      Math.min(wrappedCategory.length, 2),
+      Math.min(wrappedDetails.length, 2)
+    );
+
+    // Dynamic row height based on content (0.5" base + extra for wrapped lines)
+    const baseRowHeight = 0.5;
+    const extraHeightPerLine = 0.15;
+    const rowHeight = baseRowHeight + (maxLines > 1 ? extraHeightPerLine * (maxLines - 1) : 0);
+
     // Alternating row background (pale Jayna blue like UI)
     if (receipts.indexOf(receipt) % 2 === 0) {
       doc.setFillColor(239, 246, 255); // Jayna blue pale
-      doc.rect(0.5, yPos - 0.05, 7.5, 0.3, 'F'); // Slightly taller for wrapping
+      doc.rect(0.5, yPos, 7.5, rowHeight, 'F'); // Full row height background
     }
+
+    // Vertical centering: start text at center of row
+    const textYPos = yPos + (rowHeight / 2) + 0.03; // Center text vertically + slight offset for baseline
 
     // Vendor (with wrapping) - BOLD
     doc.setFont('helvetica', 'bold');
-    const vendorText = receipt.vendor || 'N/A';
-    const wrappedVendor = doc.splitTextToSize(vendorText, 1.0);
-    doc.text(wrappedVendor.slice(0, 2), 0.6, yPos + 0.08); // Max 2 lines
+    doc.text(wrappedVendor.slice(0, 2), 0.6, textYPos); // Max 2 lines
     doc.setFont('helvetica', 'normal');
 
     // Date
-    doc.text(receipt.purchase_date, 1.8, yPos + 0.08);
+    doc.text(receipt.purchase_date, 1.8, textYPos);
 
     // Amount
-    doc.text(`$${parseFloat(receipt.amount).toFixed(2)}`, 2.8, yPos + 0.08);
+    doc.text(`$${parseFloat(receipt.amount).toFixed(2)}`, 2.8, textYPos);
 
     // Category (with wrapping)
-    const categoryText = receipt.category || 'N/A';
-    const wrappedCategory = doc.splitTextToSize(categoryText, 0.9);
-    doc.text(wrappedCategory, 3.6, yPos + 0.08);
+    doc.text(wrappedCategory.slice(0, 2), 3.6, textYPos); // Max 2 lines
 
     // Details (with wrapping)
-    const detailsText = receipt.details || 'N/A';
-    const wrappedDetails = doc.splitTextToSize(detailsText, 2.3);
-    doc.text(wrappedDetails.slice(0, 2), 4.8, yPos + 0.08); // Max 2 lines
+    doc.text(wrappedDetails.slice(0, 2), 4.8, textYPos); // Max 2 lines
 
     // Image page reference
     if (receiptImagePages.has(receipt.id)) {
       doc.setFont('helvetica', 'italic');
       doc.setTextColor(59, 130, 246); // Jayna blue
       doc.setFontSize(8);
-      doc.text(`Pg ${receiptImagePages.get(receipt.id)}`, 7.3, yPos + 0.08);
+      doc.text(`Pg ${receiptImagePages.get(receipt.id)}`, 7.3, textYPos);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(66, 66, 66);
       doc.setFontSize(9);
     }
 
-    yPos += 0.3;
+    // Move to next row (row height + small gap for visual separation)
+    yPos += rowHeight + 0.08;
   }
 
   // Add image appendix pages
