@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { receiptIds, emailToPrinter, approvedBy } = req.body;
+    const { receiptIds, emailToPrinter, approvedBy, previewOnly } = req.body;
 
     if (!receiptIds || receiptIds.length === 0) {
       return res.status(400).json({ error: 'No receipts selected' });
@@ -57,7 +57,10 @@ export default async function handler(req, res) {
     const pdfBuffer = await generateReceiptsPDF(receipts, totalAmount, supabase);
 
     // Upload PDF to Supabase Storage
-    const pdfFileName = `amex_receipts_${Date.now()}.pdf`;
+    const pdfFileName = previewOnly
+      ? `preview_${Date.now()}.pdf`  // Temp preview file
+      : `amex_receipts_${Date.now()}.pdf`;  // Archived file
+
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('amex-archived-pdfs')
       .upload(pdfFileName, pdfBuffer, {
@@ -74,6 +77,19 @@ export default async function handler(req, res) {
 
     const pdfUrl = urlData.publicUrl;
 
+    // PREVIEW MODE: Just return PDF URL without archiving or deleting
+    if (previewOnly) {
+      console.log(`📄 Generated preview PDF for ${receipts.length} receipts`);
+      return res.json({
+        success: true,
+        pdfUrl: pdfUrl,
+        entryCount: receipts.length,
+        totalAmount: totalAmount,
+        preview: true
+      });
+    }
+
+    // ARCHIVE MODE: Save to database, email, and delete receipts
     // Save to archived_pdfs table
     const { data: archiveData, error: archiveError } = await supabase
       .from('amex_archived_pdfs')
