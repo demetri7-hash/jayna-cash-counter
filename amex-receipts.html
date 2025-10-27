@@ -534,7 +534,6 @@
       <p style="font-size: 12px; color: var(--gray-500);">DEMETRI GREGORAKIS | JAYNA ONE INC</p>
     </div>
 
-    <div id="statusMessage"></div>
 
     <!-- Tab Navigation -->
     <div class="tab-container">
@@ -1463,11 +1462,14 @@
       const selectedIds = getSelectedReceiptIds();
 
       if (selectedIds.length === 0) {
-        showStatus('Please select receipts to download', 'error');
-        return;
+        return; // Button is disabled if nothing selected, so this shouldn't happen
       }
 
-      showStatus('Generating PDF for download...', 'success');
+      const btn = document.getElementById('downloadBtn');
+      const originalText = btn.textContent;
+      btn.textContent = 'GENERATING...';
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
 
       try {
         const response = await fetch('/api/archive-amex-receipts', {
@@ -1481,14 +1483,34 @@
         });
 
         if (!response.ok) {
-          throw new Error('PDF generation failed');
+          const errorData = await response.json();
+          throw new Error(errorData.details || 'PDF generation failed');
         }
 
         const result = await response.json();
+
+        // Open PDF in new tab
         window.open(result.pdfUrl, '_blank');
-        showStatus('PDF ready for download', 'success');
+
+        // Show success on button
+        showButtonSuccess('downloadBtn', 'SUCCESS!');
+
+        // Re-enable button after feedback
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.style.opacity = '1';
+        }, 2000);
+
       } catch (error) {
-        showStatus('Error generating PDF: ' + error.message, 'error');
+        console.error('Download error:', error);
+        showButtonError('downloadBtn', 'ERROR');
+
+        // Re-enable button after feedback
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.disabled = false;
+          btn.style.opacity = '1';
+        }, 2000);
       }
     }
 
@@ -1595,12 +1617,51 @@
       container.innerHTML = html;
     }
 
-    // Status Messages
-    function showStatus(message, type) {
-      const container = document.getElementById('statusMessage');
-      container.className = 'status-message ' + type;
-      container.textContent = message;
-      setTimeout(() => container.textContent = '', 5000);
+    // Button-level feedback (no status box at top)
+    function showButtonSuccess(buttonId, successText = 'SUCCESS!') {
+      const btn = document.getElementById(buttonId);
+      if (!btn) return;
+
+      const originalText = btn.textContent;
+      const originalBg = btn.style.background;
+      const originalColor = btn.style.color;
+
+      // Show success
+      btn.textContent = successText;
+      btn.style.background = '#059669';
+      btn.style.color = 'white';
+      btn.style.borderColor = '#059669';
+
+      // Fade back after 2 seconds
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = originalBg;
+        btn.style.color = originalColor;
+        btn.style.borderColor = '';
+      }, 2000);
+    }
+
+    function showButtonError(buttonId, errorText = 'ERROR') {
+      const btn = document.getElementById(buttonId);
+      if (!btn) return;
+
+      const originalText = btn.textContent;
+      const originalBg = btn.style.background;
+      const originalColor = btn.style.color;
+
+      // Show error
+      btn.textContent = errorText;
+      btn.style.background = '#dc2626';
+      btn.style.color = 'white';
+      btn.style.borderColor = '#dc2626';
+
+      // Fade back after 2 seconds
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = originalBg;
+        btn.style.color = originalColor;
+        btn.style.borderColor = '';
+      }, 2000);
     }
   </script>
 </body>
