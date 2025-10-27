@@ -168,39 +168,80 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.text('AMEX RECEIPTS ARCHIVE', 4.25, yPos, { align: 'center' });
   yPos += 0.25;
 
+  // Date Range (formatted with day of week)
+  const startDate = new Date(receipts[0].purchase_date + 'T00:00:00');
+  const endDate = new Date(receipts[receipts.length - 1].purchase_date + 'T00:00:00');
+
+  const formatDateWithDay = (date) => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = days[date.getDay()];
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${dayName} ${month}/${day}/${year}`;
+  };
+
+  const dateRangeText = `${formatDateWithDay(startDate)} TO ${formatDateWithDay(endDate)}`;
+
   doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(100, 100, 100);
+  doc.text(dateRangeText, 4.25, yPos, { align: 'center' });
+  yPos += 0.2;
+
+  // Card info
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
   doc.setTextColor(100, 100, 100);
   doc.text(`CARD ENDING: 1100 | DEMETRI GREGORAKIS | JAYNA ONE INC`, 4.25, yPos, { align: 'center' });
-  yPos += 0.15;
+  yPos += 0.2;
 
-  const archiveDate = new Date().toLocaleDateString('en-US', {
+  // Archived timestamp (8pt, italicized, small)
+  const now = new Date();
+  const archiveDateTime = now.toLocaleString('en-US', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
   }).toUpperCase();
-  doc.text(`ARCHIVED: ${archiveDate}`, 4.25, yPos, { align: 'center' });
-  yPos += 0.3;
 
-  // Summary box
-  doc.setFillColor(245, 245, 245);
-  doc.rect(0.5, yPos, 7.5, 0.6, 'F');
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(150, 150, 150);
+  doc.text(`ARCHIVED: ${archiveDateTime}`, 4.25, yPos, { align: 'center' });
+  yPos += 0.35;
 
+  // Summary section (left-aligned)
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(33, 33, 33);
-  doc.text('SUMMARY', 0.7, yPos + 0.15);
+  doc.text('SUMMARY', 0.5, yPos);
+  yPos += 0.2;
 
+  // Total Entries
   doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`TOTAL ENTRIES: ${receipts.length}`, 0.7, yPos + 0.35);
-  doc.text(`TOTAL AMOUNT: $${totalAmount.toFixed(2)}`, 3.5, yPos + 0.35);
-  doc.text(`DATE RANGE: ${receipts[0].purchase_date} TO ${receipts[receipts.length - 1].purchase_date}`, 0.7, yPos + 0.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(33, 33, 33);
+  const totalEntriesLabel = doc.splitTextToSize('TOTAL ENTRIES:', 1.5);
+  doc.text(totalEntriesLabel, 0.5, yPos);
 
-  yPos += 0.8;
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${receipts.length}`, 1.8, yPos);
+  yPos += 0.2;
+
+  // Total Amount (bold, 90% gray)
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(26, 26, 26); // 90% gray (darker)
+  doc.text(`TOTAL AMOUNT: $${totalAmount.toFixed(2)}`, 0.5, yPos);
+  yPos += 0.35;
 
   // Receipts list
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(33, 33, 33);
   doc.text('RECEIPT DETAILS', 0.5, yPos);
   yPos += 0.25;
 
@@ -212,13 +253,13 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
   doc.text('DATE', 0.6, yPos + 0.08);
-  doc.text('AMOUNT', 2, yPos + 0.08);
-  doc.text('CATEGORY', 3, yPos + 0.08);
+  doc.text('AMOUNT', 1.8, yPos + 0.08);
+  doc.text('CATEGORY', 2.8, yPos + 0.08);
   doc.text('DETAILS', 4.5, yPos + 0.08);
 
   yPos += 0.25;
 
-  // Receipts
+  // Receipts (alternating Jayna blue background)
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(66, 66, 66);
 
@@ -228,21 +269,29 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
       yPos = 0.7;
     }
 
-    // Alternating row background
+    // Alternating row background (pale Jayna blue like UI)
     if (receipts.indexOf(receipt) % 2 === 0) {
-      doc.setFillColor(249, 249, 249);
-      doc.rect(0.5, yPos - 0.05, 7.5, 0.25, 'F');
+      doc.setFillColor(239, 246, 255); // Jayna blue pale
+      doc.rect(0.5, yPos - 0.05, 7.5, 0.3, 'F'); // Slightly taller for wrapping
     }
 
+    // Date
     doc.text(receipt.purchase_date, 0.6, yPos + 0.08);
-    doc.text(`$${parseFloat(receipt.amount).toFixed(2)}`, 2, yPos + 0.08);
-    doc.text(receipt.category, 3, yPos + 0.08);
 
+    // Amount
+    doc.text(`$${parseFloat(receipt.amount).toFixed(2)}`, 1.8, yPos + 0.08);
+
+    // Category (with wrapping)
+    const categoryText = receipt.category || 'N/A';
+    const wrappedCategory = doc.splitTextToSize(categoryText, 1.5);
+    doc.text(wrappedCategory, 2.8, yPos + 0.08);
+
+    // Details (with wrapping)
     const detailsText = receipt.details || 'N/A';
-    const wrappedDetails = doc.splitTextToSize(detailsText, 3);
-    doc.text(wrappedDetails[0], 4.5, yPos + 0.08);
+    const wrappedDetails = doc.splitTextToSize(detailsText, 3.3);
+    doc.text(wrappedDetails.slice(0, 2), 4.5, yPos + 0.08); // Max 2 lines
 
-    yPos += 0.25;
+    yPos += 0.3;
 
     // Show thumbnail if images exist
     if (receipt.image_urls && receipt.image_urls.length > 0) {
@@ -254,7 +303,7 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
         const imageBase64 = imageBuffer.toString('base64');
 
         // Add small thumbnail
-        doc.addImage(`data:image/jpeg;base64,${imageBase64}`, 'JPEG', 6.5, yPos - 0.2, 0.4, 0.4);
+        doc.addImage(`data:image/jpeg;base64,${imageBase64}`, 'JPEG', 6.8, yPos - 0.25, 0.4, 0.4);
       } catch (err) {
         console.warn('Could not load image for receipt:', receipt.id);
       }
@@ -266,7 +315,7 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.setFontSize(7);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(189, 189, 189);
-  doc.text('GENERATED BY JAYNA MANAGEMENT SYSTEM', 4.25, yPos, { align: 'center' });
+  doc.text('GENERATED AUTOMATICALLY USING THE JAYNA ONE APP, CREATED BY DEMETRI GREGORAKIS', 4.25, yPos, { align: 'center' });
 
   return Buffer.from(doc.output('arraybuffer'));
 }
