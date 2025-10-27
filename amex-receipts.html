@@ -935,8 +935,41 @@
     async function saveReceipt() {
       const date = document.getElementById('purchaseDate').value;
       const amount = parseFloat(document.getElementById('amount').value);
-      const category = document.getElementById('category').value;
+      let category = document.getElementById('category').value;
       const details = document.getElementById('details').value.trim();
+
+      // CRITICAL FIX: If user selected ADD_NEW but typed a category name without clicking "ADD CATEGORY"
+      // Automatically create the category first before saving receipt
+      if (category === 'ADD_NEW') {
+        const newCategoryInput = document.getElementById('newCategory');
+        const newCategoryName = newCategoryInput.value.trim().toUpperCase();
+
+        if (!newCategoryName) {
+          alert('Please enter a category name or select an existing category');
+          newCategoryInput.focus();
+          return;
+        }
+
+        // Create the new category automatically
+        const { data: categoryData, error: categoryError } = await supabase
+          .from('amex_categories')
+          .insert({ name: newCategoryName })
+          .select();
+
+        if (categoryError && !categoryError.message.includes('duplicate')) {
+          alert('Error creating category: ' + categoryError.message);
+          return;
+        }
+
+        // Update category variable to the new category name
+        category = newCategoryName;
+
+        // Reload categories and select the new one
+        await loadCategories();
+        document.getElementById('category').value = newCategoryName;
+
+        console.log(`Auto-created category: ${newCategoryName}`);
+      }
 
       if (!date || !amount || !category) {
         showStatus('Please fill in all required fields', 'error');
