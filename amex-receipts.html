@@ -577,7 +577,8 @@
       <div class="add-receipt-form" id="addReceiptForm">
         <div class="form-group">
           <label for="vendor">VENDOR / STORE NAME</label>
-          <input type="text" id="vendor" placeholder="e.g., Office Depot, Amazon, US Foods">
+          <input type="text" id="vendor" list="vendorList" placeholder="Start typing... (e.g., Office Depot, Amazon, US Foods)" autocomplete="off">
+          <datalist id="vendorList"></datalist>
         </div>
 
         <div class="form-group">
@@ -802,10 +803,39 @@
       initializeSharedHeader();
       initializeFileUpload();
       loadCategories();
+      loadVendors();
       loadReceipts();
       setTodayDate();
       setupCategoryDropdown();
     });
+
+    // Load existing vendors for autocomplete
+    async function loadVendors() {
+      const { data, error } = await supabase
+        .from('amex_receipts')
+        .select('vendor')
+        .not('vendor', 'is', null)
+        .order('vendor');
+
+      if (error) {
+        console.error('Error loading vendors:', error);
+        return;
+      }
+
+      // Get unique vendors
+      const uniqueVendors = [...new Set(data.map(r => r.vendor))].filter(v => v && v.trim());
+
+      // Populate datalist
+      const datalist = document.getElementById('vendorList');
+      datalist.innerHTML = '';
+      uniqueVendors.forEach(vendor => {
+        const option = document.createElement('option');
+        option.value = vendor;
+        datalist.appendChild(option);
+      });
+
+      console.log(`Loaded ${uniqueVendors.length} existing vendors for autocomplete`);
+    }
 
     // Tab Switching
     function switchTab(tab) {
@@ -1259,7 +1289,7 @@
         html += `
           <div class="form-group">
             <label>VENDOR / STORE NAME</label>
-            <input type="text" id="editVendor" value="${receipt.vendor || ''}" placeholder="e.g., Office Depot, Amazon, US Foods">
+            <input type="text" id="editVendor" list="vendorList" value="${receipt.vendor || ''}" placeholder="Start typing... (e.g., Office Depot, Amazon, US Foods)" autocomplete="off">
           </div>
           <div class="form-group">
             <label>PURCHASE DATE</label>
@@ -1338,13 +1368,16 @@
         const editNewCategoryContainer = document.getElementById('editNewCategoryContainer');
         const editNewCategoryInput = document.getElementById('editNewCategory');
 
-        editCategorySelect.addEventListener('change', () => {
+        editCategorySelect.addEventListener('change', async () => {
           if (editCategorySelect.value === 'ADD_NEW') {
             editNewCategoryContainer.style.display = 'block';
             editNewCategoryInput.focus();
           } else {
             editNewCategoryContainer.style.display = 'none';
             editNewCategoryInput.value = '';
+
+            // AUTO-SAVE: Save category immediately when changed
+            await autoSaveCategory(editCategorySelect.value);
           }
         });
 
@@ -1372,6 +1405,54 @@
         actions.innerHTML = `
           <button class="btn btn-secondary" onclick="closeDetailModal()">CLOSE</button>
         `;
+      }
+    }
+
+    // Auto-save category with green glow visual feedback
+    async function autoSaveCategory(newCategory) {
+      if (!currentReceipt) return;
+
+      const editCategorySelect = document.getElementById('editCategory');
+      const originalBorder = editCategorySelect.style.borderColor;
+      const originalBg = editCategorySelect.style.background;
+
+      try {
+        // Save to database
+        const { error } = await supabase
+          .from('amex_receipts')
+          .update({ category: newCategory })
+          .eq('id', currentReceipt.id);
+
+        if (error) throw error;
+
+        // Update current receipt object
+        currentReceipt.category = newCategory;
+
+        // GREEN GLOW SUCCESS FEEDBACK
+        editCategorySelect.style.borderColor = '#059669';
+        editCategorySelect.style.background = '#d1fae5';
+        editCategorySelect.style.transition = 'all 0.3s ease';
+
+        console.log(`✅ Auto-saved category: ${newCategory}`);
+
+        // Fade back to normal after 2 seconds
+        setTimeout(() => {
+          editCategorySelect.style.borderColor = originalBorder || '';
+          editCategorySelect.style.background = originalBg || '';
+        }, 2000);
+
+        // Reload receipt list in background to show updated category
+        loadReceipts();
+
+      } catch (error) {
+        console.error('Auto-save category error:', error);
+        // Red flash on error
+        editCategorySelect.style.borderColor = '#dc2626';
+        editCategorySelect.style.background = '#fee2e2';
+        setTimeout(() => {
+          editCategorySelect.style.borderColor = originalBorder || '';
+          editCategorySelect.style.background = originalBg || '';
+        }, 2000);
       }
     }
 
