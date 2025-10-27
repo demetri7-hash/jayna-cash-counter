@@ -1575,7 +1575,7 @@
         showConfirmModal(
           `Delete ${selectedIds.length} selected receipt(s)? This action cannot be undone.`,
           async () => {
-            showStatus('Deleting receipts...', 'success');
+            console.log('Deleting receipts:', selectedIds);
 
             try {
               const { error } = await supabase
@@ -1584,14 +1584,18 @@
                 .in('id', selectedIds);
 
               if (error) {
-                showStatus('Error deleting receipts: ' + error.message, 'error');
+                console.error('Error deleting receipts:', error);
+                alert(`Error deleting receipts: ${error.message}`);
                 return;
               }
 
-              showStatus(`Deleted ${selectedIds.length} receipt(s) successfully`, 'success');
-              setTimeout(() => loadReceipts(), 500);
+              console.log(`Deleted ${selectedIds.length} receipt(s) successfully`);
+
+              // Reload list immediately
+              loadReceipts();
             } catch (error) {
-              showStatus('Error: ' + error.message, 'error');
+              console.error('Delete error:', error);
+              alert(`Error: ${error.message}`);
             }
           }
         );
@@ -1641,6 +1645,12 @@
       html += '</div>';
 
       container.innerHTML = html;
+    }
+
+    // Simple status logging (no visual feedback for internal operations)
+    function showStatus(message, type) {
+      console.log(`[${type.toUpperCase()}] ${message}`);
+      // Just log to console - visual feedback is handled by buttons
     }
 
     // Button-level feedback (no status box at top)
