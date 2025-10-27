@@ -564,8 +564,8 @@
           <select id="category">
             <option value="">SELECT CATEGORY</option>
           </select>
-          <div style="margin-top: 12px;">
-            <input type="text" id="newCategory" placeholder="OR ADD NEW CATEGORY (ALL CAPS)" style="margin-bottom: 8px;">
+          <div id="newCategoryContainer" style="margin-top: 12px; display: none;">
+            <input type="text" id="newCategory" placeholder="Enter new category" style="margin-bottom: 8px; text-transform: uppercase;">
             <button class="btn btn-secondary" onclick="addNewCategory()" style="width: 100%;">ADD CATEGORY</button>
           </div>
         </div>
@@ -642,8 +642,10 @@
 
   <script src="shared-header.js"></script>
   <script>
-    // Use Supabase from shared-header.js
-    let supabase;
+    // Initialize Supabase for this page
+    const SUPABASE_URL_AMEX = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+    const SUPABASE_ANON_KEY_AMEX = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
+    const supabase = window.supabase.createClient(SUPABASE_URL_AMEX, SUPABASE_ANON_KEY_AMEX);
 
     const ADMIN_PASSWORD = 'JaynaGyro2025!';
 
@@ -667,14 +669,12 @@
 
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
-      // Initialize Supabase from shared header
-      supabase = supabaseClient;
-
       initializeSharedHeader();
       initializeFileUpload();
       loadCategories();
       loadReceipts();
       setTodayDate();
+      setupCategoryDropdown();
     });
 
     // Tab Switching
@@ -760,6 +760,28 @@
       container.appendChild(preview);
     }
 
+    // Category Dropdown Setup
+    function setupCategoryDropdown() {
+      const categorySelect = document.getElementById('category');
+      const newCategoryContainer = document.getElementById('newCategoryContainer');
+      const newCategoryInput = document.getElementById('newCategory');
+
+      categorySelect.addEventListener('change', () => {
+        if (categorySelect.value === 'ADD_NEW') {
+          newCategoryContainer.style.display = 'block';
+          newCategoryInput.focus();
+        } else {
+          newCategoryContainer.style.display = 'none';
+          newCategoryInput.value = '';
+        }
+      });
+
+      // Auto-uppercase input
+      newCategoryInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase();
+      });
+    }
+
     // Categories
     async function loadCategories() {
       const { data, error } = await supabase
@@ -780,6 +802,12 @@
         option.textContent = cat.name;
         select.appendChild(option);
       });
+
+      // Add "ADD NEW" option at the end
+      const addNewOption = document.createElement('option');
+      addNewOption.value = 'ADD_NEW';
+      addNewOption.textContent = '+ ADD NEW CATEGORY';
+      select.appendChild(addNewOption);
     }
 
     async function addNewCategory() {
@@ -802,6 +830,7 @@
       }
 
       input.value = '';
+      document.getElementById('newCategoryContainer').style.display = 'none';
       await loadCategories();
       document.getElementById('category').value = name;
       showStatus('Category added successfully', 'success');
