@@ -6443,6 +6443,23 @@
             transition: all 0.15s ease;
           "
         >🔐 PASSWORDS</button>
+        <button
+          id="watchdogTab_access"
+          onclick="showWatchdogSection('access')"
+          style="
+            padding: 12px 20px;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: none;
+            border-radius: 0;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+        >🔒 ACCESS CONTROL</button>
       </div>
 
       <!-- History Section -->
@@ -6501,6 +6518,13 @@
           <p style="text-align: center; padding: 20px;">Loading password management...</p>
         </div>
       </div>
+
+      <!-- Access Control Section -->
+      <div id="watchdog_access" style="display: none;">
+        <div id="accessControlContainer">
+          <p style="text-align: center; padding: 20px;">Loading access control panel...</p>
+        </div>
+      </div>
     `;
 
     // Load last 2 days by default
@@ -6515,11 +6539,13 @@
     document.getElementById('watchdog_history').style.display = 'none';
     document.getElementById('watchdog_amcash').style.display = 'none';
     document.getElementById('watchdog_passwords').style.display = 'none';
+    document.getElementById('watchdog_access').style.display = 'none';
 
     // Update button styles
     const historyBtn = document.getElementById('watchdogTab_history');
     const amCashBtn = document.getElementById('watchdogTab_amcash');
     const passwordsBtn = document.getElementById('watchdogTab_passwords');
+    const accessBtn = document.getElementById('watchdogTab_access');
 
     historyBtn.style.background = 'var(--gray-100)';
     historyBtn.style.color = 'var(--gray-700)';
@@ -6527,6 +6553,8 @@
     amCashBtn.style.color = 'var(--gray-700)';
     passwordsBtn.style.background = 'var(--gray-100)';
     passwordsBtn.style.color = 'var(--gray-700)';
+    accessBtn.style.background = 'var(--gray-100)';
+    accessBtn.style.color = 'var(--gray-700)';
 
     // Show selected section
     if (section === 'history') {
@@ -6543,6 +6571,11 @@
       passwordsBtn.style.background = 'var(--gray-700)';
       passwordsBtn.style.color = 'white';
       loadPasswordManagement();
+    } else if (section === 'access') {
+      document.getElementById('watchdog_access').style.display = 'block';
+      accessBtn.style.background = 'var(--gray-700)';
+      accessBtn.style.color = 'white';
+      loadAccessControlPanel();
     }
   }
 
@@ -8437,6 +8470,313 @@
         handleCancel();
       }
     };
+  }
+
+  // ====================================
+  // ACCESS CONTROL PANEL
+  // ====================================
+
+  /**
+   * Role Hierarchy (higher number = more access)
+   */
+  const ROLE_HIERARCHY = {
+    'Master': 4,
+    'Admin': 3,
+    'Manager': 2,
+    'Editor': 1
+  };
+
+  /**
+   * Load Access Control Panel
+   */
+  async function loadAccessControlPanel() {
+    const container = document.getElementById('accessControlContainer');
+
+    showLoading('Loading', 'Fetching access control settings...');
+
+    try {
+      // Fetch all protected features from database
+      const { data: features, error } = await supabase
+        .from('protected_features')
+        .select('*')
+        .order('page', { ascending: true })
+        .order('feature_name', { ascending: true });
+
+      if (error) throw error;
+
+      hideLoading();
+
+      let html = `
+        <div style="margin-bottom: 24px; padding: 20px; background: var(--warning-bg); border-left: 4px solid var(--warning-border); border-radius: 0;">
+          <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--warning-text); text-transform: uppercase; letter-spacing: 1px;">
+            🔒 ACCESS CONTROL PANEL
+          </h3>
+          <p style="margin: 0; font-size: 13px; color: var(--warning-text); line-height: 1.6;">
+            Configure which role levels can access each password-protected feature. Changes apply instantly across ALL devices and pages.
+          </p>
+        </div>
+
+        <div style="margin-bottom: 24px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
+          <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: var(--blue-text);">
+            📊 ROLE HIERARCHY
+          </h4>
+          <div style="font-size: 13px; color: var(--blue-text); line-height: 1.8;">
+            <strong>Master (Level 4)</strong> → Full access to everything<br>
+            <strong>Admin (Level 3)</strong> → High-level features (most areas)<br>
+            <strong>Manager (Level 2)</strong> → Operational features (day-to-day)<br>
+            <strong>Editor (Level 1)</strong> → Basic features (limited access)
+          </div>
+        </div>
+
+        <div style="background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
+          <div style="background: var(--gray-100); padding: 14px 16px; border-bottom: 2px solid var(--gray-300);">
+            <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
+              PROTECTED FEATURES (${features.length})
+            </h4>
+          </div>
+
+          <div style="padding: 16px;">
+      `;
+
+      if (!features || features.length === 0) {
+        html += `
+          <div style="text-align: center; padding: 40px;">
+            <p style="font-size: 14px; color: var(--gray-600);">
+              No protected features found. Run the SQL migration first.
+            </p>
+          </div>
+        `;
+      } else {
+        // Group features by page
+        const groupedFeatures = features.reduce((acc, f) => {
+          if (!acc[f.page]) acc[f.page] = [];
+          acc[f.page].push(f);
+          return acc;
+        }, {});
+
+        Object.keys(groupedFeatures).sort().forEach(page => {
+          html += `
+            <div style="margin-bottom: 24px;">
+              <h5 style="margin: 0 0 12px 0; font-size: 12px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 1px; padding-bottom: 8px; border-bottom: 1px solid var(--gray-300);">
+                📄 ${page.toUpperCase()}
+              </h5>
+          `;
+
+          groupedFeatures[page].forEach(feature => {
+            const statusColor = feature.is_active ? 'var(--success-border)' : 'var(--error-border)';
+            const statusBg = feature.is_active ? 'var(--success-bg)' : 'var(--error-bg)';
+            const statusText = feature.is_active ? 'var(--success-text)' : 'var(--error-text)';
+
+            html += `
+              <div style="margin-bottom: 12px; padding: 16px; background: var(--gray-50); border: 1px solid var(--gray-300); border-radius: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+                  <div style="flex: 1; min-width: 200px;">
+                    <h6 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: var(--gray-900);">
+                      ${feature.feature_name}
+                    </h6>
+                    ${feature.description ? `
+                      <p style="margin: 0; font-size: 12px; color: var(--gray-600);">
+                        ${feature.description}
+                      </p>
+                    ` : ''}
+                  </div>
+                  <span style="
+                    display: inline-block;
+                    padding: 4px 10px;
+                    background: ${statusBg};
+                    color: ${statusText};
+                    border-radius: 0;
+                    font-size: 11px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                  ">${feature.is_active ? '✅ ACTIVE' : '❌ INACTIVE'}</span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                  <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; margin-bottom: 6px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+                      Required Role
+                    </label>
+                    <select
+                      id="role_${feature.id}"
+                      data-feature-id="${feature.id}"
+                      style="
+                        width: 100%;
+                        padding: 10px;
+                        border: 2px solid var(--gray-300);
+                        border-radius: 0;
+                        font-size: 13px;
+                        font-weight: 600;
+                        box-sizing: border-box;
+                      "
+                    >
+                      <option value="Master" ${feature.required_role === 'Master' ? 'selected' : ''}>Master (Level 4) - Full Access</option>
+                      <option value="Admin" ${feature.required_role === 'Admin' ? 'selected' : ''}>Admin (Level 3) - High Access</option>
+                      <option value="Manager" ${feature.required_role === 'Manager' ? 'selected' : ''}>Manager (Level 2) - Standard</option>
+                      <option value="Editor" ${feature.required_role === 'Editor' ? 'selected' : ''}>Editor (Level 1) - Basic</option>
+                    </select>
+                  </div>
+
+                  <div style="display: flex; gap: 8px; align-items: flex-end;">
+                    <button
+                      onclick="updateFeatureAccess('${feature.id}')"
+                      style="
+                        padding: 10px 16px;
+                        background: var(--success-border);
+                        color: white;
+                        border: 2px solid var(--success-border);
+                        border-radius: 0;
+                        font-size: 11px;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        cursor: pointer;
+                        transition: all 0.15s ease;
+                      "
+                      onmouseover="this.style.background='#047857'"
+                      onmouseout="this.style.background='var(--success-border)'"
+                    >💾 SAVE</button>
+
+                    <button
+                      onclick="toggleFeatureStatus('${feature.id}', ${!feature.is_active})"
+                      style="
+                        padding: 10px 16px;
+                        background: ${feature.is_active ? 'var(--error-border)' : 'var(--success-border)'};
+                        color: white;
+                        border: 2px solid ${feature.is_active ? 'var(--error-border)' : 'var(--success-border)'};
+                        border-radius: 0;
+                        font-size: 11px;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        cursor: pointer;
+                        transition: all 0.15s ease;
+                      "
+                    >${feature.is_active ? '🚫 DISABLE' : '✅ ENABLE'}</button>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+
+          html += '</div>';
+        });
+      }
+
+      html += `
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = html;
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error loading access control:', error);
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          <p style="font-size: 16px; color: var(--error-text);">
+            Error loading access control: ${error.message}
+          </p>
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Update Feature Access Level
+   */
+  async function updateFeatureAccess(featureId) {
+    const select = document.getElementById(`role_${featureId}`);
+    const newRole = select.value;
+
+    showLoading('Updating Access', 'Saving new access level...');
+
+    try {
+      const { error } = await supabase
+        .from('protected_features')
+        .update({
+          required_role: newRole,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', featureId);
+
+      if (error) throw error;
+
+      hideLoading();
+      showMessage(`✅ Access level updated! ${newRole} role now required. Changes apply instantly on all devices.`, 'success');
+
+      // Reload panel to show updated data
+      setTimeout(() => {
+        loadAccessControlPanel();
+      }, 1500);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error updating feature access:', error);
+      showMessage(`Error updating access: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Toggle Feature Status (Enable/Disable)
+   */
+  async function toggleFeatureStatus(featureId, newStatus) {
+    showLoading('Updating Status', newStatus ? 'Enabling feature...' : 'Disabling feature...');
+
+    try {
+      const { error } = await supabase
+        .from('protected_features')
+        .update({
+          is_active: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', featureId);
+
+      if (error) throw error;
+
+      hideLoading();
+      showMessage(`✅ Feature ${newStatus ? 'enabled' : 'disabled'} successfully!`, 'success');
+
+      // Reload panel
+      setTimeout(() => {
+        loadAccessControlPanel();
+      }, 1500);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error toggling feature status:', error);
+      showMessage(`Error updating status: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Check if user has access to a feature (helper function for password validation)
+   */
+  async function checkFeatureAccess(featureId, userRole) {
+    try {
+      const { data: feature, error } = await supabase
+        .from('protected_features')
+        .select('*')
+        .eq('feature_id', featureId)
+        .eq('is_active', true)
+        .single();
+
+      if (error || !feature) {
+        // Feature not found or inactive - deny access
+        return false;
+      }
+
+      const userLevel = ROLE_HIERARCHY[userRole] || 0;
+      const requiredLevel = ROLE_HIERARCHY[feature.required_role] || 999;
+
+      return userLevel >= requiredLevel;
+
+    } catch (error) {
+      console.error('Error checking feature access:', error);
+      return false;
+    }
   }
 
   // ====================================
