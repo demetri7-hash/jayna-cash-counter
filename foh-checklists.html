@@ -1457,11 +1457,28 @@
   // SESSION MANAGEMENT (60-minute manager access)
   // ============================================
 
-  function setManagerSession() {
+  async function setManagerSession(userRole = 'Manager') {
     const now = new Date().getTime();
-    const expiryTime = now + (60 * 60 * 1000); // 60 minutes from now
+
+    // Fetch session duration for this role from database
+    let sessionMinutes = 60; // Default fallback
+    try {
+      const { data: roleSettings, error } = await supabase
+        .from('role_settings')
+        .select('session_duration_minutes')
+        .eq('role', userRole)
+        .single();
+
+      if (!error && roleSettings) {
+        sessionMinutes = roleSettings.session_duration_minutes;
+      }
+    } catch (error) {
+      console.log('Using default session duration:', sessionMinutes);
+    }
+
+    const expiryTime = now + (sessionMinutes * 60 * 1000);
     localStorage.setItem('managerSession', expiryTime.toString());
-    console.log('✓ Manager session set (60 minutes)');
+    console.log(`✓ ${userRole} session set (${sessionMinutes} minutes)`);
   }
 
   function isManagerSessionValid() {
@@ -1624,10 +1641,10 @@
       }
 
       if (enteredPassword === masterPassword) {
-        setManagerSession(); // Set 60-minute session
-        localStorage.setItem('manager_role', 'Admin'); // Store role as Admin
+        await setManagerSession('Master'); // Set session based on Master role settings
+        localStorage.setItem('manager_role', 'Master'); // Store role as Master
         document.body.removeChild(modal);
-        showMessage('✅ Admin session active (60 minutes) - Full Access', 'success');
+        showMessage('✅ Master session active - Full Access', 'success');
         callback();
         return;
       }
@@ -1653,18 +1670,20 @@
           const user = passwords[0];
           const userRole = user.role || 'Manager'; // Default to Manager if no role set
 
-          setManagerSession(); // Set 60-minute session
+          await setManagerSession(userRole); // Set session based on user's role settings
           localStorage.setItem('manager_role', userRole); // Store user's role
           localStorage.setItem('manager_username', user.username); // Store username
 
           document.body.removeChild(modal);
 
-          // Show role-specific message
-          if (userRole === 'Admin') {
-            showMessage(`✅ Admin session active (60 minutes) - ${user.username} - Full Access`, 'success');
-          } else {
-            showMessage(`✅ ${userRole} session active (60 minutes) - ${user.username} - Checklist Editing Only`, 'success');
-          }
+          const roleEmoji = {
+            'Master': '🔴',
+            'Admin': '🟠',
+            'Manager': '🟡',
+            'Editor': '🟢'
+          }[userRole] || '🔵';
+
+          showMessage(`✅ ${roleEmoji} ${userRole} session active - ${user.username}`, 'success');
 
           callback();
           return;
@@ -1859,11 +1878,11 @@
       // 2. Check if entered password is master password
       if (enteredPassword === masterPassword) {
         // Master password always grants access
-        setManagerSession();
+        await setManagerSession('Master');
         localStorage.setItem('manager_role', 'Master');
         localStorage.setItem('manager_username', 'Master');
         document.body.removeChild(modal);
-        showMessage('✅ Master session active (60 minutes) - Full System Access', 'success');
+        showMessage('✅ Master session active - Full System Access', 'success');
         callback();
         return;
       }
@@ -1899,7 +1918,7 @@
           }
 
           // Access granted!
-          setManagerSession();
+          await setManagerSession(userRole);
           localStorage.setItem('manager_role', userRole);
           localStorage.setItem('manager_username', user.username);
           document.body.removeChild(modal);
@@ -1911,7 +1930,7 @@
             'Editor': '🟢'
           }[userRole] || '🔵';
 
-          showMessage(`✅ ${roleEmoji} ${userRole} session active (60 minutes) - ${user.username}`, 'success');
+          showMessage(`✅ ${roleEmoji} ${userRole} session active - ${user.username}`, 'success');
           callback();
           return;
         }
@@ -8795,7 +8814,105 @@
             <strong>Editor (Level 1)</strong> → Basic features (limited access)
           </div>
         </div>
+      `;
 
+      // Fetch role session durations
+      const { data: roleSettings, error: roleError } = await supabase
+        .from('role_settings')
+        .select('*')
+        .order('role', { ascending: false });
+
+      if (!roleError && roleSettings) {
+        html += `
+          <div style="margin-bottom: 24px; padding: 16px; background: #f0fdf4; border-left: 4px solid #059669; border-radius: 0;">
+            <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #065f46;">
+              ⏱️ SESSION DURATION SETTINGS
+            </h4>
+            <p style="margin: 0 0 16px 0; font-size: 12px; color: #065f46; line-height: 1.6;">
+              Configure how long each role stays logged in after entering their password. Changes apply to the next login.
+            </p>
+        `;
+
+        roleSettings.forEach(roleSetting => {
+          const roleColors = {
+            'Master': { bg: '#fee2e2', text: '#991b1b', border: '#dc2626', emoji: '🔴' },
+            'Admin': { bg: '#fed7aa', text: '#9a3412', border: '#f59e0b', emoji: '🟠' },
+            'Manager': { bg: '#cffafe', text: '#164e63', border: '#0891b2', emoji: '🟡' },
+            'Editor': { bg: '#d1fae5', text: '#065f46', border: '#10b981', emoji: '🟢' }
+          };
+          const colors = roleColors[roleSetting.role] || { bg: '#e5e7eb', text: '#374151', border: '#9ca3af', emoji: '⚪' };
+
+          html += `
+            <div style="margin-bottom: 12px; padding: 12px; background: white; border: 2px solid ${colors.border}; border-radius: 0;">
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 150px;">
+                  <div style="
+                    display: inline-block;
+                    padding: 6px 12px;
+                    background: ${colors.bg};
+                    color: ${colors.text};
+                    border-radius: 0;
+                    font-size: 12px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    margin-bottom: 4px;
+                  ">
+                    ${colors.emoji} ${roleSetting.role}
+                  </div>
+                  <p style="margin: 0; font-size: 11px; color: var(--gray-600);">
+                    ${roleSetting.description}
+                  </p>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input
+                    type="number"
+                    id="session_duration_${roleSetting.role}"
+                    value="${roleSetting.session_duration_minutes}"
+                    min="5"
+                    max="480"
+                    style="
+                      width: 80px;
+                      padding: 10px;
+                      border: 2px solid var(--gray-300);
+                      border-radius: 0;
+                      font-size: 14px;
+                      font-weight: 600;
+                      text-align: center;
+                      box-sizing: border-box;
+                    "
+                  />
+                  <span style="font-size: 13px; font-weight: 600; color: var(--gray-700);">minutes</span>
+                  <button
+                    onclick="saveSessionDuration('${roleSetting.role}')"
+                    style="
+                      padding: 10px 16px;
+                      background: ${colors.border};
+                      color: white;
+                      border: 2px solid ${colors.border};
+                      border-radius: 0;
+                      font-size: 11px;
+                      font-weight: 700;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                      cursor: pointer;
+                      transition: all 0.15s ease;
+                      white-space: nowrap;
+                    "
+                    onmouseover="this.style.opacity='0.8'"
+                    onmouseout="this.style.opacity='1'"
+                  >💾 SAVE</button>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        html += '</div>';
+      }
+
+      html += `
         <div style="background: white; border: 2px solid var(--gray-300); border-radius: 0; overflow: hidden;">
           <div style="background: var(--gray-100); padding: 14px 16px; border-bottom: 2px solid var(--gray-300);">
             <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">
@@ -9016,6 +9133,55 @@
       hideLoading();
       console.error('Error toggling feature status:', error);
       showMessage(`Error updating status: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Save Session Duration for a Role
+   */
+  async function saveSessionDuration(role) {
+    const input = document.getElementById(`session_duration_${role}`);
+    const newDuration = parseInt(input.value);
+
+    // Validate input
+    if (isNaN(newDuration) || newDuration < 5 || newDuration > 480) {
+      showMessage('⚠️ Invalid duration. Please enter a value between 5 and 480 minutes.', 'error');
+      return;
+    }
+
+    const roleEmojis = {
+      'Master': '🔴',
+      'Admin': '🟠',
+      'Manager': '🟡',
+      'Editor': '🟢'
+    };
+    const emoji = roleEmojis[role] || '';
+
+    showLoading('Saving Duration', `Updating ${emoji} ${role} session duration...`);
+
+    try {
+      const { error } = await supabase
+        .from('role_settings')
+        .update({
+          session_duration_minutes: newDuration,
+          updated_at: new Date().toISOString()
+        })
+        .eq('role', role);
+
+      if (error) throw error;
+
+      hideLoading();
+      showMessage(`✅ ${emoji} ${role} session duration updated to ${newDuration} minutes! Changes apply to next login.`, 'success');
+
+      // Reload panel to show updated data
+      setTimeout(() => {
+        loadAccessControlPanel();
+      }, 1500);
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error saving session duration:', error);
+      showMessage(`Error updating session duration: ${error.message}`, 'error');
     }
   }
 
