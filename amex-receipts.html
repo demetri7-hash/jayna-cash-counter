@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AMEX Receipts - Jayna Gyro Manager Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    :root {
+      --white: #ffffff;
+      --gray-900: #1a1a1a;
+      --gray-700: #4a4a4a;
+      --gray-600: #6b6b6b;
+      --gray-500: #9ca3af;
+      --gray-400: #d1d5db;
+      --gray-300: #e5e7eb;
+      --gray-200: #f3f4f6;
+      --gray-100: #f9fafb;
+
+      --success-bg: #d1fae5;
+      --success-text: #065f46;
+      --success-border: #059669;
+
+      --error-bg: #fee2e2;
+      --error-text: #991b1b;
+      --error-border: #dc2626;
+
+      --warning-bg: #fef3c7;
+      --warning-text: #92400e;
+      --warning-border: #f59e0b;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--gray-100);
+      color: var(--gray-700);
+      line-height: 1.6;
+      padding: 0;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    h1, h2, h3 {
+      color: var(--gray-900);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+
+    h3 {
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    /* Tab System */
+    .tab-container {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--gray-300);
+    }
+
+    .tab-btn {
+      padding: 12px 20px;
+      background: var(--gray-100);
+      color: var(--gray-700);
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn.active {
+      background: var(--gray-700);
+      color: white;
+      border-bottom-color: var(--gray-700);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Form Styles */
+    .form-section {
+      background: white;
+      border: 2px solid var(--gray-300);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-700);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      font-weight: 400;
+      background: white;
+      box-sizing: border-box;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--gray-700);
+      outline: none;
+    }
+
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+      font-family: inherit;
+    }
+
+    /* Button Styles */
+    .btn {
+      padding: 12px 24px;
+      border: 2px solid var(--gray-900);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border-radius: 0;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--gray-900);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--gray-700);
+      border-color: var(--gray-700);
+    }
+
+    .btn-secondary {
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border-color: var(--gray-300);
+    }
+
+    .btn-danger {
+      background: #dc2626;
+      color: white;
+      border-color: #dc2626;
+    }
+
+    .btn-success {
+      background: #059669;
+      color: white;
+      border-color: #059669;
+    }
+
+    /* File Upload Area */
+    .file-upload-area {
+      border: 3px dashed var(--gray-300);
+      padding: 40px;
+      text-align: center;
+      background: var(--gray-100);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .file-upload-area:hover {
+      border-color: var(--gray-700);
+      background: white;
+    }
+
+    .file-upload-area.dragover {
+      border-color: var(--gray-700);
+      background: var(--success-bg);
+    }
+
+    .file-preview-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .file-preview {
+      position: relative;
+      border: 2px solid var(--gray-300);
+      padding: 8px;
+      background: white;
+    }
+
+    .file-preview img {
+      width: 100%;
+      height: 100px;
+      object-fit: cover;
+    }
+
+    .file-preview-name {
+      font-size: 10px;
+      color: var(--gray-600);
+      margin-top: 4px;
+      word-break: break-all;
+    }
+
+    .file-remove-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: #dc2626;
+      color: white;
+      border: none;
+      width: 24px;
+      height: 24px;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    /* List View */
+    .list-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .pagination-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .list-container {
+      background: white;
+      border: 2px solid var(--gray-300);
+    }
+
+    .list-item {
+      display: grid;
+      grid-template-columns: 40px 100px 100px 120px 1fr;
+      gap: 12px;
+      padding: 12px;
+      border-bottom: 1px solid var(--gray-200);
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .list-item:hover {
+      background: var(--gray-100);
+    }
+
+    .list-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .list-header {
+      display: grid;
+      grid-template-columns: 40px 100px 100px 120px 1fr;
+      gap: 12px;
+      padding: 12px;
+      background: var(--gray-100);
+      border-bottom: 2px solid var(--gray-300);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-700);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .category-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: var(--gray-200);
+      color: var(--gray-700);
+      font-weight: 600;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10000;
+      overflow-y: auto;
+      padding: 20px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 24px;
+      max-width: 800px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 3px solid var(--gray-700);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--gray-300);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: var(--gray-600);
+      cursor: pointer;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      line-height: 1;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 2px solid var(--gray-300);
+    }
+
+    /* Status Messages */
+    .status-message {
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      border: 2px solid;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .status-message.success {
+      background: var(--success-bg);
+      color: var(--success-text);
+      border-color: var(--success-border);
+    }
+
+    .status-message.error {
+      background: var(--error-bg);
+      color: var(--error-text);
+      border-color: var(--error-border);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--gray-500);
+      font-size: 13px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--gray-500);
+      font-size: 14px;
+    }
+
+    /* Archive List */
+    .archive-item {
+      padding: 16px;
+      border-bottom: 1px solid var(--gray-200);
+      display: grid;
+      grid-template-columns: 120px 100px 120px 1fr 100px;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .archive-item:hover {
+      background: var(--gray-100);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .list-header,
+      .list-item {
+        grid-template-columns: 40px 1fr;
+      }
+
+      .list-header span:not(:first-child):not(:last-child),
+      .list-item > *:not(:first-child):not(:last-child) {
+        display: none;
+      }
+
+      .archive-item {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Shared Header -->
+  <div id="sharedHeader"></div>
+
+  <div class="container">
+    <h1>AMEX RECEIPTS - CARD 1100</h1>
+    <p style="font-size: 12px; color: var(--gray-600); margin-bottom: 20px;">DEMETRI GREGORAKIS | JAYNA ONE INC</p>
+
+    <div id="statusMessage"></div>
+
+    <!-- Tab Navigation -->
+    <div class="tab-container">
+      <button class="tab-btn active" onclick="switchTab('receipts')">RECEIPTS</button>
+      <button class="tab-btn" onclick="switchTab('archive')">ARCHIVE</button>
+    </div>
+
+    <!-- RECEIPTS TAB -->
+    <div id="receiptsTab" class="tab-content active">
+      <!-- Upload Form -->
+      <div class="form-section">
+        <h2>ADD NEW RECEIPT</h2>
+
+        <div class="form-group">
+          <label for="purchaseDate">PURCHASE DATE</label>
+          <input type="date" id="purchaseDate">
+        </div>
+
+        <div class="form-group">
+          <label for="amount">AMOUNT ($)</label>
+          <input type="number" id="amount" step="0.01" placeholder="0.00">
+        </div>
+
+        <div class="form-group">
+          <label for="category">CATEGORY</label>
+          <select id="category">
+            <option value="">SELECT CATEGORY</option>
+          </select>
+          <div style="margin-top: 12px;">
+            <input type="text" id="newCategory" placeholder="OR ADD NEW CATEGORY (ALL CAPS)" style="margin-bottom: 8px;">
+            <button class="btn btn-secondary" onclick="addNewCategory()" style="width: 100%;">ADD CATEGORY</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="details">DETAILS</label>
+          <textarea id="details" placeholder="Enter purchase details..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>RECEIPT FILES (IMAGES, PDF, WORD, EXCEL)</label>
+          <div class="file-upload-area" id="fileUploadArea">
+            <p style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">CLICK OR DRAG FILES HERE</p>
+            <p style="font-size: 12px; color: var(--gray-500);">Images will be compressed. Documents saved as-is.</p>
+          </div>
+          <input type="file" id="fileInput" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display: none;">
+          <div id="filePreviewContainer" class="file-preview-container"></div>
+        </div>
+
+        <button class="btn btn-primary" onclick="saveReceipt()" style="width: 100%;">SAVE RECEIPT</button>
+      </div>
+
+      <!-- List View -->
+      <div class="form-section">
+        <div class="list-controls">
+          <h2 style="margin: 0;">RECEIPT LIST</h2>
+          <div class="pagination-controls">
+            <label style="margin: 0;">SHOW:</label>
+            <select id="pageSize" onchange="changePageSize()" style="width: auto; padding: 8px;">
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+          <button class="btn btn-success" onclick="acceptAndClear()">ACCEPT AND CLEAR</button>
+          <button class="btn btn-secondary" onclick="downloadSelectedPDF()">DOWNLOAD</button>
+        </div>
+
+        <div id="receiptListContainer"></div>
+
+        <div id="paginationControls" style="display: flex; justify-content: center; gap: 8px; margin-top: 16px; flex-wrap: wrap;"></div>
+      </div>
+    </div>
+
+    <!-- ARCHIVE TAB -->
+    <div id="archiveTab" class="tab-content">
+      <div class="form-section">
+        <h2>ARCHIVED RECEIPTS</h2>
+        <div id="archiveListContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div id="detailModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 style="margin: 0;">RECEIPT DETAILS</h2>
+        <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+      </div>
+
+      <div id="detailContent"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">CLOSE</button>
+        <button class="btn btn-primary" onclick="enableEditing()">EDIT</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared-header.js"></script>
+  <script>
+    // Initialize Supabase
+    const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const ADMIN_PASSWORD = 'JaynaGyro2025!';
+
+    // State
+    let uploadedFiles = [];
+    let currentReceipt = null;
+    let currentPage = 1;
+    let pageSize = 10;
+    let allReceipts = [];
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeSharedHeader();
+      initializeFileUpload();
+      loadCategories();
+      loadReceipts();
+      setTodayDate();
+    });
+
+    function setTodayDate() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('purchaseDate').value = today;
+    }
+
+    // Tab Switching
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      if (tab === 'receipts') {
+        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+        document.getElementById('receiptsTab').classList.add('active');
+        loadReceipts();
+      } else if (tab === 'archive') {
+        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+        document.getElementById('archiveTab').classList.add('active');
+        loadArchive();
+      }
+    }
+
+    // File Upload
+    function initializeFileUpload() {
+      const uploadArea = document.getElementById('fileUploadArea');
+      const fileInput = document.getElementById('fileInput');
+
+      uploadArea.addEventListener('click', () => fileInput.click());
+
+      uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+      });
+
+      uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+      });
+
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+      });
+    }
+
+    function handleFiles(files) {
+      Array.from(files).forEach(file => {
+        uploadedFiles.push(file);
+        displayFilePreview(file);
+      });
+    }
+
+    function displayFilePreview(file) {
+      const container = document.getElementById('filePreviewContainer');
+      const preview = document.createElement('div');
+      preview.className = 'file-preview';
+
+      if (file.type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        preview.appendChild(img);
+      } else {
+        const icon = document.createElement('div');
+        icon.style.cssText = 'width: 100%; height: 100px; display: flex; align-items: center; justify-content: center; background: var(--gray-100); font-size: 32px; color: var(--gray-500);';
+        icon.textContent = '📄';
+        preview.appendChild(icon);
+      }
+
+      const name = document.createElement('div');
+      name.className = 'file-preview-name';
+      name.textContent = file.name;
+      preview.appendChild(name);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'file-remove-btn';
+      removeBtn.textContent = '×';
+      removeBtn.onclick = () => {
+        uploadedFiles = uploadedFiles.filter(f => f !== file);
+        preview.remove();
+      };
+      preview.appendChild(removeBtn);
+
+      container.appendChild(preview);
+    }
+
+    // Categories
+    async function loadCategories() {
+      const { data, error } = await supabase
+        .from('amex_categories')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error loading categories:', error);
+        return;
+      }
+
+      const select = document.getElementById('category');
+      select.innerHTML = '<option value="">SELECT CATEGORY</option>';
+      data.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.name;
+        option.textContent = cat.name;
+        select.appendChild(option);
+      });
+    }
+
+    async function addNewCategory() {
+      const input = document.getElementById('newCategory');
+      const name = input.value.trim().toUpperCase();
+
+      if (!name) {
+        showStatus('Please enter a category name', 'error');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('amex_categories')
+        .insert({ name })
+        .select();
+
+      if (error) {
+        showStatus('Error adding category: ' + error.message, 'error');
+        return;
+      }
+
+      input.value = '';
+      await loadCategories();
+      document.getElementById('category').value = name;
+      showStatus('Category added successfully', 'success');
+    }
+
+    // Save Receipt
+    async function saveReceipt() {
+      const date = document.getElementById('purchaseDate').value;
+      const amount = parseFloat(document.getElementById('amount').value);
+      const category = document.getElementById('category').value;
+      const details = document.getElementById('details').value.trim();
+
+      if (!date || !amount || !category) {
+        showStatus('Please fill in all required fields', 'error');
+        return;
+      }
+
+      showStatus('Uploading files...', 'success');
+
+      // Upload files
+      const imageUrls = [];
+      for (const file of uploadedFiles) {
+        try {
+          const fileUrl = await uploadFile(file);
+          imageUrls.push(fileUrl);
+        } catch (error) {
+          showStatus('Error uploading file: ' + error.message, 'error');
+          return;
+        }
+      }
+
+      // Save to database
+      const { data, error } = await supabase
+        .from('amex_receipts')
+        .insert({
+          purchase_date: date,
+          amount: amount,
+          category: category,
+          details: details,
+          image_urls: imageUrls
+        })
+        .select();
+
+      if (error) {
+        showStatus('Error saving receipt: ' + error.message, 'error');
+        return;
+      }
+
+      showStatus('Receipt saved successfully', 'success');
+      clearForm();
+      loadReceipts();
+    }
+
+    async function uploadFile(file) {
+      // Convert file to base64
+      const reader = new FileReader();
+      const base64 = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Send to API
+      const response = await fetch('/api/process-amex-receipt-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file: base64,
+          fileType: file.type,
+          fileName: file.name
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('File upload failed');
+      }
+
+      const result = await response.json();
+      return result.fileUrl;
+    }
+
+    function clearForm() {
+      setTodayDate();
+      document.getElementById('amount').value = '';
+      document.getElementById('category').value = '';
+      document.getElementById('details').value = '';
+      document.getElementById('filePreviewContainer').innerHTML = '';
+      uploadedFiles = [];
+    }
+
+    // Load Receipts
+    async function loadReceipts() {
+      const container = document.getElementById('receiptListContainer');
+      container.innerHTML = '<div class="loading">Loading receipts...</div>';
+
+      const { data, error } = await supabase
+        .from('amex_receipts')
+        .select('*')
+        .order('purchase_date', { ascending: false });
+
+      if (error) {
+        container.innerHTML = '<div class="empty-state">Error loading receipts</div>';
+        return;
+      }
+
+      allReceipts = data;
+      renderReceiptList();
+    }
+
+    function renderReceiptList() {
+      const container = document.getElementById('receiptListContainer');
+
+      if (allReceipts.length === 0) {
+        container.innerHTML = '<div class="empty-state">No receipts yet. Add your first receipt above.</div>';
+        return;
+      }
+
+      const start = (currentPage - 1) * pageSize;
+      const end = start + pageSize;
+      const pageReceipts = allReceipts.slice(start, end);
+
+      let html = '<div class="list-container">';
+      html += `
+        <div class="list-header">
+          <span><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></span>
+          <span>DATE</span>
+          <span>AMOUNT</span>
+          <span>CATEGORY</span>
+          <span>DETAILS</span>
+        </div>
+      `;
+
+      pageReceipts.forEach(receipt => {
+        html += `
+          <div class="list-item" onclick="viewReceipt(${receipt.id}, event)">
+            <input type="checkbox" class="receipt-checkbox" data-id="${receipt.id}" onclick="event.stopPropagation()">
+            <span>${receipt.purchase_date}</span>
+            <span>$${parseFloat(receipt.amount).toFixed(2)}</span>
+            <span><span class="category-badge">${receipt.category}</span></span>
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${receipt.details || 'N/A'}</span>
+          </div>
+        `;
+      });
+
+      html += '</div>';
+      container.innerHTML = html;
+
+      renderPagination();
+    }
+
+    function renderPagination() {
+      const container = document.getElementById('paginationControls');
+      const totalPages = Math.ceil(allReceipts.length / pageSize);
+
+      if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+      }
+
+      let html = '';
+
+      if (currentPage > 1) {
+        html += '<button class="btn btn-secondary" onclick="changePage(' + (currentPage - 1) + ')">PREV</button>';
+      }
+
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === currentPage) {
+          html += '<button class="btn btn-primary">' + i + '</button>';
+        } else {
+          html += '<button class="btn btn-secondary" onclick="changePage(' + i + ')">' + i + '</button>';
+        }
+      }
+
+      if (currentPage < totalPages) {
+        html += '<button class="btn btn-secondary" onclick="changePage(' + (currentPage + 1) + ')">NEXT</button>';
+      }
+
+      container.innerHTML = html;
+    }
+
+    function changePage(page) {
+      currentPage = page;
+      renderReceiptList();
+    }
+
+    function changePageSize() {
+      pageSize = parseInt(document.getElementById('pageSize').value);
+      currentPage = 1;
+      renderReceiptList();
+    }
+
+    function toggleSelectAll() {
+      const checked = document.getElementById('selectAll').checked;
+      document.querySelectorAll('.receipt-checkbox').forEach(cb => cb.checked = checked);
+    }
+
+    // View Receipt
+    async function viewReceipt(id, event) {
+      if (event.target.type === 'checkbox') return;
+
+      const { data, error } = await supabase
+        .from('amex_receipts')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        showStatus('Error loading receipt', 'error');
+        return;
+      }
+
+      currentReceipt = data;
+      displayReceiptDetails(data, false);
+      document.getElementById('detailModal').classList.add('active');
+    }
+
+    function displayReceiptDetails(receipt, editable) {
+      const content = document.getElementById('detailContent');
+
+      let html = '';
+
+      if (editable) {
+        html += `
+          <div class="form-group">
+            <label>PURCHASE DATE</label>
+            <input type="date" id="editDate" value="${receipt.purchase_date}">
+          </div>
+          <div class="form-group">
+            <label>AMOUNT ($)</label>
+            <input type="number" id="editAmount" value="${receipt.amount}" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>CATEGORY</label>
+            <select id="editCategory">
+              ${Array.from(document.getElementById('category').options).map(opt =>
+                `<option value="${opt.value}" ${opt.value === receipt.category ? 'selected' : ''}>${opt.textContent}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>DETAILS</label>
+            <textarea id="editDetails">${receipt.details || ''}</textarea>
+          </div>
+        `;
+      } else {
+        html += `
+          <div style="margin-bottom: 16px;">
+            <label>PURCHASE DATE</label>
+            <p style="font-size: 14px; margin-top: 4px;">${receipt.purchase_date}</p>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label>AMOUNT</label>
+            <p style="font-size: 14px; margin-top: 4px;">$${parseFloat(receipt.amount).toFixed(2)}</p>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label>CATEGORY</label>
+            <p style="font-size: 14px; margin-top: 4px;"><span class="category-badge">${receipt.category}</span></p>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label>DETAILS</label>
+            <p style="font-size: 14px; margin-top: 4px;">${receipt.details || 'N/A'}</p>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label>DATE ADDED</label>
+            <p style="font-size: 11px; margin-top: 4px; color: var(--gray-500);">${new Date(receipt.date_added).toLocaleString()}</p>
+          </div>
+        `;
+      }
+
+      // Show images
+      if (receipt.image_urls && receipt.image_urls.length > 0) {
+        html += '<div style="margin-top: 20px;"><label>ATTACHED FILES</label>';
+        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px;">';
+        receipt.image_urls.forEach(url => {
+          if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png')) {
+            html += `<a href="${url}" target="_blank"><img src="${url}" style="width: 100%; border: 2px solid var(--gray-300);"></a>`;
+          } else {
+            html += `<a href="${url}" target="_blank" style="padding: 20px; border: 2px solid var(--gray-300); text-align: center; display: block; text-decoration: none; color: var(--gray-700);">📄 VIEW FILE</a>`;
+          }
+        });
+        html += '</div></div>';
+      }
+
+      content.innerHTML = html;
+
+      // Update actions
+      const actions = document.querySelector('.modal-actions');
+      if (editable) {
+        actions.innerHTML = `
+          <button class="btn btn-secondary" onclick="closeDetailModal()">CANCEL</button>
+          <button class="btn btn-primary" onclick="saveEdit()">SAVE</button>
+        `;
+      } else {
+        actions.innerHTML = `
+          <button class="btn btn-secondary" onclick="closeDetailModal()">CLOSE</button>
+          <button class="btn btn-primary" onclick="enableEditing()">EDIT</button>
+        `;
+      }
+    }
+
+    function enableEditing() {
+      const password = prompt('ENTER ADMIN PASSWORD:');
+      if (password !== ADMIN_PASSWORD) {
+        showStatus('Incorrect password', 'error');
+        return;
+      }
+      displayReceiptDetails(currentReceipt, true);
+    }
+
+    async function saveEdit() {
+      const date = document.getElementById('editDate').value;
+      const amount = parseFloat(document.getElementById('editAmount').value);
+      const category = document.getElementById('editCategory').value;
+      const details = document.getElementById('editDetails').value.trim();
+
+      const { error } = await supabase
+        .from('amex_receipts')
+        .update({
+          purchase_date: date,
+          amount: amount,
+          category: category,
+          details: details
+        })
+        .eq('id', currentReceipt.id);
+
+      if (error) {
+        showStatus('Error updating receipt: ' + error.message, 'error');
+        return;
+      }
+
+      showStatus('Receipt updated successfully', 'success');
+      closeDetailModal();
+      loadReceipts();
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detailModal').classList.remove('active');
+      currentReceipt = null;
+    }
+
+    // Accept and Clear
+    async function acceptAndClear() {
+      const selectedIds = getSelectedReceiptIds();
+
+      if (selectedIds.length === 0) {
+        showStatus('Please select receipts to archive', 'error');
+        return;
+      }
+
+      if (!confirm(`Archive ${selectedIds.length} receipts and email PDF to printer?`)) {
+        return;
+      }
+
+      showStatus('Generating PDF and emailing...', 'success');
+
+      try {
+        const response = await fetch('/api/archive-amex-receipts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            receiptIds: selectedIds,
+            emailToPrinter: true,
+            approvedBy: 'Yusuf Topal'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Archive failed');
+        }
+
+        const result = await response.json();
+        showStatus(`Archived ${result.entryCount} receipts. PDF emailed to printer.`, 'success');
+        loadReceipts();
+      } catch (error) {
+        showStatus('Error archiving receipts: ' + error.message, 'error');
+      }
+    }
+
+    async function downloadSelectedPDF() {
+      const selectedIds = getSelectedReceiptIds();
+
+      if (selectedIds.length === 0) {
+        showStatus('Please select receipts to download', 'error');
+        return;
+      }
+
+      showStatus('Generating PDF for download...', 'success');
+
+      try {
+        const response = await fetch('/api/archive-amex-receipts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            receiptIds: selectedIds,
+            emailToPrinter: false,
+            approvedBy: 'Demetri Gregorakis'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('PDF generation failed');
+        }
+
+        const result = await response.json();
+        window.open(result.pdfUrl, '_blank');
+        showStatus('PDF ready for download', 'success');
+      } catch (error) {
+        showStatus('Error generating PDF: ' + error.message, 'error');
+      }
+    }
+
+    function getSelectedReceiptIds() {
+      const checkboxes = document.querySelectorAll('.receipt-checkbox:checked');
+      return Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+    }
+
+    // Archive
+    async function loadArchive() {
+      const container = document.getElementById('archiveListContainer');
+      container.innerHTML = '<div class="loading">Loading archive...</div>';
+
+      const { data, error } = await supabase
+        .from('amex_archived_pdfs')
+        .select('*')
+        .order('archive_date', { ascending: false });
+
+      if (error) {
+        container.innerHTML = '<div class="empty-state">Error loading archive</div>';
+        return;
+      }
+
+      if (data.length === 0) {
+        container.innerHTML = '<div class="empty-state">No archived receipts yet</div>';
+        return;
+      }
+
+      let html = '<div class="list-container">';
+      data.forEach(archive => {
+        html += `
+          <div class="archive-item">
+            <span><strong>${archive.archive_date}</strong></span>
+            <span>${archive.entry_count} entries</span>
+            <span><strong>$${parseFloat(archive.total_amount).toFixed(2)}</strong></span>
+            <span style="font-size: 11px; color: var(--gray-500);">
+              ${archive.date_range_start} to ${archive.date_range_end}<br>
+              Approved by: ${archive.approved_by}
+            </span>
+            <a href="${archive.pdf_url}" target="_blank" class="btn btn-primary" style="text-decoration: none; padding: 8px 16px;">VIEW PDF</a>
+          </div>
+        `;
+      });
+      html += '</div>';
+
+      container.innerHTML = html;
+    }
+
+    // Status Messages
+    function showStatus(message, type) {
+      const container = document.getElementById('statusMessage');
+      container.className = 'status-message ' + type;
+      container.textContent = message;
+      setTimeout(() => container.textContent = '', 5000);
+    }
+  </script>
+</body>
+</html>
