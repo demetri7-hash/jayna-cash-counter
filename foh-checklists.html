@@ -1600,12 +1600,13 @@
     // Focus password input
     setTimeout(() => passwordInput.focus(), 100);
 
-    // Handle submit - Check against hardcoded password AND database
+    // Handle submit - Check against master password AND database
     const handleSubmit = async () => {
       const enteredPassword = passwordInput.value;
 
-      // Check hardcoded ADMIN_PASSWORD first (fallback)
-      if (enteredPassword === ADMIN_PASSWORD) {
+      // Check master password (custom or default)
+      const masterPassword = localStorage.getItem('masterPassword') || ADMIN_PASSWORD;
+      if (enteredPassword === masterPassword) {
         setManagerSession(); // Set 60-minute session
         localStorage.setItem('manager_role', 'Admin'); // Store role as Admin
         document.body.removeChild(modal);
@@ -7310,6 +7311,10 @@
 
       hideLoading();
 
+      // Get current master password from localStorage or default
+      const currentMasterPassword = localStorage.getItem('masterPassword') || 'JaynaGyro2025!';
+      const masterPasswordStatus = localStorage.getItem('masterPassword') ? 'CUSTOM' : 'DEFAULT';
+
       let html = `
         <div style="margin-bottom: 24px; padding: 20px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
@@ -7342,6 +7347,64 @@
           </div>
         </div>
 
+        <div style="margin-bottom: 24px; padding: 20px; background: var(--warning-bg); border-left: 4px solid var(--warning-border); border-radius: 0;">
+          <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: var(--warning-text); text-transform: uppercase; letter-spacing: 1px;">
+            🔑 MASTER PASSWORD SETTINGS
+          </h4>
+          <p style="margin: 0 0 16px 0; font-size: 13px; color: var(--warning-text); line-height: 1.6;">
+            The master password grants full access to ALL password-protected areas (Manager Logs, etc.). Change it here to replace the default password.
+          </p>
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px;">
+              <div style="font-size: 12px; font-weight: 700; color: var(--warning-text); margin-bottom: 4px;">
+                Current Status: <span style="padding: 2px 8px; background: ${masterPasswordStatus === 'CUSTOM' ? 'var(--success-bg)' : 'var(--gray-200)'}; color: ${masterPasswordStatus === 'CUSTOM' ? 'var(--success-text)' : 'var(--gray-700)'}; border-radius: 0; font-size: 11px;">${masterPasswordStatus}</span>
+              </div>
+              <div style="font-size: 11px; color: var(--gray-600);">
+                ${masterPasswordStatus === 'CUSTOM' ? 'Using custom master password' : 'Using default password: JaynaGyro2025!'}
+              </div>
+            </div>
+            <button
+              onclick="showChangeMasterPasswordForm()"
+              style="
+                padding: 10px 20px;
+                background: var(--gray-700);
+                color: white;
+                border: 2px solid var(--gray-700);
+                border-radius: 0;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#000'"
+              onmouseout="this.style.background='var(--gray-700)'"
+            >✏️ CHANGE MASTER PASSWORD</button>
+            ${masterPasswordStatus === 'CUSTOM' ? `
+              <button
+                onclick="resetToDefaultMasterPassword()"
+                style="
+                  padding: 10px 20px;
+                  background: #dc2626;
+                  color: white;
+                  border: 2px solid #dc2626;
+                  border-radius: 0;
+                  font-size: 11px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  cursor: pointer;
+                  transition: all 0.15s ease;
+                "
+                onmouseover="this.style.background='#b91c1c'"
+                onmouseout="this.style.background='#dc2626'"
+              >🔄 RESET TO DEFAULT</button>
+            ` : ''}
+          </div>
+        </div>
+
+        <div id="changeMasterPasswordForm" style="display: none;"></div>
         <div id="addPasswordForm" style="display: none;"></div>
 
         <div id="passwordsList">
@@ -7503,7 +7566,7 @@
             <input
               type="text"
               id="new_username"
-              placeholder="e.g., manager1, john_doe"
+              placeholder="e.g., John, Manager1, admin_user"
               style="
                 width: 100%;
                 padding: 12px;
@@ -7516,7 +7579,7 @@
               onblur="this.style.borderColor='var(--gray-300)'"
             />
             <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--gray-500);">
-              Must be unique. No spaces. Use lowercase and underscores.
+              Must be unique. No spaces allowed - use underscores instead.
             </p>
           </div>
 
@@ -7728,16 +7791,16 @@
     const password = document.getElementById('new_password').value;
     const role = document.getElementById('new_role').value;
 
-    // Validation
+    // Validation - Keep it simple!
     if (!username) {
       showMessage('Username is required!', 'error');
       document.getElementById('new_username').focus();
       return;
     }
 
-    // Username format validation
-    if (!/^[a-z0-9_]+$/.test(username)) {
-      showMessage('Username must be lowercase letters, numbers, and underscores only!', 'error');
+    // Simple username validation - just check for spaces (spaces break login forms)
+    if (username.includes(' ')) {
+      showMessage('Username cannot contain spaces. Use underscores instead.', 'error');
       document.getElementById('new_username').focus();
       return;
     }
@@ -7977,6 +8040,301 @@
       console.error('Error deleting password:', error);
       showMessage(`Error deleting password: ${error.message}`, 'error');
     }
+  }
+
+  /**
+   * Show Change Master Password Form
+   */
+  function showChangeMasterPasswordForm() {
+    const formContainer = document.getElementById('changeMasterPasswordForm');
+
+    formContainer.innerHTML = `
+      <div style="margin-bottom: 24px; background: white; border: 2px solid var(--warning-border); border-radius: 0; overflow: hidden;">
+        <div style="background: var(--warning-bg); border-bottom: 2px solid var(--warning-border); padding: 14px 16px;">
+          <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--warning-text); text-transform: uppercase; letter-spacing: 1px;">
+            🔑 CHANGE MASTER PASSWORD
+          </h4>
+        </div>
+        <div style="padding: 20px;">
+          <div style="margin-bottom: 20px; padding: 16px; background: var(--error-bg); border-left: 4px solid var(--error-border); border-radius: 0;">
+            <div style="font-size: 12px; font-weight: 700; color: var(--error-text); margin-bottom: 8px;">
+              ⚠️ IMPORTANT WARNING
+            </div>
+            <div style="font-size: 12px; color: var(--error-text); line-height: 1.6;">
+              Changing the master password will immediately invalidate the old password across ALL pages (Manager Logs, etc.).
+              Make sure to save and remember your new password!
+            </div>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              New Master Password *
+            </label>
+            <div style="position: relative;">
+              <input
+                type="password"
+                id="new_master_password"
+                placeholder="Enter new master password"
+                style="
+                  width: 100%;
+                  padding: 12px;
+                  padding-right: 50px;
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 14px;
+                  box-sizing: border-box;
+                "
+                onfocus="this.style.borderColor='var(--gray-700)'"
+                onblur="this.style.borderColor='var(--gray-300)'"
+              />
+              <button
+                type="button"
+                onclick="togglePasswordVisibility('new_master_password')"
+                style="
+                  position: absolute;
+                  right: 8px;
+                  top: 50%;
+                  transform: translateY(-50%);
+                  background: none;
+                  border: none;
+                  cursor: pointer;
+                  font-size: 18px;
+                  padding: 4px 8px;
+                "
+              >👁️</button>
+            </div>
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--gray-500);">
+              Use a strong password you'll remember. Any length accepted.
+            </p>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+              Confirm New Password *
+            </label>
+            <input
+              type="password"
+              id="confirm_master_password"
+              placeholder="Re-enter new master password"
+              style="
+                width: 100%;
+                padding: 12px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 14px;
+                box-sizing: border-box;
+              "
+              onfocus="this.style.borderColor='var(--gray-700)'"
+              onblur="this.style.borderColor='var(--gray-300)'"
+            />
+          </div>
+
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button
+              onclick="hideChangeMasterPasswordForm()"
+              style="
+                padding: 14px 24px;
+                background: var(--gray-100);
+                color: var(--gray-900);
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 13px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='var(--gray-200)'"
+              onmouseout="this.style.background='var(--gray-100)'"
+            >CANCEL</button>
+
+            <button
+              onclick="saveMasterPassword()"
+              style="
+                padding: 14px 24px;
+                background: var(--warning-border);
+                color: white;
+                border: 2px solid var(--warning-border);
+                border-radius: 0;
+                font-size: 13px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='#d97706'"
+              onmouseout="this.style.background='var(--warning-border)'"
+            >🔑 SAVE NEW PASSWORD</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    formContainer.style.display = 'block';
+
+    // Focus password field
+    setTimeout(() => {
+      document.getElementById('new_master_password').focus();
+    }, 100);
+  }
+
+  /**
+   * Hide Change Master Password Form
+   */
+  function hideChangeMasterPasswordForm() {
+    document.getElementById('changeMasterPasswordForm').style.display = 'none';
+    document.getElementById('changeMasterPasswordForm').innerHTML = '';
+  }
+
+  /**
+   * Save Master Password
+   */
+  function saveMasterPassword() {
+    const newPassword = document.getElementById('new_master_password').value;
+    const confirmPassword = document.getElementById('confirm_master_password').value;
+
+    // Validation
+    if (!newPassword) {
+      showMessage('New master password is required!', 'error');
+      document.getElementById('new_master_password').focus();
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      showMessage('Master password must be at least 4 characters long!', 'error');
+      document.getElementById('new_master_password').focus();
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showMessage('Passwords do not match!', 'error');
+      document.getElementById('confirm_master_password').focus();
+      return;
+    }
+
+    // Save to localStorage
+    localStorage.setItem('masterPassword', newPassword);
+    localStorage.removeItem('managerSession'); // Force re-login
+
+    hideChangeMasterPasswordForm();
+    showMessage('✅ Master password updated successfully! Old password no longer works.', 'success');
+
+    // Reload password management to update status
+    setTimeout(() => {
+      loadPasswordManagement();
+    }, 1500);
+  }
+
+  /**
+   * Reset to Default Master Password
+   */
+  function resetToDefaultMasterPassword() {
+    const modal = document.createElement('div');
+    modal.id = 'confirmResetPasswordModal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      padding: 20px;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+      background: white;
+      padding: 32px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid var(--warning-border);
+      border-radius: 0;
+    `;
+
+    modalContent.innerHTML = `
+      <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: var(--warning-text); text-transform: uppercase; letter-spacing: 1px;">
+        🔄 RESET TO DEFAULT PASSWORD
+      </h3>
+      <p style="margin: 0 0 20px 0; font-size: 14px; color: var(--gray-700); line-height: 1.6;">
+        Are you sure you want to reset to the default master password?
+        <br><br>
+        The master password will revert to: <strong>JaynaGyro2025!</strong>
+        <br><br>
+        Your custom password will no longer work.
+      </p>
+      <div style="display: flex; gap: 12px;">
+        <button
+          id="resetPasswordCancelBtn"
+          style="
+            flex: 1;
+            padding: 14px 24px;
+            background: var(--gray-100);
+            color: var(--gray-900);
+            border: 2px solid var(--gray-300);
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+        >CANCEL</button>
+        <button
+          id="resetPasswordConfirmBtn"
+          style="
+            flex: 1;
+            padding: 14px 24px;
+            background: var(--warning-border);
+            color: white;
+            border: 2px solid var(--warning-border);
+            border-radius: 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+        >RESET TO DEFAULT</button>
+      </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    const confirmBtn = document.getElementById('resetPasswordConfirmBtn');
+    const cancelBtn = document.getElementById('resetPasswordCancelBtn');
+
+    const handleConfirm = () => {
+      localStorage.removeItem('masterPassword');
+      localStorage.removeItem('managerSession'); // Force re-login
+      document.body.removeChild(modal);
+      showMessage('✅ Master password reset to default: JaynaGyro2025!', 'success');
+
+      setTimeout(() => {
+        loadPasswordManagement();
+      }, 1500);
+    };
+
+    const handleCancel = () => {
+      document.body.removeChild(modal);
+    };
+
+    confirmBtn.onclick = handleConfirm;
+    cancelBtn.onclick = handleCancel;
+
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        handleCancel();
+      }
+    };
   }
 
   // ====================================
@@ -8401,8 +8759,11 @@
   function submitManagerPassword() {
     const password = document.getElementById('passwordInput').value;
     const modal = document.getElementById('passwordModal');
+
+    // Check master password (custom or default)
+    const masterPassword = localStorage.getItem('masterPassword') || ADMIN_PASSWORD;
     const customPasswords = JSON.parse(localStorage.getItem('customPasswords') || '[]');
-    const validPasswords = [ADMIN_PASSWORD, ...customPasswords];
+    const validPasswords = [masterPassword, ...customPasswords];
 
     if (validPasswords.includes(password)) {
       setManagerSession();
