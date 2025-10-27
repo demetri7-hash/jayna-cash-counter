@@ -270,10 +270,11 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  doc.text('DATE', 0.6, yPos + 0.08);
-  doc.text('AMOUNT', 1.8, yPos + 0.08);
-  doc.text('CATEGORY', 2.8, yPos + 0.08);
-  doc.text('DETAILS', 4.2, yPos + 0.08);
+  doc.text('VENDOR', 0.6, yPos + 0.08);
+  doc.text('DATE', 1.8, yPos + 0.08);
+  doc.text('AMOUNT', 2.8, yPos + 0.08);
+  doc.text('CATEGORY', 3.6, yPos + 0.08);
+  doc.text('DETAILS', 4.8, yPos + 0.08);
   doc.text('IMAGE', 7.3, yPos + 0.08);
 
   yPos += 0.25;
@@ -294,21 +295,28 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
       doc.rect(0.5, yPos - 0.05, 7.5, 0.3, 'F'); // Slightly taller for wrapping
     }
 
+    // Vendor (with wrapping) - BOLD
+    doc.setFont('helvetica', 'bold');
+    const vendorText = receipt.vendor || 'N/A';
+    const wrappedVendor = doc.splitTextToSize(vendorText, 1.0);
+    doc.text(wrappedVendor.slice(0, 2), 0.6, yPos + 0.08); // Max 2 lines
+    doc.setFont('helvetica', 'normal');
+
     // Date
-    doc.text(receipt.purchase_date, 0.6, yPos + 0.08);
+    doc.text(receipt.purchase_date, 1.8, yPos + 0.08);
 
     // Amount
-    doc.text(`$${parseFloat(receipt.amount).toFixed(2)}`, 1.8, yPos + 0.08);
+    doc.text(`$${parseFloat(receipt.amount).toFixed(2)}`, 2.8, yPos + 0.08);
 
     // Category (with wrapping)
     const categoryText = receipt.category || 'N/A';
-    const wrappedCategory = doc.splitTextToSize(categoryText, 1.2);
-    doc.text(wrappedCategory, 2.8, yPos + 0.08);
+    const wrappedCategory = doc.splitTextToSize(categoryText, 0.9);
+    doc.text(wrappedCategory, 3.6, yPos + 0.08);
 
     // Details (with wrapping)
     const detailsText = receipt.details || 'N/A';
-    const wrappedDetails = doc.splitTextToSize(detailsText, 2.8);
-    doc.text(wrappedDetails.slice(0, 2), 4.2, yPos + 0.08); // Max 2 lines
+    const wrappedDetails = doc.splitTextToSize(detailsText, 2.3);
+    doc.text(wrappedDetails.slice(0, 2), 4.8, yPos + 0.08); // Max 2 lines
 
     // Image page reference
     if (receiptImagePages.has(receipt.id)) {
