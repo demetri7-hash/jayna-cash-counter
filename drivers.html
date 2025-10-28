@@ -44,15 +44,16 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--gray-100);
+      background: var(--white);
       color: var(--gray-700);
-      padding: 20px;
+      padding: 0;
       font-size: 13px;
     }
 
     .container {
       max-width: 600px;
       margin: 0 auto;
+      padding: 20px;
     }
 
     h2 {
@@ -64,11 +65,44 @@
       margin-bottom: 16px;
     }
 
-    .section {
-      background: var(--white);
-      border: 2px solid var(--gray-300);
-      padding: 20px;
+    .content {
+      padding: 12px;
+    }
+
+    /* Tab System */
+    .tab-container {
+      display: flex;
+      gap: 12px;
       margin-bottom: 20px;
+      border-bottom: 2px solid var(--gray-300);
+    }
+
+    .tab-btn {
+      padding: 12px 20px;
+      background: var(--gray-100);
+      color: var(--gray-700);
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn.active {
+      background: var(--gray-700);
+      color: white;
+      border-bottom-color: var(--gray-700);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
     }
 
     button {
@@ -105,65 +139,55 @@
       border-color: #059669;
     }
 
-    /* Flag List */
-    .flag-card {
-      background: var(--white);
+    /* List View (AMEX pattern) */
+    .list-container {
+      background: white;
       border: 2px solid var(--gray-300);
-      padding: 16px;
-      margin-bottom: 12px;
-      cursor: pointer;
-      transition: all 0.15s ease;
     }
 
-    .flag-card:hover {
-      border-color: var(--gray-700);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-
-    .flag-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-
-    .flag-date {
+    .list-header {
+      display: grid;
+      grid-template-columns: 40px 150px 100px 1fr;
+      gap: 12px;
+      padding: 16px 12px;
+      background: var(--gray-900);
+      color: white;
       font-size: 11px;
       font-weight: 700;
-      color: var(--gray-900);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
     }
 
-    .flag-staff {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--gray-600);
+    .list-item {
+      display: grid;
+      grid-template-columns: 40px 150px 100px 1fr;
+      gap: 12px;
+      padding: 16px 12px;
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      border-bottom: 1px solid var(--gray-200);
     }
 
-    .flag-preview {
-      font-size: 13px;
-      color: var(--gray-700);
-      line-height: 1.5;
-      margin-top: 8px;
+    .list-item:nth-child(even) {
+      background: var(--jayna-blue-pale);
     }
 
-    .flag-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
-    }
-
-    .flag-badge {
-      display: inline-block;
-      padding: 4px 8px;
+    .list-item:hover {
       background: var(--jayna-blue-light);
-      color: var(--jayna-blue);
-      font-weight: 600;
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
+    }
+
+    .list-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .section {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 20px;
+      margin-bottom: 20px;
     }
 
     /* Modal */
@@ -230,6 +254,7 @@
     input[type="text"],
     input[type="date"],
     input[type="time"],
+    input[type="password"],
     textarea {
       width: 100%;
       padding: 12px;
@@ -239,6 +264,7 @@
       font-weight: 400;
       background: white;
       font-family: inherit;
+      box-sizing: border-box;
     }
 
     input:focus,
@@ -252,7 +278,6 @@
       resize: vertical;
     }
 
-    /* Staff Name (Large Clickable) */
     .staff-name-large {
       font-size: 24px;
       font-weight: 700;
@@ -280,7 +305,6 @@
       font-weight: 600;
     }
 
-    /* Reason Flag Buttons */
     .reason-flags-container {
       display: flex;
       flex-wrap: wrap;
@@ -324,7 +348,6 @@
       color: var(--gray-600);
     }
 
-    /* Loading Spinner */
     .loading-overlay {
       display: none;
       position: fixed;
@@ -369,7 +392,6 @@
       letter-spacing: 1px;
     }
 
-    /* Custom Notification (replaces alert) */
     .notification-toast {
       position: fixed;
       top: 20px;
@@ -415,71 +437,41 @@
         transform: translateX(-50%) translateY(0);
       }
     }
-
-    /* Custom Input Modal (replaces prompt) */
-    .input-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.7);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 25000;
-      padding: 20px;
-    }
-
-    .input-modal.active {
-      display: flex;
-    }
-
-    .input-modal-content {
-      background: white;
-      padding: 24px;
-      max-width: 500px;
-      width: 100%;
-      border: 3px solid var(--gray-700);
-    }
-
-    .input-modal-message {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--gray-900);
-      margin-bottom: 16px;
-    }
-
-    .input-modal-input {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid var(--gray-300);
-      font-size: 14px;
-      margin-bottom: 16px;
-    }
-
-    .input-modal-buttons {
-      display: flex;
-      gap: 12px;
-      justify-content: flex-end;
-    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Shared Header -->
-    <div id="sharedHeader"></div>
+  <!-- Shared Header -->
+  <div id="sharedHeader"></div>
 
-    <div class="content" style="padding: 12px;">
-      <!-- FLAG A DRIVER Button -->
+  <div class="container">
+    <!-- Tab Navigation -->
+    <div class="tab-container">
+      <button class="tab-btn active" onclick="switchTab('flag')">FLAG</button>
+      <button class="tab-btn" onclick="switchTab('flagged')">FLAGGED</button>
+    </div>
+
+    <!-- FLAG TAB -->
+    <div id="flagTab" class="tab-content active">
       <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
         <button onclick="openFlagModal()">+ FLAG A DRIVER</button>
       </div>
+    </div>
 
-      <!-- Flagged Drivers List -->
-      <div class="section">
-        <h2>Flagged Drivers</h2>
-        <div id="flagsList" class="flags-list">
+    <!-- FLAGGED TAB (Password Protected) -->
+    <div id="flaggedTab" class="tab-content">
+      <div id="flaggedPasswordGate" style="text-align: center; padding: 60px 20px;">
+        <h2 style="margin-bottom: 20px;">PASSWORD REQUIRED</h2>
+        <input type="password" id="flaggedPassword" placeholder="Enter manager password" style="max-width: 300px; margin: 0 auto 16px; display: block;">
+        <button onclick="unlockFlagged()">UNLOCK</button>
+      </div>
+
+      <div id="flaggedContent" style="display: none;">
+        <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+          <button class="secondary" id="downloadBtn" onclick="downloadSelectedPDF()" disabled style="opacity: 0.5; cursor: not-allowed;">DOWNLOAD</button>
+          <button class="danger" id="deleteBtn" onclick="deleteSelected()" disabled style="opacity: 0.5; cursor: not-allowed;">DELETE</button>
+        </div>
+
+        <div id="flaggedListContainer">
           <div class="loading">Loading flagged drivers...</div>
         </div>
       </div>
@@ -570,7 +562,26 @@
       <div id="viewModalBody"></div>
 
       <div style="display: flex; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 2px solid var(--gray-300);">
-        <button onclick="resendEmail()">📧 RE-SEND EMAIL</button>
+        <button class="secondary" onclick="closeViewModal()">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2>CONFIRM ACTION</h2>
+        <button class="modal-close" onclick="closeConfirmModal()">CLOSE</button>
+      </div>
+
+      <div style="padding: 20px 0;">
+        <p id="confirmMessage" style="font-size: 14px; color: var(--gray-700);"></p>
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+        <button class="secondary" onclick="closeConfirmModal()">CANCEL</button>
+        <button class="danger" id="confirmButton" onclick="confirmAction()">CONFIRM</button>
       </div>
     </div>
   </div>
@@ -583,24 +594,11 @@
     </div>
   </div>
 
-  <!-- Custom Notification Toast (replaces alert) -->
+  <!-- Custom Notification Toast -->
   <div id="notificationToast" class="notification-toast"></div>
-
-  <!-- Custom Input Modal (replaces prompt) -->
-  <div id="inputModal" class="input-modal">
-    <div class="input-modal-content">
-      <div class="input-modal-message" id="inputModalMessage"></div>
-      <input type="text" class="input-modal-input" id="inputModalInput" placeholder="Enter text...">
-      <div class="input-modal-buttons">
-        <button class="secondary" onclick="cancelInputModal()">CANCEL</button>
-        <button onclick="confirmInputModal()">CONFIRM</button>
-      </div>
-    </div>
-  </div>
 
   <script src="shared-header.js"></script>
   <script>
-    // Create Supabase client
     const supabase = (() => {
       if (window._driversSupabaseClient) {
         return window._driversSupabaseClient;
@@ -614,16 +612,15 @@
     })();
 
     const MANAGER_PASSWORD = 'JaynaGyro2025!';
-
-    // State
     let clockedInEmployees = [];
     let currentStaffIndex = -1;
     let currentStaffName = null;
     let currentStaffTimestamp = null;
     let currentFlag = null;
-    let inputModalCallback = null;
+    let flaggedUnlocked = false;
+    let confirmCallback = null;
 
-    // Custom notification functions (replace alert/prompt for Google Sites sandbox)
+    // Custom notification function
     function showNotification(message, type = 'info') {
       const toast = document.getElementById('notificationToast');
       toast.textContent = message;
@@ -636,34 +633,16 @@
       }, 3000);
     }
 
-    function showInputModal(message, callback) {
-      inputModalCallback = callback;
-      document.getElementById('inputModalMessage').textContent = message;
-      document.getElementById('inputModalInput').value = '';
-      document.getElementById('inputModal').classList.add('active');
-      document.getElementById('inputModalInput').focus();
-    }
-
-    function confirmInputModal() {
-      const value = document.getElementById('inputModalInput').value;
-      document.getElementById('inputModal').classList.remove('active');
-      if (inputModalCallback) {
-        inputModalCallback(value);
-        inputModalCallback = null;
-      }
-    }
-
-    function cancelInputModal() {
-      document.getElementById('inputModal').classList.remove('active');
-      inputModalCallback = null;
-    }
-
     // Initialize
     document.addEventListener('DOMContentLoaded', async () => {
       initializeSharedHeader();
       await loadClockedInEmployees();
       setTodayDateTime();
-      loadFlags();
+
+      // Allow Enter key on password field
+      document.getElementById('flaggedPassword').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') unlockFlagged();
+      });
     });
 
     async function loadClockedInEmployees() {
@@ -800,7 +779,6 @@
         hideLoading();
         closeFlagModal();
         showNotification('✅ Driver flag submitted successfully!', 'success');
-        loadFlags();
 
       } catch (error) {
         console.error('Error submitting flag:', error);
@@ -809,9 +787,9 @@
       }
     }
 
-    async function sendFlagEmail(flagData, customNote = '') {
+    async function sendFlagEmail(flagData) {
       try {
-        const pdfData = await generateFlagPDF(flagData, customNote);
+        const pdfData = await generateFlagPDF(flagData);
 
         const response = await fetch('/api/send-driver-flag-email', {
           method: 'POST',
@@ -827,10 +805,7 @@
           })
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to send email');
-        }
-
+        if (!response.ok) throw new Error('Failed to send email');
         console.log('Email sent successfully');
       } catch (error) {
         console.error('Error sending email:', error);
@@ -838,7 +813,7 @@
       }
     }
 
-    async function generateFlagPDF(flagData, customNote = '') {
+    async function generateFlagPDF(flagData) {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
 
@@ -901,17 +876,6 @@
       doc.setFont(undefined, 'normal');
       const splitDetails = doc.splitTextToSize(flagData.details, 170);
       doc.text(splitDetails, 20, y);
-      y += splitDetails.length * 6 + 10;
-
-      if (customNote.trim()) {
-        y += 10;
-        doc.setFont(undefined, 'bold');
-        doc.text('ADDITIONAL NOTE:', 20, y);
-        y += 7;
-        doc.setFont(undefined, 'normal');
-        const splitNote = doc.splitTextToSize(customNote, 170);
-        doc.text(splitNote, 20, y);
-      }
 
       doc.setFontSize(9);
       doc.setFont(undefined, 'italic');
@@ -920,8 +884,41 @@
       return doc.output('dataurlstring');
     }
 
-    async function loadFlags() {
-      const list = document.getElementById('flagsList');
+    // Tab switching
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      if (tab === 'flag') {
+        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+        document.getElementById('flagTab').classList.add('active');
+      } else if (tab === 'flagged') {
+        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+        document.getElementById('flaggedTab').classList.add('active');
+
+        if (flaggedUnlocked) {
+          loadFlagged();
+        }
+      }
+    }
+
+    function unlockFlagged() {
+      const password = document.getElementById('flaggedPassword').value;
+      if (password !== MANAGER_PASSWORD) {
+        showNotification('Incorrect password', 'error');
+        document.getElementById('flaggedPassword').select();
+        return;
+      }
+
+      flaggedUnlocked = true;
+      document.getElementById('flaggedPasswordGate').style.display = 'none';
+      document.getElementById('flaggedContent').style.display = 'block';
+      loadFlagged();
+    }
+
+    async function loadFlagged() {
+      const container = document.getElementById('flaggedListContainer');
+      container.innerHTML = '<div class="loading">Loading flagged drivers...</div>';
 
       const { data, error } = await supabase
         .from('driver_flags')
@@ -931,87 +928,125 @@
         .order('time', { ascending: false });
 
       if (error) {
-        list.innerHTML = '<div class="empty-state">Error loading flags</div>';
+        container.innerHTML = '<div class="empty-state">Error loading flags</div>';
         return;
       }
 
       if (!data || data.length === 0) {
-        list.innerHTML = '<div class="empty-state">No flagged drivers yet</div>';
+        container.innerHTML = '<div class="empty-state">No flagged drivers yet</div>';
         return;
       }
 
-      list.innerHTML = data.map(flag => {
-        const preview = flag.details.substring(0, 100) + (flag.details.length > 100 ? '...' : '');
-        const date = new Date(flag.date).toLocaleDateString('en-US', {
-          weekday: 'short',
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        });
+      let html = '<div class="list-container">';
+      html += `
+        <div class="list-header">
+          <span><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></span>
+          <span>GUEST NAME</span>
+          <span>ORDER #</span>
+          <span>DATE</span>
+        </div>
+      `;
 
-        const reasonBadges = flag.reason_flags && flag.reason_flags.length > 0
-          ? flag.reason_flags.slice(0, 3).map(r => `<span class="flag-badge">${r}</span>`).join('')
-          : '';
-
-        return `
-          <div class="flag-card" onclick='viewFlag(${JSON.stringify(flag).replace(/'/g, "&apos;")})'>
-            <div class="flag-header">
-              <div class="flag-date">${date} at ${flag.time}</div>
-              <div class="flag-staff">${flag.staff_name}</div>
-            </div>
-            <div style="font-size: 11px; font-weight: 600; color: var(--gray-600); margin-bottom: 4px;">
-              ${flag.guest_name} • Order #${flag.order_number}
-            </div>
-            ${reasonBadges ? `<div class="flag-badges">${reasonBadges}</div>` : ''}
-            <div class="flag-preview">${preview}</div>
+      data.forEach(flag => {
+        html += `
+          <div class="list-item" onclick="viewFlag(${flag.id}, event)">
+            <input type="checkbox" class="flag-checkbox" data-id="${flag.id}" onclick="event.stopPropagation(); updateButtonStates();">
+            <span style="font-weight: 600;">${flag.guest_name}</span>
+            <span>${flag.order_number}</span>
+            <span>${flag.date}</span>
           </div>
         `;
-      }).join('');
+      });
+
+      html += '</div>';
+      container.innerHTML = html;
     }
 
-    function viewFlag(flag) {
-      currentFlag = flag;
+    function toggleSelectAll() {
+      const checked = document.getElementById('selectAll').checked;
+      document.querySelectorAll('.flag-checkbox').forEach(cb => cb.checked = checked);
+      updateButtonStates();
+    }
 
-      const date = new Date(flag.date).toLocaleDateString('en-US', {
+    function updateButtonStates() {
+      const selectedCount = document.querySelectorAll('.flag-checkbox:checked').length;
+      const downloadBtn = document.getElementById('downloadBtn');
+      const deleteBtn = document.getElementById('deleteBtn');
+
+      if (selectedCount > 0) {
+        downloadBtn.disabled = false;
+        downloadBtn.style.opacity = '1';
+        downloadBtn.style.cursor = 'pointer';
+
+        deleteBtn.disabled = false;
+        deleteBtn.style.opacity = '1';
+        deleteBtn.style.cursor = 'pointer';
+      } else {
+        downloadBtn.disabled = true;
+        downloadBtn.style.opacity = '0.5';
+        downloadBtn.style.cursor = 'not-allowed';
+
+        deleteBtn.disabled = true;
+        deleteBtn.style.opacity = '0.5';
+        deleteBtn.style.cursor = 'not-allowed';
+      }
+    }
+
+    async function viewFlag(id, event) {
+      if (event.target.type === 'checkbox') return;
+
+      const { data, error } = await supabase
+        .from('driver_flags')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        showNotification('Error loading flag', 'error');
+        return;
+      }
+
+      currentFlag = data;
+
+      const date = new Date(data.date).toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       });
 
-      const reasonBadges = flag.reason_flags && flag.reason_flags.length > 0
-        ? flag.reason_flags.map(r => `<span class="flag-badge" style="margin-right: 6px; padding: 4px 8px; font-size: 10px;">${r}</span>`).join('')
-        : '<span style="color: var(--gray-500);">None selected</span>';
+      const reasonBadges = data.reason_flags && data.reason_flags.length > 0
+        ? data.reason_flags.join(', ')
+        : 'None';
 
       document.getElementById('viewModalBody').innerHTML = `
         <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--gray-600);">DATE & TIME</label>
-          <div style="font-size: 14px; color: var(--gray-900);">${date} at ${flag.time}</div>
+          <label style="display: block; margin-bottom: 4px;">DATE & TIME</label>
+          <div style="font-size: 14px;">${date} at ${data.time}</div>
         </div>
         <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--gray-600);">REPORTED BY</label>
-          <div style="font-size: 14px; color: var(--gray-900);">${flag.staff_name}</div>
-          <div style="font-size: 11px; color: var(--gray-500); margin-top: 2px;">Submitted at: ${flag.staff_timestamp}</div>
+          <label style="display: block; margin-bottom: 4px;">REPORTED BY</label>
+          <div style="font-size: 14px;">${data.staff_name}</div>
         </div>
         <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--gray-600);">GUEST NAME</label>
-          <div style="font-size: 14px; color: var(--gray-900);">${flag.guest_name}</div>
+          <label style="display: block; margin-bottom: 4px;">GUEST NAME</label>
+          <div style="font-size: 14px;">${data.guest_name}</div>
         </div>
         <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--gray-600);">DRIVER NAME</label>
-          <div style="font-size: 14px; color: var(--gray-900);">${flag.driver_name || 'Unknown'}</div>
+          <label style="display: block; margin-bottom: 4px;">DRIVER NAME</label>
+          <div style="font-size: 14px;">${data.driver_name || 'Unknown'}</div>
         </div>
         <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--gray-600);">ORDER NUMBER</label>
-          <div style="font-size: 14px; color: var(--gray-900);">${flag.order_number}</div>
+          <label style="display: block; margin-bottom: 4px;">ORDER NUMBER</label>
+          <div style="font-size: 14px;">${data.order_number}</div>
         </div>
         <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--gray-600);">REASON FLAGS</label>
-          <div style="margin-top: 8px;">${reasonBadges}</div>
+          <label style="display: block; margin-bottom: 4px;">REASON FLAGS</label>
+          <div style="font-size: 14px;">${reasonBadges}</div>
         </div>
         <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--gray-600);">DETAILS</label>
-          <div style="font-size: 14px; color: var(--gray-900); line-height: 1.8; white-space: pre-wrap;">${flag.details}</div>
+          <label style="display: block; margin-bottom: 4px;">DETAILS</label>
+          <div style="font-size: 14px; line-height: 1.8; white-space: pre-wrap;">${data.details}</div>
         </div>
       `;
 
@@ -1023,23 +1058,116 @@
       currentFlag = null;
     }
 
-    async function resendEmail() {
-      if (!currentFlag) return;
+    async function downloadSelectedPDF() {
+      const selectedIds = getSelectedFlagIds();
+      if (selectedIds.length === 0) return;
 
-      showInputModal('Optional note to include (or leave blank):', async (customNote) => {
-        showLoading('SENDING EMAIL...', 'Generating PDF and sending to Demetri...');
+      showLoading('GENERATING PDF...', 'Creating download...');
 
-        try {
-          await sendFlagEmail(currentFlag, customNote || '');
-          hideLoading();
-          closeViewModal();
-          showNotification('✅ Email sent successfully!', 'success');
-        } catch (error) {
-          console.error('Error sending email:', error);
-          hideLoading();
-          showNotification('Error sending email: ' + error.message, 'error');
+      try {
+        const { data, error } = await supabase
+          .from('driver_flags')
+          .select('*')
+          .in('id', selectedIds);
+
+        if (error) throw error;
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.setFontSize(20);
+        doc.setFont(undefined, 'bold');
+        doc.text('JAYNA GYRO - DRIVER FLAG SUMMARY', 105, 20, { align: 'center' });
+
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 30, { align: 'center' });
+        doc.text(`Total Flags: ${data.length}`, 105, 38, { align: 'center' });
+
+        let y = 55;
+
+        data.forEach((flag, index) => {
+          if (y > 250) {
+            doc.addPage();
+            y = 20;
+          }
+
+          doc.setFontSize(11);
+          doc.setFont(undefined, 'bold');
+          doc.text(`#${index + 1}`, 20, y);
+          doc.setFont(undefined, 'normal');
+          doc.text(`Order: ${flag.order_number}`, 35, y);
+          y += 7;
+
+          doc.text(`Guest: ${flag.guest_name}`, 35, y);
+          y += 7;
+
+          doc.text(`Date: ${flag.date}`, 35, y);
+          y += 12;
+        });
+
+        doc.save(`driver_flags_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        hideLoading();
+        showNotification('✅ PDF downloaded successfully!', 'success');
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        hideLoading();
+        showNotification('Error generating PDF: ' + error.message, 'error');
+      }
+    }
+
+    function deleteSelected() {
+      const selectedIds = getSelectedFlagIds();
+      if (selectedIds.length === 0) return;
+
+      showConfirmModal(
+        `Delete ${selectedIds.length} selected flag(s)? This action cannot be undone.`,
+        async () => {
+          showLoading('DELETING...', 'Removing flags...');
+
+          try {
+            const { error } = await supabase
+              .from('driver_flags')
+              .delete()
+              .in('id', selectedIds);
+
+            if (error) throw error;
+
+            hideLoading();
+            showNotification('✅ Flags deleted successfully!', 'success');
+            loadFlagged();
+          } catch (error) {
+            console.error('Error deleting flags:', error);
+            hideLoading();
+            showNotification('Error deleting flags: ' + error.message, 'error');
+          }
         }
-      });
+      );
+    }
+
+    function getSelectedFlagIds() {
+      const checkboxes = document.querySelectorAll('.flag-checkbox:checked');
+      return Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+    }
+
+    function showConfirmModal(message, callback) {
+      document.getElementById('confirmMessage').textContent = message;
+      document.getElementById('confirmModal').classList.add('active');
+      confirmCallback = callback;
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('confirmModal').classList.remove('active');
+      confirmCallback = null;
+    }
+
+    function confirmAction() {
+      if (confirmCallback) {
+        confirmCallback();
+        confirmCallback = null;
+      }
+      closeConfirmModal();
     }
 
     function showLoading(title, message) {
@@ -1051,19 +1179,11 @@
       document.getElementById('loadingOverlay').classList.remove('active');
     }
 
-    // Close modals on ESC
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeFlagModal();
         closeViewModal();
-        cancelInputModal();
-      }
-    });
-
-    // Allow Enter key to confirm input modal
-    document.getElementById('inputModalInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        confirmInputModal();
+        closeConfirmModal();
       }
     });
   </script>
