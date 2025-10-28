@@ -1353,6 +1353,18 @@
     function displayUpcomingOrders(orders, showLoadingSpinner = true) {
       const container = document.getElementById('upcomingContent');
 
+      // DEBUG: Log all orders being displayed
+      console.log(`📊 Displaying ${orders ? orders.length : 0} orders:`);
+      if (orders && orders.length > 0) {
+        const toastOrders = orders.filter(o => o.source_system === 'TOAST');
+        const ezcaterOrders = orders.filter(o => o.source_system === 'EZCATER');
+        console.log(`  - Toast orders: ${toastOrders.length}`);
+        console.log(`  - EZCater orders: ${ezcaterOrders.length}`);
+        ezcaterOrders.forEach(order => {
+          console.log(`    • EZCater: ${order.customer_name} | ${order.delivery_date} | Status: ${order.status}`);
+        });
+      }
+
       if (!orders || orders.length === 0) {
         container.innerHTML = `
           <div class="empty-state">

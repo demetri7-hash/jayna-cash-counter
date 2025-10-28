@@ -51,6 +51,14 @@ export default async function handler(req, res) {
 
     console.log(`📊 Found ${existingOrders.length} existing EZCater orders in database`);
 
+    // Log each order for debugging
+    if (existingOrders.length > 0) {
+      console.log('📋 EZCater orders found:');
+      existingOrders.forEach(order => {
+        console.log(`  - Order ${order.order_number}: ${order.customer_name} | Delivery: ${order.delivery_date} | Status: ${order.status}`);
+      });
+    }
+
     // NOTE: EZCater uses webhooks for real-time order sync
     // This endpoint is for manual sync/debugging
     // The GraphQL API does not provide a "list orders" query - only individual order fetch by ID
