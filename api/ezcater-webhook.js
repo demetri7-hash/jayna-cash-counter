@@ -258,7 +258,9 @@ function parseOrderData(order) {
   const deliveryTime = deliveryTimestamp ? deliveryTimestamp.toISOString().split('T')[1].substring(0, 8) : null;
 
   // Extract customer info (orderCustomer in actual schema, not "customer")
-  const customerName = order.orderCustomer?.fullName ||
+    // Try contact name FIRST (that's where EZCater actually puts it!)
+  const customerName = order.event?.contact?.name ||
+                       order.orderCustomer?.fullName ||
                        `${order.orderCustomer?.firstName || ''} ${order.orderCustomer?.lastName || ''}`.trim() ||
                        null;
 
