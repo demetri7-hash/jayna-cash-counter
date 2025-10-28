@@ -890,6 +890,7 @@
           <button class="refresh-btn" onclick="syncFromEZCater()" style="background: #f59e0b; border-color: #f59e0b;">🔄 SYNC FROM EZCATER</button>
           <button class="refresh-btn" onclick="activateEZCaterWebhooks()" style="background: #dc2626; border-color: #dc2626; color: white;">🔔 ACTIVATE EZCATER WEBHOOKS</button>
           <button class="refresh-btn" onclick="checkEZCaterSubscriptions()" style="background: #6366f1; border-color: #6366f1; color: white;">🔍 CHECK SUBSCRIPTIONS</button>
+          <button class="refresh-btn" onclick="manualImportEZCaterOrder()" style="background: #10b981; border-color: #10b981; color: white;">📥 IMPORT ORDER BY UUID</button>
         </div>
 
         <div id="syncStatus" style="display: none; padding: 12px; margin-bottom: 20px; border: 2px solid; font-size: 13px; font-weight: 600;"></div>
@@ -1525,6 +1526,94 @@
         statusDiv.style.color = 'var(--error-text)';
         statusDiv.innerHTML = `❌ Failed to check subscriptions: ${error.message}<br><br>
           <strong>Action:</strong> Check your EZCater API credentials in Vercel environment variables.`;
+      }
+    }
+
+    // ============================================
+    // MANUAL IMPORT EZCATER ORDER BY UUID
+    // ============================================
+    async function manualImportEZCaterOrder() {
+      // Prompt user for order UUID
+      const orderUuid = prompt('Enter EZCater Order UUID:\n\n(You can find this in the EZCater order URL or order details)');
+
+      if (!orderUuid || orderUuid.trim() === '') {
+        return; // User cancelled or entered nothing
+      }
+
+      const statusDiv = document.getElementById('syncStatus');
+
+      try {
+        showLoading('IMPORTING ORDER', 'Fetching order from EZCater and saving to database...');
+
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'var(--warning-bg)';
+        statusDiv.style.borderColor = 'var(--warning-border)';
+        statusDiv.style.color = 'var(--warning-text)';
+        statusDiv.textContent = '📥 Importing order...';
+
+        console.log(`📥 Manual import: ${orderUuid}`);
+
+        const response = await fetch('/api/ezcater-manual-import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            orderUuid: orderUuid.trim()
+          })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to import order');
+        }
+
+        console.log('✅ Order imported:', data);
+
+        // Show success or "already exists" message
+        if (data.alreadyExists) {
+          statusDiv.style.background = 'var(--warning-bg)';
+          statusDiv.style.borderColor = 'var(--warning-border)';
+          statusDiv.style.color = 'var(--warning-text)';
+          statusDiv.innerHTML = `ℹ️  Order already exists in database!<br><br>
+            <strong>Order #:</strong> ${data.order.order_number}<br>
+            <strong>Customer:</strong> ${data.order.customer_name}<br><br>
+            <small>This order was previously synced. No action taken.</small>`;
+        } else {
+          statusDiv.style.background = 'var(--success-bg)';
+          statusDiv.style.borderColor = 'var(--success-border)';
+          statusDiv.style.color = 'var(--success-text)';
+          statusDiv.innerHTML = `✅ Order imported successfully!<br><br>
+            <strong>Order #:</strong> ${data.order.order_number}<br>
+            <strong>Customer:</strong> ${data.order.customer_name}<br>
+            <strong>Delivery Date:</strong> ${data.order.delivery_date}<br>
+            <strong>Total:</strong> $${data.order.total_amount?.toFixed(2)}<br>
+            <strong>Status:</strong> ${data.order.status}<br><br>
+            <small>Order has been added to your database and will appear in the list below.</small>`;
+
+          // Reload orders from database
+          setTimeout(() => {
+            loadOrdersFromDatabase();
+          }, 2000);
+        }
+
+        hideLoading();
+
+      } catch (error) {
+        console.error('Error importing order:', error);
+        hideLoading();
+
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'var(--error-bg)';
+        statusDiv.style.borderColor = 'var(--error-border)';
+        statusDiv.style.color = 'var(--error-text)';
+        statusDiv.innerHTML = `❌ Failed to import order: ${error.message}<br><br>
+          <strong>Possible reasons:</strong><br>
+          • Invalid order UUID (check the format)<br>
+          • Order not found in EZCater<br>
+          • API credentials issue<br><br>
+          <strong>UUID format example:</strong> 33a4d488-59d2-46ea-ac05-0c704966e612`;
       }
     }
 
