@@ -683,10 +683,34 @@
       }, 3000);
     }
 
-    // Initialize
+
+    });
+
+
+    function updateClockedInDisplay(employees) {
+      const listDiv = document.getElementById('clockedInList');
+      if (!listDiv) return;
+
+      if (employees.length === 0) {
+        listDiv.innerHTML = '<span style="color: #999; font-size: 11px; font-style: italic;">No one clocked in</span>';
+        return;
+      }
+
+      const namesText = employees.join(' | ');
+      listDiv.innerHTML = `
+        <div style="color: #2e7d32; font-size: 12px; font-weight: 500;">
+          ${namesText}
+        </div>
+        <div style="color: #666; font-size: 9px; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px;">
+          Clocked In
+        </div>
+      `;
+    }
+
+    // Initialize clocked-in display on load
     document.addEventListener('DOMContentLoaded', async () => {
-      initializeSharedHeader();
       await loadClockedInEmployees();
+      setInterval(loadClockedInEmployees, 5 * 60 * 1000); // Refresh every 5 minutes
       setTodayDateTime();
 
       // Allow Enter key on password field
@@ -728,6 +752,7 @@
         if (!result.success) return;
 
         clockedInEmployees = result.clockedIn.map(emp => emp.fullName);
+        updateClockedInDisplay(clockedInEmployees);
         console.log(`Loaded ${clockedInEmployees.length} clocked-in employees`);
       } catch (error) {
         console.error('Error loading clocked-in employees:', error);
