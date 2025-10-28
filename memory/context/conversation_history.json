@@ -1,6 +1,46 @@
 {
   "conversations": [
     {
+      "date": "2025-10-28T21:45:00Z",
+      "summary": "COMPLETE EZCATER WEBHOOK FIX: Fixed failing webhook subscriptions, customer name parsing, and created manual import tools. All 4 webhooks now active and verified.",
+      "key_decisions": [
+        "Use GraphQL introspection to discover REAL API schema (stop guessing)",
+        "Fix deprecated createSubscriber mutation → use createEventNotificationSubscription",
+        "Customer names stored in event.contact.name (NOT orderCustomer.fullName)",
+        "Create import-by-number tool (order number → UUID auto-discovery)",
+        "Replace window.prompt with modal input (Google Sites sandbox compatibility)",
+        "Created 5 new API endpoints for EZCater management"
+      ],
+      "action_items": [
+        "Monitor Vercel logs when next EZCater order arrives",
+        "Verify webhook POST requests hit /api/ezcater-webhook",
+        "Confirm customer names populate automatically for new orders",
+        "Watch for all 4 event types: submitted, accepted, rejected, cancelled"
+      ],
+      "topics": ["EZCater API", "GraphQL Introspection", "Webhook Subscriptions", "Order Synchronization", "Customer Data Parsing", "Google Sites Sandbox"],
+      "important_details": [
+        "PROBLEM: Webhook subscription failing with 500 error 'Subscriber could not be created'",
+        "ROOT CAUSE 1: Using deprecated mutations (createSubscriber/createSubscription)",
+        "FIX 1: Changed to createEventNotificationSubscription (single-step process)",
+        "ROOT CAUSE 2: Guessing API schema fields (caterer vs caterers, webhookSecret)",
+        "FIX 2: Created ezcater-introspect.js to discover REAL schema via GraphQL introspection",
+        "ROOT CAUSE 3: Customer name parsing checked orderCustomer.fullName (wrong field)",
+        "FIX 3: Changed to event.contact.name with fallbacks in parseOrderData()",
+        "ROOT CAUSE 4: Manual import required UUID (user only has order number)",
+        "FIX 4: Created import-by-number that tries 3 ID formats to auto-find UUID",
+        "ROOT CAUSE 5: window.prompt blocked in Google Sites sandbox",
+        "FIX 5: Created modal input with DOM manipulation",
+        "NEW FILES: ezcater-introspect.js, ezcater-list-subscriptions.js, ezcater-import-by-number.js, fix-customer-names.js, check-order-data.js",
+        "UPDATED FILES: ezcater-subscribe.js (complete rewrite), ezcater-webhook.js, ezcater-manual-import.js, catering.html",
+        "VERIFIED: 1 subscriber with 4 active webhook subscriptions (submitted, accepted, rejected, cancelled)",
+        "SUCCESS: Imported order #284577019 (RQJUCC) with customer name 'Rom Apolinar'",
+        "CONFIDENCE: 95% that webhooks will work for new orders (infrastructure solid, awaiting live test)",
+        "API Token: amF5bmFzY2Fuc0BnbWFpbC5jb206OGRjNDM1MDY2ZTlhM2NhZWYwNjAxZWNhYmQ0MzNlY2ViNTU1ZWJiOTdkOTBjMGY1NGFmNmY2YTg3MjQwYzRlZQ==",
+        "Commits: Multiple including final 2d0d70a - 'fix(ezcater): Extract customer names from event.contact.name field'",
+        "User extremely happy with results"
+      ]
+    },
+    {
       "date": "2025-10-28T04:00:00Z",
       "summary": "CSS Architecture Deep Dive: Fixed navigation button inconsistencies across all pages. Learned critical CSS patterns and user design intentions.",
       "key_decisions": [

@@ -95,6 +95,47 @@
         "Create ARCHIVE backup before major changes"
       ]
     },
+    "ezcater_api": {
+      "concepts_learned": [
+        "GraphQL introspection to discover real API schema",
+        "Webhook event subscriptions via createEventNotificationSubscription",
+        "Customer data stored in event.contact.name (NOT orderCustomer fields)",
+        "Order ID resolution (order number → UUID via multiple format attempts)",
+        "4 webhook event types: submitted, accepted, rejected, cancelled",
+        "Google Sites sandbox restrictions (no window.prompt/alert/confirm)"
+      ],
+      "tools_used": ["EZCater GraphQL API", "Vercel Serverless Functions", "Supabase catering_orders table"],
+      "patterns_identified": [
+        "Use introspection query to discover __schema instead of guessing fields",
+        "createEventNotificationSubscription replaces deprecated createSubscriber/createSubscription",
+        "parseOrderData checks event.contact.name first, then orderCustomer.fullName fallback",
+        "import-by-number tries 3 ID formats: direct, without leading zeros, numeric cast",
+        "Modal input pattern for Google Sites: createElement div overlay with input + buttons",
+        "Webhook handler: receive event → fetch full order → parse → upsert to Supabase",
+        "Check for existing orders before importing to avoid duplicates"
+      ],
+      "resources": [
+        "EZCATER_API_CAPABILITIES.md",
+        "EZCATER_FINAL_SETUP.md",
+        "EZCATER_SCHEMA_DISCOVERY.md",
+        "api/ezcater-introspect.js - GraphQL schema discovery",
+        "api/ezcater-list-subscriptions.js - Verify webhook config",
+        "api/ezcater-import-by-number.js - Import by order number (not UUID)",
+        "api/fix-customer-names.js - Retroactive customer name fix"
+      ],
+      "notes": [
+        "API Token format: base64(email:api_key)",
+        "Webhook URL: https://jayna-cash-counter.vercel.app/api/ezcater-webhook",
+        "All 4 subscriptions must be created separately (one mutation per event type)",
+        "Customer name location: order.event.contact.name (critical for all imports)",
+        "Order structure: order → event → contact/address/catererHandoffFoodTime",
+        "Order structure: order → totals → customerTotalDue/tip/salesTax/subTotal (subunits)",
+        "Order structure: order → catererCart → orderItems (array of menu items)",
+        "UUID discovery: try multiple formats because EZCater API accepts various ID formats",
+        "Supabase constraint: unique(source_system, external_order_id) prevents duplicates",
+        "User feedback: 'stop guessing, read docs, use introspection' - CRITICAL LESSON"
+      ]
+    },
     "css_styling_architecture": {
       "concepts_learned": [
         "CSS class vs inline style conflicts",
