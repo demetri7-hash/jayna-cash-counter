@@ -1,6 +1,6 @@
 /**
- * EZCater Subscription Diagnostic Tool
- * Lists all active webhook subscriptions
+ * EZCater Subscription Diagnostic Tool (FIXED - October 2025)
+ * Lists all active webhook subscriptions using REAL API schema from introspection
  */
 
 export default async function handler(req, res) {
@@ -21,29 +21,27 @@ export default async function handler(req, res) {
       throw new Error('EZCATER_API_TOKEN not configured');
     }
 
-    console.log('🔍 Fetching EZCater webhook subscriptions...');
+    console.log('🔍 Fetching EZCater webhook subscriptions using REAL schema...');
 
-    // GraphQL query to list all subscriptions for this caterer
-    const query = `
-      query GetCaterer($uuid: ID!) {
-        caterer(id: $uuid) {
-          uuid
+    // STEP 1: Get all subscribers (discovered via introspection)
+    const subscribersQuery = `
+      query GetSubscribers {
+        subscribers {
+          id
           name
-          storeNumber
-          eventNotificationSubscriptions {
-            id
-            url
+          webhookUrl
+          webhookSecret
+          subscriptions {
             eventEntity
             eventKey
-            parentId
             parentEntity
-            createdAt
+            parentId
           }
         }
       }
     `;
 
-    const response = await fetch('https://api.ezcater.com/graphql', {
+    const subscribersResponse = await fetch('https://api.ezcater.com/graphql', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -52,32 +50,71 @@ export default async function handler(req, res) {
         'Apollographql-client-version': '1.0.0'
       },
       body: JSON.stringify({
-        query: query,
+        query: subscribersQuery
+      })
+    });
+
+    const subscribersData = await subscribersResponse.json();
+
+    if (subscribersData.errors) {
+      console.error('❌ GraphQL errors:', subscribersData.errors);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch subscribers',
+        details: subscribersData.errors
+      });
+    }
+
+    const allSubscribers = subscribersData.data?.subscribers || [];
+
+    console.log(`✅ Found ${allSubscribers.length} total subscribers`);
+
+    // STEP 2: Get caterer info (using correct plural query)
+    const catererQuery = `
+      query GetCaterer($uuids: [ID!]!) {
+        caterers(uuids: $uuids) {
+          uuid
+          name
+          storeNumber
+        }
+      }
+    `;
+
+    const catererResponse = await fetch('https://api.ezcater.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': EZCATER_API_TOKEN,
+        'Apollographql-client-name': 'Jayna-Gyro-Sacramento',
+        'Apollographql-client-version': '1.0.0'
+      },
+      body: JSON.stringify({
+        query: catererQuery,
         variables: {
-          uuid: CATERER_UUID
+          uuids: [CATERER_UUID]
         }
       })
     });
 
-    const data = await response.json();
+    const catererData = await catererResponse.json();
+    const caterer = catererData.data?.caterers?.[0];
 
-    if (data.errors) {
-      console.error('❌ GraphQL errors:', data.errors);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to fetch subscriptions',
-        details: data.errors
-      });
-    }
-
-    const caterer = data.data?.caterer;
-    const subscriptions = caterer?.eventNotificationSubscriptions || [];
-
-    console.log(`✅ Found ${subscriptions.length} active subscriptions`);
-
-    // Check for our webhook URL
+    // STEP 3: Filter subscribers for our webhook URL and caterer
     const ourWebhookUrl = 'https://jayna-cash-counter.vercel.app/api/ezcater-webhook';
-    const activeSubscriptions = subscriptions.filter(sub => sub.url === ourWebhookUrl);
+    const ourSubscribers = allSubscribers.filter(sub => sub.webhookUrl === ourWebhookUrl);
+
+    console.log(`📋 Found ${ourSubscribers.length} subscribers with our webhook URL`);
+
+    // Collect all subscriptions for our caterer
+    const ourSubscriptions = [];
+    ourSubscribers.forEach(subscriber => {
+      const catererSubscriptions = subscriber.subscriptions?.filter(s =>
+        s.parentId === CATERER_UUID && s.parentEntity === 'Caterer'
+      ) || [];
+      ourSubscriptions.push(...catererSubscriptions);
+    });
+
+    console.log(`✅ Found ${ourSubscriptions.length} active subscriptions for our caterer`);
 
     return res.status(200).json({
       success: true,
@@ -86,16 +123,18 @@ export default async function handler(req, res) {
         uuid: caterer?.uuid,
         storeNumber: caterer?.storeNumber
       },
-      totalSubscriptions: subscriptions.length,
-      activeForOurWebhook: activeSubscriptions.length,
-      subscriptions: subscriptions,
+      totalSubscribers: allSubscribers.length,
+      ourSubscribers: ourSubscribers.length,
+      totalSubscriptions: ourSubscriptions.length,
+      subscriptions: ourSubscriptions,
       webhookUrl: ourWebhookUrl,
       coverage: {
-        submitted: activeSubscriptions.some(s => s.eventKey === 'submitted'),
-        accepted: activeSubscriptions.some(s => s.eventKey === 'accepted'),
-        rejected: activeSubscriptions.some(s => s.eventKey === 'rejected'),
-        cancelled: activeSubscriptions.some(s => s.eventKey === 'cancelled')
+        submitted: ourSubscriptions.some(s => s.eventKey === 'submitted'),
+        accepted: ourSubscriptions.some(s => s.eventKey === 'accepted'),
+        rejected: ourSubscriptions.some(s => s.eventKey === 'rejected'),
+        cancelled: ourSubscriptions.some(s => s.eventKey === 'cancelled')
       },
+      allSubscribers: ourSubscribers,
       timestamp: new Date().toISOString()
     });
 
