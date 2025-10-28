@@ -2942,7 +2942,7 @@
       try {
         event.preventDefault();
         console.log(`🏷️ Generating labels for order ${orderId}...`);
-        showLoading('GENERATING LABELS', 'Creating CSV file for batch printing...');
+        showLoading('GENERATING LABELS', 'Creating Excel files for batch printing...');
 
         // Fetch order and line items via API
         const response = await fetch(`/api/get-order-items?order_id=${orderId}`);
@@ -2968,46 +2968,56 @@
           return;
         }
 
-        // Generate Excel file using ExcelJS (creates native Excel format)
-        const excelBlob = await generateLabelsExcel(labels);
-
-        // Format filename for display
+        // Format filenames
         const guestName = (order.customer_name || 'Customer').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
         const orderDate = order.delivery_date ? formatPacificDateShort(order.delivery_date) : formatPacificDateShort(getPacificToday());
-        const fileName = `Labels_${guestName}_${orderDate}.xlsx`;
 
-        // Create download URL
-        const url = URL.createObjectURL(excelBlob);
+        // FILE 1: Generate main labels Excel (all items with 4 columns)
+        const labelsBlob = await generateLabelsExcel(labels);
+        const labelsFileName = `Labels_${guestName}_${orderDate}.xlsx`;
 
-        // Download Excel file
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
+        // FILE 2: Generate ingredient labels Excel (sauces only with 2 columns)
+        const ingredientLabels = generateIngredientLabels(labels);
+        const ingredientsBlob = await generateIngredientsExcel(ingredientLabels);
+        const ingredientsFileName = `Labels_Ingredients_${guestName}_${orderDate}.xlsx`;
 
-        // For iOS compatibility
-        link.style.display = 'none';
-        document.body.appendChild(link);
+        // Download FILE 1 (main labels)
+        const link1 = document.createElement('a');
+        link1.href = URL.createObjectURL(labelsBlob);
+        link1.download = labelsFileName;
+        link1.style.display = 'none';
+        document.body.appendChild(link1);
+        link1.click();
 
-        // Trigger download
-        link.click();
-
-        // Cleanup
+        // Download FILE 2 (ingredient labels) after 500ms delay
         setTimeout(() => {
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        }, 100);
+          const link2 = document.createElement('a');
+          link2.href = URL.createObjectURL(ingredientsBlob);
+          link2.download = ingredientsFileName;
+          link2.style.display = 'none';
+          document.body.appendChild(link2);
+          link2.click();
+
+          // Cleanup both
+          setTimeout(() => {
+            document.body.removeChild(link1);
+            document.body.removeChild(link2);
+            URL.revokeObjectURL(link1.href);
+            URL.revokeObjectURL(link2.href);
+          }, 100);
+        }, 500);
 
         hideLoading();
 
-        console.log(`✅ LABELS EXPORTED! ${labels.length} labels | File: ${fileName}`);
+        console.log(`✅ LABELS EXPORTED!`);
+        console.log(`📄 File 1: ${labelsFileName} (${labels.length} labels)`);
+        console.log(`📄 File 2: ${ingredientsFileName} (${ingredientLabels.length} ingredient labels)`);
         console.log(`📱 Next steps:
-1. Find the downloaded Excel file in your Downloads folder or Files app
+1. Find the 2 downloaded Excel files in your Downloads folder
 2. Open Print Master app on your phone
-3. Create a NEW LABEL TEMPLATE first (40x30mm for M110) with 4 text fields
-4. After creating the template, click the "Excel" import button
-5. Select the downloaded Excel file: ${fileName}
-6. The app should automatically map the 4 columns to your 4 text fields
-7. Preview and print your batch labels!`);
+3. Import File 1 for main labels (4-column template)
+4. Import File 2 for ingredient labels (2-column template)
+5. Print your batch labels!`);
 
       } catch (error) {
         console.error('❌ Label export error:', error);
@@ -3551,19 +3561,92 @@
 
       // Set column widths
       worksheet.columns = [
-        { header: 'COMPANY', key: 'company', width: 25 },
+        { header: 'CUSTOMER', key: 'customer', width: 35 },
         { header: 'ITEM', key: 'item', width: 30 },
-        { header: 'QUANTITY', key: 'quantity', width: 25 },
-        { header: 'CUSTOMER', key: 'customer', width: 35 }
+        { header: 'TAGLINE', key: 'tagline', width: 55 },
+        { header: 'QTY', key: 'qty', width: 25 }
       ];
 
       // Add data rows
       labels.forEach(label => {
         worksheet.addRow({
-          company: 'JAYNA GYRO CATERING',
+          customer: String((label.packDate || '') + ' ' + (label.customerLastName || '')),
           item: String(label.item || ''),
-          quantity: String(label.qty || ''),
-          customer: String((label.packDate || '') + ' ' + (label.customerLastName || ''))
+          tagline: 'Made with Love by your friends at Jayna Gyro 💙',
+          qty: String(label.qty || '')
+        });
+      });
+
+      // Generate Excel file buffer
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      return new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+    }
+
+    /**
+     * Generate ingredient labels for sauces (1:1 ratio with sauce labels)
+     * Only creates ingredient labels for: Tzatziki, Spicy Aioli, Lemon Vinaigrette, Hummus, Baba Ganoush
+     */
+    function generateIngredientLabels(labels) {
+      const ingredientMapping = {
+        'TZATZIKI': 'Yogurt, kefir cheese, mint, garlic, cucumber, salt.',
+        'SPICY AIOLI': 'Mayonnaise, crushed red pepper, garlic powder, cayenne, lemon, pepperoncini',
+        'LEMON VINAIGRETTE': 'Whole grain mustard, shallots, lemon, black pepper, salt, olive oil.',
+        'HUMMUS': 'Garbanzo beans, dill, garlic, lemon, salt, cumin, tahini, olive oil.',
+        'BABA GANOUSH': 'Charred Eggplant, kefir cheese, tahini, lemon, garlic, olive oil, allepo pepper, parsley.'
+      };
+
+      const ingredientLabels = [];
+
+      // For each label, check if it contains any of the sauce names
+      labels.forEach(label => {
+        const itemName = String(label.item || '').toUpperCase();
+
+        // Check if this label contains any of the tracked sauces
+        for (const [sauceName, ingredients] of Object.entries(ingredientMapping)) {
+          if (itemName.includes(sauceName)) {
+            ingredientLabels.push({
+              item: sauceName,
+              ingredients: ingredients
+            });
+            break; // Only create one ingredient label per label (avoid duplicates)
+          }
+        }
+      });
+
+      return ingredientLabels;
+    }
+
+    /**
+     * Generate Excel file for ingredient labels (2-column format)
+     * Headers: ITEM NAME, INGREDIENTS
+     */
+    async function generateIngredientsExcel(ingredientLabels) {
+      // Create new workbook using ExcelJS
+      const workbook = new ExcelJS.Workbook();
+
+      // Set workbook properties
+      workbook.creator = 'Jayna Gyro';
+      workbook.lastModifiedBy = 'Jayna Gyro';
+      workbook.created = new Date();
+      workbook.modified = new Date();
+
+      // Add worksheet
+      const worksheet = workbook.addWorksheet('Sheet1');
+
+      // Set column widths
+      worksheet.columns = [
+        { header: 'ITEM NAME', key: 'item', width: 30 },
+        { header: 'INGREDIENTS', key: 'ingredients', width: 70 }
+      ];
+
+      // Add data rows
+      ingredientLabels.forEach(label => {
+        worksheet.addRow({
+          item: String(label.item || ''),
+          ingredients: String(label.ingredients || '')
         });
       });
 
