@@ -891,6 +891,7 @@
           <button class="refresh-btn" onclick="activateEZCaterWebhooks()" style="background: #dc2626; border-color: #dc2626; color: white;">🔔 ACTIVATE EZCATER WEBHOOKS</button>
           <button class="refresh-btn" onclick="checkEZCaterSubscriptions()" style="background: #6366f1; border-color: #6366f1; color: white;">🔍 CHECK SUBSCRIPTIONS</button>
           <button class="refresh-btn" onclick="manualImportEZCaterOrder()" style="background: #10b981; border-color: #10b981; color: white;">📥 IMPORT ORDER BY NUMBER</button>
+          <button class="refresh-btn" onclick="forceSyncEZCaterOrder()" style="background: #8b5cf6; border-color: #8b5cf6; color: white;">🔄 SYNC MODIFIED ORDER</button>
         </div>
 
         <div id="syncStatus" style="display: none; padding: 12px; margin-bottom: 20px; border: 2px solid; font-size: 13px; font-weight: 600;"></div>
@@ -1676,6 +1677,147 @@
           • Order not found in EZCater<br>
           • API credentials issue<br><br>
           <strong>Example:</strong> From ezmanage.ezcater.com/orders/<strong>284577019</strong>, enter just "284577019"`;
+      }
+    }
+
+    // ============================================
+    // FORCE SYNC MODIFIED EZCATER ORDER
+    // ============================================
+    async function forceSyncEZCaterOrder() {
+      // Create modal input
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+      const modalContent = document.createElement('div');
+      modalContent.style.cssText = 'background: white; padding: 24px; max-width: 500px; width: 90%;';
+
+      const title = document.createElement('h3');
+      title.textContent = 'SYNC MODIFIED ORDER';
+      title.style.cssText = 'margin: 0 0 16px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; color: #8b5cf6;';
+
+      const label = document.createElement('label');
+      label.textContent = 'Enter Order Number to Force Sync:';
+      label.style.cssText = 'display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600;';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = '284323829';
+      input.style.cssText = 'width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; margin-bottom: 8px; box-sizing: border-box;';
+
+      const helpText = document.createElement('div');
+      helpText.innerHTML = '<small style="color: var(--gray-600);">Use this when a customer <strong>modifies an existing order</strong> and you need to update it with the latest data from EZCater.</small>';
+      helpText.style.cssText = 'margin-bottom: 16px;';
+
+      const buttonGroup = document.createElement('div');
+      buttonGroup.style.cssText = 'display: flex; gap: 12px; justify-content: flex-end;';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'CANCEL';
+      cancelBtn.style.cssText = 'padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;';
+      cancelBtn.onclick = () => document.body.removeChild(modal);
+
+      const syncBtn = document.createElement('button');
+      syncBtn.textContent = 'SYNC NOW';
+      syncBtn.style.cssText = 'padding: 12px 24px; background: #8b5cf6; border: 2px solid #8b5cf6; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;';
+
+      buttonGroup.appendChild(cancelBtn);
+      buttonGroup.appendChild(syncBtn);
+
+      modalContent.appendChild(title);
+      modalContent.appendChild(label);
+      modalContent.appendChild(input);
+      modalContent.appendChild(helpText);
+      modalContent.appendChild(buttonGroup);
+      modal.appendChild(modalContent);
+      document.body.appendChild(modal);
+
+      input.focus();
+
+      // Wait for user to click sync or cancel
+      syncBtn.onclick = async () => {
+        const orderNumber = input.value.trim();
+        document.body.removeChild(modal);
+
+        if (!orderNumber) {
+          return;
+        }
+
+        await processOrderForceSync(orderNumber);
+      };
+
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          syncBtn.click();
+        }
+      });
+    }
+
+    async function processOrderForceSync(orderNumber) {
+      const statusDiv = document.getElementById('syncStatus');
+
+      try {
+        showLoading('SYNCING ORDER', 'Fetching latest data from EZCater...');
+
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'var(--warning-bg)';
+        statusDiv.style.borderColor = 'var(--warning-border)';
+        statusDiv.style.color = 'var(--warning-text)';
+        statusDiv.textContent = '🔄 Force syncing order with latest data...';
+
+        console.log(`🔄 Force sync order number: ${orderNumber}`);
+
+        const response = await fetch('/api/ezcater-force-sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            orderNumber: orderNumber.trim()
+          })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to sync order');
+        }
+
+        console.log('✅ Order synced:', data);
+
+        // Show success message
+        statusDiv.style.background = 'var(--success-bg)';
+        statusDiv.style.borderColor = 'var(--success-border)';
+        statusDiv.style.color = 'var(--success-text)';
+        statusDiv.innerHTML = `✅ Order synced successfully with latest data!<br><br>
+          <strong>Order #:</strong> ${data.order.order_number}<br>
+          <strong>Customer:</strong> ${data.order.customer_name}<br>
+          <strong>Delivery Date:</strong> ${data.order.delivery_date}<br>
+          <strong>Total:</strong> $${data.order.total_amount?.toFixed(2)}<br>
+          <strong>Status:</strong> ${data.order.status}<br>
+          <strong>Last Synced:</strong> ${new Date(data.order.last_synced_at).toLocaleString()}<br><br>
+          <small>Order has been updated with the latest modifications from EZCater.</small>`;
+
+        // Reload orders from database
+        setTimeout(() => {
+          loadOrdersFromDatabase();
+        }, 2000);
+
+        hideLoading();
+
+      } catch (error) {
+        console.error('Error syncing order:', error);
+        hideLoading();
+
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'var(--error-bg)';
+        statusDiv.style.borderColor = 'var(--error-border)';
+        statusDiv.style.color = 'var(--error-text)';
+        statusDiv.innerHTML = `❌ Failed to sync order: ${error.message}<br><br>
+          <strong>Possible reasons:</strong><br>
+          • Invalid order number<br>
+          • Order not found in EZCater<br>
+          • API credentials issue<br><br>
+          <strong>Tip:</strong> Make sure the order exists in EZCater and you have the correct order number.`;
       }
     }
 
