@@ -887,6 +887,7 @@
         <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
           <button class="refresh-btn" onclick="loadOrdersFromDatabase()">🔄 RELOAD FROM DATABASE</button>
           <button class="refresh-btn" onclick="syncFromToast()" style="background: var(--primary-blue); border-color: var(--primary-blue);">🔄 SYNC FROM TOAST</button>
+          <button class="refresh-btn" onclick="syncFromEZCater()" style="background: #f59e0b; border-color: #f59e0b;">🔄 SYNC FROM EZCATER</button>
         </div>
 
         <div id="syncStatus" style="display: none; padding: 12px; margin-bottom: 20px; border: 2px solid; font-size: 13px; font-weight: 600;"></div>
@@ -1253,6 +1254,94 @@
               'Please try again or load from database.'}
           </div>
           <button class="refresh-btn" onclick="syncFromToast()">🔄 TRY AGAIN</button>
+          <button class="refresh-btn" onclick="loadOrdersFromDatabase()" style="background: var(--gray-700);">📂 LOAD FROM DATABASE</button>
+        `;
+      }
+    }
+
+    // ============================================
+    // SYNC FROM EZCATER API (MANUAL FETCH)
+    // ============================================
+    async function syncFromEZCater() {
+      const container = document.getElementById('upcomingContent');
+      const statusDiv = document.getElementById('syncStatus');
+
+      try {
+        showLoading('SYNCING FROM EZCATER', 'Fetching recent EZCater orders...');
+
+        // Show sync status
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'var(--blue-bg)';
+        statusDiv.style.borderColor = 'var(--warning-border)';
+        statusDiv.style.color = 'var(--warning-text)';
+        statusDiv.textContent = '🔄 Syncing from EZCater...';
+
+        // Calculate date range (last 30 days to cover recent orders)
+        const today = new Date();
+        const startDate = new Date();
+        startDate.setDate(today.getDate() - 30);
+        const endDate = new Date();
+        endDate.setDate(today.getDate() + 14);
+
+        const startDateStr = formatDate(startDate);
+        const endDateStr = formatDate(endDate);
+
+        console.log(`🔄 Syncing from EZCater: ${startDateStr} to ${endDateStr}`);
+
+        // Call EZCater sync API (will fetch recent orders and save to database)
+        const response = await fetch('/api/ezcater-sync-orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            startDate: startDateStr,
+            endDate: endDateStr
+          })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to sync EZCater orders');
+        }
+
+        console.log(`✅ Synced ${data.data.totalOrders} orders from EZCater`);
+
+        // Show success status
+        statusDiv.style.background = 'var(--success-bg)';
+        statusDiv.style.borderColor = 'var(--success-border)';
+        statusDiv.style.color = 'var(--success-text)';
+        statusDiv.textContent = `✅ Successfully synced ${data.data.totalOrders} orders from EZCater!`;
+
+        // Hide status after 5 seconds
+        setTimeout(() => {
+          statusDiv.style.display = 'none';
+        }, 5000);
+
+        // Reload from database to show orders
+        loadOrdersFromDatabase();
+
+      } catch (error) {
+        console.error('Error syncing from EZCater:', error);
+        hideLoading();
+
+        // Show error status
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'var(--error-bg)';
+        statusDiv.style.borderColor = 'var(--error-border)';
+        statusDiv.style.color = 'var(--error-text)';
+        statusDiv.textContent = `❌ Sync failed: ${error.message}`;
+
+        container.innerHTML = `
+          <div class="error-message">
+            ❌ Error syncing from EZCater: ${error.message}
+            <br><br>
+            ${error.message.includes('not implemented') || error.message.includes('404') ?
+              'EZCater sync endpoint needs to be created. Using webhook-only for now.' :
+              'Please try again or check Vercel logs for webhook errors.'}
+          </div>
+          <button class="refresh-btn" onclick="syncFromEZCater()">🔄 TRY AGAIN</button>
           <button class="refresh-btn" onclick="loadOrdersFromDatabase()" style="background: var(--gray-700);">📂 LOAD FROM DATABASE</button>
         `;
       }
