@@ -1,6 +1,8 @@
 /**
- * ezCater Subscription Setup
- * Creates webhook subscriptions for order events
+ * ezCater Subscription Setup (FIXED - October 2025)
+ * Creates webhook subscriptions for order events using correct API mutation
+ *
+ * FIXED: Changed from createSubscriber (deprecated) to createEventNotificationSubscription
  */
 
 export default async function handler(req, res) {
@@ -27,110 +29,32 @@ export default async function handler(req, res) {
 
     console.log('🔔 Setting up ezCater webhook subscriptions...');
 
-    // STEP 0: Find ALL types with "Subscriber" or "Subscription" in name
-    const typeIntrospection = `
-      {
-        __schema {
-          types {
-            name
-            kind
-            inputFields {
-              name
-              type {
-                name
-                kind
-              }
-            }
-            fields {
-              name
-              type {
-                name
-                kind
-              }
-            }
-          }
-        }
-      }
-    `;
-
-    const typeResponse = await fetch('https://api.ezcater.com/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': EZCATER_API_TOKEN,
-        'Apollographql-client-name': 'Jayna-Gyro-Sacramento',
-        'Apollographql-client-version': '1.0.0'
-      },
-      body: JSON.stringify({
-        query: typeIntrospection
-      })
-    });
-
-    // STEP 1: Create Subscriber (register webhook URL)
-    const createSubscriberMutation = `
-      mutation CreateSubscriber($subscriberParams: CreateSubscriberFields!) {
-        createSubscriber(subscriberParams: $subscriberParams) {
-          subscriber {
-            id
-            name
-            webhookUrl
-            webhookSecret
-          }
-        }
-      }
-    `;
-
-    const subscriberResponse = await fetch('https://api.ezcater.com/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': EZCATER_API_TOKEN,
-        'Apollographql-client-name': 'Jayna-Gyro-Sacramento',
-        'Apollographql-client-version': '1.0.0'
-      },
-      body: JSON.stringify({
-        query: createSubscriberMutation,
-        variables: {
-          subscriberParams: {
-            name: 'Jayna Gyro Sacramento',
-            webhookUrl: WEBHOOK_URL
-          }
-        }
-      })
-    });
-
-    const subscriberData = await subscriberResponse.json();
-
-    if (subscriberData.errors) {
-      console.error('❌ Subscriber creation failed:', subscriberData.errors);
-      throw new Error(`Failed to create subscriber: ${JSON.stringify(subscriberData.errors)}`);
-    }
-
-    console.log('✅ Subscriber created:', subscriberData.data.createSubscriber.subscriber);
-
-    const subscriberId = subscriberData.data.createSubscriber.subscriber.id;
-
-    // STEP 2: Create Subscription for Order events
-    const createSubscriptionMutation = `
-      mutation CreateSubscription($subscriptionParams: CreateSubscriptionFields!) {
-        createSubscription(subscriptionParams: $subscriptionParams) {
-          subscription {
-            eventEntity
-            eventKey
-            parentEntity
-            parentId
-            subscriberId
-          }
-        }
-      }
-    `;
-
-    // Subscribe to all order events: submitted, accepted, rejected, cancelled
+    // Create subscriptions for all order events using CORRECT mutation
     const eventKeys = ['submitted', 'accepted', 'rejected', 'cancelled'];
     const subscriptions = [];
+    const errors = [];
 
     for (const eventKey of eventKeys) {
-      const subscriptionResponse = await fetch('https://api.ezcater.com/graphql', {
+      console.log(`📝 Creating subscription for order.${eventKey}...`);
+
+      const mutation = `
+        mutation CreateOrderSubscription($input: CreateEventNotificationSubscriptionInput!) {
+          createEventNotificationSubscription(input: $input) {
+            eventNotificationSubscription {
+              id
+              url
+              eventEntity
+              eventKey
+              parentId
+              parentEntity
+              createdAt
+            }
+            errors
+          }
+        }
+      `;
+
+      const response = await fetch('https://api.ezcater.com/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -139,34 +63,88 @@ export default async function handler(req, res) {
           'Apollographql-client-version': '1.0.0'
         },
         body: JSON.stringify({
-          query: createSubscriptionMutation,
+          query: mutation,
           variables: {
-            subscriptionParams: {
+            input: {
+              url: WEBHOOK_URL,
               eventEntity: 'Order',
               eventKey: eventKey,
-              parentEntity: 'Caterer',
               parentId: CATERER_UUID,
-              subscriberId: subscriberId
+              parentEntity: 'Caterer'
             }
           }
         })
       });
 
-      const subscriptionData = await subscriptionResponse.json();
+      const data = await response.json();
 
-      if (subscriptionData.errors) {
-        console.error(`❌ Subscription failed for ${eventKey}:`, subscriptionData.errors);
-      } else {
-        console.log(`✅ Subscribed to order.${eventKey}`);
-        subscriptions.push(subscriptionData.data.createSubscription.subscription);
+      if (data.errors) {
+        console.error(`❌ GraphQL error for ${eventKey}:`, data.errors);
+        errors.push({ eventKey, error: data.errors });
+        continue;
       }
+
+      const result = data.data?.createEventNotificationSubscription;
+
+      if (result?.errors && result.errors.length > 0) {
+        console.error(`❌ Subscription error for ${eventKey}:`, result.errors);
+
+        // Check if subscription already exists
+        const isDuplicate = result.errors.some(err =>
+          err.message?.toLowerCase().includes('already exists') ||
+          err.message?.toLowerCase().includes('duplicate')
+        );
+
+        if (isDuplicate) {
+          console.log(`ℹ️  Subscription for order.${eventKey} already exists (skipping)`);
+          errors.push({ eventKey, error: 'Already exists', skipped: true });
+        } else {
+          errors.push({ eventKey, error: result.errors });
+        }
+        continue;
+      }
+
+      if (result?.eventNotificationSubscription) {
+        console.log(`✅ Subscribed to order.${eventKey} (ID: ${result.eventNotificationSubscription.id})`);
+        subscriptions.push(result.eventNotificationSubscription);
+      }
+
+      // Rate limiting: wait 500ms between requests
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    // Check if we have any successful subscriptions
+    if (subscriptions.length === 0 && errors.length > 0) {
+      // All failed, but check if they were duplicates
+      const allDuplicates = errors.every(e => e.skipped);
+
+      if (allDuplicates) {
+        return res.status(200).json({
+          success: true,
+          message: 'Webhook subscriptions already exist! ✅',
+          note: 'All subscriptions were already configured. Orders should be syncing automatically.',
+          subscriptions: [],
+          errors: errors,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      throw new Error(`Failed to create any subscriptions: ${JSON.stringify(errors)}`);
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Webhook subscriptions created successfully! 🎉',
-      subscriber: subscriberData.data.createSubscriber.subscriber,
+      message: `Webhook subscriptions created successfully! 🎉 (${subscriptions.length}/${eventKeys.length})`,
+      webhookUrl: WEBHOOK_URL,
       subscriptions: subscriptions,
+      skipped: errors.filter(e => e.skipped),
+      errors: errors.filter(e => !e.skipped),
+      coverage: {
+        submitted: subscriptions.some(s => s.eventKey === 'submitted') || errors.some(e => e.eventKey === 'submitted' && e.skipped),
+        accepted: subscriptions.some(s => s.eventKey === 'accepted') || errors.some(e => e.eventKey === 'accepted' && e.skipped),
+        rejected: subscriptions.some(s => s.eventKey === 'rejected') || errors.some(e => e.eventKey === 'rejected' && e.skipped),
+        cancelled: subscriptions.some(s => s.eventKey === 'cancelled') || errors.some(e => e.eventKey === 'cancelled' && e.skipped)
+      },
       timestamp: new Date().toISOString()
     });
 

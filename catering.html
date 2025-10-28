@@ -889,6 +889,7 @@
           <button class="refresh-btn" onclick="syncFromToast()" style="background: var(--primary-blue); border-color: var(--primary-blue);">🔄 SYNC FROM TOAST</button>
           <button class="refresh-btn" onclick="syncFromEZCater()" style="background: #f59e0b; border-color: #f59e0b;">🔄 SYNC FROM EZCATER</button>
           <button class="refresh-btn" onclick="activateEZCaterWebhooks()" style="background: #dc2626; border-color: #dc2626; color: white;">🔔 ACTIVATE EZCATER WEBHOOKS</button>
+          <button class="refresh-btn" onclick="checkEZCaterSubscriptions()" style="background: #6366f1; border-color: #6366f1; color: white;">🔍 CHECK SUBSCRIPTIONS</button>
         </div>
 
         <div id="syncStatus" style="display: none; padding: 12px; margin-bottom: 20px; border: 2px solid; font-size: 13px; font-weight: 600;"></div>
@@ -1386,9 +1387,34 @@
         statusDiv.style.background = 'var(--success-bg)';
         statusDiv.style.borderColor = 'var(--success-border)';
         statusDiv.style.color = 'var(--success-text)';
-        statusDiv.innerHTML = `✅ EZCater webhooks activated!<br><br>
-          <strong>Webhook URL:</strong> ${data.subscriber.webhookUrl}<br>
-          <strong>Subscriptions:</strong> ${data.subscriptions.length} order events (submitted, accepted, rejected, cancelled)<br><br>
+
+        // Build subscription summary
+        const totalCreated = data.subscriptions?.length || 0;
+        const totalSkipped = data.skipped?.length || 0;
+        const totalErrors = data.errors?.length || 0;
+
+        let summary = '';
+        if (totalCreated > 0) {
+          summary += `<strong>✅ Created:</strong> ${totalCreated} subscriptions<br>`;
+        }
+        if (totalSkipped > 0) {
+          summary += `<strong>ℹ️ Already Existed:</strong> ${totalSkipped} subscriptions<br>`;
+        }
+        if (totalErrors > 0) {
+          summary += `<strong>❌ Failed:</strong> ${totalErrors} subscriptions<br>`;
+        }
+
+        // Show coverage
+        const coverage = data.coverage;
+        summary += `<br><strong>Event Coverage:</strong><br>`;
+        summary += `• order.submitted: ${coverage?.submitted ? '✅' : '❌'}<br>`;
+        summary += `• order.accepted: ${coverage?.accepted ? '✅' : '❌'}<br>`;
+        summary += `• order.rejected: ${coverage?.rejected ? '✅' : '❌'}<br>`;
+        summary += `• order.cancelled: ${coverage?.cancelled ? '✅' : '❌'}`;
+
+        statusDiv.innerHTML = `${data.message}<br><br>
+          <strong>Webhook URL:</strong> ${data.webhookUrl}<br><br>
+          ${summary}<br><br>
           <small>New EZCater orders will now automatically appear in your catering page!</small>`;
 
         hideLoading();
@@ -1409,6 +1435,94 @@
           ${error.message.includes('already exists') || error.message.includes('Subscriber') ?
             '<strong>Note:</strong> Webhooks may already be active. Check Vercel logs for incoming webhook POST requests.' :
             '<strong>Action:</strong> Check your EZCater API credentials in Vercel environment variables.'}`;
+      }
+    }
+
+    // ============================================
+    // CHECK EZCATER SUBSCRIPTIONS (DIAGNOSTIC)
+    // ============================================
+    async function checkEZCaterSubscriptions() {
+      const statusDiv = document.getElementById('syncStatus');
+
+      try {
+        showLoading('CHECKING SUBSCRIPTIONS', 'Fetching EZCater webhook configuration...');
+
+        // Show status
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'var(--warning-bg)';
+        statusDiv.style.borderColor = 'var(--warning-border)';
+        statusDiv.style.color = 'var(--warning-text)';
+        statusDiv.textContent = '🔍 Checking EZCater subscriptions...';
+
+        console.log('🔍 Checking EZCater webhook subscriptions...');
+
+        // Call list subscriptions endpoint
+        const response = await fetch('/api/ezcater-list-subscriptions', {
+          method: 'GET'
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch subscriptions');
+        }
+
+        console.log('✅ Subscription data:', data);
+
+        // Build coverage status HTML
+        const coverageStatus = `
+          <strong>Event Coverage:</strong><br>
+          • order.submitted: ${data.coverage.submitted ? '✅ Active' : '❌ Missing'}<br>
+          • order.accepted: ${data.coverage.accepted ? '✅ Active' : '❌ Missing'}<br>
+          • order.rejected: ${data.coverage.rejected ? '✅ Active' : '❌ Missing'}<br>
+          • order.cancelled: ${data.coverage.cancelled ? '✅ Active' : '❌ Missing'}
+        `;
+
+        // Determine overall status
+        const allActive = data.coverage.submitted && data.coverage.accepted &&
+                         data.coverage.rejected && data.coverage.cancelled;
+
+        // Show status
+        if (allActive) {
+          statusDiv.style.background = 'var(--success-bg)';
+          statusDiv.style.borderColor = 'var(--success-border)';
+          statusDiv.style.color = 'var(--success-text)';
+          statusDiv.innerHTML = `✅ EZCater webhooks are ACTIVE!<br><br>
+            <strong>Caterer:</strong> ${data.caterer.name}<br>
+            <strong>Store #:</strong> ${data.caterer.storeNumber}<br>
+            <strong>Webhook URL:</strong> ${data.webhookUrl}<br>
+            <strong>Total Subscriptions:</strong> ${data.activeForOurWebhook} / ${data.totalSubscriptions}<br><br>
+            ${coverageStatus}<br><br>
+            <small>✅ All order events are configured. Orders should sync automatically!</small>`;
+        } else {
+          statusDiv.style.background = 'var(--warning-bg)';
+          statusDiv.style.borderColor = 'var(--warning-border)';
+          statusDiv.style.color = 'var(--warning-text)';
+          statusDiv.innerHTML = `⚠️ EZCater webhooks PARTIALLY configured<br><br>
+            <strong>Caterer:</strong> ${data.caterer.name}<br>
+            <strong>Store #:</strong> ${data.caterer.storeNumber}<br>
+            <strong>Webhook URL:</strong> ${data.webhookUrl}<br>
+            <strong>Total Subscriptions:</strong> ${data.activeForOurWebhook} / ${data.totalSubscriptions}<br><br>
+            ${coverageStatus}<br><br>
+            <strong>Action:</strong> Click "ACTIVATE EZCATER WEBHOOKS" to complete setup.`;
+        }
+
+        hideLoading();
+
+        // Keep status visible (don't auto-hide)
+        console.log('✅ Subscription check complete!');
+
+      } catch (error) {
+        console.error('Error checking subscriptions:', error);
+        hideLoading();
+
+        // Show error status
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'var(--error-bg)';
+        statusDiv.style.borderColor = 'var(--error-border)';
+        statusDiv.style.color = 'var(--error-text)';
+        statusDiv.innerHTML = `❌ Failed to check subscriptions: ${error.message}<br><br>
+          <strong>Action:</strong> Check your EZCater API credentials in Vercel environment variables.`;
       }
     }
 
