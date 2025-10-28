@@ -2715,20 +2715,145 @@
    */
   function toggleReorderMode() {
     if (!reorderMode) {
-      // Entering reorder mode - check password
-      const password = prompt('Enter password to reorder checklists:');
-      if (password !== 'jaynagod') {
-        showMessage('Incorrect password!', 'error');
-        return;
-      }
-      reorderMode = true;
-      showMessage('✅ Reorder mode enabled. Drag cards to reorder.', 'success');
+      // Entering reorder mode - show password modal
+      showPasswordModal();
     } else {
       // Exiting reorder mode
       reorderMode = false;
       showMessage('✅ Order saved!', 'success');
+      renderWorkflowSelector();
     }
-    renderWorkflowSelector();
+  }
+
+  /**
+   * Show Password Modal for Reorder Mode
+   */
+  function showPasswordModal() {
+    const modalHTML = `
+      <div id="reorderPasswordModal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        padding: 20px;
+      ">
+        <div style="
+          background: white;
+          padding: 24px;
+          max-width: 400px;
+          width: 100%;
+          border: 3px solid var(--gray-700);
+          border-radius: 0;
+        ">
+          <h3 style="
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gray-900);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          ">
+            🔒 Enter Password
+          </h3>
+          <p style="
+            margin: 0 0 16px 0;
+            font-size: 13px;
+            color: var(--gray-600);
+          ">
+            Enter password to enable checklist reordering:
+          </p>
+          <input
+            type="password"
+            id="reorderPasswordInput"
+            placeholder="Password"
+            style="
+              width: 100%;
+              padding: 12px;
+              border: 2px solid var(--gray-300);
+              border-radius: 0;
+              font-size: 14px;
+              margin-bottom: 16px;
+              box-sizing: border-box;
+            "
+            onkeypress="if(event.key==='Enter') submitReorderPassword()"
+          />
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button
+              onclick="closePasswordModal()"
+              style="
+                padding: 12px 24px;
+                background: var(--gray-100);
+                border: 2px solid var(--gray-300);
+                color: var(--gray-900);
+                font-size: 13px;
+                font-weight: 700;
+                cursor: pointer;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                border-radius: 0;
+              "
+            >
+              CANCEL
+            </button>
+            <button
+              onclick="submitReorderPassword()"
+              style="
+                padding: 12px 24px;
+                background: var(--gray-900);
+                border: 2px solid var(--gray-900);
+                color: white;
+                font-size: 13px;
+                font-weight: 700;
+                cursor: pointer;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                border-radius: 0;
+              "
+            >
+              SUBMIT
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    document.getElementById('reorderPasswordInput').focus();
+  }
+
+  /**
+   * Submit Reorder Password
+   */
+  function submitReorderPassword() {
+    const input = document.getElementById('reorderPasswordInput');
+    const password = input.value;
+
+    if (password === 'jaynagod') {
+      closePasswordModal();
+      reorderMode = true;
+      showMessage('✅ Reorder mode enabled. Drag cards to reorder.', 'success');
+      renderWorkflowSelector();
+    } else {
+      showMessage('❌ Incorrect password!', 'error');
+      input.value = '';
+      input.focus();
+    }
+  }
+
+  /**
+   * Close Password Modal
+   */
+  function closePasswordModal() {
+    const modal = document.getElementById('reorderPasswordModal');
+    if (modal) {
+      modal.remove();
+    }
   }
 
   /**
