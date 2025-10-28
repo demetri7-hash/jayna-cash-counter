@@ -7,7 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-    <style>
+  <style>
     /* Jayna Brand Design - Sky Blue & Grayscale */
     :root {
       --primary-blue: #00A8E1;
@@ -439,6 +439,7 @@
     }
 
     .notification-toast.error {
+      border-color: var(--error-border);
       background: var(--error-bg);
       color: var(--error-text);
     }
@@ -454,47 +455,12 @@
       }
     }
   </style>
-
 </head>
 <body>
+  <!-- Shared Header -->
+  <div id="sharedHeader"></div>
 
-<div class="container">
-    <div class="header">
-      <img src="jayna-logo.png" alt="Jayna Gyro Logo" style="width: 80px; height: 80px; margin-bottom: 12px;">
-      <h1 style="margin-bottom: 4px;">JAYNA GYRO</h1>
-      <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 4px; letter-spacing: 1.5px;">INTERNAL FUNCTION APP</h2>
-      <p style="font-size: 11px; font-weight: 500; letter-spacing: 1px; margin-bottom: 8px;">FOR AUTHORIZED USE ONLY</p>
-      <p style="opacity: 0.7;">App created by Demetri Gregorakis</p>
-
-      <!-- CURRENTLY CLOCKED IN -->
-      <div id="clockedInContainer" style="margin: 8px 0; text-align: center;">
-        <div id="clockedInList" style="color: #2e7d32; font-size: 12px; font-weight: 500;">
-          Loading...
-        </div>
-      </div>
-    </div>
-
-    <div class="content">
-      <div id="messageArea"></div>
-
-      <!-- Main Menu -->
-      <div id="mainMenu" class="main-menu">
-        <a href="index.html" class="menu-btn primary" style="text-decoration: none;">Cash</a>
-        <a href="index.html" class="menu-btn" style="background: var(--gray-700) !important; color: white !important; border-color: var(--gray-700) !important; text-decoration: none;">Orders & Prep</a>
-        <a href="foh-checklists.html" class="menu-btn primary" style="text-decoration: none;">FOH</a>
-        <a href="boh.html" class="menu-btn" style="background: var(--gray-700) !important; color: white !important; border-color: var(--gray-700) !important; text-decoration: none;">BOH</a>
-        <a href="catering.html" class="menu-btn primary" style="text-decoration: none;">Catering</a>
-        <a href="drivers.html" class="menu-btn" style="background: var(--gray-700) !important; color: white !important; border-color: var(--gray-700) !important; text-decoration: none;">Drivers</a>
-        <a href="manager.html" class="menu-btn primary" style="text-decoration: none;">Manager</a>
-      </div>
-
-      <!-- Manager Logs Link -->
-      <div style="text-align: center; margin: 16px 0 20px 0;">
-        <a href="javascript:void(0)" onclick="requirePasswordFor('Manager Logs', accessManagerLogs)" style="font-size: 11px; font-weight: 600; color: var(--gray-700); text-decoration: none; letter-spacing: 0.8px; padding: 6px 12px; border: 2px solid var(--gray-300); background: white; display: inline-block; transition: all 0.15s ease; cursor: pointer;">MANAGER LOGS</a>
-      </div>
-
-      
-
+  <div class="container">
     <!-- Tab Navigation -->
     <div class="tab-container">
       <button class="tab-btn active" onclick="switchTab('flag')">FLAG</button>
@@ -529,7 +495,7 @@
     </div>
   </div>
 
-  <!-- Flag Driver Modal -->
+    <!-- Flag Driver Modal -->
   <div id="flagModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -648,6 +614,7 @@
   <!-- Custom Notification Toast -->
   <div id="notificationToast" class="notification-toast"></div>
 
+  <script src="shared-header.js"></script>
 <script>
     const supabase = (() => {
       if (window._driversSupabaseClient) {
@@ -670,47 +637,10 @@
     let flaggedUnlocked = false;
     let confirmCallback = null;
 
-    // Custom notification function
-    function showNotification(message, type = 'info') {
-      const toast = document.getElementById('notificationToast');
-      toast.textContent = message;
-      toast.className = 'notification-toast active';
-      if (type === 'success' || type === 'error') {
-        toast.classList.add(type);
-      }
-      setTimeout(() => {
-        toast.classList.remove('active');
-      }, 3000);
-    }
-
-
-    });
-
-
-    function updateClockedInDisplay(employees) {
-      const listDiv = document.getElementById('clockedInList');
-      if (!listDiv) return;
-
-      if (employees.length === 0) {
-        listDiv.innerHTML = '<span style="color: #999; font-size: 11px; font-style: italic;">No one clocked in</span>';
-        return;
-      }
-
-      const namesText = employees.join(' | ');
-      listDiv.innerHTML = `
-        <div style="color: #2e7d32; font-size: 12px; font-weight: 500;">
-          ${namesText}
-        </div>
-        <div style="color: #666; font-size: 9px; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px;">
-          Clocked In
-        </div>
-      `;
-    }
-
-    // Initialize clocked-in display on load
+    // Initialize
     document.addEventListener('DOMContentLoaded', async () => {
+      initializeSharedHeader();
       await loadClockedInEmployees();
-      setInterval(loadClockedInEmployees, 5 * 60 * 1000); // Refresh every 5 minutes
       setTodayDateTime();
 
       // Allow Enter key on password field
@@ -752,20 +682,27 @@
         if (!result.success) return;
 
         clockedInEmployees = result.clockedIn.map(emp => emp.fullName);
-        updateClockedInDisplay(clockedInEmployees);
-        console.log(`Loaded ${clockedInEmployees.length} clocked-in employees`);
       } catch (error) {
         console.error('Error loading clocked-in employees:', error);
       }
     }
 
-    function setTodayDateTime() {
-      const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      const time = now.toTimeString().slice(0, 5);
-      document.getElementById('flagDate').value = today;
-      document.getElementById('flagTime').value = time;
+
+
+    // Custom notification function
+    function showNotification(message, type = 'info') {
+      const toast = document.getElementById('notificationToast');
+      toast.textContent = message;
+      toast.className = 'notification-toast active';
+      if (type === 'success' || type === 'error') {
+        toast.classList.add(type);
+      }
+      setTimeout(() => {
+        toast.classList.remove('active');
+      }, 3000);
     }
+
+
 
     function cycleStaffName() {
       if (clockedInEmployees.length === 0) {
