@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Driver Flags - Jayna Gyro Manager Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    :root {
+      --white: #ffffff;
+      --gray-900: #1a1a1a;
+      --gray-700: #4a4a4a;
+      --gray-600: #6b6b6b;
+      --gray-500: #9ca3af;
+      --gray-400: #d1d5db;
+      --gray-300: #e5e7eb;
+      --gray-200: #f3f4f6;
+      --gray-100: #f9fafb;
+
+      --jayna-blue: #3b82f6;
+      --jayna-blue-pale: #eff6ff;
+      --jayna-blue-light: #dbeafe;
+
+      --success-bg: #d1fae5;
+      --success-text: #065f46;
+      --success-border: #059669;
+
+      --error-bg: #fee2e2;
+      --error-text: #991b1b;
+      --error-border: #dc2626;
+
+      --warning-bg: #fef3c7;
+      --warning-text: #92400e;
+      --warning-border: #f59e0b;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Aptos', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--white);
+      min-height: 100vh;
+      padding: 0;
+      margin: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: var(--white);
+      border-radius: 0;
+      overflow: visible;
+      box-shadow: none;
+      min-height: auto;
+      max-height: none;
+    }
+
+    .content {
+      padding: 12px;
+      max-height: none;
+      overflow: visible;
+    }
+
+    h1, h2, h3 {
+      color: var(--gray-900);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+
+    h3 {
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    /* Disclaimer Box */
+    .disclaimer {
+      background: var(--jayna-blue-pale);
+      border: 2px solid var(--jayna-blue);
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .disclaimer h3 {
+      color: var(--jayna-blue);
+      margin-bottom: 12px;
+    }
+
+    .disclaimer p {
+      font-size: 13px;
+      line-height: 1.8;
+      color: var(--gray-700);
+    }
+
+    /* Tab System */
+    .tab-container {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--gray-300);
+    }
+
+    .tab-btn {
+      padding: 12px 20px;
+      background: var(--gray-100);
+      color: var(--gray-700);
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn.active {
+      background: var(--gray-700);
+      color: white;
+      border-bottom-color: var(--gray-700);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Form Styles */
+    .form-section {
+      background: white;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 2px solid var(--gray-300);
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-700);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      font-weight: 400;
+      background: white;
+      box-sizing: border-box;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: var(--gray-700);
+      outline: none;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+      font-family: inherit;
+    }
+
+    /* Staff Name (Large Clickable) */
+    .staff-name-large {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--jayna-blue);
+      cursor: pointer;
+      padding: 12px;
+      border: 2px solid var(--gray-300);
+      background: white;
+      text-align: center;
+      transition: all 0.15s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .staff-name-large:hover {
+      border-color: var(--jayna-blue);
+      background: var(--jayna-blue-pale);
+    }
+
+    .staff-timestamp {
+      text-align: center;
+      font-size: 10px;
+      color: var(--gray-500);
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    /* Reason Flag Buttons */
+    .reason-flags-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .reason-flag-btn {
+      padding: 8px 14px;
+      background: white;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-700);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.15s ease;
+    }
+
+    .reason-flag-btn:hover {
+      border-color: var(--gray-700);
+    }
+
+    .reason-flag-btn.active {
+      background: var(--jayna-blue);
+      border-color: var(--jayna-blue);
+      color: white;
+    }
+
+    /* Button Styles */
+    .btn {
+      padding: 12px 24px;
+      border: 2px solid var(--gray-900);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border-radius: 0;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--gray-900);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--gray-700);
+      border-color: var(--gray-700);
+    }
+
+    .btn-secondary {
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border-color: var(--gray-300);
+    }
+
+    .btn-danger {
+      background: #dc2626;
+      color: white;
+      border-color: #dc2626;
+    }
+
+    .btn-success {
+      background: #059669;
+      color: white;
+      border-color: #059669;
+    }
+
+    /* List View */
+    .list-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .list-container {
+      background: white;
+    }
+
+    .list-header {
+      display: grid;
+      grid-template-columns: 40px 100px 1fr 80px;
+      gap: 8px;
+      padding: 12px 8px;
+      background: var(--gray-900);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .list-item {
+      display: grid;
+      grid-template-columns: 40px 100px 1fr 80px;
+      gap: 8px;
+      padding: 12px 8px;
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .list-item:nth-child(even) {
+      background: var(--jayna-blue-pale);
+    }
+
+    .list-item:hover {
+      background: var(--jayna-blue-light);
+    }
+
+    .list-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    /* Reason flags in list */
+    .flag-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .flag-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      background: var(--jayna-blue-light);
+      color: var(--jayna-blue);
+      font-weight: 600;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    /* Action Icons */
+    .action-icons {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .action-icon {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .action-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--gray-600);
+    }
+
+    .action-icon:hover svg {
+      fill: var(--gray-900);
+    }
+
+    .action-icon.delete:hover svg {
+      fill: #dc2626;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10000;
+      overflow-y: auto;
+      padding: 20px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 24px;
+      max-width: 700px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 3px solid var(--gray-700);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--gray-300);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: var(--gray-600);
+      cursor: pointer;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      line-height: 1;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 2px solid var(--gray-300);
+    }
+
+    /* Loading Spinner */
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 20000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .loading-overlay.active {
+      display: flex;
+    }
+
+    .loading-content {
+      text-align: center;
+      color: white;
+    }
+
+    .spinner {
+      border: 4px solid var(--gray-300);
+      border-top: 4px solid white;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 18px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Success Message */
+    .success-message {
+      background: var(--success-bg);
+      border: 2px solid var(--success-border);
+      color: var(--success-text);
+      padding: 16px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    /* Details truncation (2 lines max in list) */
+    .details-truncated {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .container {
+        padding: 8px;
+      }
+
+      .reason-flags-container {
+        gap: 6px;
+      }
+
+      .reason-flag-btn {
+        padding: 6px 10px;
+        font-size: 10px;
+      }
+
+      .list-header,
+      .list-item {
+        grid-template-columns: 30px 90px 1fr 70px;
+        gap: 6px;
+        padding: 10px 6px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Shared Header -->
+  <div id="sharedHeader"></div>
+
+  <div class="container">
+    <div class="content">
+      <h1 style="margin-bottom: 8px; color: var(--gray-900);">DRIVER FLAGS</h1>
+      <p style="font-size: 13px; color: var(--gray-600); font-weight: 600; margin-bottom: 24px;">3RD PARTY DELIVERY DRIVER QUALITY CONTROL</p>
+
+      <!-- Tab Navigation -->
+      <div class="tab-container">
+      <button class="tab-btn active" onclick="switchTab('flag')">FLAG</button>
+      <button class="tab-btn" onclick="switchTab('flagged')">FLAGGED</button>
+    </div>
+
+    <!-- FLAG TAB -->
+    <div id="flagTab" class="tab-content active">
+      <!-- Disclaimer -->
+      <div class="disclaimer">
+        <h3>🎯 OUR MISSION: EXCELLENCE IN EVERY DELIVERY</h3>
+        <p>At Jayna Gyro, we believe that quality hospitality extends beyond our doors. Our partnership with 3rd-party delivery drivers (DoorDash, Grubhub, Uber Eats) is a critical part of the guest experience. This system allows our team to flag drivers who do not meet our standards for professionalism, cleanliness, punctuality, and respect.</p>
+        <p style="margin-top: 12px;"><strong>All flags are reviewed by Demetri.</strong> Drivers who consistently fail to meet our standards will be blocked from picking up orders, ensuring that ONLY THE BEST drivers represent Jayna Gyro in the community.</p>
+      </div>
+
+      <!-- Flag Form -->
+      <div class="form-section">
+        <div class="form-group">
+          <label>YOUR NAME (CLICK TO CHANGE)</label>
+          <div class="staff-name-large" id="staffNameLarge" onclick="cycleStaffName()">
+            CLICK TO SELECT YOUR NAME
+          </div>
+          <div class="staff-timestamp" id="staffTimestamp"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="guestName">GUEST NAME</label>
+          <input type="text" id="guestName" placeholder="First and last name">
+        </div>
+
+        <div class="form-group">
+          <label for="driverName">DRIVER NAME (OPTIONAL)</label>
+          <input type="text" id="driverName" placeholder="If known">
+        </div>
+
+        <div class="form-group">
+          <label for="orderNumber">ORDER NUMBER</label>
+          <input type="text" id="orderNumber" placeholder="e.g. 12345">
+        </div>
+
+        <div class="form-group">
+          <label for="flagDate">DATE</label>
+          <input type="date" id="flagDate">
+        </div>
+
+        <div class="form-group">
+          <label for="flagTime">TIME</label>
+          <input type="time" id="flagTime">
+        </div>
+
+        <div class="form-group">
+          <label>REASON FLAGS (SELECT ALL THAT APPLY)</label>
+          <div class="reason-flags-container">
+            <button class="reason-flag-btn" data-flag="RUDE" onclick="toggleReasonFlag(this)">RUDE</button>
+            <button class="reason-flag-btn" data-flag="LATE" onclick="toggleReasonFlag(this)">LATE</button>
+            <button class="reason-flag-btn" data-flag="DIRTY" onclick="toggleReasonFlag(this)">DIRTY</button>
+            <button class="reason-flag-btn" data-flag="APPEARANCE" onclick="toggleReasonFlag(this)">APPEARANCE</button>
+            <button class="reason-flag-btn" data-flag="WRONG ORDER" onclick="toggleReasonFlag(this)">WRONG ORDER</button>
+            <button class="reason-flag-btn" data-flag="DAMAGED FOOD" onclick="toggleReasonFlag(this)">DAMAGED FOOD</button>
+            <button class="reason-flag-btn" data-flag="ARGUED" onclick="toggleReasonFlag(this)">ARGUED</button>
+            <button class="reason-flag-btn" data-flag="IMPATIENT" onclick="toggleReasonFlag(this)">IMPATIENT</button>
+            <button class="reason-flag-btn" data-flag="PHONE ISSUE" onclick="toggleReasonFlag(this)">PHONE ISSUE</button>
+            <button class="reason-flag-btn" data-flag="PARKING" onclick="toggleReasonFlag(this)">PARKING</button>
+            <button class="reason-flag-btn" data-flag="SMELL" onclick="toggleReasonFlag(this)">SMELL</button>
+            <button class="reason-flag-btn" data-flag="OTHER" onclick="toggleReasonFlag(this)">OTHER</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="flagDetails">DETAILS</label>
+          <textarea id="flagDetails" placeholder="Describe what happened..."></textarea>
+        </div>
+
+        <button class="btn btn-primary" onclick="submitFlag()" style="width: 100%;">SUBMIT FLAG</button>
+      </div>
+    </div>
+
+      <!-- FLAGGED TAB -->
+      <div id="flaggedTab" class="tab-content">
+        <div class="form-section">
+          <div class="list-controls">
+            <h2 style="margin: 0;">FLAGGED DRIVERS</h2>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+            <button class="btn btn-secondary" id="emailReportBtn" onclick="emailSelectedReports()" disabled style="opacity: 0.5; cursor: not-allowed; display: none;">EMAIL REPORT</button>
+            <button class="btn btn-secondary" id="downloadReportBtn" onclick="downloadSelectedReports()" disabled style="opacity: 0.5; cursor: not-allowed; display: none;">DOWNLOAD</button>
+            <button class="btn btn-danger" id="deleteSelectedBtn" onclick="deleteSelected()" disabled style="opacity: 0.5; cursor: not-allowed; display: none;">DELETE SELECTED</button>
+            <button class="btn btn-secondary" id="archiveSelectedBtn" onclick="archiveSelected()" disabled style="opacity: 0.5; cursor: not-allowed; display: none;">ARCHIVE SELECTED</button>
+          </div>
+
+          <div id="flagListContainer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div id="detailModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 style="margin: 0;">FLAG DETAILS</h2>
+        <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+      </div>
+
+      <div id="detailContent"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">CLOSE</button>
+        <button class="btn btn-primary" id="resendEmailBtn" onclick="resendEmail()">RE-SEND EMAIL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Password Modal -->
+  <div id="passwordModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h2 style="margin: 0;">ENTER PASSWORD</h2>
+        <button class="modal-close" onclick="closePasswordModal()">&times;</button>
+      </div>
+
+      <div style="padding: 20px 0;">
+        <input type="password" id="passwordInput" placeholder="Manager password" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px;">
+        <p id="passwordError" style="color: var(--error-text); font-size: 12px; margin-top: 8px; display: none;">Incorrect password</p>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closePasswordModal()">CANCEL</button>
+        <button class="btn btn-primary" onclick="checkPassword()">SUBMIT</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email Note Modal -->
+  <div id="emailNoteModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2 style="margin: 0;">ADD CUSTOM NOTE</h2>
+        <button class="modal-close" onclick="closeEmailNoteModal()">&times;</button>
+      </div>
+
+      <div style="padding: 20px 0;">
+        <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase;">OPTIONAL NOTE TO INCLUDE:</label>
+        <textarea id="emailNoteInput" placeholder="Add any additional context..." style="width: 100%; min-height: 100px; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; font-family: inherit;"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeEmailNoteModal()">CANCEL</button>
+        <button class="btn btn-primary" onclick="sendEmailNow()">SEND NOW</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loadingText">PROCESSING...</div>
+      <div id="loadingSuccess" style="display: none;">
+        <div class="success-message">
+          <div style="font-size: 48px; margin-bottom: 12px;">✓</div>
+          <div id="successText">SUCCESS! THANK YOU!</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared-header.js"></script>
+  <script>
+    // Create Supabase client
+    const supabase = (() => {
+      if (window._driversSupabaseClient) {
+        return window._driversSupabaseClient;
+      }
+      window._driversSupabaseClient = window.supabase.createClient(
+        'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg',
+        { db: { schema: 'public' }, auth: { persistSession: false } }
+      );
+      return window._driversSupabaseClient;
+    })();
+
+    const MANAGER_PASSWORD = 'JaynaGyro2025!';
+
+    // State
+    let clockedInEmployees = [];
+    let currentStaffIndex = -1;
+    let currentStaffName = null;
+    let currentStaffTimestamp = null;
+    let allFlags = [];
+    let currentFlag = null;
+    let pendingEmailFlagId = null;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+      initializeSharedHeader();
+      await loadClockedInEmployees();
+      setTodayDateTime();
+    });
+
+    async function loadClockedInEmployees() {
+      try {
+        // Get TODAY in Pacific time
+        const todayPacific = new Date().toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+
+        const [month, day, year] = todayPacific.split(', ')[0].split('/');
+        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+        // Authenticate with Toast API
+        const authResponse = await fetch('/api/toast-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!authResponse.ok) return;
+
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) return;
+
+        const token = authData.data.accessToken;
+
+        // Fetch clocked-in employees
+        const clockedInUrl = `/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`;
+        const response = await fetch(clockedInUrl);
+
+        if (!response.ok) return;
+
+        const result = await response.json();
+        if (!result.success) return;
+
+        clockedInEmployees = result.clockedIn.map(emp => emp.fullName);
+        console.log(`Loaded ${clockedInEmployees.length} clocked-in employees`);
+      } catch (error) {
+        console.error('Error loading clocked-in employees:', error);
+      }
+    }
+
+    function setTodayDateTime() {
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const time = now.toTimeString().slice(0, 5);
+      document.getElementById('flagDate').value = today;
+      document.getElementById('flagTime').value = time;
+    }
+
+    function cycleStaffName() {
+      if (clockedInEmployees.length === 0) {
+        alert('No employees are currently clocked in');
+        return;
+      }
+
+      currentStaffIndex = (currentStaffIndex + 1) % clockedInEmployees.length;
+      currentStaffName = clockedInEmployees[currentStaffIndex];
+      currentStaffTimestamp = new Date().toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+
+      document.getElementById('staffNameLarge').textContent = currentStaffName.toUpperCase();
+      document.getElementById('staffTimestamp').textContent = `Selected at ${currentStaffTimestamp}`;
+    }
+
+    function toggleReasonFlag(button) {
+      button.classList.toggle('active');
+    }
+
+    function getSelectedReasonFlags() {
+      const activeButtons = document.querySelectorAll('.reason-flag-btn.active');
+      return Array.from(activeButtons).map(btn => btn.dataset.flag);
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      if (tab === 'flag') {
+        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+        document.getElementById('flagTab').classList.add('active');
+      } else if (tab === 'flagged') {
+        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+        document.getElementById('flaggedTab').classList.add('active');
+        loadFlags();
+      }
+    }
+
+    async function submitFlag() {
+      const guestName = document.getElementById('guestName').value.trim();
+      const driverName = document.getElementById('driverName').value.trim();
+      const orderNumber = document.getElementById('orderNumber').value.trim();
+      const flagDate = document.getElementById('flagDate').value;
+      const flagTime = document.getElementById('flagTime').value;
+      const reasonFlags = getSelectedReasonFlags();
+      const details = document.getElementById('flagDetails').value.trim();
+
+      // Validation
+      if (!currentStaffName) {
+        alert('Please select your name');
+        return;
+      }
+
+      if (!guestName) {
+        alert('Please enter the guest name');
+        document.getElementById('guestName').focus();
+        return;
+      }
+
+      if (!orderNumber) {
+        alert('Please enter the order number');
+        document.getElementById('orderNumber').focus();
+        return;
+      }
+
+      if (!flagDate || !flagTime) {
+        alert('Please enter the date and time');
+        return;
+      }
+
+      if (!details) {
+        alert('Please provide details about the incident');
+        document.getElementById('flagDetails').focus();
+        return;
+      }
+
+      // Show loading
+      showLoading('SUBMITTING...', 'Your driver flag is being saved and sent to Demetri...');
+
+      try {
+        // Save to database
+        const { data, error } = await supabase
+          .from('driver_flags')
+          .insert({
+            date: flagDate,
+            time: flagTime,
+            staff_name: currentStaffName,
+            staff_timestamp: currentStaffTimestamp,
+            guest_name: guestName,
+            driver_name: driverName || null,
+            order_number: orderNumber,
+            reason_flags: reasonFlags,
+            details: details,
+            archived: false
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Send email to Demetri
+        await sendFlagEmail(data);
+
+        // Show success
+        showSuccess('SUCCESS! THANK YOU!', 'Your driver flag has been saved and sent to Demetri.');
+
+        // Clear form after 3 seconds
+        setTimeout(() => {
+          clearForm();
+          hideLoading();
+        }, 3000);
+
+      } catch (error) {
+        console.error('Error submitting flag:', error);
+        hideLoading();
+        alert('Error submitting flag: ' + error.message);
+      }
+    }
+
+    async function sendFlagEmail(flagData, customNote = '') {
+      try {
+        // Generate PDF
+        const pdfData = await generateFlagPDF(flagData, customNote);
+
+        // Send via Gmail API (using serverless function)
+        const response = await fetch('/api/send-driver-flag-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pdfData: pdfData,
+            flagId: flagData.id,
+            staffName: flagData.staff_name,
+            guestName: flagData.guest_name,
+            driverName: flagData.driver_name || 'Unknown',
+            orderNumber: flagData.order_number,
+            date: flagData.date
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to send email');
+        }
+
+        console.log('Email sent successfully');
+      } catch (error) {
+        console.error('Error sending email:', error);
+        throw error;
+      }
+    }
+
+    async function generateFlagPDF(flagData, customNote = '') {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Title
+      doc.setFontSize(20);
+      doc.setFont(undefined, 'bold');
+      doc.text('JAYNA GYRO - DRIVER FLAG REPORT', 105, 20, { align: 'center' });
+
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Date: ${flagData.date} at ${flagData.time}`, 105, 30, { align: 'center' });
+
+      // Flag Details
+      let y = 50;
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'bold');
+      doc.text('REPORTED BY:', 20, y);
+      doc.setFont(undefined, 'normal');
+      doc.text(flagData.staff_name, 60, y);
+      y += 7;
+
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(9);
+      doc.text(`Submitted at: ${flagData.staff_timestamp}`, 60, y);
+      y += 15;
+
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'bold');
+      doc.text('GUEST NAME:', 20, y);
+      doc.setFont(undefined, 'normal');
+      doc.text(flagData.guest_name, 60, y);
+      y += 10;
+
+      if (flagData.driver_name) {
+        doc.setFont(undefined, 'bold');
+        doc.text('DRIVER NAME:', 20, y);
+        doc.setFont(undefined, 'normal');
+        doc.text(flagData.driver_name, 60, y);
+        y += 10;
+      }
+
+      doc.setFont(undefined, 'bold');
+      doc.text('ORDER NUMBER:', 20, y);
+      doc.setFont(undefined, 'normal');
+      doc.text(flagData.order_number, 60, y);
+      y += 15;
+
+      // Reason Flags
+      if (flagData.reason_flags && flagData.reason_flags.length > 0) {
+        doc.setFont(undefined, 'bold');
+        doc.text('REASON FLAGS:', 20, y);
+        y += 7;
+        doc.setFont(undefined, 'normal');
+        const reasonsText = flagData.reason_flags.join(', ');
+        const splitReasons = doc.splitTextToSize(reasonsText, 170);
+        doc.text(splitReasons, 20, y);
+        y += splitReasons.length * 6 + 10;
+      }
+
+      // Details
+      doc.setFont(undefined, 'bold');
+      doc.text('DETAILS:', 20, y);
+      y += 7;
+      doc.setFont(undefined, 'normal');
+      const splitDetails = doc.splitTextToSize(flagData.details, 170);
+      doc.text(splitDetails, 20, y);
+      y += splitDetails.length * 6 + 10;
+
+      // Custom Note (if provided)
+      if (customNote.trim()) {
+        y += 10;
+        doc.setFont(undefined, 'bold');
+        doc.text('ADDITIONAL NOTE:', 20, y);
+        y += 7;
+        doc.setFont(undefined, 'normal');
+        const splitNote = doc.splitTextToSize(customNote, 170);
+        doc.text(splitNote, 20, y);
+      }
+
+      // Footer
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'italic');
+      doc.text('Generated by Jayna Gyro Driver Flag System', 105, 280, { align: 'center' });
+
+      return doc.output('dataurlstring');
+    }
+
+    function clearForm() {
+      currentStaffName = null;
+      currentStaffIndex = -1;
+      currentStaffTimestamp = null;
+      document.getElementById('staffNameLarge').textContent = 'CLICK TO SELECT YOUR NAME';
+      document.getElementById('staffTimestamp').textContent = '';
+      document.getElementById('guestName').value = '';
+      document.getElementById('driverName').value = '';
+      document.getElementById('orderNumber').value = '';
+      document.getElementById('flagDetails').value = '';
+      document.querySelectorAll('.reason-flag-btn').forEach(btn => btn.classList.remove('active'));
+      setTodayDateTime();
+    }
+
+    // Load flags for FLAGGED tab
+    async function loadFlags() {
+      const container = document.getElementById('flagListContainer');
+      container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-500);">Loading flags...</div>';
+
+      // Show password modal first
+      document.getElementById('passwordModal').classList.add('active');
+      document.getElementById('passwordInput').value = '';
+      document.getElementById('passwordError').style.display = 'none';
+
+      setTimeout(() => {
+        const input = document.getElementById('passwordInput');
+        input.focus();
+        input.onkeypress = (e) => {
+          if (e.key === 'Enter') checkPassword();
+        };
+      }, 100);
+    }
+
+    function closePasswordModal() {
+      document.getElementById('passwordModal').classList.remove('active');
+      // Go back to FLAG tab if password cancelled
+      switchTab('flag');
+    }
+
+    async function checkPassword() {
+      const password = document.getElementById('passwordInput').value;
+      if (password !== MANAGER_PASSWORD) {
+        document.getElementById('passwordError').style.display = 'block';
+        document.getElementById('passwordInput').select();
+        return;
+      }
+
+      closePasswordModal();
+      await fetchAndRenderFlags();
+    }
+
+    async function fetchAndRenderFlags() {
+      try {
+        const { data, error } = await supabase
+          .from('driver_flags')
+          .select('*')
+          .eq('archived', false)
+          .order('date', { ascending: false })
+          .order('time', { ascending: false });
+
+        if (error) throw error;
+
+        allFlags = data;
+        renderFlagList();
+      } catch (error) {
+        console.error('Error loading flags:', error);
+        document.getElementById('flagListContainer').innerHTML = '<div style="text-align: center; padding: 40px; color: var(--error-text);">Error loading flags</div>';
+      }
+    }
+
+    function renderFlagList() {
+      const container = document.getElementById('flagListContainer');
+
+      if (allFlags.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 60px; color: var(--gray-500); font-size: 14px;">No flagged drivers yet</div>';
+        return;
+      }
+
+      let html = '<div class="list-container">';
+      html += `
+        <div class="list-header">
+          <span><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></span>
+          <span>DATE</span>
+          <span>INFO</span>
+          <span>ACTIONS</span>
+        </div>
+      `;
+
+      allFlags.forEach(flag => {
+        const reasonBadges = flag.reason_flags && flag.reason_flags.length > 0
+          ? flag.reason_flags.slice(0, 3).map(r => `<span class="flag-badge">${r}</span>`).join('')
+          : '<span style="color: var(--gray-500); font-size: 10px;">None</span>';
+
+        html += `
+          <div class="list-item" onclick="viewFlag(${flag.id}, event)">
+            <input type="checkbox" class="flag-checkbox" data-id="${flag.id}" onclick="event.stopPropagation(); updateButtonStates();">
+            <span style="font-weight: 600; font-size: 11px;">${flag.date}</span>
+            <span>
+              <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">${flag.guest_name}</div>
+              <div style="font-size: 10px; color: var(--gray-600);">by ${flag.staff_name}</div>
+              <div style="margin-top: 4px;">${reasonBadges}</div>
+            </span>
+            <span class="action-icons">
+              <button class="action-icon" onclick="event.stopPropagation(); editFlag(${flag.id})" title="Edit">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                </svg>
+              </button>
+              <button class="action-icon delete" onclick="event.stopPropagation(); deleteFlag(${flag.id})" title="Delete">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                </svg>
+              </button>
+            </span>
+          </div>
+        `;
+      });
+
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    function toggleSelectAll() {
+      const checked = document.getElementById('selectAll').checked;
+      document.querySelectorAll('.flag-checkbox').forEach(cb => cb.checked = checked);
+      updateButtonStates();
+    }
+
+    function updateButtonStates() {
+      const selectedCount = document.querySelectorAll('.flag-checkbox:checked').length;
+      const emailBtn = document.getElementById('emailReportBtn');
+      const downloadBtn = document.getElementById('downloadReportBtn');
+      const deleteBtn = document.getElementById('deleteSelectedBtn');
+      const archiveBtn = document.getElementById('archiveSelectedBtn');
+
+      [emailBtn, downloadBtn, deleteBtn, archiveBtn].forEach(btn => {
+        if (selectedCount > 0) {
+          btn.disabled = false;
+          btn.style.opacity = '1';
+          btn.style.cursor = 'pointer';
+          btn.style.display = 'inline-block';
+        } else {
+          btn.disabled = true;
+          btn.style.opacity = '0.5';
+          btn.style.cursor = 'not-allowed';
+          btn.style.display = 'none';
+        }
+      });
+    }
+
+    function getSelectedFlagIds() {
+      const checkboxes = document.querySelectorAll('.flag-checkbox:checked');
+      return Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+    }
+
+    async function viewFlag(id, event) {
+      if (event && event.target.type === 'checkbox') return;
+
+      const flag = allFlags.find(f => f.id === id);
+      if (!flag) return;
+
+      currentFlag = flag;
+      displayFlagDetails(flag);
+      document.getElementById('detailModal').classList.add('active');
+    }
+
+    function displayFlagDetails(flag) {
+      const content = document.getElementById('detailContent');
+
+      const reasonBadges = flag.reason_flags && flag.reason_flags.length > 0
+        ? flag.reason_flags.map(r => `<span class="flag-badge" style="margin-right: 6px; padding: 4px 8px; font-size: 10px;">${r}</span>`).join('')
+        : '<span style="color: var(--gray-500);">None selected</span>';
+
+      let html = `
+        <div style="margin-bottom: 16px;">
+          <label>DATE & TIME</label>
+          <p style="font-size: 14px; margin-top: 4px; font-weight: 600;">${flag.date} at ${flag.time}</p>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label>REPORTED BY</label>
+          <p style="font-size: 14px; margin-top: 4px; font-weight: 600;">${flag.staff_name}</p>
+          <p style="font-size: 11px; color: var(--gray-500); margin-top: 2px;">Submitted at: ${flag.staff_timestamp}</p>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label>GUEST NAME</label>
+          <p style="font-size: 14px; margin-top: 4px;">${flag.guest_name}</p>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label>DRIVER NAME</label>
+          <p style="font-size: 14px; margin-top: 4px;">${flag.driver_name || 'Unknown'}</p>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label>ORDER NUMBER</label>
+          <p style="font-size: 14px; margin-top: 4px;">${flag.order_number}</p>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label>REASON FLAGS</label>
+          <p style="margin-top: 8px;">${reasonBadges}</p>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label>DETAILS</label>
+          <p style="font-size: 14px; margin-top: 4px; line-height: 1.8; white-space: pre-wrap;">${flag.details}</p>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label>CREATED</label>
+          <p style="font-size: 11px; margin-top: 4px; color: var(--gray-500);">${new Date(flag.created_at).toLocaleString()}</p>
+        </div>
+      `;
+
+      content.innerHTML = html;
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detailModal').classList.remove('active');
+      currentFlag = null;
+    }
+
+    function resendEmail() {
+      if (!currentFlag) return;
+
+      // Show email note modal
+      pendingEmailFlagId = currentFlag.id;
+      document.getElementById('emailNoteModal').classList.add('active');
+      document.getElementById('emailNoteInput').value = '';
+      document.getElementById('emailNoteInput').focus();
+    }
+
+    function closeEmailNoteModal() {
+      document.getElementById('emailNoteModal').classList.remove('active');
+      pendingEmailFlagId = null;
+    }
+
+    async function sendEmailNow() {
+      const note = document.getElementById('emailNoteInput').value.trim();
+
+      if (!pendingEmailFlagId) return;
+
+      const flag = allFlags.find(f => f.id === pendingEmailFlagId);
+      if (!flag) return;
+
+      closeEmailNoteModal();
+      closeDetailModal();
+      showLoading('SENDING EMAIL...', 'Generating PDF and sending to Demetri...');
+
+      try {
+        await sendFlagEmail(flag, note);
+        showSuccess('EMAIL SENT!', 'The driver flag report has been emailed to Demetri.');
+        setTimeout(() => hideLoading(), 2000);
+      } catch (error) {
+        console.error('Error sending email:', error);
+        hideLoading();
+        alert('Error sending email: ' + error.message);
+      }
+    }
+
+    async function editFlag(id) {
+      // For now, just show details modal (full edit functionality can be added later)
+      await viewFlag(id);
+    }
+
+    async function deleteFlag(id) {
+      if (!confirm('Delete this driver flag? This action cannot be undone.')) return;
+
+      try {
+        const { error } = await supabase
+          .from('driver_flags')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+
+        await fetchAndRenderFlags();
+      } catch (error) {
+        console.error('Error deleting flag:', error);
+        alert('Error deleting flag: ' + error.message);
+      }
+    }
+
+    async function deleteSelected() {
+      const selectedIds = getSelectedFlagIds();
+      if (selectedIds.length === 0) return;
+
+      if (!confirm(`Delete ${selectedIds.length} selected flag(s)? This action cannot be undone.`)) return;
+
+      try {
+        const { error } = await supabase
+          .from('driver_flags')
+          .delete()
+          .in('id', selectedIds);
+
+        if (error) throw error;
+
+        await fetchAndRenderFlags();
+      } catch (error) {
+        console.error('Error deleting flags:', error);
+        alert('Error deleting flags: ' + error.message);
+      }
+    }
+
+    async function archiveSelected() {
+      const selectedIds = getSelectedFlagIds();
+      if (selectedIds.length === 0) return;
+
+      if (!confirm(`Archive ${selectedIds.length} selected flag(s)?`)) return;
+
+      try {
+        const { error } = await supabase
+          .from('driver_flags')
+          .update({ archived: true })
+          .in('id', selectedIds);
+
+        if (error) throw error;
+
+        await fetchAndRenderFlags();
+      } catch (error) {
+        console.error('Error archiving flags:', error);
+        alert('Error archiving flags: ' + error.message);
+      }
+    }
+
+    function emailSelectedReports() {
+      alert('Email selected reports functionality coming soon');
+    }
+
+    function downloadSelectedReports() {
+      alert('Download selected reports functionality coming soon');
+    }
+
+    function showLoading(title, message) {
+      document.getElementById('loadingText').textContent = title;
+      document.getElementById('loadingSuccess').style.display = 'none';
+      document.getElementById('loadingOverlay').classList.add('active');
+    }
+
+    function showSuccess(title, message) {
+      document.getElementById('successText').textContent = title;
+      document.getElementById('loadingSuccess').style.display = 'block';
+      document.querySelector('.spinner').style.display = 'none';
+      document.getElementById('loadingText').style.display = 'none';
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('active');
+      document.querySelector('.spinner').style.display = 'block';
+      document.getElementById('loadingText').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
