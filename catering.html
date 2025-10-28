@@ -890,7 +890,7 @@
           <button class="refresh-btn" onclick="syncFromEZCater()" style="background: #f59e0b; border-color: #f59e0b;">🔄 SYNC FROM EZCATER</button>
           <button class="refresh-btn" onclick="activateEZCaterWebhooks()" style="background: #dc2626; border-color: #dc2626; color: white;">🔔 ACTIVATE EZCATER WEBHOOKS</button>
           <button class="refresh-btn" onclick="checkEZCaterSubscriptions()" style="background: #6366f1; border-color: #6366f1; color: white;">🔍 CHECK SUBSCRIPTIONS</button>
-          <button class="refresh-btn" onclick="manualImportEZCaterOrder()" style="background: #10b981; border-color: #10b981; color: white;">📥 IMPORT ORDER BY UUID</button>
+          <button class="refresh-btn" onclick="manualImportEZCaterOrder()" style="background: #10b981; border-color: #10b981; color: white;">📥 IMPORT ORDER BY NUMBER</button>
         </div>
 
         <div id="syncStatus" style="display: none; padding: 12px; margin-bottom: 20px; border: 2px solid; font-size: 13px; font-weight: 600;"></div>
@@ -1545,16 +1545,16 @@
       title.style.cssText = 'margin: 0 0 16px 0; font-size: 16px; font-weight: 700; text-transform: uppercase;';
 
       const label = document.createElement('label');
-      label.textContent = 'Enter Order UUID:';
+      label.textContent = 'Enter Order Number:';
       label.style.cssText = 'display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600;';
 
       const input = document.createElement('input');
       input.type = 'text';
-      input.placeholder = '33a4d488-59d2-46ea-ac05-0c704966e612';
+      input.placeholder = '284577019';
       input.style.cssText = 'width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; margin-bottom: 8px; box-sizing: border-box;';
 
       const helpText = document.createElement('div');
-      helpText.innerHTML = '<small style="color: var(--gray-600);">Find the UUID in the ezManage order URL or order details page.</small>';
+      helpText.innerHTML = '<small style="color: var(--gray-600);">Enter the order number from the ezManage URL (e.g., ezmanage.ezcater.com/orders/<strong>284577019</strong>)</small>';
       helpText.style.cssText = 'margin-bottom: 16px;';
 
       const buttonGroup = document.createElement('div');
@@ -1601,11 +1601,11 @@
       });
     }
 
-    async function processOrderImport(orderUuid) {
+    async function processOrderImport(orderNumber) {
       const statusDiv = document.getElementById('syncStatus');
 
       try {
-        showLoading('IMPORTING ORDER', 'Fetching order from EZCater and saving to database...');
+        showLoading('IMPORTING ORDER', 'Searching for order and fetching from EZCater...');
 
         statusDiv.style.display = 'block';
         statusDiv.style.background = 'var(--warning-bg)';
@@ -1613,15 +1613,15 @@
         statusDiv.style.color = 'var(--warning-text)';
         statusDiv.textContent = '📥 Importing order...';
 
-        console.log(`📥 Manual import: ${orderUuid}`);
+        console.log(`📥 Manual import by order number: ${orderNumber}`);
 
-        const response = await fetch('/api/ezcater-manual-import', {
+        const response = await fetch('/api/ezcater-import-by-number', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            orderUuid: orderUuid.trim()
+            orderNumber: orderNumber.trim()
           })
         });
 
@@ -1672,10 +1672,10 @@
         statusDiv.style.color = 'var(--error-text)';
         statusDiv.innerHTML = `❌ Failed to import order: ${error.message}<br><br>
           <strong>Possible reasons:</strong><br>
-          • Invalid order UUID (check the format)<br>
+          • Invalid order number (check the ezManage URL)<br>
           • Order not found in EZCater<br>
           • API credentials issue<br><br>
-          <strong>UUID format example:</strong> 33a4d488-59d2-46ea-ac05-0c704966e612`;
+          <strong>Example:</strong> From ezmanage.ezcater.com/orders/<strong>284577019</strong>, enter just "284577019"`;
       }
     }
 
