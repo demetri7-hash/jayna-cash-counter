@@ -368,6 +368,101 @@
       text-transform: uppercase;
       letter-spacing: 1px;
     }
+
+    /* Custom Notification (replaces alert) */
+    .notification-toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30000;
+      background: white;
+      border: 3px solid var(--gray-700);
+      padding: 16px 24px;
+      min-width: 300px;
+      max-width: 500px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .notification-toast.active {
+      display: block;
+      animation: slideDown 0.3s ease;
+    }
+
+    .notification-toast.success {
+      border-color: var(--success-border);
+      background: var(--success-bg);
+      color: var(--success-text);
+    }
+
+    .notification-toast.error {
+      border-color: var(--error-border);
+      background: var(--error-bg);
+      color: var(--error-text);
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    /* Custom Input Modal (replaces prompt) */
+    .input-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 25000;
+      padding: 20px;
+    }
+
+    .input-modal.active {
+      display: flex;
+    }
+
+    .input-modal-content {
+      background: white;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid var(--gray-700);
+    }
+
+    .input-modal-message {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 16px;
+    }
+
+    .input-modal-input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--gray-300);
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .input-modal-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
   </style>
 </head>
 <body>
@@ -488,6 +583,21 @@
     </div>
   </div>
 
+  <!-- Custom Notification Toast (replaces alert) -->
+  <div id="notificationToast" class="notification-toast"></div>
+
+  <!-- Custom Input Modal (replaces prompt) -->
+  <div id="inputModal" class="input-modal">
+    <div class="input-modal-content">
+      <div class="input-modal-message" id="inputModalMessage"></div>
+      <input type="text" class="input-modal-input" id="inputModalInput" placeholder="Enter text...">
+      <div class="input-modal-buttons">
+        <button class="secondary" onclick="cancelInputModal()">CANCEL</button>
+        <button onclick="confirmInputModal()">CONFIRM</button>
+      </div>
+    </div>
+  </div>
+
   <script src="shared-header.js"></script>
   <script>
     // Create Supabase client
@@ -511,6 +621,42 @@
     let currentStaffName = null;
     let currentStaffTimestamp = null;
     let currentFlag = null;
+    let inputModalCallback = null;
+
+    // Custom notification functions (replace alert/prompt for Google Sites sandbox)
+    function showNotification(message, type = 'info') {
+      const toast = document.getElementById('notificationToast');
+      toast.textContent = message;
+      toast.className = 'notification-toast active';
+      if (type === 'success' || type === 'error') {
+        toast.classList.add(type);
+      }
+      setTimeout(() => {
+        toast.classList.remove('active');
+      }, 3000);
+    }
+
+    function showInputModal(message, callback) {
+      inputModalCallback = callback;
+      document.getElementById('inputModalMessage').textContent = message;
+      document.getElementById('inputModalInput').value = '';
+      document.getElementById('inputModal').classList.add('active');
+      document.getElementById('inputModalInput').focus();
+    }
+
+    function confirmInputModal() {
+      const value = document.getElementById('inputModalInput').value;
+      document.getElementById('inputModal').classList.remove('active');
+      if (inputModalCallback) {
+        inputModalCallback(value);
+        inputModalCallback = null;
+      }
+    }
+
+    function cancelInputModal() {
+      document.getElementById('inputModal').classList.remove('active');
+      inputModalCallback = null;
+    }
 
     // Initialize
     document.addEventListener('DOMContentLoaded', async () => {
@@ -569,7 +715,7 @@
 
     function cycleStaffName() {
       if (clockedInEmployees.length === 0) {
-        alert('No employees are currently clocked in');
+        showNotification('No employees are currently clocked in', 'error');
         return;
       }
 
@@ -623,7 +769,7 @@
       const details = document.getElementById('flagDetails').value.trim();
 
       if (!currentStaffName) {
-        alert('Please select your name');
+        showNotification('Please select your name', 'error');
         return;
       }
 
@@ -653,13 +799,13 @@
 
         hideLoading();
         closeFlagModal();
-        alert('✅ Driver flag submitted successfully!');
+        showNotification('✅ Driver flag submitted successfully!', 'success');
         loadFlags();
 
       } catch (error) {
         console.error('Error submitting flag:', error);
         hideLoading();
-        alert('Error submitting flag: ' + error.message);
+        showNotification('Error submitting flag: ' + error.message, 'error');
       }
     }
 
@@ -880,21 +1026,20 @@
     async function resendEmail() {
       if (!currentFlag) return;
 
-      const customNote = prompt('Optional note to include (or leave blank):');
-      if (customNote === null) return;
+      showInputModal('Optional note to include (or leave blank):', async (customNote) => {
+        showLoading('SENDING EMAIL...', 'Generating PDF and sending to Demetri...');
 
-      showLoading('SENDING EMAIL...', 'Generating PDF and sending to Demetri...');
-
-      try {
-        await sendFlagEmail(currentFlag, customNote || '');
-        hideLoading();
-        closeViewModal();
-        alert('✅ Email sent successfully!');
-      } catch (error) {
-        console.error('Error sending email:', error);
-        hideLoading();
-        alert('Error sending email: ' + error.message);
-      }
+        try {
+          await sendFlagEmail(currentFlag, customNote || '');
+          hideLoading();
+          closeViewModal();
+          showNotification('✅ Email sent successfully!', 'success');
+        } catch (error) {
+          console.error('Error sending email:', error);
+          hideLoading();
+          showNotification('Error sending email: ' + error.message, 'error');
+        }
+      });
     }
 
     function showLoading(title, message) {
@@ -911,6 +1056,14 @@
       if (e.key === 'Escape') {
         closeFlagModal();
         closeViewModal();
+        cancelInputModal();
+      }
+    });
+
+    // Allow Enter key to confirm input modal
+    document.getElementById('inputModalInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        confirmInputModal();
       }
     });
   </script>
