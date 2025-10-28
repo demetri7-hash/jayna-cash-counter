@@ -1,6 +1,64 @@
 {
   "conversations": [
     {
+      "date": "2025-10-28T04:00:00Z",
+      "summary": "CSS Architecture Deep Dive: Fixed navigation button inconsistencies across all pages. Learned critical CSS patterns and user design intentions.",
+      "key_decisions": [
+        "index.html has CSS class (.menu-btn) vs inline style conflicts - fixed with !important",
+        "Manager Logs button is INTENTIONALLY smaller - user designed it that way",
+        "drivers.html needed complete CSS rewrite to match other pages",
+        "All pages must use same base CSS structure (copied from foh-checklists.html)",
+        "Use scoped button classes (.driver-button) NOT global selectors (button {})"
+      ],
+      "action_items": [
+        "When creating new pages, ALWAYS copy base CSS from foh-checklists.html",
+        "NEVER standardize Manager Logs button - it's intentionally different",
+        "Use scoped class names to avoid global CSS conflicts",
+        "Test with hard refresh (Cmd+Shift+R) after CSS changes"
+      ],
+      "topics": ["CSS Architecture", "Navigation Styling", "Design Consistency", "User Intent", "CSS Specificity Wars"],
+      "important_details": [
+        "ROOT CAUSE 1: index.html had .menu-btn CSS class fighting with inline styles on buttons",
+        "FIX 1: Added !important to all .menu-btn CSS properties, removed redundant inline styles",
+        "ROOT CAUSE 2: drivers.html had completely different CSS (wrong font, global button selector, different padding)",
+        "FIX 2: Copied exact CSS structure from foh-checklists.html to drivers.html, renamed button to .driver-button",
+        "MISTAKE: Changed Manager Logs button to match navigation (user designed it smaller on purpose)",
+        "REVERT: Restored Manager Logs to 6px padding, font-weight 600 across all pages",
+        "LEARNED: User has intentional design choices - don't assume inconsistency means mistake",
+        "Base CSS pattern: font-family 'Aptos', CSS variables --gray-*, body/container styling must match",
+        "Navigation pattern: 16px padding, 11px font, 50px min-height, 1.2px letter-spacing, alternating light/dark",
+        "Commits: 33091a3 (index fix), eacdd68 (Manager Logs change), 34f5bdd (revert + !important fix), f8d0241 (drivers CSS)",
+        "Documented all learnings in memory/knowledge/domain_expertise.json under css_styling_architecture domain"
+      ]
+    },
+    {
+      "date": "2025-10-27T23:00:00Z",
+      "summary": "Successfully implemented driver flag system with proper formatting and documentation. Fixed drivers.html layout, deployed to production.",
+      "key_decisions": [
+        "Created standalone drivers.html (NOT touching index.html)",
+        "Matched exact formatting of other pages (white background, content wrapper, 600px)",
+        "Used existing shared-header.js pattern for consistency",
+        "Created api/send-driver-flag-email.js for email notifications",
+        "Applied learnings from CRITICAL RULE #3 - asked permission, copied patterns"
+      ],
+      "action_items": [
+        "Monitor driver flag submissions in production",
+        "Ensure Supabase driver_flags table exists with proper schema",
+        "Test email notifications when first flag is submitted"
+      ],
+      "topics": ["Driver Flags", "Production Success", "Following Best Practices", "Layout Fixes"],
+      "important_details": [
+        "File: drivers.html - 600px mobile-friendly layout with FLAG/FLAGGED tabs",
+        "File: api/send-driver-flag-email.js - Gmail integration for PDF reports",
+        "Styling: White background, proper .content wrapper, matches boh.html exactly",
+        "Database: Uses driver_flags table with columns: date, time, staff_name, guest_name, driver_name, order_number, reason_flags, details, archived",
+        "Features: Staff name cycling from clocked-in employees, reason flag buttons, PDF generation, password-protected FLAGGED tab",
+        "Commit: 26d20c2 - feat(drivers): Add driver flag system with mobile-friendly layout",
+        "Deployment: Successfully deployed to Vercel, verified live at /drivers.html",
+        "Local testing: Verified server runs on port 8000, returns HTTP 200"
+      ]
+    },
+    {
       "date": "2025-10-27T20:00:00Z",
       "summary": "CRITICAL FAILURE: Broke index.html by removing 196 lines without permission. User extremely upset. Reverted 9 commits to restore working state.",
       "key_decisions": [
