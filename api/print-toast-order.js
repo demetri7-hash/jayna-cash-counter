@@ -324,10 +324,14 @@ async function generateOrderReceiptPDF(order, lineItems) {
     }
   }
 
-  // Customer Name
+  // Customer Name - LARGE AND BOLD
   if (order.customer_name) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
     doc.text(`Customer: ${order.customer_name}`, 50, yPos);
-    yPos += 15;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    yPos += 18;
   }
 
   yPos += 10; // Bottom padding of box
