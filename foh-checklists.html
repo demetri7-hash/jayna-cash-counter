@@ -4748,25 +4748,87 @@
       return;
     }
 
+    // Load task data for all sessions
+    showLoading('Analyzing...', 'Calculating progress and activity...');
+    const sessionStats = await Promise.all(
+      completedSessions.map(async session => {
+        // Load tasks for this session
+        const { data: tasks, error } = await supabase
+          .from('foh_checklist_tasks')
+          .select('*')
+          .eq('session_id', session.id);
+
+        if (error) {
+          console.error('Error loading tasks for session:', session.id, error);
+          return { session, stats: null };
+        }
+
+        // Calculate stats from individual tasks
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(t => t.is_complete === true).length;
+        const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+        // Get unique contributors (users who completed tasks)
+        const contributors = [...new Set(
+          tasks
+            .filter(t => t.is_complete && t.completed_by)
+            .map(t => t.completed_by)
+        )];
+
+        // Find most recent task completion
+        const completedTasksSorted = tasks
+          .filter(t => t.is_complete && t.completed_at)
+          .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
+
+        const lastActivity = completedTasksSorted.length > 0
+          ? {
+              user: completedTasksSorted[0].completed_by,
+              timestamp: completedTasksSorted[0].completed_at
+            }
+          : null;
+
+        // Determine status
+        let status = 'not-started';
+        if (completedTasks === totalTasks && totalTasks > 0) {
+          status = 'complete';
+        } else if (completedTasks > 0) {
+          status = 'in-progress';
+        }
+
+        return {
+          session,
+          stats: {
+            totalTasks,
+            completedTasks,
+            progressPercent,
+            contributors,
+            lastActivity,
+            status
+          }
+        };
+      })
+    );
+    hideLoading();
+
     let html = `
       <div style="margin-bottom: 20px; padding: 16px; background: var(--blue-bg); border-left: 4px solid var(--blue-text); border-radius: 0;">
         <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: var(--blue-text); text-transform: uppercase; letter-spacing: 1px;">
           📋 RECENT CHECKLISTS
         </h3>
         <p style="color: var(--blue-text); font-size: 12px; margin: 0;">
-          All checklists from the last 2 days. Click to view, print, or download as PDF.
+          All checklists from the last 2 days with live progress tracking.
         </p>
       </div>
     `;
 
     // Group sessions by date
     const sessionsByDate = {};
-    completedSessions.forEach(session => {
+    sessionStats.forEach(({ session, stats }) => {
       const date = session.session_date;
       if (!sessionsByDate[date]) {
         sessionsByDate[date] = [];
       }
-      sessionsByDate[date].push(session);
+      sessionsByDate[date].push({ session, stats });
     });
 
     // Sort dates (newest first)
@@ -4774,10 +4836,10 @@
 
     // Render each date group
     sortedDates.forEach(date => {
-      const sessions = sessionsByDate[date];
+      const sessionsWithStats = sessionsByDate[date];
 
       // Sort sessions within date (newest first)
-      sessions.sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
+      sessionsWithStats.sort((a, b) => new Date(b.session.started_at) - new Date(a.session.started_at));
 
       // Get day of week
       const dateObj = new Date(date + 'T12:00:00');
@@ -4794,7 +4856,7 @@
           <div style="display: grid; gap: 12px;">
       `;
 
-      sessions.forEach(session => {
+      sessionsWithStats.forEach(({ session, stats }) => {
         const startedTime = new Date(session.started_at).toLocaleString('en-US', {
           timeZone: 'America/Los_Angeles',
           hour: 'numeric',
@@ -4803,10 +4865,53 @@
         });
         const checklistName = session.checklist_name || session.checklist_type.replace(/_/g, ' ').toUpperCase();
 
-        const isComplete = session.is_complete === true;
-        const statusBadge = isComplete
-          ? `<span style="background: var(--success-bg); color: var(--success-text); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">✓ COMPLETE</span>`
-          : `<span style="background: var(--warning-bg); color: var(--warning-text); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">⏳ IN PROGRESS</span>`;
+        // Status badge based on actual task completion
+        let statusBadge, statusColor;
+        if (!stats) {
+          statusBadge = `<span style="background: var(--gray-200); color: var(--gray-600); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">⚠️ NO DATA</span>`;
+          statusColor = 'var(--gray-300)';
+        } else if (stats.status === 'complete') {
+          statusBadge = `<span style="background: var(--success-bg); color: var(--success-text); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">✓ COMPLETE</span>`;
+          statusColor = 'var(--success-border)';
+        } else if (stats.status === 'in-progress') {
+          statusBadge = `<span style="background: var(--warning-bg); color: var(--warning-text); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">⏳ IN PROGRESS</span>`;
+          statusColor = 'var(--warning-border)';
+        } else {
+          statusBadge = `<span style="background: var(--gray-200); color: var(--gray-600); padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 0;">○ NOT STARTED</span>`;
+          statusColor = 'var(--gray-400)';
+        }
+
+        // Progress bar
+        const progressPercent = stats?.progressPercent || 0;
+        const progressBar = `
+          <div style="margin: 12px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">
+                PROGRESS
+              </span>
+              <span style="font-size: 13px; font-weight: 700; color: ${statusColor};">
+                ${stats?.completedTasks || 0}/${stats?.totalTasks || 0} TASKS (${progressPercent}%)
+              </span>
+            </div>
+            <div style="height: 8px; background: var(--gray-200); border-radius: 0; overflow: hidden;">
+              <div style="height: 100%; background: ${statusColor}; width: ${progressPercent}%; transition: width 0.3s ease;"></div>
+            </div>
+          </div>
+        `;
+
+        // Last activity
+        const lastActivityHTML = stats?.lastActivity
+          ? `<div style="font-size: 11px; color: var(--gray-600); margin: 8px 0;">
+              ⚡ Last activity: <strong>${stats.lastActivity.user}</strong> • ${formatPacificDateDisplay(new Date(stats.lastActivity.timestamp), { format: 'time' })}
+            </div>`
+          : `<div style="font-size: 11px; color: var(--gray-500); margin: 8px 0; font-style: italic;">No activity recorded</div>`;
+
+        // Contributors
+        const contributorsHTML = stats?.contributors.length > 0
+          ? `<div style="font-size: 11px; color: var(--gray-700); margin: 8px 0;">
+              👥 Contributors: <strong>${stats.contributors.join(', ')}</strong>
+            </div>`
+          : '';
 
         html += `
           <div style="
@@ -4817,17 +4922,21 @@
           "
           onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';"
           onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">
                 ${checklistName}
               </h4>
               ${statusBadge}
             </div>
-            <div style="font-size: 12px; color: var(--gray-600); margin-bottom: 12px;">
-              <div>👤 ${[session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).join(', ') || 'Unknown'}</div>
-              <div>🕐 ${startedTime}</div>
+            <div style="font-size: 11px; color: var(--gray-500); margin-bottom: 12px;">
+              🕐 Started: ${startedTime}
             </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+
+            ${progressBar}
+            ${lastActivityHTML}
+            ${contributorsHTML}
+
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-200);">
               <button onclick="viewCompletedChecklistSession('${session.id}')" style="
                 flex: 1;
                 min-width: 100px;
