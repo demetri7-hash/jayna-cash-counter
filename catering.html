@@ -1533,13 +1533,75 @@
     // MANUAL IMPORT EZCATER ORDER BY UUID
     // ============================================
     async function manualImportEZCaterOrder() {
-      // Prompt user for order UUID
-      const orderUuid = prompt('Enter EZCater Order UUID:\n\n(You can find this in the EZCater order URL or order details)');
+      // Create modal input (no window.prompt - blocked in Google Sites sandbox)
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
 
-      if (!orderUuid || orderUuid.trim() === '') {
-        return; // User cancelled or entered nothing
-      }
+      const modalContent = document.createElement('div');
+      modalContent.style.cssText = 'background: white; padding: 24px; max-width: 500px; width: 90%;';
 
+      const title = document.createElement('h3');
+      title.textContent = 'IMPORT EZCATER ORDER';
+      title.style.cssText = 'margin: 0 0 16px 0; font-size: 16px; font-weight: 700; text-transform: uppercase;';
+
+      const label = document.createElement('label');
+      label.textContent = 'Enter Order UUID:';
+      label.style.cssText = 'display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600;';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = '33a4d488-59d2-46ea-ac05-0c704966e612';
+      input.style.cssText = 'width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; margin-bottom: 8px; box-sizing: border-box;';
+
+      const helpText = document.createElement('div');
+      helpText.innerHTML = '<small style="color: var(--gray-600);">Find the UUID in the ezManage order URL or order details page.</small>';
+      helpText.style.cssText = 'margin-bottom: 16px;';
+
+      const buttonGroup = document.createElement('div');
+      buttonGroup.style.cssText = 'display: flex; gap: 12px; justify-content: flex-end;';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'CANCEL';
+      cancelBtn.style.cssText = 'padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;';
+      cancelBtn.onclick = () => document.body.removeChild(modal);
+
+      const importBtn = document.createElement('button');
+      importBtn.textContent = 'IMPORT';
+      importBtn.style.cssText = 'padding: 12px 24px; background: #10b981; border: 2px solid #10b981; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;';
+
+      buttonGroup.appendChild(cancelBtn);
+      buttonGroup.appendChild(importBtn);
+
+      modalContent.appendChild(title);
+      modalContent.appendChild(label);
+      modalContent.appendChild(input);
+      modalContent.appendChild(helpText);
+      modalContent.appendChild(buttonGroup);
+      modal.appendChild(modalContent);
+      document.body.appendChild(modal);
+
+      input.focus();
+
+      // Wait for user to click import or cancel
+      importBtn.onclick = async () => {
+        const orderUuid = input.value.trim();
+        document.body.removeChild(modal);
+
+        if (!orderUuid) {
+          return;
+        }
+
+        await processOrderImport(orderUuid);
+      };
+
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          importBtn.click();
+        }
+      });
+    }
+
+    async function processOrderImport(orderUuid) {
       const statusDiv = document.getElementById('syncStatus');
 
       try {
