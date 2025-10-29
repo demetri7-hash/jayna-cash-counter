@@ -19808,24 +19808,19 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     showMessage('Generating prep sheet PDF...', 'info');
 
     try {
-      // Check if jsPDF is loaded
       if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
         throw new Error('jsPDF library not loaded. Please refresh the page.');
       }
 
       const { jsPDF } = jspdf;
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'in',
-        format: 'letter'
-      });
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' });
 
-      const jaynaBlue = [33, 150, 243]; // #2196F3
-      const darkGray = [66, 66, 66]; // #424242
-      const black = [33, 33, 33]; // #212121
-      const lightGray = [245, 245, 245]; // #f5f5f5
+      const jaynaBlue = [33, 150, 243];
+      const darkGray = [66, 66, 66];
+      const black = [33, 33, 33];
+      const redText = [220, 38, 38];
 
-      // Date logic: If after 8pm Pacific, use next day's date
+      // Date logic
       const now = new Date();
       const currentHour = getPacificHour(now);
       const baseDate = getPacificMidday(now);
@@ -19833,15 +19828,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const dateStr = formatPacificDateDisplay(prepDate, { month: '2-digit', day: '2-digit', year: 'numeric' });
       const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit' });
 
-      // Calculate custom notes height
-      const customNotes = document.getElementById('prepSheetNotes')?.value.trim();
-      let customNotesHeight = 0;
-      if (customNotes) {
-        const notesLines = doc.splitTextToSize(customNotes, 7).length;
-        customNotesHeight = 0.6 + (notesLines > 2 ? (notesLines - 2) * 0.1 : 0);
-      }
-
-      // Prepare all sections for height calculation
+      // Filter items
       const bottledItems = recommendations.filter(r => {
         const nameMatch = isBottledOrToGoItem(r.itemName);
         const checkboxMatch = r.showInBottleCount === true;
@@ -19854,126 +19841,102 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         return !nameMatch && !checkboxMatch;
       });
 
-      const needsToBePrepped = (item) => {
-        return item.currentStock === 0 || item.stockPercentage < 100 || item.recommendedAmount > 0;
-      };
+      const needsToBePrepped = (item) => item.currentStock === 0 || item.stockPercentage < 100 || item.recommendedAmount > 0;
 
       const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && needsToBePrepped(r))
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      
+
       const makeFirst = prepItems.filter(r => r.urgent === true && !r.lineCooksPrep && needsToBePrepped(r))
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      
-      const markedButNotNeeded = prepItems.filter(r => 
-        (r.urgent === true && !r.lineCooksPrep) && !needsToBePrepped(r)
-      );
-      
+
       const urgent = prepItems.filter(r => r.priority === 'urgent' && !r.urgent && !r.lineCooksPrep);
+
+      // COMBINED SECTION: MAKE FIRST + URGENT
+      const makeFirstAndUrgent = [...makeFirst, ...urgent];
+      const makeFirstCount = makeFirst.length;
+      const urgentCount = urgent.length;
+      const combinedTitle = `MAKE FIRST (${makeFirstCount}) | URGENT (${urgentCount})`;
+
       const high = prepItems.filter(r => r.priority === 'high' && !r.urgent && !r.lineCooksPrep);
       const medium = prepItems.filter(r => r.priority === 'medium' && !r.urgent && !r.lineCooksPrep);
-      
-      const low = [
-        ...prepItems.filter(r => r.priority === 'low' && !r.urgent && !r.lineCooksPrep),
-        ...markedButNotNeeded
-      ];
 
-      // Build sections array for height calculation
-      const sections = [
-        { items: bottledItems, isCompact: true, columns: 3 },
-        { items: makeFirst, isCompact: false },
-        { items: urgent, isCompact: false },
-        { items: high, isCompact: false },
-        { items: medium, isCompact: false },
-        { items: low, isCompact: true, columns: 2 },
-        { items: lineCooksPrep, isCompact: false }
-      ];
+      const lowPriority = prepItems.filter(r => r.priority === 'low' && !r.urgent && !r.lineCooksPrep);
 
-      // Calculate total content height and scale factor
-      const estimatedHeight = calculateContentHeight(sections, customNotesHeight);
-      const scaleFactor = calculateScaleFactor(estimatedHeight);
+      // COMBINED SECTION: LOW PRIORITY + LINE COOKS (with line cooks at end, in blue)
+      const lowAndLineCooks = [...lowPriority, ...lineCooksPrep];
+      const lowAndLineCooksTitle = `LOW PRIORITY (${lowPriority.length}) | LINE COOKS (${lineCooksPrep.length})`;
 
-      console.log(`PDF Content: ${estimatedHeight.toFixed(2)}" estimated, scale factor: ${scaleFactor.toFixed(2)}`);
+      const scaleFactor = 1.0; // Fixed scale for new design
 
       // Header
-      doc.setFontSize(14 * scaleFactor);
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(black[0], black[1], black[2]);
       doc.text('PREP SHEET - ' + dateStr, 4.25, 0.7, { align: 'center' });
 
-      // Blue underline
       doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
       doc.setLineWidth(0.02);
       doc.line(0.5, 0.78, 8, 0.78);
 
-      // Subtitle
-      doc.setFontSize(7 * scaleFactor);
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(102, 102, 102);
       doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
 
       let yPos = 1.1;
 
-      // Custom Notes Section (if provided) with dynamic font size
-      if (customNotes) {
-        doc.setFillColor(255, 249, 196); // Light yellow background
-        doc.rect(0.5, yPos, 7.5, 0.5 * scaleFactor, 'F');
-        doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
-        doc.setLineWidth(0.02);
-        doc.rect(0.5, yPos, 7.5, 0.5 * scaleFactor);
+      // MANDATORY NOTE (dark red box)
+      yPos = renderMandatoryNote(doc, yPos, scaleFactor);
+      yPos += 0.1;
 
-        doc.setFontSize(8 * scaleFactor);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(black[0], black[1], black[2]);
-        doc.text('CUSTOM NOTES:', 0.6, yPos + (0.15 * scaleFactor));
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7 * scaleFactor);
-        const notesLines = doc.splitTextToSize(customNotes, 7);
-        doc.text(notesLines, 0.6, yPos + (0.3 * scaleFactor));
-        yPos += 0.6 * scaleFactor;
-      }
-
-      // Render all sections with scale factor (using arrays created above for height calculation)
+      // BOTTLE COUNT + TO GO COUNT
       if (bottledItems.length > 0) {
-        yPos = renderCompactList(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243], 3, scaleFactor);
+        yPos = renderBottleAndToGoSection(doc, 'BOTTLE COUNT & TO-GO PREP', bottledItems, yPos, jaynaBlue, 3, scaleFactor);
       }
 
-      // Render all sections with scale factor
-      if (makeFirst.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0], scaleFactor);
+      // MAKE FIRST + URGENT COMBINED
+      if (makeFirstAndUrgent.length > 0) {
+        yPos = renderPrepPDFSection(doc, combinedTitle, makeFirstAndUrgent, yPos, redText, scaleFactor, false);
       }
-      if (urgent.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black, scaleFactor);
-      }
+
+      // HIGH PRIORITY
       if (high.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'HIGH PRIORITY - Low Stock', high, yPos, darkGray, scaleFactor);
-      }
-      if (medium.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'MEDIUM PRIORITY', medium, yPos, darkGray, scaleFactor);
-      }
-      if (low.length > 0) {
-        yPos = renderCompactList(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray, 2, scaleFactor);
-      }
-      if (lineCooksPrep.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130], scaleFactor);
+        yPos = renderPrepPDFSection(doc, `HIGH PRIORITY (${high.length})`, high, yPos, darkGray, scaleFactor, false);
       }
 
-      // Footer with disclaimer (dynamically scaled)
+      // MEDIUM PRIORITY
+      if (medium.length > 0) {
+        yPos = renderPrepPDFSection(doc, `MEDIUM PRIORITY (${medium.length})`, medium, yPos, darkGray, scaleFactor, false);
+      }
+
+      // LOW PRIORITY + LINE COOKS COMBINED
+      if (lowAndLineCooks.length > 0) {
+        yPos = renderPrepPDFSection(doc, lowAndLineCooksTitle, lowAndLineCooks, yPos, darkGray, scaleFactor, true);
+      }
+
+      // Footer
       if (yPos < 10) {
         doc.setDrawColor(224, 224, 224);
         doc.line(0.5, 10.2, 8, 10.2);
-        doc.setFontSize(6 * scaleFactor);
+        doc.setFontSize(6);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(153, 153, 153);
         doc.text('MISTAKES HAPPEN, PLEASE USE YOUR BRAIN WHEN READING THIS LIST AND', 4.25, 10.32, { align: 'center' });
         doc.text('DOUBLE CHECK BY CLARIFYING WITH YOUR MANAGER IF YOU DOUBT ANYTHING.', 4.25, 10.40, { align: 'center' });
-        
-        // Credit line
-        doc.setFontSize(5.5 * scaleFactor);
+
+        doc.setFontSize(5.5);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(170, 170, 170);
         doc.text('PREP GENERATION FLOW CREATED AND DESIGNED BY DEMETRI GREGORAKIS', 4.25, 10.52, { align: 'center' });
       }
+
+      // SEPARATE PAGE: LINE COOKS PREP (large 18pt text)
+      if (lineCooksPrep.length > 0) {
+        renderLineCooksPage(doc, lineCooksPrep, prepDate);
+      }
+
+      // CATERING ORDERS PAGES (page 2/3)
+      await fetchAndRenderCateringOrders(doc, prepDate);
 
       // Save PDF
       const filename = `Prep_Sheet_${dateStr.replace(/\//g, '-')}.pdf`;
@@ -19981,7 +19944,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
       showMessage('Prep sheet PDF generated successfully!', 'success');
 
-      return doc; // Return for email function
+      return doc;
 
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -20008,24 +19971,19 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     showMessage('Generating and sending prep sheet to printer...', 'info');
 
     try {
-      // Check if jsPDF is loaded
       if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
         throw new Error('jsPDF library not loaded. Please refresh the page.');
       }
 
       const { jsPDF } = jspdf;
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'in',
-        format: 'letter'
-      });
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' });
 
       const jaynaBlue = [33, 150, 243];
       const darkGray = [66, 66, 66];
       const black = [33, 33, 33];
-      const lightGray = [245, 245, 245];
+      const redText = [220, 38, 38];
 
-      // Date logic: If after 8pm Pacific, use next day's date
+      // Date logic
       const now = new Date();
       const currentHour = getPacificHour(now);
       const baseDate = getPacificMidday(now);
@@ -20033,15 +19991,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const dateStr = formatPacificDateDisplay(prepDate, { month: '2-digit', day: '2-digit', year: 'numeric' });
       const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit' });
 
-      // Calculate custom notes height
-      const customNotes = document.getElementById('prepSheetNotes')?.value.trim();
-      let customNotesHeight = 0;
-      if (customNotes) {
-        const notesLines = doc.splitTextToSize(customNotes, 7).length;
-        customNotesHeight = 0.6 + (notesLines > 2 ? (notesLines - 2) * 0.1 : 0);
-      }
-
-      // Prepare all sections for height calculation (same as generatePrepSheetPDF)
+      // Filter items (same as generatePrepSheetPDF)
       const bottledItems = recommendations.filter(r => {
         const nameMatch = isBottledOrToGoItem(r.itemName);
         const checkboxMatch = r.showInBottleCount === true;
@@ -20054,48 +20004,35 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         return !nameMatch && !checkboxMatch;
       });
 
-      const needsToBePrepped = (item) => {
-        return item.currentStock === 0 || item.stockPercentage < 100 || item.recommendedAmount > 0;
-      };
+      const needsToBePrepped = (item) => item.currentStock === 0 || item.stockPercentage < 100 || item.recommendedAmount > 0;
 
       const lineCooksPrep = prepItems.filter(r => r.lineCooksPrep === true && needsToBePrepped(r))
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      
+
       const makeFirst = prepItems.filter(r => r.urgent === true && !r.lineCooksPrep && needsToBePrepped(r))
         .sort((a, b) => a.stockPercentage - b.stockPercentage);
-      
-      const markedButNotNeeded = prepItems.filter(r => 
-        (r.urgent === true && !r.lineCooksPrep) && !needsToBePrepped(r)
-      );
-      
+
       const urgent = prepItems.filter(r => r.priority === 'urgent' && !r.urgent && !r.lineCooksPrep);
+
+      // COMBINED SECTION: MAKE FIRST + URGENT
+      const makeFirstAndUrgent = [...makeFirst, ...urgent];
+      const makeFirstCount = makeFirst.length;
+      const urgentCount = urgent.length;
+      const combinedTitle = `MAKE FIRST (${makeFirstCount}) | URGENT (${urgentCount})`;
+
       const high = prepItems.filter(r => r.priority === 'high' && !r.urgent && !r.lineCooksPrep);
       const medium = prepItems.filter(r => r.priority === 'medium' && !r.urgent && !r.lineCooksPrep);
-      
-      const low = [
-        ...prepItems.filter(r => r.priority === 'low' && !r.urgent && !r.lineCooksPrep),
-        ...markedButNotNeeded
-      ];
 
-      // Build sections array for height calculation
-      const sections = [
-        { items: bottledItems, isCompact: true, columns: 3 },
-        { items: makeFirst, isCompact: false },
-        { items: urgent, isCompact: false },
-        { items: high, isCompact: false },
-        { items: medium, isCompact: false },
-        { items: low, isCompact: true, columns: 2 },
-        { items: lineCooksPrep, isCompact: false }
-      ];
+      const lowPriority = prepItems.filter(r => r.priority === 'low' && !r.urgent && !r.lineCooksPrep);
 
-      // Calculate total content height and scale factor
-      const estimatedHeight = calculateContentHeight(sections, customNotesHeight);
-      const scaleFactor = calculateScaleFactor(estimatedHeight);
+      // COMBINED SECTION: LOW PRIORITY + LINE COOKS
+      const lowAndLineCooks = [...lowPriority, ...lineCooksPrep];
+      const lowAndLineCooksTitle = `LOW PRIORITY (${lowPriority.length}) | LINE COOKS (${lineCooksPrep.length})`;
 
-      console.log(`PDF Email Content: ${estimatedHeight.toFixed(2)}" estimated, scale factor: ${scaleFactor.toFixed(2)}`);
+      const scaleFactor = 1.0;
 
       // Header
-      doc.setFontSize(14 * scaleFactor);
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(black[0], black[1], black[2]);
       doc.text('PREP SHEET - ' + dateStr, 4.25, 0.7, { align: 'center' });
@@ -20104,72 +20041,65 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.setLineWidth(0.02);
       doc.line(0.5, 0.78, 8, 0.78);
 
-      doc.setFontSize(7 * scaleFactor);
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(102, 102, 102);
       doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
 
       let yPos = 1.1;
 
-      // Custom Notes with dynamic font size
-      if (customNotes) {
-        doc.setFillColor(255, 249, 196);
-        doc.rect(0.5, yPos, 7.5, 0.5 * scaleFactor, 'F');
-        doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
-        doc.setLineWidth(0.02);
-        doc.rect(0.5, yPos, 7.5, 0.5 * scaleFactor);
+      // MANDATORY NOTE (dark red box)
+      yPos = renderMandatoryNote(doc, yPos, scaleFactor);
+      yPos += 0.1;
 
-        doc.setFontSize(8 * scaleFactor);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(black[0], black[1], black[2]);
-        doc.text('CUSTOM NOTES:', 0.6, yPos + (0.15 * scaleFactor));
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7 * scaleFactor);
-        const notesLines = doc.splitTextToSize(customNotes, 7);
-        doc.text(notesLines, 0.6, yPos + (0.3 * scaleFactor));
-        yPos += 0.6 * scaleFactor;
-      }
-
-      // Render all sections with scale factor
+      // BOTTLE COUNT + TO GO COUNT
       if (bottledItems.length > 0) {
-        yPos = renderCompactList(doc, 'BOTTLED & TO-GO PREP CHECK', bottledItems, yPos, [33, 150, 243], 3, scaleFactor);
-      }
-      if (makeFirst.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'MAKE FIRST', makeFirst, yPos, [220, 0, 0], scaleFactor);
-      }
-      if (urgent.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'URGENT - Out of Stock', urgent, yPos, black, scaleFactor);
-      }
-      if (high.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'HIGH PRIORITY - Low Stock', high, yPos, darkGray, scaleFactor);
-      }
-      if (medium.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'MEDIUM PRIORITY', medium, yPos, darkGray, scaleFactor);
-      }
-      if (low.length > 0) {
-        yPos = renderCompactList(doc, 'LOW PRIORITY - Stock Good', low, yPos, darkGray, 2, scaleFactor);
-      }
-      if (lineCooksPrep.length > 0) {
-        yPos = renderPrepPDFSection(doc, 'LINE COOKS PREP', lineCooksPrep, yPos, [75, 0, 130], scaleFactor);
+        yPos = renderBottleAndToGoSection(doc, 'BOTTLE COUNT & TO-GO PREP', bottledItems, yPos, jaynaBlue, 3, scaleFactor);
       }
 
-      // Footer (dynamically scaled)
+      // MAKE FIRST + URGENT COMBINED
+      if (makeFirstAndUrgent.length > 0) {
+        yPos = renderPrepPDFSection(doc, combinedTitle, makeFirstAndUrgent, yPos, redText, scaleFactor, false);
+      }
+
+      // HIGH PRIORITY
+      if (high.length > 0) {
+        yPos = renderPrepPDFSection(doc, `HIGH PRIORITY (${high.length})`, high, yPos, darkGray, scaleFactor, false);
+      }
+
+      // MEDIUM PRIORITY
+      if (medium.length > 0) {
+        yPos = renderPrepPDFSection(doc, `MEDIUM PRIORITY (${medium.length})`, medium, yPos, darkGray, scaleFactor, false);
+      }
+
+      // LOW PRIORITY + LINE COOKS COMBINED
+      if (lowAndLineCooks.length > 0) {
+        yPos = renderPrepPDFSection(doc, lowAndLineCooksTitle, lowAndLineCooks, yPos, darkGray, scaleFactor, true);
+      }
+
+      // Footer
       if (yPos < 10) {
         doc.setDrawColor(224, 224, 224);
         doc.line(0.5, 10.2, 8, 10.2);
-        doc.setFontSize(6 * scaleFactor);
+        doc.setFontSize(6);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(153, 153, 153);
         doc.text('MISTAKES HAPPEN, PLEASE USE YOUR BRAIN WHEN READING THIS LIST AND', 4.25, 10.32, { align: 'center' });
         doc.text('DOUBLE CHECK BY CLARIFYING WITH YOUR MANAGER IF YOU DOUBT ANYTHING.', 4.25, 10.40, { align: 'center' });
-        
-        // Credit line
-        doc.setFontSize(5.5 * scaleFactor);
+
+        doc.setFontSize(5.5);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(170, 170, 170);
         doc.text('PREP GENERATION FLOW CREATED AND DESIGNED BY DEMETRI GREGORAKIS', 4.25, 10.52, { align: 'center' });
       }
+
+      // SEPARATE PAGE: LINE COOKS PREP (large 18pt text)
+      if (lineCooksPrep.length > 0) {
+        renderLineCooksPage(doc, lineCooksPrep, prepDate);
+      }
+
+      // CATERING ORDERS PAGES (page 2/3)
+      await fetchAndRenderCateringOrders(doc, prepDate);
 
       // Get PDF as base64
       const pdfBase64 = doc.output('datauristring').split(',')[1];
@@ -20731,9 +20661,70 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
-   * Render a compact list format (for bottle count and low priority)
+   * NEW: Render mandatory note at top with checkboxes
    */
-  function renderCompactList(doc, title, items, startY, headerColor, columns = 2, scaleFactor = 1.0) {
+  function renderMandatoryNote(doc, yPos, scaleFactor = 1.0) {
+    const darkRed = [139, 0, 0];
+    const black = [33, 33, 33];
+    const lightGray = [200, 200, 200];
+
+    // Dark red background box
+    doc.setFillColor(255, 240, 240); // Light pink background
+    doc.rect(0.5, yPos, 7.5, 0.6 * scaleFactor, 'F');
+    doc.setDrawColor(darkRed[0], darkRed[1], darkRed[2]);
+    doc.setLineWidth(0.02);
+    doc.rect(0.5, yPos, 7.5, 0.6 * scaleFactor, 'S');
+
+    yPos += 0.12 * scaleFactor;
+
+    // Title in dark red
+    doc.setFontSize(9 * scaleFactor);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(darkRed[0], darkRed[1], darkRed[2]);
+    doc.text('Must have these items at par before leaving for the day', 0.6, yPos);
+
+    yPos += 0.18 * scaleFactor;
+
+    // BLANCHED POTATOES 4X with checkbox
+    doc.setFontSize(7 * scaleFactor);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(black[0], black[1], black[2]);
+
+    const checkbox1X = 0.6;
+    const checkbox1Y = yPos - 0.05 * scaleFactor;
+    const checkboxSize = 0.1 * scaleFactor;
+
+    doc.setDrawColor(100, 100, 100);
+    doc.rect(checkbox1X, checkbox1Y, checkboxSize, checkboxSize, 'S');
+    doc.text('☐ BLANCHED POTATOES 4X', checkbox1X + checkboxSize + 0.05, yPos);
+
+    // SALAD MIX 3X with checkbox
+    const checkbox2X = 3.0;
+    doc.rect(checkbox2X, checkbox1Y, checkboxSize, checkboxSize, 'S');
+    doc.text('☐ SALAD MIX 3X', checkbox2X + checkboxSize + 0.05, yPos);
+
+    yPos += 0.16 * scaleFactor;
+
+    // INITIAL, COUNT, TIME fields
+    doc.setFontSize(6 * scaleFactor);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INITIAL:', 0.6, yPos);
+    doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
+    doc.line(1.0, yPos, 1.8, yPos);
+
+    doc.text('COUNT:', 2.2, yPos);
+    doc.line(2.6, yPos, 3.4, yPos);
+
+    doc.text('TIME:', 3.8, yPos);
+    doc.line(4.2, yPos, 5.0, yPos);
+
+    return yPos + 0.15 * scaleFactor;
+  }
+
+  /**
+   * NEW: Render BOTTLE COUNT + TO GO COUNT combined section (2-3 columns)
+   */
+  function renderBottleAndToGoSection(doc, title, items, startY, headerColor, columns = 3, scaleFactor = 1.0) {
     const white = [255, 255, 255];
     const darkText = [33, 33, 33];
     const grayText = [102, 102, 102];
@@ -20745,7 +20736,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       startY = 0.7;
     }
 
-    // Section header - sleek and minimal (dynamically scaled)
+    // Section header
     const headerHeight = 0.18 * scaleFactor;
     doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
     doc.rect(0.5, startY, 7.5, headerHeight, 'F');
@@ -20756,22 +20747,29 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     startY += headerHeight;
 
-    // Add subtle separator line
+    // Note about FOH completion in bold italic
+    doc.setFontSize(6 * scaleFactor);
+    doc.setFont('helvetica', 'bolditalic');
+    doc.setTextColor(darkText[0], darkText[1], darkText[2]);
+    doc.text('To-go items are to be completed by the FOH staff', 0.6, startY + (0.1 * scaleFactor));
+
+    startY += 0.16 * scaleFactor;
+
+    // Separator line
     doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
     doc.setLineWidth(0.003);
     doc.line(0.5, startY, 8, startY);
 
-    // Reduced spacing - move content closer to header (dynamically scaled)
     startY += 0.08 * scaleFactor;
 
-    // Calculate column width and padding
+    // Calculate column layout
     const columnWidth = 7.5 / columns;
     const itemsPerColumn = Math.ceil(items.length / columns);
-    const lineHeight = 0.20 * scaleFactor; // Dynamically scaled
+    const lineHeight = 0.20 * scaleFactor;
 
     // Render items in columns
     let maxY = startY;
-    
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const columnIndex = Math.floor(i / itemsPerColumn);
@@ -20779,35 +20777,30 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const x = 0.5 + (columnIndex * columnWidth) + 0.08;
       const y = startY + (rowIndex * lineHeight);
 
-      // FULL item name (no truncation) with qty and last counted (dynamically scaled fonts)
       doc.setFontSize(5.8 * scaleFactor);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(darkText[0], darkText[1], darkText[2]);
-      
-      // Show full name but check if it fits in column width
-      const maxWidth = columnWidth - 0.16; // Leave padding
+
+      const maxWidth = columnWidth - 0.16;
       let itemName = item.itemName;
-      
-      // If name is too long, wrap to multiple lines or truncate smartly
+
+      // Truncate if too long
       const nameWidth = doc.getTextWidth(itemName);
-      if (nameWidth > maxWidth * 0.7) { // If name takes more than 70% of column
-        // Truncate but show most of the name
+      if (nameWidth > maxWidth * 0.7) {
         const chars = Math.floor((maxWidth * 0.7) / (nameWidth / itemName.length));
         itemName = itemName.substring(0, chars - 3) + '...';
       }
-      
-      // Format: "ITEM NAME: Qty - Unit"
+
       const qtyText = `${item.currentStock || 0} - ${item.unit || ''}`;
       doc.text(itemName + ':', x, y);
-      
-      // Quantity with dash on same line
+
       const nameDisplayWidth = doc.getTextWidth(itemName + ':');
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(5.5 * scaleFactor);
       doc.setTextColor(grayText[0], grayText[1], grayText[2]);
       doc.text(` ${qtyText}`, x + nameDisplayWidth, y);
 
-      // Last counted time on second line
+      // Last counted on second line
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
       doc.setFontSize(4.5 * scaleFactor);
       doc.setFont('helvetica', 'italic');
@@ -20821,15 +20814,55 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
-   * Render a priority section in the PDF with clean, well-spaced tables
+   * NEW: Render delegation checkbox with colored names stacked vertically
    */
-  function renderPrepPDFSection(doc, title, items, startY, headerColor, scaleFactor = 1.0) {
+  function renderDelegationCheckbox(doc, x, y, scaleFactor = 1.0) {
+    // Colors for each staff member
+    const huseyinColor = [220, 38, 38]; // Red
+    const savanahColor = [16, 185, 129]; // Green
+    const emilioColor = [59, 130, 246]; // Blue
+
+    const fontSize = 4 * scaleFactor;
+    const lineHeight = 0.08 * scaleFactor;
+
+    // Stack names vertically with colors
+    doc.setFontSize(fontSize);
+    doc.setFont('helvetica', 'bold');
+
+    doc.setTextColor(...huseyinColor);
+    doc.text('HUSEYIN', x, y, { align: 'center' });
+    y += lineHeight;
+
+    doc.setTextColor(...savanahColor);
+    doc.text('SAVANAH', x, y + lineHeight, { align: 'center' });
+    y += lineHeight;
+
+    doc.setTextColor(...emilioColor);
+    doc.text('EMILIO', x, y + (lineHeight * 2), { align: 'center' });
+
+    // Draw checkbox below names
+    const checkboxSize = 0.12 * scaleFactor;
+    const checkboxY = y + (lineHeight * 2.8);
+    doc.setDrawColor(100, 100, 100);
+    doc.setLineWidth(0.01);
+    doc.rect(x - (checkboxSize / 2), checkboxY, checkboxSize, checkboxSize, 'S');
+  }
+
+  /**
+   * NEW: Render a priority section with redesigned table structure
+   * Columns: ☐ | ITEM (with last counted below) | CURRENT | PAR | MAKE | NOTES
+   * Priority color coding: HIGH=ORANGE, MEDIUM=YELLOW, LOW=GREEN
+   */
+  function renderPrepPDFSection(doc, title, items, startY, headerColor, scaleFactor = 1.0, isCombinedSection = false) {
     const white = [255, 255, 255];
     const darkText = [33, 33, 33];
     const grayText = [102, 102, 102];
     const lightGray = [136, 136, 136];
-    const redText = [211, 47, 47];
-    const isMakeFirstSection = title === 'MAKE FIRST';
+    const redText = [220, 38, 38]; // Red for MAKE FIRST
+    const orangeText = [249, 115, 22]; // Orange for HIGH
+    const yellowText = [234, 179, 8]; // Yellow for MEDIUM
+    const greenText = [34, 197, 94]; // Green for LOW
+    const jaynaBlue = [33, 150, 243]; // Blue for LINE COOKS
 
     // Check if we need a new page
     if (startY > 9.5) {
@@ -20837,19 +20870,18 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       startY = 0.7;
     }
 
-    // Section header with colored background - sleek and compact (dynamically scaled)
+    // Section header
     const headerHeight = 0.18 * scaleFactor;
     doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
     doc.rect(0.5, startY, 7.5, headerHeight, 'F');
     doc.setFontSize(7 * scaleFactor);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(white[0], white[1], white[2]);
-    doc.text(`${title} (${items.length})`, 0.6, startY + (0.12 * scaleFactor));
+    doc.text(`${title}`, 0.6, startY + (0.12 * scaleFactor));
 
     startY += headerHeight;
 
-    // Prepare table data - each item is ONE row with ALL info
-    // Order: ITEM, CURRENT, MAKE, PAR, REASON, LAST COUNTED
+    // Build table data with item name + last counted together
     const tableData = items.map(item => {
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
       const isOut = item.currentStock === 0;
@@ -20857,31 +20889,34 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const parDisplay = `${item.parLevel} - ${item.unit}`;
       const recommendValue = item.recommendedAmount > 0 ? `${item.recommendedAmount} - ${item.unit}` : '—';
 
+      // Item name with last counted on next line
+      const itemWithTime = `${item.itemName}\nLast: ${lastCountStr}`;
+
       return [
-        item.itemName,        // ITEM
-        stockDisplay,         // CURRENT
-        recommendValue,       // MAKE
-        parDisplay,           // PAR
-        item.reasoning,       // REASON
-        lastCountStr          // LAST COUNTED
+        '☐',              // Checkbox placeholder
+        itemWithTime,     // ITEM + last counted
+        stockDisplay,     // CURRENT
+        parDisplay,       // PAR (swapped with MAKE)
+        recommendValue,   // MAKE (swapped with PAR)
+        ''                // NOTES (blank for pen)
       ];
     });
 
-    // Render table with compact spacing (dynamically scaled)
+    // Render table
     doc.autoTable({
       startY: startY,
-      head: [['ITEM', 'CURRENT', 'MAKE', 'PAR', 'REASON', 'LAST COUNTED']],
+      head: [['☐', 'ITEM', 'CURRENT', 'PAR', 'MAKE', 'NOTES']],
       body: tableData,
       theme: 'grid',
       margin: { left: 0.5, right: 0.5 },
       tableWidth: 7.5,
       styles: {
         fontSize: 5.8 * scaleFactor,
-        cellPadding: 0.03 * scaleFactor,
+        cellPadding: 0.04 * scaleFactor,
         lineColor: lightGray,
         lineWidth: 0.003,
-        valign: 'middle',
-        minCellHeight: 0.18 * scaleFactor,
+        valign: 'top',
+        minCellHeight: 0.25 * scaleFactor,
         halign: 'left',
         textColor: darkText,
         overflow: 'linebreak'
@@ -20892,39 +20927,59 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         fontStyle: 'bold',
         fontSize: 5.2 * scaleFactor,
         cellPadding: 0.03 * scaleFactor,
-        halign: 'left',
+        halign: 'center',
         valign: 'middle'
       },
       columnStyles: {
-        0: { cellWidth: 1.4, fontStyle: 'bold', fontSize: 5.8 * scaleFactor },                                     // ITEM
-        1: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 * scaleFactor },                                    // CURRENT
-        2: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 * scaleFactor },                                    // MAKE
-        3: { cellWidth: 0.65, halign: 'center', fontSize: 5.8 * scaleFactor },                                    // PAR
-        4: { cellWidth: 2.5, fontSize: 5.3 * scaleFactor, textColor: grayText, fontStyle: 'italic' },             // REASON
-        5: { cellWidth: 1.6, fontSize: 4.8 * scaleFactor, textColor: grayText, halign: 'right' }                  // LAST COUNTED
+        0: { cellWidth: 0.35, halign: 'center' },                              // Checkbox
+        1: { cellWidth: 1.8, fontStyle: 'bold', fontSize: 5.8 * scaleFactor }, // ITEM
+        2: { cellWidth: 0.7, halign: 'center', fontSize: 5.8 * scaleFactor },  // CURRENT
+        3: { cellWidth: 0.7, halign: 'center', fontSize: 5.8 * scaleFactor },  // PAR
+        4: { cellWidth: 0.7, halign: 'center', fontSize: 5.8 * scaleFactor },  // MAKE
+        5: { cellWidth: 2.75, fontSize: 5.3 * scaleFactor }                     // NOTES (blank)
+      },
+      didDrawCell: function(data) {
+        // Draw delegation checkbox with colored names in first column
+        if (data.column.index === 0 && data.section === 'body') {
+          const cellX = data.cell.x + (data.cell.width / 2);
+          const cellY = data.cell.y + 0.05 * scaleFactor;
+          renderDelegationCheckbox(doc, cellX, cellY, scaleFactor);
+        }
       },
       didParseCell: function(data) {
-        // YELLOW HIGHLIGHT: Items in LINE COOKS PREP that need immediate attention
-        // Highlight if: (URGENT + LINE COOKS PREP) OR (OUT of stock + LINE COOKS PREP)
-        if (data.section === 'body') {
+        // Apply priority color coding to item names
+        if (data.column.index === 1 && data.section === 'body') {
           const rowIndex = data.row.index;
           const item = items[rowIndex];
-          if (item && item.lineCooksPrep === true) {
-            // Yellow highlight if urgent OR out of stock
-            if (item.urgent === true || item.currentStock === 0) {
-              data.cell.styles.fillColor = [255, 255, 200]; // Light yellow highlight
-            }
+
+          // Priority color coding
+          if (title.includes('MAKE FIRST')) {
+            data.cell.styles.textColor = redText;
+            data.cell.styles.fontSize = 6.5 * scaleFactor;
+          } else if (item.priority === 'high') {
+            data.cell.styles.textColor = orangeText;
+          } else if (item.priority === 'medium') {
+            data.cell.styles.textColor = yellowText;
+          } else if (item.priority === 'low') {
+            data.cell.styles.textColor = greenText;
+          }
+
+          // LINE COOKS in blue (in combined section)
+          if (isCombinedSection && item.lineCooksPrep === true) {
+            data.cell.styles.textColor = jaynaBlue;
+          }
+
+          // Format "Last: X ago" in smaller gray italic
+          const cellText = data.cell.text[0] || '';
+          if (cellText.includes('\n')) {
+            // Split into name and time
+            const lines = cellText.split('\n');
+            data.cell.text = [lines[0], lines[1]]; // Keep both lines
           }
         }
-        
-        // RED TEXT: CURRENT column in MAKE FIRST section (highest priority - always needs attention)
-        if (isMakeFirstSection && data.column.index === 1 && data.section === 'body') {
-          data.cell.styles.textColor = redText;
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fontSize = 6.5 * scaleFactor;
-        }
-        // Highlight OUT items in red in other sections (column index 1 for CURRENT)
-        else if (!isMakeFirstSection && data.column.index === 1 && data.section === 'body') {
+
+        // RED TEXT for OUT in CURRENT column
+        if (data.column.index === 2 && data.section === 'body') {
           const cellText = data.cell.text[0];
           if (cellText && cellText.includes('OUT')) {
             data.cell.styles.textColor = redText;
@@ -20932,10 +20987,266 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             data.cell.styles.fontSize = 7 * scaleFactor;
           }
         }
+      },
+      didDrawPage: function(data) {
+        // Custom rendering for "Last: X ago" in gray italic
+        // This is handled in didParseCell above
       }
     });
 
     return doc.lastAutoTable.finalY + (0.06 * scaleFactor);
+  }
+
+  /**
+   * NEW: Render separate LINE COOKS PREP page with large 18pt text
+   */
+  function renderLineCooksPage(doc, items, prepDate) {
+    if (!items || items.length === 0) return;
+
+    doc.addPage();
+
+    const black = [33, 33, 33];
+    const grayText = [128, 128, 128];
+    const jaynaBlue = [33, 150, 243];
+
+    let yPos = 0.7;
+
+    // Page title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(black[0], black[1], black[2]);
+    doc.text('LINE COOKS PREP', 4.25, yPos, { align: 'center' });
+
+    yPos += 0.3;
+
+    // Date
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(grayText[0], grayText[1], grayText[2]);
+    const dateStr = formatPacificDateDisplay(prepDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    doc.text(dateStr, 4.25, yPos, { align: 'center' });
+
+    yPos += 0.4;
+
+    // Render each item with large text
+    items.forEach(item => {
+      if (yPos > 10) {
+        doc.addPage();
+        yPos = 0.7;
+      }
+
+      // Item name in large 18pt text
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+      doc.text(item.itemName, 0.6, yPos);
+
+      yPos += 0.3;
+
+      // Details in smaller text
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(black[0], black[1], black[2]);
+
+      const stockDisplay = item.currentStock === 0 ? 'OUT' : `${item.currentStock} ${item.unit}`;
+      const parDisplay = `${item.parLevel} ${item.unit}`;
+      const location = item.storageLocation || 'No location defined';
+      const lastCounted = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+
+      doc.text(`Current Stock: ${stockDisplay}`, 0.8, yPos);
+      yPos += 0.2;
+
+      doc.text(`Par Level: ${parDisplay}`, 0.8, yPos);
+      yPos += 0.2;
+
+      doc.text(`Location: ${location}`, 0.8, yPos);
+      yPos += 0.2;
+
+      doc.setFontSize(10);
+      doc.setTextColor(grayText[0], grayText[1], grayText[2]);
+      doc.text(`Last Counted: ${lastCounted}`, 0.8, yPos);
+
+      yPos += 0.4;
+
+      // Separator line
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.005);
+      doc.line(0.6, yPos, 7.9, yPos);
+
+      yPos += 0.3;
+    });
+  }
+
+  /**
+   * NEW: Fetch and render catering orders for tomorrow and day after
+   */
+  async function fetchAndRenderCateringOrders(doc, prepDate) {
+    try {
+      const tomorrow = new Date(prepDate);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+      const dayAfter = new Date(prepDate);
+      dayAfter.setDate(dayAfter.getDate() + 2);
+      const dayAfterStr = dayAfter.toISOString().split('T')[0];
+
+      // Fetch orders for both dates
+      const { data: orders, error } = await supabase
+        .from('catering_orders')
+        .select(`
+          *,
+          catering_order_items (*)
+        `)
+        .in('delivery_date', [tomorrowStr, dayAfterStr])
+        .order('delivery_date', { ascending: true });
+
+      if (error) throw error;
+
+      if (!orders || orders.length === 0) {
+        console.log('No catering orders for tomorrow or day after');
+        return;
+      }
+
+      // Group by date
+      const ordersByDate = {};
+      orders.forEach(order => {
+        if (!ordersByDate[order.delivery_date]) {
+          ordersByDate[order.delivery_date] = [];
+        }
+        ordersByDate[order.delivery_date].push(order);
+      });
+
+      // Render page for each date
+      Object.keys(ordersByDate).sort().forEach(date => {
+        renderCateringOrdersPage(doc, ordersByDate[date], date);
+      });
+
+    } catch (error) {
+      console.error('Error fetching catering orders:', error);
+    }
+  }
+
+  /**
+   * NEW: Render catering orders summary page
+   */
+  function renderCateringOrdersPage(doc, orders, date) {
+    doc.addPage();
+
+    const black = [33, 33, 33];
+    const grayText = [102, 102, 102];
+    const jaynaBlue = [33, 150, 243];
+
+    let yPos = 0.7;
+
+    // Page title
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(black[0], black[1], black[2]);
+    doc.text('CATERING ORDERS PREP SUMMARY', 4.25, yPos, { align: 'center' });
+
+    yPos += 0.25;
+
+    // Date
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(grayText[0], grayText[1], grayText[2]);
+    const dateObj = new Date(date + 'T12:00:00');
+    const dateStr = formatPacificDateDisplay(dateObj, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    doc.text(dateStr, 4.25, yPos, { align: 'center' });
+
+    yPos += 0.35;
+
+    // Render each order
+    orders.forEach((order, index) => {
+      if (yPos > 9.5) {
+        doc.addPage();
+        yPos = 0.7;
+      }
+
+      // Order header
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+      const orderNum = order.order_number || order.id;
+      doc.text(`ORDER #${orderNum} - ${order.customer_name || 'Customer'}`, 0.6, yPos);
+
+      yPos += 0.18;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(grayText[0], grayText[1], grayText[2]);
+      const deliveryTime = order.delivery_time ? formatPacificTime(order.delivery_time) : 'TBD';
+      doc.text(`Delivery: ${deliveryTime} | Headcount: ${order.headcount || 'N/A'}`, 0.7, yPos);
+
+      yPos += 0.2;
+
+      // Line items
+      if (order.catering_order_items && order.catering_order_items.length > 0) {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(black[0], black[1], black[2]);
+
+        order.catering_order_items.forEach(item => {
+          if (yPos > 10) {
+            doc.addPage();
+            yPos = 0.7;
+          }
+
+          doc.text(`• ${item.quantity}x ${item.item_name}`, 0.9, yPos);
+          yPos += 0.14;
+        });
+      }
+
+      yPos += 0.15;
+
+      // Separator between orders
+      if (index < orders.length - 1) {
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.005);
+        doc.line(0.6, yPos, 7.9, yPos);
+        yPos += 0.2;
+      }
+    });
+
+    // Combined summary if multiple orders
+    if (orders.length > 1) {
+      yPos += 0.15;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(black[0], black[1], black[2]);
+      doc.text(`COMBINED SUMMARY (${orders.length} Orders)`, 0.6, yPos);
+
+      yPos += 0.2;
+
+      // Aggregate items
+      const itemMap = new Map();
+      orders.forEach(order => {
+        if (order.catering_order_items) {
+          order.catering_order_items.forEach(item => {
+            const key = item.item_name.toUpperCase();
+            if (itemMap.has(key)) {
+              itemMap.set(key, itemMap.get(key) + (item.quantity || 0));
+            } else {
+              itemMap.set(key, item.quantity || 0);
+            }
+          });
+        }
+      });
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+
+      Array.from(itemMap.entries()).sort().forEach(([name, qty]) => {
+        if (yPos > 10) {
+          doc.addPage();
+          yPos = 0.7;
+        }
+
+        doc.text(`• ${qty}x ${name}`, 0.9, yPos);
+        yPos += 0.14;
+      });
+    }
   }
 
   /**
