@@ -41,13 +41,13 @@ export default async function handler(req, res) {
     // Convert base64 to buffer for attachment
     const pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
-    // Email options
+    // Email options (empty body - only PDF attachment)
     const mailOptions = {
       from: gmailUser,
       to: toEmail,
       subject: subject || 'Prep Sheet',
-      text: 'Prep sheet attached.',
-      html: '<p>Prep sheet attached.</p>',
+      text: '',
+      html: '',
       attachments: [
         {
           filename: filename,
