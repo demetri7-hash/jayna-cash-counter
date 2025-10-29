@@ -3296,7 +3296,95 @@
       showMessage('Cash counting is not available at this time. Please try between 7:00 AM and 2:00 AM Pacific Time.', 'error');
     }
   }
-  
+
+  // ===== MANUAL CASH FLOW NAVIGATION =====
+  // Detect hash fragments from WATCHDOG manual buttons
+  document.addEventListener('DOMContentLoaded', function() {
+    const hash = window.location.hash;
+
+    if (hash === '#am-count') {
+      console.log('Manual AM Count triggered via hash');
+      window.location.hash = ''; // Clear hash to prevent repeated triggers
+      startSmartCashFlowManual('am');
+    } else if (hash === '#pm-count') {
+      console.log('Manual PM Count triggered via hash');
+      window.location.hash = ''; // Clear hash to prevent repeated triggers
+      startSmartCashFlowManual('pm');
+    }
+  });
+
+  function startSmartCashFlowManual(flowType) {
+    // Check if session is valid
+    if (isCashSessionValid()) {
+      // Session valid, proceed directly
+      if (flowType === 'am') {
+        startAMCount();
+      } else {
+        startPMCount();
+      }
+      return;
+    }
+
+    // No valid session, show password modal with manual flow type
+    showCashPasswordModalManual(flowType);
+  }
+
+  function showCashPasswordModalManual(flowType) {
+    const flowName = flowType === 'am' ? 'AM Count (Morning Baseline)' : 'PM Count (Evening Close)';
+    const modal = document.createElement('div');
+    modal.id = 'cashPasswordModal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+    modal.innerHTML = `
+      <div style="background: white; padding: 40px; border-radius: 0; border: 3px solid var(--gray-700); max-width: 400px; width: 90%;">
+        <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Manual Cash Flow Access</h3>
+        <p style="margin-bottom: 20px; color: var(--gray-700); font-size: 13px;">Enter password to access <strong>${flowName}</strong>:</p>
+        <input type="password" id="cashPasswordInput" placeholder="Enter password" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; margin-bottom: 20px; box-sizing: border-box;" />
+        <div style="display: flex; gap: 12px;">
+          <button onclick="closeCashPasswordModal()" style="flex: 1; padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">Cancel</button>
+          <button onclick="verifyCashPasswordManual('${flowType}')" style="flex: 1; padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">Submit</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    setTimeout(() => {
+      document.getElementById('cashPasswordInput').focus();
+    }, 100);
+
+    document.getElementById('cashPasswordInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        verifyCashPasswordManual(flowType);
+      }
+    });
+  }
+
+  function verifyCashPasswordManual(flowType) {
+    const input = document.getElementById('cashPasswordInput');
+    if (!input) {
+      console.error('Cash password input not found');
+      return;
+    }
+
+    const password = input.value;
+
+    if (password === CASH_PASSWORD) {
+      setCashSession();
+      closeCashPasswordModal();
+
+      // Load specified flow
+      if (flowType === 'am') {
+        startAMCount();
+      } else {
+        startPMCount();
+      }
+    } else {
+      showMessage('Incorrect password. Access denied.', 'error');
+      closeCashPasswordModal();
+    }
+  }
+
   function showReports() {
     // Keep main menu visible at top
     hideAllSections();
