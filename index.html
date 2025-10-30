@@ -21311,16 +21311,16 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
       console.log(`📋 Fetching catering orders for ${tomorrowStr} and ${dayAfterStr}`);
 
-      // Fetch orders for both dates
-      const { data: orders, error } = await supabase
+      // Fetch orders for both dates (simple query)
+      const { data: orders, error: ordersError } = await supabase
         .from('catering_orders')
-        .select('*, catering_order_items(*)')
+        .select('*')
         .in('delivery_date', [tomorrowStr, dayAfterStr])
         .order('delivery_date', { ascending: true });
 
-      if (error) {
-        console.error('❌ Catering orders fetch error:', error);
-        throw error;
+      if (ordersError) {
+        console.error('❌ Catering orders fetch error:', ordersError);
+        throw ordersError;
       }
 
       console.log(`✅ Found ${orders?.length || 0} catering orders`);
@@ -21329,6 +21329,25 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         console.log('ℹ️ No catering orders for tomorrow or day after');
         return;
       }
+
+      // Fetch line items for all orders
+      const orderIds = orders.map(o => o.id);
+      const { data: items, error: itemsError } = await supabase
+        .from('catering_order_items')
+        .select('*')
+        .in('order_id', orderIds);
+
+      if (itemsError) {
+        console.error('❌ Catering items fetch error:', itemsError);
+        throw itemsError;
+      }
+
+      console.log(`✅ Found ${items?.length || 0} catering order items`);
+
+      // Manually attach items to orders
+      orders.forEach(order => {
+        order.catering_order_items = items.filter(item => item.order_id === order.id);
+      });
 
       // Group by date
       const ordersByDate = {};
