@@ -19828,11 +19828,22 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const dateStr = formatPacificDateDisplay(prepDate, { month: '2-digit', day: '2-digit', year: 'numeric' });
       const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit' });
 
-      // Filter items
-      const bottledItems = recommendations.filter(r => {
+      // Filter items - separate bottles from to-go
+      const allBottleAndToGo = recommendations.filter(r => {
         const nameMatch = isBottledOrToGoItem(r.itemName);
         const checkboxMatch = r.showInBottleCount === true;
         return nameMatch || checkboxMatch;
+      });
+
+      const bottleItems = allBottleAndToGo.filter(r => {
+        const name = (r.itemName || '').toLowerCase();
+        const isToGo = name.includes('to go') || name.includes('to-go');
+        return !isToGo; // Only bottles, not to-go
+      });
+
+      const toGoItems = allBottleAndToGo.filter(r => {
+        const name = (r.itemName || '').toLowerCase();
+        return name.includes('to go') || name.includes('to-go');
       });
 
       const prepItems = recommendations.filter(r => {
@@ -19883,15 +19894,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.setTextColor(102, 102, 102);
       doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
 
-      let yPos = 1.1;
+      // Delegation key (H, S, E)
+      let yPos = renderDelegationKey(doc, 1.05, scaleFactor);
 
       // MANDATORY NOTE (dark red box)
       yPos = renderMandatoryNote(doc, yPos, scaleFactor);
       yPos += 0.1;
 
-      // BOTTLE COUNT + TO GO COUNT
-      if (bottledItems.length > 0) {
-        yPos = renderBottleAndToGoSection(doc, 'BOTTLE COUNT & TO-GO PREP', bottledItems, yPos, jaynaBlue, 3, scaleFactor);
+      // BOTTLE COUNT + TO GO PREP (separate sections with divider)
+      if (bottleItems.length > 0 || toGoItems.length > 0) {
+        const title = `BOTTLE COUNT (${bottleItems.length}) & TO-GO PREP (${toGoItems.length})`;
+        yPos = renderBottleAndToGoSection(doc, title, bottleItems, toGoItems, yPos, jaynaBlue, scaleFactor);
       }
 
       // MAKE FIRST + URGENT COMBINED
@@ -19909,9 +19922,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos = renderPrepPDFSection(doc, `MEDIUM PRIORITY (${medium.length})`, medium, yPos, darkGray, scaleFactor, false);
       }
 
-      // LOW PRIORITY + LINE COOKS COMBINED
+      // LOW PRIORITY + LINE COOKS COMBINED (4-column layout)
       if (lowAndLineCooks.length > 0) {
-        yPos = renderPrepPDFSection(doc, lowAndLineCooksTitle, lowAndLineCooks, yPos, darkGray, scaleFactor, true);
+        yPos = renderLowAndLineCooksSection(doc, lowAndLineCooksTitle, lowAndLineCooks, yPos, darkGray, scaleFactor);
       }
 
       // Footer
@@ -19991,11 +20004,22 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const dateStr = formatPacificDateDisplay(prepDate, { month: '2-digit', day: '2-digit', year: 'numeric' });
       const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit' });
 
-      // Filter items (same as generatePrepSheetPDF)
-      const bottledItems = recommendations.filter(r => {
+      // Filter items - separate bottles from to-go
+      const allBottleAndToGo = recommendations.filter(r => {
         const nameMatch = isBottledOrToGoItem(r.itemName);
         const checkboxMatch = r.showInBottleCount === true;
         return nameMatch || checkboxMatch;
+      });
+
+      const bottleItems = allBottleAndToGo.filter(r => {
+        const name = (r.itemName || '').toLowerCase();
+        const isToGo = name.includes('to go') || name.includes('to-go');
+        return !isToGo; // Only bottles, not to-go
+      });
+
+      const toGoItems = allBottleAndToGo.filter(r => {
+        const name = (r.itemName || '').toLowerCase();
+        return name.includes('to go') || name.includes('to-go');
       });
 
       const prepItems = recommendations.filter(r => {
@@ -20046,15 +20070,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.setTextColor(102, 102, 102);
       doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
 
-      let yPos = 1.1;
+      // Delegation key (H, S, E)
+      let yPos = renderDelegationKey(doc, 1.05, scaleFactor);
 
       // MANDATORY NOTE (dark red box)
       yPos = renderMandatoryNote(doc, yPos, scaleFactor);
       yPos += 0.1;
 
-      // BOTTLE COUNT + TO GO COUNT
-      if (bottledItems.length > 0) {
-        yPos = renderBottleAndToGoSection(doc, 'BOTTLE COUNT & TO-GO PREP', bottledItems, yPos, jaynaBlue, 3, scaleFactor);
+      // BOTTLE COUNT + TO GO PREP (separate sections with divider)
+      if (bottleItems.length > 0 || toGoItems.length > 0) {
+        const title = `BOTTLE COUNT (${bottleItems.length}) & TO-GO PREP (${toGoItems.length})`;
+        yPos = renderBottleAndToGoSection(doc, title, bottleItems, toGoItems, yPos, jaynaBlue, scaleFactor);
       }
 
       // MAKE FIRST + URGENT COMBINED
@@ -20072,9 +20098,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos = renderPrepPDFSection(doc, `MEDIUM PRIORITY (${medium.length})`, medium, yPos, darkGray, scaleFactor, false);
       }
 
-      // LOW PRIORITY + LINE COOKS COMBINED
+      // LOW PRIORITY + LINE COOKS COMBINED (4-column layout)
       if (lowAndLineCooks.length > 0) {
-        yPos = renderPrepPDFSection(doc, lowAndLineCooksTitle, lowAndLineCooks, yPos, darkGray, scaleFactor, true);
+        yPos = renderLowAndLineCooksSection(doc, lowAndLineCooksTitle, lowAndLineCooks, yPos, darkGray, scaleFactor);
       }
 
       // Footer
@@ -20661,74 +20687,94 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
-   * NEW: Render mandatory note at top with checkboxes
+   * NEW: Render mandatory note at top with checkboxes and individual fields
    */
   function renderMandatoryNote(doc, yPos, scaleFactor = 1.0) {
     const darkRed = [139, 0, 0];
     const black = [33, 33, 33];
     const lightGray = [200, 200, 200];
 
-    // Dark red background box
-    doc.setFillColor(255, 240, 240); // Light pink background
+    // Dark red background box (same height)
+    doc.setFillColor(255, 240, 240);
     doc.rect(0.5, yPos, 7.5, 0.6 * scaleFactor, 'F');
     doc.setDrawColor(darkRed[0], darkRed[1], darkRed[2]);
     doc.setLineWidth(0.02);
     doc.rect(0.5, yPos, 7.5, 0.6 * scaleFactor, 'S');
 
-    yPos += 0.12 * scaleFactor;
+    yPos += 0.08 * scaleFactor;
 
-    // Title in dark red
-    doc.setFontSize(9 * scaleFactor);
+    // Title in ALL CAPS dark red
+    doc.setFontSize(8 * scaleFactor);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkRed[0], darkRed[1], darkRed[2]);
-    doc.text('Must have these items at par before leaving for the day', 0.6, yPos);
+    doc.text('MUST HAVE THESE ITEMS AT PAR BEFORE LEAVING FOR THE DAY', 0.6, yPos);
 
-    yPos += 0.18 * scaleFactor;
+    yPos += 0.14 * scaleFactor;
 
-    // BLANCHED POTATOES 4X with checkbox
+    // Left column: BLANCHED POTATOES 4X
+    const col1X = 0.6;
+    const col2X = 4.2;
+
     doc.setFontSize(7 * scaleFactor);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(black[0], black[1], black[2]);
 
-    const checkbox1X = 0.6;
-    const checkbox1Y = yPos - 0.05 * scaleFactor;
-    const checkboxSize = 0.1 * scaleFactor;
-
+    // Checkbox + item name
+    const checkboxSize = 0.08 * scaleFactor;
     doc.setDrawColor(100, 100, 100);
-    doc.rect(checkbox1X, checkbox1Y, checkboxSize, checkboxSize, 'S');
-    doc.text('☐ BLANCHED POTATOES 4X', checkbox1X + checkboxSize + 0.05, yPos);
+    doc.rect(col1X, yPos - 0.04 * scaleFactor, checkboxSize, checkboxSize, 'S');
+    doc.text('☐ BLANCHED POTATOES 4X', col1X + checkboxSize + 0.04, yPos);
 
-    // SALAD MIX 3X with checkbox
-    const checkbox2X = 3.0;
-    doc.rect(checkbox2X, checkbox1Y, checkboxSize, checkboxSize, 'S');
-    doc.text('☐ SALAD MIX 3X', checkbox2X + checkboxSize + 0.05, yPos);
+    // Fields stacked below item 1
+    yPos += 0.10 * scaleFactor;
+    doc.setFontSize(5.5 * scaleFactor);
+    doc.setFont('helvetica', 'normal');
 
-    yPos += 0.16 * scaleFactor;
-
-    // INITIAL, COUNT, TIME fields
-    doc.setFontSize(6 * scaleFactor);
-    doc.setFont('helvetica', 'bold');
-    doc.text('INITIAL:', 0.6, yPos);
+    doc.text('INITIAL:', col1X, yPos);
     doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
-    doc.line(1.0, yPos, 1.8, yPos);
+    doc.line(col1X + 0.25, yPos, col1X + 0.70, yPos);
 
-    doc.text('COUNT:', 2.2, yPos);
-    doc.line(2.6, yPos, 3.4, yPos);
+    doc.text('COUNT:', col1X + 0.85, yPos);
+    doc.line(col1X + 1.10, yPos, col1X + 1.55, yPos);
 
-    doc.text('TIME:', 3.8, yPos);
-    doc.line(4.2, yPos, 5.0, yPos);
+    doc.text('TIME:', col1X + 1.70, yPos);
+    doc.line(col1X + 1.95, yPos, col1X + 2.40, yPos);
 
-    return yPos + 0.15 * scaleFactor;
+    // Right column: SALAD MIX 3X
+    yPos -= 0.10 * scaleFactor; // Reset to same height as item 1
+
+    doc.setFontSize(7 * scaleFactor);
+    doc.setFont('helvetica', 'bold');
+    doc.rect(col2X, yPos - 0.04 * scaleFactor, checkboxSize, checkboxSize, 'S');
+    doc.text('☐ SALAD MIX 3X', col2X + checkboxSize + 0.04, yPos);
+
+    // Fields stacked below item 2
+    yPos += 0.10 * scaleFactor;
+    doc.setFontSize(5.5 * scaleFactor);
+    doc.setFont('helvetica', 'normal');
+
+    doc.text('INITIAL:', col2X, yPos);
+    doc.line(col2X + 0.25, yPos, col2X + 0.70, yPos);
+
+    doc.text('COUNT:', col2X + 0.85, yPos);
+    doc.line(col2X + 1.10, yPos, col2X + 1.55, yPos);
+
+    doc.text('TIME:', col2X + 1.70, yPos);
+    doc.line(col2X + 1.95, yPos, col2X + 2.40, yPos);
+
+    return yPos + 0.12 * scaleFactor;
   }
 
   /**
-   * NEW: Render BOTTLE COUNT + TO GO COUNT combined section (2-3 columns)
+   * NEW: Render BOTTLE COUNT + TO GO PREP with vertical divider
+   * Bottles on left, to-go items on right in Jayna Blue
    */
-  function renderBottleAndToGoSection(doc, title, items, startY, headerColor, columns = 3, scaleFactor = 1.0) {
+  function renderBottleAndToGoSection(doc, title, bottleItems, toGoItems, startY, headerColor, scaleFactor = 1.0) {
     const white = [255, 255, 255];
     const darkText = [33, 33, 33];
     const grayText = [102, 102, 102];
     const lightGray = [220, 220, 220];
+    const jaynaBlue = [33, 150, 243];
 
     // Check if we need a new page
     if (startY > 9.5) {
@@ -20743,7 +20789,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     doc.setFontSize(7 * scaleFactor);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(white[0], white[1], white[2]);
-    doc.text(`${title} (${items.length})`, 0.6, startY + (0.12 * scaleFactor));
+    doc.text(title, 0.6, startY + (0.12 * scaleFactor));
 
     startY += headerHeight;
 
@@ -20762,20 +20808,19 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     startY += 0.08 * scaleFactor;
 
-    // Calculate column layout
-    const columnWidth = 7.5 / columns;
-    const itemsPerColumn = Math.ceil(items.length / columns);
+    // Layout: 2 columns with vertical divider
+    const leftColumnX = 0.5;
+    const rightColumnX = 4.25;
+    const dividerX = 4.15;
+    const columnWidth = 3.65;
     const lineHeight = 0.20 * scaleFactor;
 
-    // Render items in columns
     let maxY = startY;
 
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const columnIndex = Math.floor(i / itemsPerColumn);
-      const rowIndex = i % itemsPerColumn;
-      const x = 0.5 + (columnIndex * columnWidth) + 0.08;
-      const y = startY + (rowIndex * lineHeight);
+    // Render bottle items (left column)
+    for (let i = 0; i < bottleItems.length; i++) {
+      const item = bottleItems[i];
+      const y = startY + (i * lineHeight);
 
       doc.setFontSize(5.8 * scaleFactor);
       doc.setFont('helvetica', 'bold');
@@ -20792,60 +20837,229 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       }
 
       const qtyText = `${item.currentStock || 0} - ${item.unit || ''}`;
-      doc.text(itemName + ':', x, y);
+      doc.text(itemName + ':', leftColumnX + 0.08, y);
 
       const nameDisplayWidth = doc.getTextWidth(itemName + ':');
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(5.5 * scaleFactor);
       doc.setTextColor(grayText[0], grayText[1], grayText[2]);
-      doc.text(` ${qtyText}`, x + nameDisplayWidth, y);
+      doc.text(` ${qtyText}`, leftColumnX + 0.08 + nameDisplayWidth, y);
 
       // Last counted on second line
       const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
-      doc.setFontSize(4.5 * scaleFactor);
+      doc.setFontSize(3.5 * scaleFactor);
       doc.setFont('helvetica', 'italic');
-      doc.setTextColor(lightGray[0] - 40, lightGray[1] - 40, lightGray[2] - 40);
-      doc.text(`  Last: ${lastCountStr}`, x, y + (0.08 * scaleFactor));
+      doc.setTextColor(179, 179, 179);
+      doc.text(`  ${lastCountStr}`, leftColumnX + 0.08, y + (0.08 * scaleFactor));
 
       maxY = Math.max(maxY, y + (0.12 * scaleFactor));
+    }
+
+    // Render to-go items (right column, in Jayna Blue)
+    for (let i = 0; i < toGoItems.length; i++) {
+      const item = toGoItems[i];
+      const y = startY + (i * lineHeight);
+
+      doc.setFontSize(5.8 * scaleFactor);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]); // TO-GO in Jayna Blue
+
+      const maxWidth = columnWidth - 0.16;
+      let itemName = item.itemName;
+
+      // Truncate if too long
+      const nameWidth = doc.getTextWidth(itemName);
+      if (nameWidth > maxWidth * 0.7) {
+        const chars = Math.floor((maxWidth * 0.7) / (nameWidth / itemName.length));
+        itemName = itemName.substring(0, chars - 3) + '...';
+      }
+
+      const qtyText = `${item.currentStock || 0} - ${item.unit || ''}`;
+      doc.text(itemName + ':', rightColumnX + 0.08, y);
+
+      const nameDisplayWidth = doc.getTextWidth(itemName + ':');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.5 * scaleFactor);
+      doc.setTextColor(grayText[0], grayText[1], grayText[2]);
+      doc.text(` ${qtyText}`, rightColumnX + 0.08 + nameDisplayWidth, y);
+
+      // Last counted on second line
+      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+      doc.setFontSize(3.5 * scaleFactor);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(179, 179, 179);
+      doc.text(`  ${lastCountStr}`, rightColumnX + 0.08, y + (0.08 * scaleFactor));
+
+      maxY = Math.max(maxY, y + (0.12 * scaleFactor));
+    }
+
+    // Draw vertical divider line
+    doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
+    doc.setLineWidth(0.01);
+    doc.line(dividerX, startY - 0.08, dividerX, maxY);
+
+    return maxY + (0.08 * scaleFactor);
+  }
+
+  /**
+   * NEW: Render LOW PRIORITY + LINE COOKS in 4-column layout
+   * Line cooks items in Jayna Blue
+   */
+  function renderLowAndLineCooksSection(doc, title, items, startY, headerColor, scaleFactor = 1.0) {
+    const white = [255, 255, 255];
+    const darkText = [33, 33, 33];
+    const grayText = [102, 102, 102];
+    const lightGray = [220, 220, 220];
+    const jaynaBlue = [33, 150, 243];
+
+    // Check if we need a new page
+    if (startY > 9.5) {
+      doc.addPage();
+      startY = 0.7;
+    }
+
+    // Section header
+    const headerHeight = 0.18 * scaleFactor;
+    doc.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
+    doc.rect(0.5, startY, 7.5, headerHeight, 'F');
+    doc.setFontSize(7 * scaleFactor);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(white[0], white[1], white[2]);
+    doc.text(title, 0.6, startY + (0.12 * scaleFactor));
+
+    startY += headerHeight;
+    startY += 0.08 * scaleFactor;
+
+    // Calculate 4-column layout
+    const columns = 4;
+    const columnWidth = 7.5 / columns;
+    const itemsPerColumn = Math.ceil(items.length / columns);
+    const lineHeight = 0.18 * scaleFactor;
+
+    let maxY = startY;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const columnIndex = Math.floor(i / itemsPerColumn);
+      const rowIndex = i % itemsPerColumn;
+      const x = 0.5 + (columnIndex * columnWidth) + 0.08;
+      const y = startY + (rowIndex * lineHeight);
+
+      doc.setFontSize(5.5 * scaleFactor);
+      doc.setFont('helvetica', 'bold');
+
+      // Color: LINE COOKS in Jayna Blue, others in dark text
+      if (item.lineCooksPrep === true) {
+        doc.setTextColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+      } else {
+        doc.setTextColor(darkText[0], darkText[1], darkText[2]);
+      }
+
+      const maxWidth = columnWidth - 0.16;
+      let itemName = item.itemName;
+
+      // Truncate if too long
+      const nameWidth = doc.getTextWidth(itemName);
+      if (nameWidth > maxWidth * 0.65) {
+        const chars = Math.floor((maxWidth * 0.65) / (nameWidth / itemName.length));
+        itemName = itemName.substring(0, chars - 3) + '...';
+      }
+
+      const stockDisplay = item.currentStock === 0 ? 'OUT' : `${item.currentStock}`;
+      doc.text(`${itemName}:`, x, y);
+
+      const nameDisplayWidth = doc.getTextWidth(`${itemName}:`);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5 * scaleFactor);
+      doc.setTextColor(grayText[0], grayText[1], grayText[2]);
+      doc.text(` ${stockDisplay}`, x + nameDisplayWidth, y);
+
+      // Last counted on second line
+      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+      doc.setFontSize(3.2 * scaleFactor);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(179, 179, 179);
+      doc.text(`  ${lastCountStr}`, x, y + (0.07 * scaleFactor));
+
+      maxY = Math.max(maxY, y + (0.10 * scaleFactor));
     }
 
     return maxY + (0.08 * scaleFactor);
   }
 
   /**
-   * NEW: Render delegation checkbox with colored names stacked vertically
+   * NEW: Render delegation key at top of page
    */
-  function renderDelegationCheckbox(doc, x, y, scaleFactor = 1.0) {
-    // Colors for each staff member
-    const huseyinColor = [220, 38, 38]; // Red
-    const savanahColor = [16, 185, 129]; // Green
-    const emilioColor = [59, 130, 246]; // Blue
+  function renderDelegationKey(doc, yPos, scaleFactor = 1.0) {
+    const huseyinColor = [239, 68, 68]; // Softer red
+    const savanahColor = [34, 197, 94]; // Softer green
+    const emilioColor = [96, 165, 250]; // Softer blue
+    const black = [33, 33, 33];
 
-    const fontSize = 4 * scaleFactor;
-    const lineHeight = 0.08 * scaleFactor;
+    doc.setFontSize(6 * scaleFactor);
+    doc.setFont('helvetica', 'normal');
 
-    // Stack names vertically with colors
+    const startX = 0.6;
+    let xPos = startX;
+
+    // E - EMILIO
+    doc.setTextColor(...emilioColor);
+    doc.setFont('helvetica', 'bold');
+    doc.text('E', xPos, yPos);
+    xPos += 0.08;
+    doc.setTextColor(...black);
+    doc.setFont('helvetica', 'normal');
+    doc.text('- EMILIO', xPos, yPos);
+    xPos += 0.5;
+
+    // S - SAVANAH
+    doc.setTextColor(...savanahColor);
+    doc.setFont('helvetica', 'bold');
+    doc.text('S', xPos, yPos);
+    xPos += 0.08;
+    doc.setTextColor(...black);
+    doc.setFont('helvetica', 'normal');
+    doc.text('- SAVANAH', xPos, yPos);
+    xPos += 0.6;
+
+    // H - HUSEYIN
+    doc.setTextColor(...huseyinColor);
+    doc.setFont('helvetica', 'bold');
+    doc.text('H', xPos, yPos);
+    xPos += 0.08;
+    doc.setTextColor(...black);
+    doc.setFont('helvetica', 'normal');
+    doc.text('- HUSEYIN', xPos, yPos);
+
+    return yPos + 0.15;
+  }
+
+  /**
+   * NEW: Render delegation initials (H, S, E) in line with spacing
+   */
+  function renderDelegationInitials(doc, x, y, scaleFactor = 1.0) {
+    // Softer colors for each staff member
+    const huseyinColor = [239, 68, 68]; // Softer red
+    const savanahColor = [34, 197, 94]; // Softer green
+    const emilioColor = [96, 165, 250]; // Softer blue
+
+    const fontSize = 7 * scaleFactor;
+    const spacing = 0.08;
+
     doc.setFontSize(fontSize);
     doc.setFont('helvetica', 'bold');
 
+    // H
     doc.setTextColor(...huseyinColor);
-    doc.text('HUSEYIN', x, y, { align: 'center' });
-    y += lineHeight;
+    doc.text('H', x - spacing, y, { align: 'center' });
 
+    // S
     doc.setTextColor(...savanahColor);
-    doc.text('SAVANAH', x, y + lineHeight, { align: 'center' });
-    y += lineHeight;
+    doc.text('S', x, y, { align: 'center' });
 
+    // E
     doc.setTextColor(...emilioColor);
-    doc.text('EMILIO', x, y + (lineHeight * 2), { align: 'center' });
-
-    // Draw checkbox below names
-    const checkboxSize = 0.12 * scaleFactor;
-    const checkboxY = y + (lineHeight * 2.8);
-    doc.setDrawColor(100, 100, 100);
-    doc.setLineWidth(0.01);
-    doc.rect(x - (checkboxSize / 2), checkboxY, checkboxSize, checkboxSize, 'S');
+    doc.text('E', x + spacing, y, { align: 'center' });
   }
 
   /**
@@ -20889,11 +21103,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const parDisplay = `${item.parLevel} - ${item.unit}`;
       const recommendValue = item.recommendedAmount > 0 ? `${item.recommendedAmount} - ${item.unit}` : '—';
 
-      // Item name with last counted on next line
-      const itemWithTime = `${item.itemName}\nLast: ${lastCountStr}`;
+      // Item name with last counted on next line (no "Last:" prefix)
+      const itemWithTime = `${item.itemName}\n${lastCountStr}`;
 
       return [
-        '☐',              // Checkbox placeholder
+        '',               // Delegation column (H S E)
         itemWithTime,     // ITEM + last counted
         stockDisplay,     // CURRENT
         parDisplay,       // PAR (swapped with MAKE)
@@ -20905,7 +21119,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     // Render table
     doc.autoTable({
       startY: startY,
-      head: [['☐', 'ITEM', 'CURRENT', 'PAR', 'MAKE', 'NOTES']],
+      head: [['ASSIGN', 'ITEM', 'CURRENT', 'PAR', 'MAKE', 'NOTES']],
       body: tableData,
       theme: 'grid',
       margin: { left: 0.5, right: 0.5 },
@@ -20939,11 +21153,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         5: { cellWidth: 2.75, fontSize: 5.3 * scaleFactor }                     // NOTES (blank)
       },
       didDrawCell: function(data) {
-        // Draw delegation checkbox with colored names in first column
+        // Draw delegation initials (H S E) in first column
         if (data.column.index === 0 && data.section === 'body') {
           const cellX = data.cell.x + (data.cell.width / 2);
-          const cellY = data.cell.y + 0.05 * scaleFactor;
-          renderDelegationCheckbox(doc, cellX, cellY, scaleFactor);
+          const cellY = data.cell.y + (data.cell.height / 2);
+          renderDelegationInitials(doc, cellX, cellY, scaleFactor);
         }
       },
       didParseCell: function(data) {
