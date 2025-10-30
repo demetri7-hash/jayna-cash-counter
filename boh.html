@@ -2358,19 +2358,74 @@
       fohSystemState.currentSession = session;
       fohSystemState.staffName = savedUsername;
 
-      // Load existing tasks
-      const { data: tasks, error: tasksError } = await supabase
-        .from('foh_checklist_tasks')
+      // Load existing tasks from session
+      const { data: existingTasks, error: tasksError } = await supabase
+        .from('boh_checklist_tasks')
         .select('*')
         .eq('session_id', session.id)
         .order('task_order');
 
       if (tasksError) throw tasksError;
-      fohSystemState.tasks = tasks || [];
+
+      // Load FRESH checklist definition to check for new tasks
+      const freshChecklist = fohSystemState.currentChecklist;
+      const freshSections = freshChecklist.sections || [];
+
+      // Build list of fresh tasks from definition
+      const freshTasksList = [];
+      freshSections.forEach(section => {
+        if (section.tasks) {
+          section.tasks.forEach(task => {
+            freshTasksList.push({
+              section_title: section.title,
+              task_description: task.description,
+              required: task.required || false,
+              requires_photo: task.requiresPhoto || false
+            });
+          });
+        }
+      });
+
+      // Merge: Keep existing tasks (with completion status) + add any NEW tasks
+      const existingTaskDescriptions = new Set(
+        (existingTasks || []).map(t => t.task_description)
+      );
+
+      const mergedTasks = [...(existingTasks || [])];
+      let nextTaskOrder = mergedTasks.length;
+
+      // Add new tasks that weren't in the session
+      for (const freshTask of freshTasksList) {
+        if (!existingTaskDescriptions.has(freshTask.task_description)) {
+          console.log(`➕ Adding new task to session: ${freshTask.task_description}`);
+          // Create new task in database
+          const { data: newTask, error: insertError } = await supabase
+            .from('boh_checklist_tasks')
+            .insert({
+              session_id: session.id,
+              section_title: freshTask.section_title,
+              task_description: freshTask.task_description,
+              task_order: nextTaskOrder++,
+              completed: false,
+              required: freshTask.required,
+              requires_photo: freshTask.requires_photo
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error('Error adding new task:', insertError);
+          } else {
+            mergedTasks.push(newTask);
+          }
+        }
+      }
+
+      fohSystemState.tasks = mergedTasks;
 
       // Load existing ratings
       const { data: ratings, error: ratingsError } = await supabase
-        .from('foh_checklist_ratings')
+        .from('boh_checklist_ratings')
         .select('*')
         .eq('session_id', session.id);
 

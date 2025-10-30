@@ -2557,18 +2557,31 @@
     const currentMinute = pacificTime.getMinutes();
     const currentTimeInMinutes = (currentHour * 60) + currentMinute;
 
-    // Load saved order from localStorage
-    const savedOrder = JSON.parse(localStorage.getItem('foh_checklist_order') || '[]');
-
-    // Sort checklists by saved order
+    // Sort checklists by start time (earliest first)
     const sortedChecklists = [...availableChecklists].sort((a, b) => {
-      const indexA = savedOrder.indexOf(a.type);
-      const indexB = savedOrder.indexOf(b.type);
-      if (indexA === -1 && indexB === -1) return 0;
-      if (indexA === -1) return 1;
-      if (indexB === -1) return -1;
-      return indexA - indexB;
+      const aStartMinutes = (a.start_hour || 0) * 60 + (a.start_minute || 0);
+      const bStartMinutes = (b.start_hour || 0) * 60 + (b.start_minute || 0);
+      return aStartMinutes - bStartMinutes;
     });
+
+    // Query today's sessions to determine status
+    const todayDate = getPacificDate();
+    const { data: todaySessions, error: sessionsError } = await supabase
+      .from('foh_checklist_sessions')
+      .select('checklist_type, id')
+      .eq('session_date', todayDate);
+
+    if (sessionsError) {
+      console.error('Error fetching today\'s sessions:', sessionsError);
+    }
+
+    // Create a map of checklist statuses
+    const checklistStatuses = {};
+    if (todaySessions) {
+      todaySessions.forEach(session => {
+        checklistStatuses[session.checklist_type] = 'IN_PROGRESS';
+      });
+    }
 
     // Separate active and inactive checklists
     const activeChecklists = [];
@@ -2647,7 +2660,12 @@
             ✅ ACTIVE CHECKLISTS
           </h3>
           <div id="activeChecklistsContainer" style="display: flex; flex-direction: column; gap: 12px;">
-            ${activeChecklists.map(checklist => `
+            ${activeChecklists.map(checklist => {
+              const status = checklistStatuses[checklist.type] || 'NOT_STARTED';
+              const statusColor = status === 'IN_PROGRESS' ? '#f59e0b' : '#dc2626';
+              const statusText = status === 'IN_PROGRESS' ? 'IN PROGRESS' : 'NOT YET STARTED';
+
+              return `
               <div
                 class="checklist-card ${reorderMode ? 'draggable' : ''}"
                 data-type="${checklist.type}"
@@ -2663,9 +2681,20 @@
                 ${!reorderMode ? `onclick="selectChecklist('${checklist.type}')"` : ''}
                 ${!reorderMode ? `onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';"` : ''}
                 ${!reorderMode ? `onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';"` : ''}>
-                <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.8px;">
-                  ${reorderMode ? '☰ ' : ''}${checklist.title}
-                </h3>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                  <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.8px;">
+                    ${reorderMode ? '☰ ' : ''}${checklist.title}
+                  </h3>
+                  <span style="
+                    font-size: 10px;
+                    font-weight: 700;
+                    color: ${statusColor};
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    white-space: nowrap;
+                    margin-left: 8px;
+                  ">${statusText}</span>
+                </div>
                 ${checklist.start_hour !== undefined && checklist.end_hour !== undefined ? `
                   <p style="margin: 0; font-size: 13px; font-weight: 600; color: var(--primary-blue); letter-spacing: 0.5px;">
                     🕒 ${formatTimeWindow(checklist.start_hour, checklist.start_minute || 0, checklist.end_hour, checklist.end_minute || 0)}
@@ -2676,7 +2705,8 @@
                   </p>
                 `}
               </div>
-            `).join('')}
+            `;
+            }).join('')}
           </div>
         </div>
       ` : ''}
@@ -3085,15 +3115,70 @@
 
       fohSystemState.currentSession = session;
 
-      // Load existing tasks
-      const { data: tasks, error: tasksError } = await supabase
+      // Load existing tasks from session
+      const { data: existingTasks, error: tasksError } = await supabase
         .from('foh_checklist_tasks')
         .select('*')
         .eq('session_id', session.id)
         .order('task_order');
 
       if (tasksError) throw tasksError;
-      fohSystemState.tasks = tasks || [];
+
+      // Load FRESH checklist definition to check for new tasks
+      const freshChecklist = fohSystemState.currentChecklist;
+      const freshSections = freshChecklist.sections || [];
+
+      // Build list of fresh tasks from definition
+      const freshTasksList = [];
+      freshSections.forEach(section => {
+        if (section.tasks) {
+          section.tasks.forEach(task => {
+            freshTasksList.push({
+              section_title: section.title,
+              task_description: task.description,
+              required: task.required || false,
+              requires_photo: task.requiresPhoto || false
+            });
+          });
+        }
+      });
+
+      // Merge: Keep existing tasks (with completion status) + add any NEW tasks
+      const existingTaskDescriptions = new Set(
+        (existingTasks || []).map(t => t.task_description)
+      );
+
+      const mergedTasks = [...(existingTasks || [])];
+      let nextTaskOrder = mergedTasks.length;
+
+      // Add new tasks that weren't in the session
+      for (const freshTask of freshTasksList) {
+        if (!existingTaskDescriptions.has(freshTask.task_description)) {
+          console.log(`➕ Adding new task to session: ${freshTask.task_description}`);
+          // Create new task in database
+          const { data: newTask, error: insertError } = await supabase
+            .from('foh_checklist_tasks')
+            .insert({
+              session_id: session.id,
+              section_title: freshTask.section_title,
+              task_description: freshTask.task_description,
+              task_order: nextTaskOrder++,
+              completed: false,
+              required: freshTask.required,
+              requires_photo: freshTask.requires_photo
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error('Error adding new task:', insertError);
+          } else {
+            mergedTasks.push(newTask);
+          }
+        }
+      }
+
+      fohSystemState.tasks = mergedTasks;
 
       // Load existing ratings
       const { data: ratings, error: ratingsError } = await supabase
