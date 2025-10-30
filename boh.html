@@ -2265,12 +2265,16 @@
    * Select Checklist - Check for existing session or create new one
    */
   async function selectChecklist(checklistType) {
-    const checklist = getChecklistByType(checklistType);
+    // ALWAYS reload fresh from database to get latest edits
+    console.log(`🔄 Loading fresh checklist data for: ${checklistType}`);
+    const checklist = await loadChecklistFromDatabase(checklistType);
     if (!checklist) {
       showMessage('Checklist not found!', 'error');
       return;
     }
 
+    // Update cached state with fresh data
+    fohSystemState.allChecklists[checklistType] = checklist;
     fohSystemState.currentChecklist = checklist;
 
     // Disable review mode (this is normal checklist selection, not viewing from REVIEW tab)
