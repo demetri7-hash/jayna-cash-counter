@@ -3127,12 +3127,15 @@
       // Load FRESH checklist definition to check for new tasks
       const freshChecklist = fohSystemState.currentChecklist;
       const freshSections = freshChecklist.sections || [];
+      console.log(`🔄 MERGE CHECK: Fresh checklist has ${freshSections.length} sections`);
 
       // Build list of fresh tasks from definition
       const freshTasksList = [];
       freshSections.forEach(section => {
+        console.log(`  📋 Section: "${section.name}" has ${section.tasks?.length || 0} tasks`);
         if (section.tasks) {
           section.tasks.forEach(task => {
+            console.log(`    ✓ Task: "${task.text}"`);
             freshTasksList.push({
               section_title: section.name,  // Correct field name
               task_description: task.text,  // Correct field name
@@ -3142,11 +3145,14 @@
           });
         }
       });
+      console.log(`🔄 Built fresh tasks list: ${freshTasksList.length} total tasks from definition`);
 
       // Merge: Keep existing tasks (with completion status) + add any NEW tasks
       const existingTaskDescriptions = new Set(
         (existingTasks || []).map(t => t.task_description)
       );
+      console.log(`🔄 Existing tasks in session: ${existingTasks?.length || 0}`);
+      console.log(`🔄 Existing task descriptions:`, Array.from(existingTaskDescriptions));
 
       const mergedTasks = [...(existingTasks || [])];
       let nextTaskOrder = mergedTasks.length;
@@ -3173,11 +3179,15 @@
           if (insertError) {
             console.error('Error adding new task:', insertError);
           } else {
+            console.log(`  ✅ New task added successfully!`);
             mergedTasks.push(newTask);
           }
+        } else {
+          console.log(`  ⏭️ Task already exists: "${freshTask.task_description}"`);
         }
       }
 
+      console.log(`✅ MERGE COMPLETE: Final task count = ${mergedTasks.length}`);
       fohSystemState.tasks = mergedTasks;
 
       // Load existing ratings
