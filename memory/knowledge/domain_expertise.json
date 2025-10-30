@@ -1,5 +1,41 @@
 {
   "domains": {
+    "database_schema_first_principle": {
+      "concepts_learned": [
+        "ALWAYS reference existing database schema before writing new code",
+        "Database schema is the SINGLE SOURCE OF TRUTH",
+        "Never invent field names - look them up in existing load/save functions",
+        "Field name mismatches cause silent failures that are hard to debug",
+        "Existing patterns contain the correct schema (loadChecklistFromDatabase, saveChecklistToDatabase)"
+      ],
+      "tools_used": ["Grep", "Read tool", "Supabase schema"],
+      "patterns_identified": [
+        "WRONG APPROACH: Write code → invent field names → test → debug field name errors",
+        "RIGHT APPROACH: Read existing load function → copy exact field names → write new code",
+        "Checklist schema (from loadChecklistFromDatabase line 715-718): section.name, task.text, task.is_required",
+        "Session task schema (from database): section_title, task_description, required, requires_photo",
+        "When merging data from definition → session, field names MUST match exactly"
+      ],
+      "resources": [
+        "foh-checklists.html line 651-746: loadChecklistFromDatabase() - SOURCE OF TRUTH for checklist structure",
+        "foh-checklists.html line 751-860: saveChecklistToDatabase() - SOURCE OF TRUTH for save format",
+        "Database tables: checklist_definitions, checklist_sections, checklist_section_tasks, foh_checklist_tasks"
+      ],
+      "notes": [
+        "CRITICAL MISTAKE (Oct 30, 2025): Used task.description instead of task.text, section.title instead of section.name",
+        "IMPACT: Merge logic built list of undefined values, failed silently, new tasks never appeared",
+        "LESSON: Before writing ANY code that touches database records, READ the existing load/save functions FIRST",
+        "User quote: 'learn a lesson from this about making things up when the actual database schema is completely available to you at all times'",
+        "This wasted hours of debugging when 2 minutes of reading existing code would have prevented it",
+        "PROTOCOL: 1) Find existing load function, 2) Read it completely, 3) Document field names, 4) Use EXACT names in new code",
+        "Field name reference guide:",
+        "  Checklist definition: type, title, time_range, description, staff_count, has_ratings, has_notes, has_photos, rating_scale, start_hour, start_minute, end_hour, end_minute",
+        "  Section object: name (NOT title), description, type (section_type in DB)",
+        "  Task object: text (NOT description), is_required (NOT required)",
+        "  Session task DB: section_title, task_description, task_order, completed, required, requires_photo",
+        "ALWAYS use Grep to find load functions: grep -n 'async function load.*FromDatabase' filename.html"
+      ]
+    },
     "restaurant_management": {
       "concepts_learned": [
         "AM/PM cash counting workflows",

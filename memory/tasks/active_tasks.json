@@ -1,6 +1,98 @@
 {
   "tasks": [
     {
+      "id": "task_20251030_001",
+      "title": "Catering PDF Visual Quality & Date Clarity",
+      "description": "Redesign catering prep breakdown page with proper checkboxes, colored sections, and clear date labels",
+      "status": "completed",
+      "priority": "high",
+      "created": "2025-10-30T10:00:00Z",
+      "completed": "2025-10-30T12:00:00Z",
+      "related_files": ["index.html"],
+      "dependencies": [],
+      "notes": [
+        "Replaced corrupted Unicode emojis/checkboxes with drawn rectangles",
+        "Added blue title bars, gray section headers",
+        "Separated 'Generated on:' timestamp from 'DUE DATE:' labels",
+        "User confirmed looks good"
+      ]
+    },
+    {
+      "id": "task_20251030_002",
+      "title": "Adjust BYO Gyro Sauce Quantities",
+      "description": "Reduce sauce quantities from 10 portions per set to 20 portions per set",
+      "status": "completed",
+      "priority": "medium",
+      "created": "2025-10-30T12:00:00Z",
+      "completed": "2025-10-30T12:15:00Z",
+      "related_files": ["index.html"],
+      "dependencies": [],
+      "notes": [
+        "Changed Math.ceil(total/10) to Math.ceil(total/20)",
+        "Halved sauce quantities as requested",
+        "User confirmed correct"
+      ]
+    },
+    {
+      "id": "task_20251030_003",
+      "title": "Implement Department Filtering for Checklists",
+      "description": "Add FOH/BOH department column to database, filter checklists by department on each page",
+      "status": "completed",
+      "priority": "high",
+      "created": "2025-10-30T13:00:00Z",
+      "completed": "2025-10-30T15:00:00Z",
+      "related_files": [
+        "foh-checklists.html",
+        "boh.html",
+        "sql/add_department_column.sql",
+        "sql/mark_boh_checklists.sql"
+      ],
+      "dependencies": ["Supabase checklist_definitions table"],
+      "notes": [
+        "Added department TEXT column with CHECK constraint",
+        "Marked 8 checklists as FOH, all boh_* as BOH",
+        "Changed filter from .like('foh_%') to .eq('department', 'FOH')",
+        "Fixed BOH page duplicate ADMIN_PASSWORD error",
+        "All checklists now visible in appropriate pages"
+      ]
+    },
+    {
+      "id": "task_20251030_004",
+      "title": "Fix Checklist Edit Data Freshness",
+      "description": "Ensure edited checklists reload from database when started, not from cache",
+      "status": "completed",
+      "priority": "high",
+      "created": "2025-10-30T15:00:00Z",
+      "completed": "2025-10-30T15:30:00Z",
+      "related_files": ["foh-checklists.html", "boh.html"],
+      "dependencies": [],
+      "notes": [
+        "Changed selectChecklist() to call loadChecklistFromDatabase() first",
+        "Then update cached state with fresh data",
+        "Fixes issue where new tasks weren't showing after edit"
+      ]
+    },
+    {
+      "id": "task_20251030_005",
+      "title": "Add Status Indicators and Sort by Start Time",
+      "description": "Display 'NOT YET STARTED' or 'IN PROGRESS' badge on checklist cards, sort by start time",
+      "status": "completed",
+      "priority": "medium",
+      "created": "2025-10-30T16:00:00Z",
+      "completed": "2025-10-30T17:30:00Z",
+      "related_files": ["foh-checklists.html", "boh.html"],
+      "dependencies": ["foh_checklist_sessions table", "boh_checklist_sessions table"],
+      "notes": [
+        "Query today's sessions from database",
+        "Create checklistStatuses map (session exists = IN_PROGRESS)",
+        "Display badge: 'NOT YET STARTED' (red #dc2626) or 'IN PROGRESS' (yellow #f59e0b)",
+        "Sort checklists by start time (earliest first)",
+        "Maintain sort order even when expired",
+        "Fixed BOH page bug: was querying foh_checklist_sessions instead of boh_checklist_sessions",
+        "Deployed to production: commit aaefd66"
+      ]
+    },
+    {
       "id": "task_20251027_001",
       "title": "Monitor Paid Break Policy Compliance",
       "description": "Track staff compliance with new paid break policy requiring Toast POS clock-out. Staff have 7-day grace period.",
@@ -17,23 +109,6 @@
         "Message sent in 3 languages via Homebase",
         "Staff must clock PAID BREAK (not unpaid) for 10-minute breaks",
         "Reason: Compliance, liability, ensuring breaks are taken"
-      ]
-    },
-    {
-      "id": "task_20251019_001",
-      "title": "Add AM Cash Count Viewer to FOH WATCHDOG",
-      "description": "Add password-protected tab in FOH WATCHDOG to view AM cash count data at any time of day",
-      "status": "completed",
-      "priority": "high",
-      "created": "2025-10-19T08:00:00Z",
-      "completed": "2025-10-19T08:30:00Z",
-      "related_files": ["foh-checklists.html"],
-      "dependencies": [],
-      "notes": [
-        "Added AM CASH tab between HISTORY and PASSWORDS",
-        "Shows date selector, AM total, drawer breakdowns, notes",
-        "Uses existing password protection from WATCHDOG tab",
-        "Deployed to production successfully"
       ]
     }
   ]

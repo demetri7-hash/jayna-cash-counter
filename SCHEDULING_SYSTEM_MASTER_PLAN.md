@@ -1130,12 +1130,14 @@ docs(scheduling): Update master plan with Phase 2 completion
 4. Build Toast employee sync API (Phase 1.2)
 5. Create basic `scheduling.html` page (Phase 1.3)
 
-### Questions for User
-1. **Manager Access:** Should we use existing manager password system (30-min/60-min sessions)?
-2. **Employee Login:** How should employees authenticate? (Simple code? Email link? Toast login?)
-3. **Week Start:** Does your schedule week start Sunday or Monday?
-4. **Hourly Wages:** Should we pull hourly wages from Toast or let managers enter them?
-5. **Priority Features:** Which Phase is most critical to launch first? (Can adjust order)
+### Questions for User - ✅ ANSWERED (Oct 30, 2025)
+1. **Manager Access:** ✅ YES - Use existing manager password system (30-min/60-min sessions)
+2. **Employee Login:** ✅ Whichever is easiest to develop AND easiest for staff to use (Decision: Simple 4-digit code per employee)
+3. **Week Start:** ✅ Sundays (but make it configurable in settings for future flexibility)
+4. **Hourly Wages:** ✅ ALWAYS sync from Toast - most up-to-date accurate data
+5. **Priority Features:** ✅ **MOST IMPORTANT: Drag-and-drop 7-day schedule view** - Get this working first, then iterate based on live testing feedback
+
+**Development Priority:** Visual schedule builder FIRST → then features incrementally based on production testing.
 
 ---
 

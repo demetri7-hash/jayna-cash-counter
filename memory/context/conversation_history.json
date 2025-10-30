@@ -1,6 +1,59 @@
 {
   "conversations": [
     {
+      "date": "2025-10-30T17:30:00Z",
+      "summary": "Major improvements to catering prep PDFs and checklist system. Fixed visual quality, date clarity, department filtering, data freshness, and added status indicators.",
+      "key_decisions": [
+        "Replace broken Unicode characters with drawn rectangles (checkboxes)",
+        "Separate 'Generated on:' timestamp from 'DUE DATE:' in catering orders",
+        "Reduce sauce quantities: 20 portions per sauce set (was 10, gives LESS sauce)",
+        "Add department column to checklist_definitions table for proper FOH/BOH separation",
+        "Always reload checklist data from database (not cache) to show latest edits",
+        "Display status badges: 'NOT YET STARTED' (red) or 'IN PROGRESS' (yellow)",
+        "Sort checklists by start time (earliest first), maintain order when expired"
+      ],
+      "action_items": [
+        "Monitor catering prep PDFs for emoji/checkbox rendering issues",
+        "Verify sauce quantities with kitchen staff (now 20 portions per set)",
+        "Test checklist editing workflow (edit → save → start checklist)",
+        "Verify status indicators update correctly when sessions are created",
+        "Confirm both FOH and BOH pages show correct department-specific checklists"
+      ],
+      "topics": ["Catering PDF", "jsPDF", "Checklist System", "Department Filtering", "Status Indicators", "Database Schema", "Data Freshness"],
+      "important_details": [
+        "PROBLEM 1: Catering PDF showed corrupted emoji 'Ø<B}þ' and broken checkbox character '☐'",
+        "FIX 1: Removed emojis entirely, drew actual rectangles using doc.rect() for checkboxes",
+        "VISUAL DESIGN: Blue title bars (#2196F3), gray section headers (#F0F0F0), proper spacing",
+        "PROBLEM 2: Unclear if date on catering page was generation date or delivery date",
+        "FIX 2: Added 'Generated on: [timestamp]' at top (9px italic), bold 'DUE DATE:' with each order (10px bold)",
+        "PROBLEM 3: BYO Gyro sauce quantities too high (user wanted LESS sauce)",
+        "FIX 3: Changed from Math.ceil(total/10) to Math.ceil(total/20) - halved sauce quantities",
+        "Sauce sets now: 1 set per 20 portions (16oz Tzatziki, Spicy Aioli, Lemon Vinaigrette)",
+        "PROBLEM 4: EDIT tab only showing few checklists (filter was 'like foh_%')",
+        "FIX 4: Added department TEXT column with CHECK constraint ('FOH' or 'BOH')",
+        "SQL 1: add_department_column.sql - adds column, index, marks 8 FOH checklists",
+        "SQL 2: mark_boh_checklists.sql - marks all type LIKE 'boh_%' as BOH department",
+        "Updated filter from .like('foh_%') to .eq('department', 'FOH')",
+        "PROBLEM 5: Duplicate ADMIN_PASSWORD declaration on BOH page line 8345",
+        "FIX 5: Removed duplicate, kept original at line 617",
+        "PROBLEM 6: Edited checklists not showing new tasks when started from landing page",
+        "ROOT CAUSE: selectChecklist() used cached data from page load (fohSystemState.allChecklists)",
+        "FIX 6: Changed to loadChecklistFromDatabase() FIRST, then update cached state",
+        "PROBLEM 7: User wants status visibility on checklist cards (not started vs in progress)",
+        "FIX 7: Query today's sessions, create checklistStatuses map, add badge to card HTML",
+        "Status badge: 'NOT YET STARTED' (#dc2626 red) if no session exists",
+        "Status badge: 'IN PROGRESS' (#f59e0b yellow) if session exists for today",
+        "SORTING: Changed from custom sort order to start time order (earliest first)",
+        "Sort maintained even when checklist time window expires",
+        "FILES MODIFIED: index.html (catering PDF), foh-checklists.html, boh.html",
+        "FILES CREATED: sql/add_department_column.sql, sql/mark_boh_checklists.sql",
+        "BOH BUG: Was querying foh_checklist_sessions instead of boh_checklist_sessions",
+        "COMMITS: Multiple, final commit aaefd66 - feat(boh): Add status indicators and sort checklists",
+        "All changes tested and deployed to production",
+        "User confirmed catering PDF looks good, sauce quantities correct"
+      ]
+    },
+    {
       "date": "2025-10-28T21:45:00Z",
       "summary": "COMPLETE EZCATER WEBHOOK FIX: Fixed failing webhook subscriptions, customer name parsing, and created manual import tools. All 4 webhooks now active and verified.",
       "key_decisions": [
@@ -120,7 +173,7 @@
         "Mistake 2: Added shared-header.js causing duplicate variable errors",
         "Mistake 3: Broke Supabase initialization (DATABASE NOT CONNECTED)",
         "Mistake 4: Ignored user's explicit warning about being afraid of index.html changes",
-        "Mistake 5: Experimented instead of following working patterns",
+        "Mistake 5: Experimented instead of following patterns",
         "Recovery: Reverted to commit 070a362, saved driver files for future",
         "Key learning: 'Duplicate' code often serves a purpose - NEVER remove without understanding",
         "Trust damaged - must rebuild by asking permission before touching core files",
