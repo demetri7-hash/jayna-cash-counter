@@ -21035,7 +21035,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const emilioColor = [96, 165, 250]; // Softer blue
 
     const fontSize = 7 * scaleFactor;
-    const spacing = 0.20; // 3+ spaces for easy circling
+    const spacing = 0.12; // Enough space for circling, all visible
 
     doc.setFontSize(fontSize);
     doc.setFont('helvetica', 'bold');
@@ -21104,19 +21104,19 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       ];
     });
 
-    // Render table
+    // Render table (no borders, only horizontal lines)
     doc.autoTable({
       startY: startY,
       head: [['ASSIGN', 'ITEM', 'CURRENT', 'PAR', 'MAKE', 'NOTES']],
       body: tableData,
-      theme: 'grid',
+      theme: 'plain',
       margin: { left: 0.5, right: 0.5 },
       tableWidth: 7.5,
       styles: {
         fontSize: 5.8 * scaleFactor,
         cellPadding: 0.04 * scaleFactor,
-        lineColor: lightGray,
-        lineWidth: 0.003,
+        lineColor: [153, 153, 153], // 60% gray
+        lineWidth: 0.005,
         valign: 'top',
         minCellHeight: 0.25 * scaleFactor,
         halign: 'left',
@@ -21267,7 +21267,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
       const stockDisplay = item.currentStock === 0 ? 'OUT' : `${item.currentStock} ${item.unit}`;
       const parDisplay = `${item.parLevel} ${item.unit}`;
-      const location = item.storageLocation || 'No location defined';
+      const location = item.storageLocation || item.storage_location || item.area || 'No location defined';
       const lastCounted = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
 
       doc.text(`Current Stock: ${stockDisplay}`, 0.8, yPos);
