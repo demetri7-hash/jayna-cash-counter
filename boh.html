@@ -2166,6 +2166,32 @@
       <div style="display: grid; gap: 16px;">
     `;
 
+    // Sort checklists by start time (earliest first)
+    const sortedChecklists = [...availableChecklists].sort((a, b) => {
+      const aStartMinutes = (a.start_hour || 0) * 60 + (a.start_minute || 0);
+      const bStartMinutes = (b.start_hour || 0) * 60 + (b.start_minute || 0);
+      return aStartMinutes - bStartMinutes;
+    });
+
+    // Query today's sessions to determine status
+    const todayDate = getPacificDate();
+    const { data: todaySessions, error: sessionsError } = await supabase
+      .from('boh_checklist_sessions')
+      .select('checklist_type, id')
+      .eq('session_date', todayDate);
+
+    if (sessionsError) {
+      console.error('Error fetching today\'s sessions:', sessionsError);
+    }
+
+    // Create a map of checklist statuses
+    const checklistStatuses = {};
+    if (todaySessions) {
+      todaySessions.forEach(session => {
+        checklistStatuses[session.checklist_type] = 'IN_PROGRESS';
+      });
+    }
+
     // Get current Pacific time for expiration check
     const now = new Date();
     const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
@@ -2173,7 +2199,12 @@
     const currentMinute = pacificTime.getMinutes();
     const currentTimeInMinutes = (currentHour * 60) + currentMinute;
 
-    availableChecklists.forEach(checklist => {
+    sortedChecklists.forEach(checklist => {
+      // Determine checklist status
+      const status = checklistStatuses[checklist.type] || 'NOT_STARTED';
+      const statusColor = status === 'IN_PROGRESS' ? '#f59e0b' : '#dc2626';
+      const statusText = status === 'IN_PROGRESS' ? 'IN PROGRESS' : 'NOT YET STARTED';
+
       // Check if checklist time window has expired
       let isExpired = false;
       if (checklist.end_hour !== undefined && checklist.end_minute !== undefined) {
@@ -2221,10 +2252,14 @@
           </div>
           ` : ''}
 
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
             <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: ${titleColor}; text-transform: uppercase; letter-spacing: 1px;">
               ${checklist.title}
             </h3>
+            <span style="font-size: 10px; font-weight: 700; color: ${statusColor}; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; margin-left: 8px;">${statusText}</span>
+          </div>
+
+          <div style="margin-bottom: 12px;">
             <span style="${badgeStyle}">${checklist.timeRange}</span>
           </div>
 
