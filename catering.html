@@ -4877,6 +4877,69 @@
     }
 
     /**
+     * Show success overlay (auto-hide after 1.5s)
+     */
+    function showSuccess(message) {
+      hideLoading(); // Hide loading first if it's showing
+      const overlay = document.getElementById('successOverlay');
+      const messageEl = document.getElementById('successMessage');
+
+      if (!overlay || !messageEl) {
+        console.error('Success overlay elements not found in DOM');
+        return;
+      }
+
+      messageEl.textContent = message;
+      overlay.style.display = 'flex';
+
+      // Auto-hide after 1.5 seconds
+      setTimeout(() => {
+        overlay.style.display = 'none';
+      }, 1500);
+    }
+
+    /**
+     * Show error overlay (user must click OK)
+     */
+    function showError(message) {
+      hideLoading(); // Hide loading first if it's showing
+      const overlay = document.getElementById('errorOverlay');
+      const messageEl = document.getElementById('errorMessage');
+
+      if (!overlay || !messageEl) {
+        console.error('Error overlay elements not found in DOM');
+        alert(message); // Fallback to alert
+        return;
+      }
+
+      messageEl.textContent = message;
+      overlay.style.display = 'flex';
+    }
+
+    /**
+     * Hide error overlay
+     */
+    function hideError() {
+      const overlay = document.getElementById('errorOverlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+    }
+
+    /**
+     * Universal message function - redirects to appropriate overlay
+     */
+    function showMessage(text, type) {
+      if (type === 'success') {
+        showSuccess(text);
+      } else if (type === 'error') {
+        showError(text);
+      } else {
+        showSuccess(text); // Default to success for 'info' type
+      }
+    }
+
+    /**
      * Show a prominent success message modal with auto-dismiss
      */
     function showSuccessMessage(title, message) {
@@ -5887,6 +5950,83 @@
     }
     // ==================== END PASSWORD PROTECTION ====================
   </script>
+
+  <!-- Success Overlay (auto-hide after 1.5s) -->
+  <div id="successOverlay" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+  ">
+    <div style="
+      text-align: center;
+      background: white;
+      padding: 40px 50px;
+      border-radius: 0;
+      border: 3px solid #059669;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      min-width: 300px;
+    ">
+      <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+      <div id="successMessage" style="
+        font-size: 16px;
+        font-weight: 700;
+        color: #065f46;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      "></div>
+    </div>
+  </div>
+
+  <!-- Error Overlay (user must click OK) -->
+  <div id="errorOverlay" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+  ">
+    <div style="
+      text-align: center;
+      background: white;
+      padding: 40px 50px;
+      border-radius: 0;
+      border: 3px solid #dc2626;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      min-width: 300px;
+    ">
+      <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+      <div id="errorMessage" style="
+        font-size: 14px;
+        font-weight: 600;
+        color: #991b1b;
+        margin-bottom: 24px;
+        line-height: 1.5;
+      "></div>
+      <button onclick="hideError()" style="
+        padding: 12px 24px;
+        background: #dc2626;
+        color: white;
+        border: none;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      ">OK</button>
+    </div>
+  </div>
 
   <!-- Image Lightbox Modal -->
   <div id="lightboxModal" class="lightbox-modal" onclick="closeLightbox()">
