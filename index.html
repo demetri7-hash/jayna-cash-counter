@@ -20687,82 +20687,73 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
-   * NEW: Render mandatory note at top with checkboxes and individual fields
+   * Render mandatory note - clean and well-padded
    */
   function renderMandatoryNote(doc, yPos, scaleFactor = 1.0) {
     const darkRed = [139, 0, 0];
     const black = [33, 33, 33];
-    const lightGray = [200, 200, 200];
+    const gray = [120, 120, 120];
 
-    // Dark red background box (same height)
+    const boxHeight = 0.70;
+    const padding = 0.12;
+
+    // Box background and border
     doc.setFillColor(255, 240, 240);
-    doc.rect(0.5, yPos, 7.5, 0.6 * scaleFactor, 'F');
+    doc.rect(0.5, yPos, 7.5, boxHeight, 'F');
     doc.setDrawColor(darkRed[0], darkRed[1], darkRed[2]);
     doc.setLineWidth(0.02);
-    doc.rect(0.5, yPos, 7.5, 0.6 * scaleFactor, 'S');
+    doc.rect(0.5, yPos, 7.5, boxHeight, 'S');
 
-    yPos += 0.08 * scaleFactor;
+    let currentY = yPos + padding;
 
-    // Title in ALL CAPS dark red
-    doc.setFontSize(8 * scaleFactor);
+    // Title
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(darkRed[0], darkRed[1], darkRed[2]);
-    doc.text('MUST HAVE THESE ITEMS AT PAR BEFORE LEAVING FOR THE DAY', 0.6, yPos);
+    doc.text('MUST HAVE THESE ITEMS AT PAR BEFORE LEAVING FOR THE DAY', 0.65, currentY);
 
-    yPos += 0.14 * scaleFactor;
+    currentY += 0.20;
 
-    // Left column: BLANCHED POTATOES 4X
-    const col1X = 0.6;
-    const col2X = 4.2;
+    const col1X = 0.65;
+    const col2X = 4.3;
+    const checkboxSize = 0.09;
 
-    doc.setFontSize(7 * scaleFactor);
+    // LEFT: BLANCHED POTATOES 4X
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(black[0], black[1], black[2]);
+    doc.setDrawColor(gray[0], gray[1], gray[2]);
+    doc.rect(col1X, currentY - 0.05, checkboxSize, checkboxSize, 'S');
+    doc.text('BLANCHED POTATOES 4X', col1X + checkboxSize + 0.05, currentY);
 
-    // Checkbox + item name
-    const checkboxSize = 0.08 * scaleFactor;
-    doc.setDrawColor(100, 100, 100);
-    doc.rect(col1X, yPos - 0.04 * scaleFactor, checkboxSize, checkboxSize, 'S');
-    doc.text('☐ BLANCHED POTATOES 4X', col1X + checkboxSize + 0.04, yPos);
+    // RIGHT: SALAD MIX 3X
+    doc.rect(col2X, currentY - 0.05, checkboxSize, checkboxSize, 'S');
+    doc.text('SALAD MIX 3X', col2X + checkboxSize + 0.05, currentY);
 
-    // Fields stacked below item 1
-    yPos += 0.10 * scaleFactor;
-    doc.setFontSize(5.5 * scaleFactor);
+    currentY += 0.14;
+
+    // Fields
+    doc.setFontSize(5.5);
     doc.setFont('helvetica', 'normal');
+    doc.setDrawColor(200, 200, 200);
 
-    doc.text('INITIAL:', col1X, yPos);
-    doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
-    doc.line(col1X + 0.25, yPos, col1X + 0.70, yPos);
+    // LEFT fields
+    doc.text('INITIAL:', col1X, currentY);
+    doc.line(col1X + 0.28, currentY, col1X + 0.75, currentY);
+    doc.text('COUNT:', col1X + 0.90, currentY);
+    doc.line(col1X + 1.18, currentY, col1X + 1.65, currentY);
+    doc.text('TIME:', col1X + 1.80, currentY);
+    doc.line(col1X + 2.05, currentY, col1X + 2.52, currentY);
 
-    doc.text('COUNT:', col1X + 0.85, yPos);
-    doc.line(col1X + 1.10, yPos, col1X + 1.55, yPos);
+    // RIGHT fields
+    doc.text('INITIAL:', col2X, currentY);
+    doc.line(col2X + 0.28, currentY, col2X + 0.75, currentY);
+    doc.text('COUNT:', col2X + 0.90, currentY);
+    doc.line(col2X + 1.18, currentY, col2X + 1.65, currentY);
+    doc.text('TIME:', col2X + 1.80, currentY);
+    doc.line(col2X + 2.05, currentY, col2X + 2.52, currentY);
 
-    doc.text('TIME:', col1X + 1.70, yPos);
-    doc.line(col1X + 1.95, yPos, col1X + 2.40, yPos);
-
-    // Right column: SALAD MIX 3X
-    yPos -= 0.10 * scaleFactor; // Reset to same height as item 1
-
-    doc.setFontSize(7 * scaleFactor);
-    doc.setFont('helvetica', 'bold');
-    doc.rect(col2X, yPos - 0.04 * scaleFactor, checkboxSize, checkboxSize, 'S');
-    doc.text('☐ SALAD MIX 3X', col2X + checkboxSize + 0.04, yPos);
-
-    // Fields stacked below item 2
-    yPos += 0.10 * scaleFactor;
-    doc.setFontSize(5.5 * scaleFactor);
-    doc.setFont('helvetica', 'normal');
-
-    doc.text('INITIAL:', col2X, yPos);
-    doc.line(col2X + 0.25, yPos, col2X + 0.70, yPos);
-
-    doc.text('COUNT:', col2X + 0.85, yPos);
-    doc.line(col2X + 1.10, yPos, col2X + 1.55, yPos);
-
-    doc.text('TIME:', col2X + 1.70, yPos);
-    doc.line(col2X + 1.95, yPos, col2X + 2.40, yPos);
-
-    return yPos + 0.12 * scaleFactor;
+    return yPos + boxHeight + 0.10;
   }
 
   /**
@@ -21044,7 +21035,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const emilioColor = [96, 165, 250]; // Softer blue
 
     const fontSize = 7 * scaleFactor;
-    const spacing = 0.08;
+    const spacing = 0.20; // 3+ spaces for easy circling
 
     doc.setFontSize(fontSize);
     doc.setFont('helvetica', 'bold');
@@ -21103,12 +21094,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const parDisplay = `${item.parLevel} - ${item.unit}`;
       const recommendValue = item.recommendedAmount > 0 ? `${item.recommendedAmount} - ${item.unit}` : '—';
 
-      // Item name with last counted on next line (no "Last:" prefix)
-      const itemWithTime = `${item.itemName}\n${lastCountStr}`;
-
       return [
         '',               // Delegation column (H S E)
-        itemWithTime,     // ITEM + last counted
+        item.itemName,    // ITEM (timestamp drawn separately in didDrawCell)
         stockDisplay,     // CURRENT
         parDisplay,       // PAR (swapped with MAKE)
         recommendValue,   // MAKE (swapped with PAR)
@@ -21158,6 +21146,21 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           const cellX = data.cell.x + (data.cell.width / 2);
           const cellY = data.cell.y + (data.cell.height / 2);
           renderDelegationInitials(doc, cellX, cellY, scaleFactor);
+        }
+
+        // Draw tiny timestamp in ITEM column (matches LOW PRIORITY style)
+        if (data.column.index === 1 && data.section === 'body') {
+          const rowIndex = data.row.index;
+          const item = items[rowIndex];
+          const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+
+          // Draw timestamp below item name in tiny gray italic
+          doc.setFontSize(3.2 * scaleFactor); // Same as LOW PRIORITY
+          doc.setFont('helvetica', 'italic');
+          doc.setTextColor(179, 179, 179); // 70% gray
+          const timestampX = data.cell.x + 0.04 * scaleFactor;
+          const timestampY = data.cell.y + data.cell.height - 0.04 * scaleFactor;
+          doc.text(lastCountStr, timestampX, timestampY);
         }
       },
       didParseCell: function(data) {
