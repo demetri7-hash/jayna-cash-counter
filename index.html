@@ -21446,11 +21446,13 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
-   * Render prep list breakdown in PDF
+   * Render prep list breakdown in PDF (beautiful version)
    */
   function renderPrepBreakdown(doc, orders, yPos) {
     const jaynaBlue = [33, 150, 243];
     const black = [33, 33, 33];
+    const gray = [102, 102, 102];
+    const lightGray = [240, 240, 240];
 
     // Combine all line items
     const allLineItems = [];
@@ -21462,69 +21464,95 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     const prep = calculateCateringPrepList(allLineItems);
 
-    // Title
+    // Title section with background
+    yPos += 0.15;
+    const titleBoxHeight = 0.35;
+    doc.setFillColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+    doc.rect(0.5, yPos, 7.5, titleBoxHeight, 'F');
+
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
-    doc.text('🍽️ PREP LIST BREAKDOWN', 0.6, yPos);
-    yPos += 0.25;
+    doc.setTextColor(255, 255, 255);
+    doc.text('PREP LIST BREAKDOWN', 0.65, yPos + 0.22);
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(black[0], black[1], black[2]);
+    yPos += titleBoxHeight + 0.20;
 
-    // BYO GYROS
+    // Helper function to draw checkbox
+    function drawCheckbox(x, y, size = 0.10) {
+      doc.setDrawColor(gray[0], gray[1], gray[2]);
+      doc.setLineWidth(0.01);
+      doc.rect(x, y - size + 0.02, size, size, 'S');
+    }
+
+    // Helper function to render section
+    function renderSection(title, items, yPos) {
+      if (items.length === 0) return yPos;
+
+      // Section header with subtle background
+      doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+      doc.rect(0.5, yPos - 0.05, 7.5, 0.22, 'F');
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(black[0], black[1], black[2]);
+      doc.text(title, 0.65, yPos + 0.10);
+      yPos += 0.25;
+
+      // Items
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(black[0], black[1], black[2]);
+
+      items.forEach(item => {
+        drawCheckbox(0.70, yPos);
+        doc.text(item, 0.95, yPos);
+        yPos += 0.16;
+      });
+
+      yPos += 0.10;
+      return yPos;
+    }
+
+    // BYO GYROS section
     if (prep.byoGyros.total > 0) {
       const sets = Math.ceil(prep.byoGyros.total / 10);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`BYO GYRO PITAS (${prep.byoGyros.total} PORTIONS)`, 0.7, yPos);
-      yPos += 0.15;
-      doc.setFont('helvetica', 'normal');
-      doc.text(`☐ ${sets}x 16oz Tzatziki (no dill)`, 0.9, yPos); yPos += 0.13;
-      doc.text(`☐ ${sets}x 16oz Spicy Aioli`, 0.9, yPos); yPos += 0.13;
-      doc.text(`☐ ${sets}x 16oz Lemon Vinaigrette`, 0.9, yPos); yPos += 0.13;
+      const items = [
+        `${sets}x 16oz Tzatziki (no dill)`,
+        `${sets}x 16oz Spicy Aioli`,
+        `${sets}x 16oz Lemon Vinaigrette`
+      ];
+
       const fullPans = Math.floor(sets / 2);
       const halfPans = sets % 2;
       let panText = fullPans > 0 && halfPans > 0 ? `${fullPans} full + 1 half pan` :
                     fullPans > 0 ? `${fullPans} full pan${fullPans > 1 ? 's' : ''}` : '1 half pan';
-      doc.text(`☐ ${panText} Mixed Greens`, 0.9, yPos);
-      yPos += 0.20;
+      items.push(`${panText} Mixed Greens`);
+
+      yPos = renderSection(`BYO GYRO PITAS (${prep.byoGyros.total} PORTIONS)`, items, yPos);
     }
 
-    // SALADS
+    // SALADS section
     if (prep.salads.length > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('SALADS', 0.7, yPos); yPos += 0.15;
-      doc.setFont('helvetica', 'normal');
-      prep.salads.forEach(s => { doc.text(`☐ ${s.qty}x ${s.name}`, 0.9, yPos); yPos += 0.13; });
-      yPos += 0.07;
+      const items = prep.salads.map(s => `${s.qty}x ${s.name}`);
+      yPos = renderSection('SALADS', items, yPos);
     }
 
-    // DIPS
+    // DIPS section
     if (prep.dips.length > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('DIPS', 0.7, yPos); yPos += 0.15;
-      doc.setFont('helvetica', 'normal');
-      prep.dips.forEach(d => { doc.text(`☐ ${d.qty}x ${d.name}`, 0.9, yPos); yPos += 0.13; });
-      yPos += 0.07;
+      const items = prep.dips.map(d => `${d.qty}x ${d.name}`);
+      yPos = renderSection('DIPS', items, yPos);
     }
 
-    // SIDES
+    // SIDES section
     if (prep.sides.length > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('SIDES', 0.7, yPos); yPos += 0.15;
-      doc.setFont('helvetica', 'normal');
-      prep.sides.forEach(s => { doc.text(`☐ ${s.qty}x ${s.name}`, 0.9, yPos); yPos += 0.13; });
-      yPos += 0.07;
+      const items = prep.sides.map(s => `${s.qty}x ${s.name}`);
+      yPos = renderSection('SIDES', items, yPos);
     }
 
-    // DESSERTS
+    // DESSERTS section
     if (prep.desserts.length > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('DESSERTS', 0.7, yPos); yPos += 0.15;
-      doc.setFont('helvetica', 'normal');
-      prep.desserts.forEach(d => { doc.text(`☐ ${d.qty}x ${d.name}`, 0.9, yPos); yPos += 0.13; });
-      yPos += 0.07;
+      const items = prep.desserts.map(d => `${d.qty}x ${d.name}`);
+      yPos = renderSection('DESSERTS', items, yPos);
     }
 
     return yPos;
@@ -21560,21 +21588,32 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     yPos += 0.35;
 
-    // Render each order
+    // Render each order with beautiful boxes
     orders.forEach((order, index) => {
       if (yPos > 9.5) {
         doc.addPage();
         yPos = 0.7;
       }
 
-      // Order header
+      const orderStartY = yPos;
+
+      // Order header with blue background
+      const headerHeight = 0.30;
+      doc.setFillColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+      doc.rect(0.5, yPos, 7.5, headerHeight, 'F');
+
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+      doc.setTextColor(255, 255, 255);
       const orderNum = order.order_number || order.id;
-      doc.text(`ORDER #${orderNum} - ${order.customer_name || 'Customer'}`, 0.6, yPos);
+      doc.text(`ORDER #${orderNum} - ${order.customer_name || 'Customer'}`, 0.65, yPos + 0.20);
 
-      yPos += 0.18;
+      yPos += headerHeight + 0.12;
+
+      // Delivery info in gray box
+      const infoHeight = 0.20;
+      doc.setFillColor(245, 245, 245);
+      doc.rect(0.5, yPos, 7.5, infoHeight, 'F');
 
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
@@ -21584,13 +21623,13 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         const timeObj = new Date(order.delivery_time);
         deliveryTime = formatPacificDateDisplay(timeObj, { hour: 'numeric', minute: '2-digit', hour12: true });
       }
-      doc.text(`Delivery: ${deliveryTime} | Headcount: ${order.headcount || 'N/A'}`, 0.7, yPos);
+      doc.text(`Delivery: ${deliveryTime} | Headcount: ${order.headcount || 'N/A'}`, 0.65, yPos + 0.14);
 
-      yPos += 0.2;
+      yPos += infoHeight + 0.15;
 
-      // Line items
+      // Line items with bullets
       if (order.catering_order_items && order.catering_order_items.length > 0) {
-        doc.setFontSize(8);
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(black[0], black[1], black[2]);
 
@@ -21600,19 +21639,23 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             yPos = 0.7;
           }
 
-          doc.text(`• ${item.quantity}x ${item.item_name}`, 0.9, yPos);
-          yPos += 0.14;
+          // Draw bullet point
+          doc.setFillColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+          doc.circle(0.62, yPos - 0.02, 0.02, 'F');
+
+          doc.text(`${item.quantity}x ${item.item_name}`, 0.75, yPos);
+          yPos += 0.16;
         });
       }
 
-      yPos += 0.15;
+      yPos += 0.20;
 
       // Separator between orders
       if (index < orders.length - 1) {
         doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.005);
-        doc.line(0.6, yPos, 7.9, yPos);
-        yPos += 0.2;
+        doc.setLineWidth(0.01);
+        doc.line(0.5, yPos, 8.0, yPos);
+        yPos += 0.25;
       }
     });
 
@@ -21623,46 +21666,6 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       yPos = 0.7;
     }
     yPos = renderPrepBreakdown(doc, orders, yPos);
-
-    // Combined summary if multiple orders
-    if (orders.length > 1) {
-      yPos += 0.15;
-
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(black[0], black[1], black[2]);
-      doc.text(`COMBINED SUMMARY (${orders.length} Orders)`, 0.6, yPos);
-
-      yPos += 0.2;
-
-      // Aggregate items
-      const itemMap = new Map();
-      orders.forEach(order => {
-        if (order.catering_order_items) {
-          order.catering_order_items.forEach(item => {
-            const key = item.item_name.toUpperCase();
-            if (itemMap.has(key)) {
-              itemMap.set(key, itemMap.get(key) + (item.quantity || 0));
-            } else {
-              itemMap.set(key, item.quantity || 0);
-            }
-          });
-        }
-      });
-
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-
-      Array.from(itemMap.entries()).sort().forEach(([name, qty]) => {
-        if (yPos > 10) {
-          doc.addPage();
-          yPos = 0.7;
-        }
-
-        doc.text(`• ${qty}x ${name}`, 0.9, yPos);
-        yPos += 0.14;
-      });
-    }
   }
 
   /**
