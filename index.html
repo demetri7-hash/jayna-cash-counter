@@ -21578,13 +21578,13 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     yPos += 0.25;
 
-    // Date
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
+    // Generated date/time (smaller text)
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
     doc.setTextColor(grayText[0], grayText[1], grayText[2]);
-    const dateObj = new Date(date + 'T12:00:00');
-    const dateStr = formatPacificDateDisplay(dateObj, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    doc.text(dateStr, 4.25, yPos, { align: 'center' });
+    const now = new Date();
+    const generatedStr = formatPacificDateDisplay(now, { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+    doc.text(`Generated on: ${generatedStr}`, 4.25, yPos, { align: 'center' });
 
     yPos += 0.35;
 
@@ -21610,11 +21610,20 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
       yPos += headerHeight + 0.12;
 
-      // Delivery info in gray box
-      const infoHeight = 0.20;
+      // Delivery info in gray box (expanded for DUE DATE)
+      const infoHeight = 0.35;
       doc.setFillColor(245, 245, 245);
       doc.rect(0.5, yPos, 7.5, infoHeight, 'F');
 
+      // DUE DATE (prominent)
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(black[0], black[1], black[2]);
+      const dueDateObj = new Date(order.delivery_date || date + 'T12:00:00');
+      const dueDateStr = formatPacificDateDisplay(dueDateObj, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      doc.text(`DUE DATE: ${dueDateStr}`, 0.65, yPos + 0.14);
+
+      // Delivery time and headcount (smaller, below)
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(grayText[0], grayText[1], grayText[2]);
@@ -21623,7 +21632,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         const timeObj = new Date(order.delivery_time);
         deliveryTime = formatPacificDateDisplay(timeObj, { hour: 'numeric', minute: '2-digit', hour12: true });
       }
-      doc.text(`Delivery: ${deliveryTime} | Headcount: ${order.headcount || 'N/A'}`, 0.65, yPos + 0.14);
+      doc.text(`Delivery Time: ${deliveryTime} | Headcount: ${order.headcount || 'N/A'}`, 0.65, yPos + 0.28);
 
       yPos += infoHeight + 0.15;
 
