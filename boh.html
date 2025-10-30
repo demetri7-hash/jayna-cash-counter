@@ -2387,8 +2387,8 @@
       });
 
       // Merge: Keep existing tasks (with completion status) + add any NEW tasks
-      const existingTaskDescriptions = new Set(
-        (existingTasks || []).map(t => t.task_description)
+      const existingTaskTexts = new Set(
+        (existingTasks || []).map(t => t.task_text)  // CORRECT COLUMN NAME
       );
 
       const mergedTasks = [...(existingTasks || [])];
@@ -2396,19 +2396,19 @@
 
       // Add new tasks that weren't in the session
       for (const freshTask of freshTasksList) {
-        if (!existingTaskDescriptions.has(freshTask.task_description)) {
+        if (!existingTaskTexts.has(freshTask.task_description)) {  // Compare against task_text
           console.log(`➕ Adding new task to session: ${freshTask.task_description}`);
-          // Create new task in database
+          // Create new task in database - USE CORRECT COLUMN NAMES!
           const { data: newTask, error: insertError } = await supabase
             .from('boh_checklist_tasks')
             .insert({
               session_id: session.id,
-              section_title: freshTask.section_title,
-              task_description: freshTask.task_description,
+              checklist_type: fohSystemState.currentChecklist.type,  // Add this required field
+              section_name: freshTask.section_title,  // CORRECT: section_name
+              task_text: freshTask.task_description,  // CORRECT: task_text
               task_order: nextTaskOrder++,
-              completed: false,
-              required: freshTask.required,
-              requires_photo: freshTask.requires_photo
+              is_completed: false,  // CORRECT: is_completed
+              is_required: freshTask.required  // CORRECT: is_required
             })
             .select()
             .single();
