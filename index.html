@@ -21417,7 +21417,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(grayText[0], grayText[1], grayText[2]);
-      const deliveryTime = order.delivery_time ? formatPacificTime(order.delivery_time) : 'TBD';
+      let deliveryTime = 'TBD';
+      if (order.delivery_time) {
+        const timeObj = new Date(order.delivery_time);
+        deliveryTime = formatPacificDateDisplay(timeObj, { hour: 'numeric', minute: '2-digit', hour12: true });
+      }
       doc.text(`Delivery: ${deliveryTime} | Headcount: ${order.headcount || 'N/A'}`, 0.7, yPos);
 
       yPos += 0.2;
