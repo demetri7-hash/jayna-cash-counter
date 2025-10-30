@@ -21369,6 +21369,128 @@ async function refreshUpcomingOrdersUI(targetContainer) {
   }
 
   /**
+   * Calculate prep list from catering order line items
+   */
+  function calculateCateringPrepList(lineItems) {
+    const prep = {
+      byoGyros: { total: 0, items: [] },
+      salads: [],
+      dips: [],
+      sides: [],
+      desserts: []
+    };
+
+    lineItems.forEach(item => {
+      const itemName = (item.item_name || '').toUpperCase();
+      const qty = parseFloat(item.quantity || 1);
+
+      if (itemName.includes('MAKE YOUR OWN') || itemName.includes('BYO')) {
+        prep.byoGyros.total += qty;
+        prep.byoGyros.items.push({ name: item.item_name, qty });
+      }
+      else if (itemName.includes('SALAD')) {
+        prep.salads.push({ name: item.item_name, qty });
+      }
+      else if (itemName.includes('HUMMUS') || itemName.includes('BABA') || itemName.includes('TZATZIKI')) {
+        prep.dips.push({ name: item.item_name, qty });
+      }
+      else if (itemName.includes('FRIES') || itemName.includes('PITA') || itemName.includes('DOLMAS') || itemName.includes('SPANAKOPITA')) {
+        prep.sides.push({ name: item.item_name, qty });
+      }
+      else if (itemName.includes('BAKLAVA') || itemName.includes('RICE PUDDING')) {
+        prep.desserts.push({ name: item.item_name, qty });
+      }
+    });
+
+    return prep;
+  }
+
+  /**
+   * Render prep list breakdown in PDF
+   */
+  function renderPrepBreakdown(doc, orders, yPos) {
+    const jaynaBlue = [33, 150, 243];
+    const black = [33, 33, 33];
+
+    // Combine all line items
+    const allLineItems = [];
+    orders.forEach(order => {
+      if (order.catering_order_items) {
+        allLineItems.push(...order.catering_order_items);
+      }
+    });
+
+    const prep = calculateCateringPrepList(allLineItems);
+
+    // Title
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
+    doc.text('🍽️ PREP LIST BREAKDOWN', 0.6, yPos);
+    yPos += 0.25;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(black[0], black[1], black[2]);
+
+    // BYO GYROS
+    if (prep.byoGyros.total > 0) {
+      const sets = Math.ceil(prep.byoGyros.total / 10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`BYO GYRO PITAS (${prep.byoGyros.total} PORTIONS)`, 0.7, yPos);
+      yPos += 0.15;
+      doc.setFont('helvetica', 'normal');
+      doc.text(`☐ ${sets}x 16oz Tzatziki (no dill)`, 0.9, yPos); yPos += 0.13;
+      doc.text(`☐ ${sets}x 16oz Spicy Aioli`, 0.9, yPos); yPos += 0.13;
+      doc.text(`☐ ${sets}x 16oz Lemon Vinaigrette`, 0.9, yPos); yPos += 0.13;
+      const fullPans = Math.floor(sets / 2);
+      const halfPans = sets % 2;
+      let panText = fullPans > 0 && halfPans > 0 ? `${fullPans} full + 1 half pan` :
+                    fullPans > 0 ? `${fullPans} full pan${fullPans > 1 ? 's' : ''}` : '1 half pan';
+      doc.text(`☐ ${panText} Mixed Greens`, 0.9, yPos);
+      yPos += 0.20;
+    }
+
+    // SALADS
+    if (prep.salads.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('SALADS', 0.7, yPos); yPos += 0.15;
+      doc.setFont('helvetica', 'normal');
+      prep.salads.forEach(s => { doc.text(`☐ ${s.qty}x ${s.name}`, 0.9, yPos); yPos += 0.13; });
+      yPos += 0.07;
+    }
+
+    // DIPS
+    if (prep.dips.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('DIPS', 0.7, yPos); yPos += 0.15;
+      doc.setFont('helvetica', 'normal');
+      prep.dips.forEach(d => { doc.text(`☐ ${d.qty}x ${d.name}`, 0.9, yPos); yPos += 0.13; });
+      yPos += 0.07;
+    }
+
+    // SIDES
+    if (prep.sides.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('SIDES', 0.7, yPos); yPos += 0.15;
+      doc.setFont('helvetica', 'normal');
+      prep.sides.forEach(s => { doc.text(`☐ ${s.qty}x ${s.name}`, 0.9, yPos); yPos += 0.13; });
+      yPos += 0.07;
+    }
+
+    // DESSERTS
+    if (prep.desserts.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('DESSERTS', 0.7, yPos); yPos += 0.15;
+      doc.setFont('helvetica', 'normal');
+      prep.desserts.forEach(d => { doc.text(`☐ ${d.qty}x ${d.name}`, 0.9, yPos); yPos += 0.13; });
+      yPos += 0.07;
+    }
+
+    return yPos;
+  }
+
+  /**
    * NEW: Render catering orders summary page
    */
   function renderCateringOrdersPage(doc, orders, date) {
@@ -21453,6 +21575,14 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         yPos += 0.2;
       }
     });
+
+    // Add prep breakdown showing what needs to be made
+    yPos += 0.3;
+    if (yPos > 9.5) {
+      doc.addPage();
+      yPos = 0.7;
+    }
+    yPos = renderPrepBreakdown(doc, orders, yPos);
 
     // Combined summary if multiple orders
     if (orders.length > 1) {
