@@ -19526,7 +19526,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       urgent: item.urgent || false,
       lineCooksPrep: item.lineCooksPrep || false,
       notMadeDaily: item.notMadeDaily || false,
-      lastCountedDate: item.lastCountedDate
+      lastCountedDate: item.lastCountedDate,
+      storageLocation: item.storageLocation,
+      showInBottleCount: item.showInBottleCount || false
     };
   }
 
@@ -21307,6 +21309,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       dayAfter.setDate(dayAfter.getDate() + 2);
       const dayAfterStr = dayAfter.toISOString().split('T')[0];
 
+      console.log(`📋 Fetching catering orders for ${tomorrowStr} and ${dayAfterStr}`);
+
       // Fetch orders for both dates
       const { data: orders, error } = await supabase
         .from('catering_orders')
@@ -21314,10 +21318,15 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         .in('delivery_date', [tomorrowStr, dayAfterStr])
         .order('delivery_date', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Catering orders fetch error:', error);
+        throw error;
+      }
+
+      console.log(`✅ Found ${orders?.length || 0} catering orders`);
 
       if (!orders || orders.length === 0) {
-        console.log('No catering orders for tomorrow or day after');
+        console.log('ℹ️ No catering orders for tomorrow or day after');
         return;
       }
 
