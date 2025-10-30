@@ -624,22 +624,22 @@ async function generateChecklistsPDF(sessions, definitionsMap, reportDate, analy
     yPos += 0.3;
 
     // Tasks section
-    const tasks = session.foh_checklist_tasks || [];
-    if (tasks.length > 0) {
+    const sessionTasks = session.foh_checklist_tasks || [];
+    if (sessionTasks.length > 0) {
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(black[0], black[1], black[2]);
       doc.text('TASKS', 0.5, yPos);
       yPos += 0.2;
 
-      const completedTasks = tasks.filter(t => t.is_completed);
-      const incompleteTasks = tasks.filter(t => !t.is_completed);
+      const completedTasks = sessionTasks.filter(t => t.is_completed);
+      const incompleteTasks = sessionTasks.filter(t => !t.is_completed);
 
       // Summary stats
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(successGreen[0], successGreen[1], successGreen[2]);
-      doc.text(`COMPLETED: ${completedTasks.length}/${tasks.length}`, 0.5, yPos);
+      doc.text(`COMPLETED: ${completedTasks.length}/${sessionTasks.length}`, 0.5, yPos);
 
       if (incompleteTasks.length > 0) {
         doc.setTextColor(errorRed[0], errorRed[1], errorRed[2]);
