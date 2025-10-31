@@ -221,26 +221,64 @@ function updateTipsPerHourDisplay(data) {
   // Display tips per hour
   displayDiv.textContent = `$${data.tipsPerHour.toFixed(2)}/hr`;
 
-  // Color and trend indicator based on comparison to yesterday
+  // Build trend indicators
+  let trendHTML = '';
+
+  // Yesterday comparison
   if (data.trendingUp === true) {
     displayDiv.style.color = '#059669'; // Green
-    trendDiv.innerHTML = `
-      <span style="color: #059669;">
+    trendHTML += `
+      <div style="color: #059669; margin-bottom: 4px;">
         ↑ ${data.percentChangeFromYesterday > 0 ? '+' : ''}${data.percentChangeFromYesterday}% vs yesterday
-      </span>
+      </div>
     `;
   } else if (data.trendingUp === false) {
     displayDiv.style.color = '#dc2626'; // Red
-    trendDiv.innerHTML = `
-      <span style="color: #dc2626;">
+    trendHTML += `
+      <div style="color: #dc2626; margin-bottom: 4px;">
         ↓ ${data.percentChangeFromYesterday}% vs yesterday
-      </span>
+      </div>
     `;
   } else {
-    // No comparison data available (first day)
-    displayDiv.style.color = 'var(--gray-900)'; // Neutral
-    trendDiv.innerHTML = '<span style="color: var(--gray-600); font-size: 10px;">First day tracking</span>';
+    displayDiv.style.color = 'var(--gray-900)';
   }
+
+  // Week comparison
+  if (data.trendingUpWeek === true) {
+    trendHTML += `
+      <div style="color: #059669; margin-bottom: 4px;">
+        ↑ ${data.percentChangeFromLastWeek > 0 ? '+' : ''}${data.percentChangeFromLastWeek}% vs last week
+      </div>
+    `;
+  } else if (data.trendingUpWeek === false) {
+    trendHTML += `
+      <div style="color: #dc2626; margin-bottom: 4px;">
+        ↓ ${data.percentChangeFromLastWeek}% vs last week
+      </div>
+    `;
+  }
+
+  // Month comparison
+  if (data.trendingUpMonth === true) {
+    trendHTML += `
+      <div style="color: #059669;">
+        ↑ ${data.percentChangeFromLastMonth > 0 ? '+' : ''}${data.percentChangeFromLastMonth}% vs last month
+      </div>
+    `;
+  } else if (data.trendingUpMonth === false) {
+    trendHTML += `
+      <div style="color: #dc2626;">
+        ↓ ${data.percentChangeFromLastMonth}% vs last month
+      </div>
+    `;
+  }
+
+  // If no data at all
+  if (!trendHTML) {
+    trendHTML = '<span style="color: var(--gray-600); font-size: 10px;">Building historical data...</span>';
+  }
+
+  trendDiv.innerHTML = trendHTML;
 }
 
 function isManagerSessionValid() {

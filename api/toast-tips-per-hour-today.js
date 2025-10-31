@@ -120,11 +120,20 @@ export default async function handler(req, res) {
     const tipsPerHour = totalHours > 0 ? totalCCTips / totalHours : 0;
     console.log(`🎯 Tips Per Hour: $${tipsPerHour.toFixed(2)}`);
 
-    // STEP 7: Get yesterday's tips/hour for comparison
+    // STEP 7: Get comparison data from database (yesterday, last week, last month)
     const yesterday = new Date(businessDate);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayDate = yesterday.toISOString().split('T')[0];
 
+    const lastWeek = new Date(businessDate);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    const lastWeekDate = lastWeek.toISOString().split('T')[0];
+
+    const lastMonth = new Date(businessDate);
+    lastMonth.setDate(lastMonth.getDate() - 30);
+    const lastMonthDate = lastMonth.toISOString().split('T')[0];
+
+    // Fetch yesterday's data
     const { data: yesterdayData } = await supabase
       .from('daily_tips_metrics')
       .select('tips_per_hour')
@@ -132,6 +141,23 @@ export default async function handler(req, res) {
       .eq('is_end_of_day', true)
       .single();
 
+    // Fetch last week's data
+    const { data: lastWeekData } = await supabase
+      .from('daily_tips_metrics')
+      .select('tips_per_hour')
+      .eq('business_date', lastWeekDate)
+      .eq('is_end_of_day', true)
+      .single();
+
+    // Fetch last month's data
+    const { data: lastMonthData } = await supabase
+      .from('daily_tips_metrics')
+      .select('tips_per_hour')
+      .eq('business_date', lastMonthDate)
+      .eq('is_end_of_day', true)
+      .single();
+
+    // Calculate yesterday comparison
     let previousDayTipsPerHour = null;
     let percentChange = null;
     let trendingUp = null;
@@ -143,6 +169,34 @@ export default async function handler(req, res) {
 
       console.log(`📊 Yesterday's Tips/Hour: $${previousDayTipsPerHour.toFixed(2)}`);
       console.log(`📈 Change: ${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%`);
+    }
+
+    // Calculate last week comparison
+    let lastWeekTipsPerHour = null;
+    let percentChangeWeek = null;
+    let trendingUpWeek = null;
+
+    if (lastWeekData && lastWeekData.tips_per_hour) {
+      lastWeekTipsPerHour = parseFloat(lastWeekData.tips_per_hour);
+      percentChangeWeek = ((tipsPerHour - lastWeekTipsPerHour) / lastWeekTipsPerHour) * 100;
+      trendingUpWeek = percentChangeWeek >= 0;
+
+      console.log(`📊 Last Week's Tips/Hour: $${lastWeekTipsPerHour.toFixed(2)}`);
+      console.log(`📈 Week Change: ${percentChangeWeek > 0 ? '+' : ''}${percentChangeWeek.toFixed(1)}%`);
+    }
+
+    // Calculate last month comparison
+    let lastMonthTipsPerHour = null;
+    let percentChangeMonth = null;
+    let trendingUpMonth = null;
+
+    if (lastMonthData && lastMonthData.tips_per_hour) {
+      lastMonthTipsPerHour = parseFloat(lastMonthData.tips_per_hour);
+      percentChangeMonth = ((tipsPerHour - lastMonthTipsPerHour) / lastMonthTipsPerHour) * 100;
+      trendingUpMonth = percentChangeMonth >= 0;
+
+      console.log(`📊 Last Month's Tips/Hour: $${lastMonthTipsPerHour.toFixed(2)}`);
+      console.log(`📈 Month Change: ${percentChangeMonth > 0 ? '+' : ''}${percentChangeMonth.toFixed(1)}%`);
     }
 
     // STEP 8: Save to database (upsert)
@@ -187,9 +241,22 @@ export default async function handler(req, res) {
         totalOrdersCount: orderCount,
         employeesWorkedToday: employeeCount,
         currentlyClockedIn: currentlyClockedIn,
+
+        // Yesterday comparison
         previousDayTipsPerHour: previousDayTipsPerHour ? parseFloat(previousDayTipsPerHour.toFixed(2)) : null,
         percentChangeFromYesterday: percentChange ? parseFloat(percentChange.toFixed(1)) : null,
         trendingUp: trendingUp,
+
+        // Week comparison
+        lastWeekTipsPerHour: lastWeekTipsPerHour ? parseFloat(lastWeekTipsPerHour.toFixed(2)) : null,
+        percentChangeFromLastWeek: percentChangeWeek ? parseFloat(percentChangeWeek.toFixed(1)) : null,
+        trendingUpWeek: trendingUpWeek,
+
+        // Month comparison
+        lastMonthTipsPerHour: lastMonthTipsPerHour ? parseFloat(lastMonthTipsPerHour.toFixed(2)) : null,
+        percentChangeFromLastMonth: percentChangeMonth ? parseFloat(percentChangeMonth.toFixed(1)) : null,
+        trendingUpMonth: trendingUpMonth,
+
         calculatedAt: new Date().toISOString()
       }
     });
