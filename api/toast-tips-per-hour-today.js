@@ -305,59 +305,30 @@ export default async function handler(req, res) {
  * Get Pacific Time date range (5am today to now)
  */
 function getPacificTimeRange() {
-  // Get current time in milliseconds
-  const nowUTC = new Date();
+  // Use the SAME pattern as shared-header.js and everywhere else in the codebase
+  const now = new Date();
+  const pacificTimeString = now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
+  const nowPacific = new Date(pacificTimeString);
 
-  // Convert to Pacific time using proper offset
-  // Pacific is UTC-8 (PST) or UTC-7 (PDT) - use Intl API for automatic DST handling
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
+  // Get today at 5am Pacific
+  const todayAt5AM = new Date(nowPacific);
+  todayAt5AM.setHours(5, 0, 0, 0);
 
-  const parts = formatter.formatToParts(nowUTC);
-  const get = (type) => parts.find(p => p.type === type).value;
-
-  const pacificYear = parseInt(get('year'));
-  const pacificMonth = parseInt(get('month')) - 1; // JS months are 0-indexed
-  const pacificDay = parseInt(get('day'));
-  const pacificHour = parseInt(get('hour'));
-  const pacificMinute = parseInt(get('minute'));
-  const pacificSecond = parseInt(get('second'));
-
-  // Create date in Pacific timezone
-  // This creates a Date object but we'll only use it for date math
-  const nowPacific = new Date(pacificYear, pacificMonth, pacificDay, pacificHour, pacificMinute, pacificSecond);
-
-  // Get 5am Pacific today
-  let startPacific;
-  if (pacificHour < 5) {
-    // Before 5am - use yesterday at 5am
-    startPacific = new Date(pacificYear, pacificMonth, pacificDay - 1, 5, 0, 0);
+  // If current time is before 5am, use yesterday's 5am
+  let startTime;
+  if (nowPacific < todayAt5AM) {
+    todayAt5AM.setDate(todayAt5AM.getDate() - 1);
+    startTime = todayAt5AM;
   } else {
-    // After 5am - use today at 5am
-    startPacific = new Date(pacificYear, pacificMonth, pacificDay, 5, 0, 0);
+    startTime = todayAt5AM;
   }
 
-  // Business date is the date of the 5am start
-  const businessDate = `${startPacific.getFullYear()}-${String(startPacific.getMonth() + 1).padStart(2, '0')}-${String(startPacific.getDate()).padStart(2, '0')}`;
+  // Business date is the date of the 5am start time
+  const businessDate = startTime.toISOString().split('T')[0];
 
-  // For Toast API, we need to convert these Pacific times back to UTC ISO strings
-  // Calculate offset in minutes
-  const pacificOffsetMs = nowPacific.getTime() - nowUTC.getTime();
-
-  // Create UTC times that correspond to our Pacific times
-  const startDateUTC = new Date(startPacific.getTime() - pacificOffsetMs);
-  const endDateUTC = nowUTC; // End is "now" in UTC
-
-  const startDate = startDateUTC.toISOString();
-  const endDate = endDateUTC.toISOString();
+  // Format for Toast API (ISO 8601 with timezone)
+  const startDate = startTime.toISOString();
+  const endDate = now.toISOString(); // Use UTC "now" for end date
 
   return {
     startDate,

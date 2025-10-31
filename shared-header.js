@@ -38,6 +38,10 @@ function initializeSharedHeader() {
         <div id="clockedInList" style="color: #2e7d32; font-size: 12px; font-weight: 500;">
           Loading...
         </div>
+        <!-- LEADERBOARD (inline text below clocked in) -->
+        <div id="leaderboardInline" style="margin-top: 8px; font-size: 9px; line-height: 1.4;">
+          <!-- Leaderboard will appear here -->
+        </div>
       </div>
 
       <!-- TIPS PER HOUR (LIVE) -->
@@ -53,24 +57,6 @@ function initializeSharedHeader() {
         </div>
         <div style="font-size: 9px; color: var(--gray-500); margin-top: 8px; font-style: italic;">
           ⚠️ Live estimate - not 100% accurate
-        </div>
-        <button onclick="showLeaderboard()" style="margin-top: 10px; padding: 8px 16px; background: var(--gray-700); border: 2px solid var(--gray-700); color: white; font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
-          🏆 View Leaderboard
-        </button>
-      </div>
-
-      <!-- LEADERBOARD MODAL (hidden by default) -->
-      <div id="leaderboardModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 10000; overflow-y: auto; padding: 20px;">
-        <div style="background: white; padding: 24px; max-width: 600px; margin: 40px auto; border: 3px solid var(--gray-700); position: relative;">
-          <button onclick="closeLeaderboard()" style="position: absolute; top: 10px; right: 10px; background: #dc2626; border: none; color: white; font-size: 18px; width: 30px; height: 30px; cursor: pointer; font-weight: 700;">✕</button>
-
-          <h2 style="margin-bottom: 16px; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; text-align: center;">🏆 TODAY'S LEADERBOARD</h2>
-
-          <div id="leaderboardContent" style="margin-top: 20px;">
-            <div style="text-align: center; padding: 40px; color: var(--gray-500);">
-              Loading leaderboard...
-            </div>
-          </div>
         </div>
       </div>
 
@@ -113,6 +99,10 @@ function initializeSharedHeader() {
   // Initialize tips per hour display
   fetchTipsPerHour();
   setInterval(fetchTipsPerHour, 5 * 60 * 1000); // Refresh every 5 minutes
+
+  // Initialize inline leaderboard display
+  fetchInlineLeaderboard();
+  setInterval(fetchInlineLeaderboard, 5 * 60 * 1000); // Refresh every 5 minutes
 
   // Initialize session status
   updateSessionStatus();
@@ -299,6 +289,59 @@ function updateTipsPerHourDisplay(data) {
   trendDiv.innerHTML = trendHTML;
 }
 
+async function fetchInlineLeaderboard() {
+  try {
+    const response = await fetch('/api/toast-employee-performance', {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      updateInlineLeaderboard(null);
+      return;
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.data && result.data.leaderboard) {
+      updateInlineLeaderboard(result.data.leaderboard);
+    } else {
+      updateInlineLeaderboard(null);
+    }
+  } catch (error) {
+    console.error('❌ Error fetching inline leaderboard:', error);
+    updateInlineLeaderboard(null);
+  }
+}
+
+function updateInlineLeaderboard(leaderboard) {
+  const displayDiv = document.getElementById('leaderboardInline');
+  if (!displayDiv) return;
+
+  if (!leaderboard || leaderboard.length === 0) {
+    displayDiv.innerHTML = '';
+    return;
+  }
+
+  // Show only top 5
+  const top5 = leaderboard.slice(0, 5);
+
+  let html = '';
+  top5.forEach((emp, index) => {
+    // Color based on rank
+    let color = '#059669'; // Green for #1
+    if (emp.rank === 2) color = '#2563eb'; // Blue for #2
+    if (emp.rank === 3) color = '#f59e0b'; // Orange for #3
+    if (emp.rank > 3) color = '#6b7280'; // Gray for others
+
+    // Arrow based on performance
+    const arrow = emp.tipsPerHour > 15 ? '↑' : emp.tipsPerHour > 10 ? '→' : '↓';
+
+    html += `<div style="color: ${color}; margin-bottom: 2px;">${arrow} ${emp.rank}. ${emp.name}: $${emp.tipsPerHour.toFixed(2)}/hr</div>`;
+  });
+
+  displayDiv.innerHTML = html;
+}
+
 function isManagerSessionValid() {
   const sessionExpiry = localStorage.getItem('managerSession');
   if (!sessionExpiry) return false;
@@ -345,106 +388,6 @@ function updateSessionStatus() {
     logoutBtn.style.display = 'none';
   }
 }
-
-// Leaderboard functions
-async function showLeaderboard() {
-  const modal = document.getElementById('leaderboardModal');
-  const content = document.getElementById('leaderboardContent');
-
-  if (!modal || !content) return;
-
-  modal.style.display = 'block';
-  content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-500);">Loading leaderboard...</div>';
-
-  try {
-    const response = await fetch('/api/toast-employee-performance', {
-      method: 'POST'
-    });
-
-    if (!response.ok) {
-      content.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc2626;">Failed to load leaderboard</div>';
-      return;
-    }
-
-    const result = await response.json();
-
-    if (!result.success || !result.data || !result.data.leaderboard) {
-      content.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc2626;">No leaderboard data available</div>';
-      return;
-    }
-
-    displayLeaderboard(result.data.leaderboard);
-
-  } catch (error) {
-    console.error('❌ Error loading leaderboard:', error);
-    content.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc2626;">Error loading leaderboard</div>';
-  }
-}
-
-function closeLeaderboard() {
-  const modal = document.getElementById('leaderboardModal');
-  if (modal) {
-    modal.style.display = 'none';
-  }
-}
-
-function displayLeaderboard(leaderboard) {
-  const content = document.getElementById('leaderboardContent');
-  if (!content) return;
-
-  if (leaderboard.length === 0) {
-    content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-500);">No employees with tips today</div>';
-    return;
-  }
-
-  let html = '';
-
-  leaderboard.forEach((emp, index) => {
-    // Medal emojis for top 3
-    let rankDisplay = `#${emp.rank}`;
-    if (emp.rank === 1) rankDisplay = '🥇';
-    if (emp.rank === 2) rankDisplay = '🥈';
-    if (emp.rank === 3) rankDisplay = '🥉';
-
-    // Color code based on performance
-    let tipsColor = '#059669'; // Green for top performers
-    if (emp.rank > 3) tipsColor = 'var(--gray-700)';
-
-    html += `
-      <div style="padding: 16px; border-bottom: 1px solid var(--gray-300); display: grid; grid-template-columns: 50px 1fr auto; gap: 12px; align-items: center;">
-        <div style="font-size: 24px; font-weight: 700; text-align: center;">
-          ${rankDisplay}
-        </div>
-        <div>
-          <div style="font-size: 14px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px;">
-            ${emp.name}
-          </div>
-          <div style="font-size: 11px; color: var(--gray-600);">
-            ${emp.hoursWorked.toFixed(1)}h worked • ${emp.ordersServed} orders
-          </div>
-        </div>
-        <div style="text-align: right;">
-          <div style="font-size: 18px; font-weight: 700; color: ${tipsColor};">
-            $${emp.tipsPerHour.toFixed(2)}/hr
-          </div>
-          <div style="font-size: 11px; color: var(--gray-600);">
-            $${emp.totalTips.toFixed(2)} total
-          </div>
-        </div>
-      </div>
-    `;
-  });
-
-  content.innerHTML = html;
-}
-
-// Close modal on outside click
-document.addEventListener('click', function(e) {
-  const modal = document.getElementById('leaderboardModal');
-  if (modal && e.target === modal) {
-    closeLeaderboard();
-  }
-});
 
 // Export for use in other scripts
 if (typeof module !== 'undefined' && module.exports) {
