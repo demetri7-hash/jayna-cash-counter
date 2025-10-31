@@ -846,13 +846,23 @@
     <!-- Header -->
     <div class="header">
       <div class="header-info">
-        <h1>Manager Portal</h1>
-        <p>Real-time analytics & labor management</p>
+        <div style="text-align: center; margin-bottom: 12px;">
+          <img src="jayna-logo-new.png" alt="Jayna Gyro Logo" style="width: 80px; height: 80px; margin-bottom: 4px;">
+          <h1 style="margin-bottom: 8px; font-size: 18px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">JAYNA GYRO</h1>
+          <p style="font-size: 11px; font-weight: 500; letter-spacing: 1px; margin-bottom: 4px;">MANAGER PORTAL</p>
+        </div>
 
         <!-- CURRENTLY CLOCKED IN -->
-        <div id="clockedInContainer" style="margin: 8px 0; text-align: left;">
+        <div id="clockedInContainer" style="margin: 8px 0; text-align: center;">
           <div id="clockedInList" style="color: #2e7d32; font-size: 12px; font-weight: 500;">
             Loading...
+          </div>
+          <!-- TIPS PER HOUR -->
+          <div style="margin-top: 8px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #666;">
+            CURRENT TIPS PER HOUR
+          </div>
+          <div id="tipsPerHourText" style="margin-top: 4px; font-size: 9px; line-height: 1.3;">
+            <!-- Tips/hr will display here -->
           </div>
         </div>
       </div>
@@ -3412,11 +3422,52 @@
       `;
     }
 
+    // ==================== TIPS PER HOUR DISPLAY ====================
+
+    async function fetchTipsPerHour() {
+      try {
+        const response = await fetch('/api/toast-tips-per-hour-today', { method: 'POST' });
+        if (!response.ok) { updateTipsPerHourDisplay(null); return; }
+        const result = await response.json();
+        if (result.success && result.data) { updateTipsPerHourDisplay(result.data); }
+        else { updateTipsPerHourDisplay(null); }
+      } catch (error) {
+        console.error('Error fetching tips per hour:', error);
+        updateTipsPerHourDisplay(null);
+      }
+    }
+
+    function updateTipsPerHourDisplay(data) {
+      const displayDiv = document.getElementById('tipsPerHourText');
+      if (!displayDiv) return;
+      if (!data) { displayDiv.innerHTML = ''; return; }
+
+      let html = '';
+      const mainColor = data.trendingUp ? '#059669' : '#dc2626';
+      const arrow = data.trendingUp ? '↑' : '↓';
+      html += `<div style="color: ${mainColor}; font-weight: 600; margin-bottom: 2px;">${arrow} $${data.tipsPerHour.toFixed(2)}/hr</div>`;
+
+      if (data.percentChangeFromYesterday !== null) {
+        const color = data.trendingUp ? '#059669' : '#dc2626';
+        html += `<div style="color: ${color}; margin-bottom: 2px;">${data.percentChangeFromYesterday > 0 ? '+' : ''}${data.percentChangeFromYesterday.toFixed(1)}% vs yesterday</div>`;
+      }
+      if (data.percentChangeFromLastWeek !== null) {
+        const color = data.trendingUpWeek ? '#059669' : '#dc2626';
+        html += `<div style="color: ${color}; margin-bottom: 2px;">${data.percentChangeFromLastWeek > 0 ? '+' : ''}${data.percentChangeFromLastWeek.toFixed(1)}% vs last week</div>`;
+      }
+      if (data.percentChangeFromLastMonth !== null) {
+        const color = data.trendingUpMonth ? '#059669' : '#dc2626';
+        html += `<div style="color: ${color};">${data.percentChangeFromLastMonth > 0 ? '+' : ''}${data.percentChangeFromLastMonth.toFixed(1)}% vs last month</div>`;
+      }
+      displayDiv.innerHTML = html;
+    }
+
     // Fetch on page load
     document.addEventListener('DOMContentLoaded', function() {
       fetchClockedInEmployees();
-      // Auto-refresh every 5 minutes
+      fetchTipsPerHour();
       setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
+      setInterval(fetchTipsPerHour, 5 * 60 * 1000);
     });
 
     // ==================== END CLOCKED IN DISPLAY ====================
