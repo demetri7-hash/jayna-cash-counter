@@ -133,7 +133,7 @@ export default async function handler(req, res) {
     console.log(`✅ Fetched ${timeEntries.length} total time entries`);
 
     // STEP 4: Calculate total hours worked
-    const { totalHours, employeeCount, currentlyClockedIn } = calculateTotalHoursWorked(timeEntries, nowPacific);
+    const { totalHours, employeeCount, currentlyClockedIn } = calculateTotalHoursWorked(timeEntries);
 
     console.log(`⏱️  Total Hours Worked: ${totalHours.toFixed(2)}`);
     console.log(`👥 Employees Worked Today: ${employeeCount}`);
@@ -341,10 +341,13 @@ function getPacificTimeRange() {
 /**
  * Calculate total hours worked (including currently clocked-in employees)
  */
-function calculateTotalHoursWorked(timeEntries, nowPacific) {
+function calculateTotalHoursWorked(timeEntries) {
   let totalHours = 0;
   const employeesWorked = new Set();
   let currentlyClockedIn = 0;
+
+  // Use current UTC time for calculating currently clocked-in hours
+  const nowUTC = new Date();
 
   timeEntries.forEach(entry => {
     // Track unique employees
@@ -361,8 +364,9 @@ function calculateTotalHoursWorked(timeEntries, nowPacific) {
       // Still clocked in - calculate hours manually
       currentlyClockedIn++;
 
+      // Both times are in UTC, so this will be correct
       const clockInTime = new Date(entry.inDate);
-      const diffMs = nowPacific - clockInTime;
+      const diffMs = nowUTC - clockInTime;
       let hoursWorked = diffMs / (1000 * 60 * 60);
 
       // Apply 30-minute lunch break deduction if >6 hours

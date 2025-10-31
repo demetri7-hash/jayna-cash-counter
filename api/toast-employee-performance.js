@@ -162,7 +162,9 @@ export default async function handler(req, res) {
     }
 
     // STEP 9: Sort by tips per hour for leaderboard
+    // FILTER: Only show FOH employees with sales data (orders/tips > 0)
     const leaderboard = performanceData
+      .filter(emp => emp.orders_served > 0 || emp.cc_tips_earned > 0) // Only FOH with sales
       .sort((a, b) => b.tips_per_hour - a.tips_per_hour)
       .map((emp, index) => ({
         rank: index + 1,
