@@ -40,6 +40,22 @@ function initializeSharedHeader() {
         </div>
       </div>
 
+      <!-- TIPS PER HOUR (LIVE) -->
+      <div id="tipsPerHourContainer" style="margin: 12px auto 12px auto; max-width: 400px; text-align: center; padding: 12px; background: var(--gray-100); border: 2px solid var(--gray-300);">
+        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--gray-600); margin-bottom: 6px; letter-spacing: 0.5px;">
+          TODAY'S PERFORMANCE
+        </div>
+        <div id="tipsPerHourDisplay" style="font-size: 24px; font-weight: 700; color: var(--gray-900);">
+          Loading...
+        </div>
+        <div id="tipsPerHourTrend" style="font-size: 11px; font-weight: 600; margin-top: 6px;">
+          <!-- Trend indicator will appear here -->
+        </div>
+        <div style="font-size: 9px; color: var(--gray-500); margin-top: 8px; font-style: italic;">
+          ⚠️ Live estimate - not 100% accurate
+        </div>
+      </div>
+
       <p style="opacity: 0.7;">App created by Demetri Gregorakis</p>
       <div style="font-size: 12px; color: #666; margin-top: 5px;">
         <span id="sessionStatus"></span>
@@ -75,6 +91,10 @@ function initializeSharedHeader() {
   // Initialize clocked-in employees display
   fetchClockedInEmployees();
   setInterval(fetchClockedInEmployees, 5 * 60 * 1000); // Refresh every 5 minutes
+
+  // Initialize tips per hour display
+  fetchTipsPerHour();
+  setInterval(fetchTipsPerHour, 5 * 60 * 1000); // Refresh every 5 minutes
 
   // Initialize session status
   updateSessionStatus();
@@ -159,6 +179,68 @@ function updateClockedInDisplay(employees) {
       Clocked In
     </div>
   `;
+}
+
+async function fetchTipsPerHour() {
+  try {
+    const response = await fetch('/api/toast-tips-per-hour-today', {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      updateTipsPerHourDisplay(null);
+      return;
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      updateTipsPerHourDisplay(result.data);
+    } else {
+      updateTipsPerHourDisplay(null);
+    }
+  } catch (error) {
+    console.error('❌ Error fetching tips per hour:', error);
+    updateTipsPerHourDisplay(null);
+  }
+}
+
+function updateTipsPerHourDisplay(data) {
+  const displayDiv = document.getElementById('tipsPerHourDisplay');
+  const trendDiv = document.getElementById('tipsPerHourTrend');
+
+  if (!displayDiv || !trendDiv) return;
+
+  if (!data) {
+    displayDiv.textContent = 'N/A';
+    displayDiv.style.color = 'var(--gray-500)';
+    trendDiv.innerHTML = '<span style="color: var(--gray-500); font-size: 10px;">Unable to calculate</span>';
+    return;
+  }
+
+  // Display tips per hour
+  displayDiv.textContent = `$${data.tipsPerHour.toFixed(2)}/hr`;
+
+  // Color and trend indicator based on comparison to yesterday
+  if (data.trendingUp === true) {
+    displayDiv.style.color = '#059669'; // Green
+    trendDiv.innerHTML = `
+      <span style="color: #059669;">
+        ↑ ${data.percentChangeFromYesterday > 0 ? '+' : ''}${data.percentChangeFromYesterday}% vs yesterday
+      </span>
+    `;
+  } else if (data.trendingUp === false) {
+    displayDiv.style.color = '#dc2626'; // Red
+    trendDiv.innerHTML = `
+      <span style="color: #dc2626;">
+        ↓ ${data.percentChangeFromYesterday}% vs yesterday
+      </span>
+    `;
+  } else {
+    // No comparison data available (first day)
+    displayDiv.style.color = 'var(--gray-900)'; // Neutral
+    trendDiv.innerHTML = '<span style="color: var(--gray-600); font-size: 10px;">First day tracking</span>';
+  }
 }
 
 function isManagerSessionValid() {
