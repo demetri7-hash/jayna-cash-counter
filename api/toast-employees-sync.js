@@ -111,8 +111,8 @@ export default async function handler(req, res) {
           job_guid: extractJobGuid(emp),
           hourly_wage: extractHourlyWage(emp),
           // Active if NOT deleted AND NOT disabled
-          is_active: (emp.deleted === false || emp.deletedDate === null) &&
-                     (emp.disabled === false || emp.disabled === null),
+          // Toast API: deleted=true means fired/terminated, disabled=true means temporarily inactive
+          is_active: emp.deleted !== true && emp.disabled !== true,
           last_synced_from_toast: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
