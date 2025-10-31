@@ -65,7 +65,33 @@ export default async function handler(req, res) {
       throw new Error('Failed to get Toast access token');
     }
 
-    // Fetch employees from Toast Labor API
+    // STEP 1: Fetch all jobs first to get wage information
+    console.log(`📡 Fetching jobs from Toast API...`);
+    const jobsResponse = await fetch(`${TOAST_BASE_URL}/labor/v1/jobs?restaurantGuid=${TOAST_RESTAURANT_GUID}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Toast-Restaurant-External-ID': TOAST_RESTAURANT_GUID,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!jobsResponse.ok) {
+      const jobsErrorText = await jobsResponse.text();
+      console.error('Toast Jobs API Error:', jobsErrorText);
+      throw new Error(`Toast Jobs API request failed: ${jobsResponse.status} ${jobsResponse.statusText}`);
+    }
+
+    const jobs = await jobsResponse.json();
+    console.log(`✅ Fetched ${jobs.length} jobs from Toast`);
+
+    // Create a map of job GUID -> job data for quick lookup
+    const jobsMap = new Map();
+    jobs.forEach(job => {
+      jobsMap.set(job.guid, job);
+    });
+
+    // STEP 2: Fetch employees from Toast Labor API
     console.log(`📡 Fetching employees from Toast API...`);
     const response = await fetch(`${TOAST_BASE_URL}/labor/v1/employees?restaurantGuid=${TOAST_RESTAURANT_GUID}`, {
       method: 'GET',
@@ -107,9 +133,9 @@ export default async function handler(req, res) {
           email: emp.email || null,
           phone: emp.phoneNumber || emp.phoneEmail || null,
           external_employee_id: emp.externalEmployeeId || null,
-          job_title: extractJobTitle(emp),
+          job_title: extractJobTitle(emp, jobsMap),
           job_guid: extractJobGuid(emp),
-          hourly_wage: extractHourlyWage(emp),
+          hourly_wage: extractHourlyWage(emp, jobsMap),
           // Active if NOT deleted AND NOT disabled
           // Toast API: deleted=true means fired/terminated, disabled=true means temporarily inactive
           is_active: emp.deleted !== true && emp.disabled !== true,
@@ -183,14 +209,23 @@ export default async function handler(req, res) {
 /**
  * Extract primary job title from employee's job references
  */
-function extractJobTitle(employee) {
+function extractJobTitle(employee, jobsMap) {
   if (!employee.jobReferences || employee.jobReferences.length === 0) {
     return 'Staff';
   }
 
   // Get first job (primary job)
-  const primaryJob = employee.jobReferences[0];
-  return primaryJob.jobName || 'Staff';
+  const primaryJobRef = employee.jobReferences[0];
+
+  // Look up full job details from jobs map
+  const jobDetails = jobsMap.get(primaryJobRef.guid);
+
+  if (jobDetails && jobDetails.title) {
+    return jobDetails.title;
+  }
+
+  // Fallback to jobName if it exists in the reference (older API versions)
+  return primaryJobRef.jobName || 'Staff';
 }
 
 /**
@@ -207,19 +242,42 @@ function extractJobGuid(employee) {
 
 /**
  * Extract hourly wage from employee data
+ * Priority: wageOverrides > job defaultWage
  * Note: Toast may not always provide wage data depending on permissions
  */
-function extractHourlyWage(employee) {
+function extractHourlyWage(employee, jobsMap) {
   if (!employee.jobReferences || employee.jobReferences.length === 0) {
     return null;
   }
 
-  const primaryJob = employee.jobReferences[0];
+  const primaryJobRef = employee.jobReferences[0];
 
-  // Check various possible wage fields
-  if (primaryJob.wage) return parseFloat(primaryJob.wage);
-  if (primaryJob.hourlyWage) return parseFloat(primaryJob.hourlyWage);
-  if (primaryJob.wageCents) return parseFloat(primaryJob.wageCents) / 100;
+  // PRIORITY 1: Check for employee-specific wage overrides
+  if (employee.wageOverrides && employee.wageOverrides.length > 0) {
+    // Find wage override for primary job
+    const wageOverride = employee.wageOverrides.find(
+      override => override.jobReference && override.jobReference.guid === primaryJobRef.guid
+    );
+
+    if (wageOverride && wageOverride.wage) {
+      return parseFloat(wageOverride.wage);
+    }
+  }
+
+  // PRIORITY 2: Look up default wage from job details
+  const jobDetails = jobsMap.get(primaryJobRef.guid);
+
+  if (jobDetails) {
+    // Only return wage if it's hourly (not salary)
+    if (jobDetails.wageFrequency === 'HOURLY' && jobDetails.defaultWage) {
+      return parseFloat(jobDetails.defaultWage);
+    }
+  }
+
+  // PRIORITY 3: Fallback to legacy fields (older API versions)
+  if (primaryJobRef.wage) return parseFloat(primaryJobRef.wage);
+  if (primaryJobRef.hourlyWage) return parseFloat(primaryJobRef.hourlyWage);
+  if (primaryJobRef.wageCents) return parseFloat(primaryJobRef.wageCents) / 100;
 
   return null; // Wage not available
 }
