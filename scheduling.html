@@ -1077,14 +1077,14 @@ function renderEmployeeTable() {
   // Filter employees by active status
   const filteredEmployees = showInactive ? employees : employees.filter(emp => emp.is_active);
 
-  // Show last sync time and count
+  // Show last sync time and count (Pacific Time)
   const lastSync = employees[0]?.last_synced_from_toast;
   if (lastSync) {
     const syncDate = new Date(lastSync);
     const activeCount = employees.filter(emp => emp.is_active).length;
     const inactiveCount = employees.length - activeCount;
     document.getElementById('lastSyncInfo').textContent =
-      `Last synced: ${syncDate.toLocaleString()} | Active: ${activeCount} | Inactive: ${inactiveCount} | Total: ${employees.length}`;
+      `Last synced: ${syncDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })} PT | Active: ${activeCount} | Inactive: ${inactiveCount} | Total: ${employees.length}`;
   }
 
   tbody.innerHTML = '';
@@ -1188,7 +1188,7 @@ function unlockEmployeeDetails() {
 
   document.getElementById('detailsLastSynced').textContent =
     selectedEmployee.last_synced_from_toast ?
-    new Date(selectedEmployee.last_synced_from_toast).toLocaleString() : 'Never';
+    new Date(selectedEmployee.last_synced_from_toast).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }) + ' PT' : 'Never';
 
   // Hide password gate, show details
   document.getElementById('employeePasswordGate').style.display = 'none';
