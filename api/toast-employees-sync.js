@@ -110,7 +110,9 @@ export default async function handler(req, res) {
           job_title: extractJobTitle(emp),
           job_guid: extractJobGuid(emp),
           hourly_wage: extractHourlyWage(emp),
-          is_active: emp.deletedDate === null, // Active if not deleted
+          // Active if NOT deleted AND NOT disabled
+          is_active: (emp.deleted === false || emp.deletedDate === null) &&
+                     (emp.disabled === false || emp.disabled === null),
           last_synced_from_toast: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
