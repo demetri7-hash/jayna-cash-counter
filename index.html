@@ -1822,6 +1822,37 @@
           <!-- PREP Item Counting Section -->
           <div style="margin-bottom: 30px;">
             <h3 style="margin-bottom: 12px; color: var(--gray-900); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Update Prep Stock Counts</h3>
+
+            <!-- Staff Counter Display -->
+            <div id="prepCounterDisplay" style="margin-bottom: 16px; padding: 12px 16px; background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); border: 2px solid #2196F3; border-radius: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div id="prepCounterColorDot" style="width: 12px; height: 12px; border-radius: 50%; background: #0094D6; flex-shrink: 0;"></div>
+                <span style="font-size: 13px; font-weight: 600; color: var(--gray-900);">
+                  Counting as: <span id="prepCounterName" style="font-weight: 700;">Loading...</span>
+                </span>
+              </div>
+              <button
+                onclick="cycleToNextPrepCounter()"
+                style="
+                  padding: 6px 14px;
+                  background: white;
+                  color: var(--gray-900);
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  font-size: 11px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  cursor: pointer;
+                  transition: all 0.15s ease;
+                "
+                onmouseover="this.style.background='var(--gray-100)'"
+                onmouseout="this.style.background='white'"
+                title="Click to switch to next clocked-in staff member">
+                SWITCH COUNTER
+              </button>
+            </div>
+
             <div id="prepCountList" style="width: 100%;">
               <p style="text-align: center; padding: 20px; color: var(--gray-500);">Loading prep items...</p>
             </div>
@@ -11176,6 +11207,210 @@
   };
 
   /**
+   * PREP COUNTING STAFF TRACKING SYSTEM
+   * Similar to FOH checklists - track who counts prep items with timestamp
+   */
+  const prepCountingState = {
+    clockedInEmployees: [],
+    teamNames: [], // Array of {name: string, color: string}
+    activeUserIndex: 0, // Index of currently active user
+    activeUserTimeout: null, // Timeout to reset to default user after 30 minutes
+    lastFetched: null // Last time clocked-in employees were fetched
+  };
+
+  // User color palette (same as FOH checklists)
+  const USER_COLORS = [
+    '#0094D6', // Blue
+    '#00C853', // Green
+    '#FFB300', // Orange
+    '#9C27B0', // Purple
+    '#F44336', // Red
+    '#00BCD4', // Cyan
+    '#FF9800', // Deep Orange
+    '#4CAF50'  // Lime Green
+  ];
+
+  /**
+   * Get color for user by index
+   */
+  function getUserColor(index) {
+    return USER_COLORS[index % USER_COLORS.length];
+  }
+
+  /**
+   * Set active user with 30-minute timeout
+   */
+  function setActivePrepCounter(index) {
+    prepCountingState.activeUserIndex = index;
+
+    // Clear existing timeout
+    if (prepCountingState.activeUserTimeout) {
+      clearTimeout(prepCountingState.activeUserTimeout);
+    }
+
+    // Set new timeout to reset to first user after 30 minutes
+    prepCountingState.activeUserTimeout = setTimeout(() => {
+      prepCountingState.activeUserIndex = 0;
+      console.log('⏰ Prep counter timeout - reset to default user');
+    }, 1800000); // 30 minutes (30 * 60 * 1000 ms)
+  }
+
+  /**
+   * Cycle to next prep counter
+   */
+  function cycleToNextPrepCounter() {
+    if (prepCountingState.teamNames.length === 0) return;
+    const nextIndex = (prepCountingState.activeUserIndex + 1) % prepCountingState.teamNames.length;
+    setActivePrepCounter(nextIndex);
+    console.log(`👤 Switched to prep counter: ${getActivePrepCounterName()}`);
+    // Update the display to show new counter name
+    updatePrepCounterDisplay();
+  }
+
+  /**
+   * Update the prep counter display UI with current active user
+   */
+  function updatePrepCounterDisplay() {
+    const nameElement = document.getElementById('prepCounterName');
+    const dotElement = document.getElementById('prepCounterColorDot');
+
+    if (nameElement) {
+      const activeName = getActivePrepCounterName();
+      nameElement.textContent = activeName;
+      console.log(`📝 Updated prep counter display: ${activeName}`);
+    }
+
+    if (dotElement) {
+      const activeColor = getActivePrepCounterColor();
+      dotElement.style.background = activeColor;
+    }
+  }
+
+  /**
+   * Get active prep counter name
+   */
+  function getActivePrepCounterName() {
+    if (prepCountingState.teamNames.length === 0) return 'Unknown';
+    return prepCountingState.teamNames[prepCountingState.activeUserIndex]?.name || 'Unknown';
+  }
+
+  /**
+   * Get active prep counter color
+   */
+  function getActivePrepCounterColor() {
+    if (prepCountingState.teamNames.length === 0) return getUserColor(0);
+    return prepCountingState.teamNames[prepCountingState.activeUserIndex]?.color || getUserColor(0);
+  }
+
+  /**
+   * Fetch Currently Clocked-In Employees from Toast API for prep counting
+   */
+  async function fetchClockedInEmployeesForPrep() {
+    try {
+      // Get TODAY in YYYY-MM-DD format (Pacific time)
+      const todayPacific = new Date().toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+
+      const [month, day, year] = todayPacific.split(', ')[0].split('/');
+      const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+      console.log('👥 Fetching clocked-in employees from Toast for prep counting:', today);
+
+      // STEP 1: Authenticate with Toast API
+      const authResponse = await fetch('/api/toast-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!authResponse.ok) {
+        console.error('❌ Failed to authenticate with Toast API');
+        prepCountingState.clockedInEmployees = [];
+        return;
+      }
+
+      const authData = await authResponse.json();
+      if (!authData.success || !authData.data?.accessToken) {
+        console.error('❌ Toast authentication failed');
+        prepCountingState.clockedInEmployees = [];
+        return;
+      }
+
+      const accessToken = authData.data.accessToken;
+
+      // STEP 2: Fetch labor entries for today
+      const laborUrl = `/api/toast-labor-summary?businessDate=${today}`;
+      const laborResponse = await fetch(laborUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Toast-Restaurant-External-ID': authData.data.restaurantGuid
+        }
+      });
+
+      if (!laborResponse.ok) {
+        console.error('❌ Failed to fetch labor data from Toast');
+        prepCountingState.clockedInEmployees = [];
+        return;
+      }
+
+      const laborData = await laborResponse.json();
+      console.log('📊 Toast labor data:', laborData);
+
+      // STEP 3: Extract unique employee names from current shifts
+      const currentlyClocked = new Set();
+      const now = new Date();
+
+      if (laborData.laborEntries && Array.isArray(laborData.laborEntries)) {
+        laborData.laborEntries.forEach(entry => {
+          // If entry has no out time (inDate exists but outDate is null), they're currently clocked in
+          if (entry.inDate && !entry.outDate) {
+            const employeeName = entry.employeeName || 'Unknown';
+            currentlyClocked.add(employeeName);
+          }
+        });
+      }
+
+      const clockedInList = Array.from(currentlyClocked).sort();
+      prepCountingState.clockedInEmployees = clockedInList;
+
+      // Update teamNames array
+      if (clockedInList.length > 0) {
+        prepCountingState.teamNames = clockedInList.map((name, index) => ({
+          name: name,
+          color: getUserColor(index)
+        }));
+        // Keep current active index if valid, otherwise reset to 0
+        if (prepCountingState.activeUserIndex >= prepCountingState.teamNames.length) {
+          prepCountingState.activeUserIndex = 0;
+        }
+      } else {
+        // No clocked-in employees - set default user
+        prepCountingState.teamNames = [{ name: 'Unknown', color: getUserColor(0) }];
+        prepCountingState.activeUserIndex = 0;
+      }
+
+      prepCountingState.lastFetched = new Date();
+      console.log(`✅ Found ${clockedInList.length} clocked-in employees for prep counting:`, clockedInList);
+
+      // Update the UI display
+      updatePrepCounterDisplay();
+
+    } catch (error) {
+      console.error('❌ Error fetching clocked-in employees for prep:', error);
+      prepCountingState.clockedInEmployees = [];
+      // Set default user on error
+      prepCountingState.teamNames = [{ name: 'Unknown', color: getUserColor(0) }];
+      prepCountingState.activeUserIndex = 0;
+
+      // Update the UI display even on error
+      updatePrepCounterDisplay();
+    }
+  }
+
+  /**
    * Print Ordering Guide PDF for vendors (sends to printer via email)
    */
   async function downloadOrderingGuide(vendor) {
@@ -11379,6 +11614,7 @@
     // Load data AFTER form is visible (same pattern as startPMCount)
     try {
       await loadInventoryData();
+      await fetchClockedInEmployeesForPrep(); // Load clocked-in staff for prep counting
       calculateUpcomingOrders();
       await refreshUpcomingOrdersUI();
       await refreshUpcomingOrdersUI();
@@ -11424,6 +11660,7 @@
       refreshPrepSheet();
       updateCountSessionDisplay(); // Update session info each time PREP tab is opened
       refreshBottleCount(); // Refresh bottle count display
+      fetchClockedInEmployeesForPrep(); // Refresh clocked-in employees for prep counting
     }
 
     // Load both pending orders AND AI suggestions when ORDERS tab is opened
@@ -12956,6 +13193,8 @@ async function renderOrdersTab() {
         currentStock: item.current_stock || 0,
         unit: item.unit,
         lastCountedDate: item.last_counted_date,
+        countedBy: item.counted_by, // Who counted this item (staff name)
+        countedAt: item.counted_at, // When this item was counted (ISO timestamp)
         currentUnitCost: item.current_unit_cost,
         lastCostUpdate: item.last_cost_update,
         itemType: item.item_type || 'ingredient', // Track if item is 'prep' or 'ingredient'
@@ -17516,13 +17755,18 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       // Calculate total stock as sum of all locations
       const totalStock = Object.values(updatedLocationCounts).reduce((sum, count) => sum + parseFloat(count || 0), 0);
 
-      // Save to database
+      // Save to database with counter name and timestamp
+      const countedBy = getActivePrepCounterName();
+      const countedAt = new Date().toISOString();
+
       const { error } = await supabase
         .from('inventory_items')
         .update({
           location_counts: updatedLocationCounts,
           current_stock: totalStock,
-          last_counted_date: new Date().toISOString()
+          last_counted_date: countedAt,
+          counted_by: countedBy,
+          counted_at: countedAt
         })
         .eq('id', itemId);
 
@@ -17531,7 +17775,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       // Update local state
       item.locationCounts = updatedLocationCounts;
       item.currentStock = totalStock;
-      item.lastCountedDate = new Date().toISOString();
+      item.lastCountedDate = countedAt;
+      item.countedBy = countedBy;
+      item.countedAt = countedAt;
 
       // Update total display
       const totalInput = document.getElementById(`stock-${itemId}`);
