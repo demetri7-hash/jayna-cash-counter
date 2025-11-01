@@ -5350,14 +5350,15 @@
 
       // QUALITY REVIEW SECTION (if ratings exist)
       if (ratings && ratings.length > 0) {
+        // Detect if this is a REVIEW-only checklist (few/no tasks, mostly ratings)
+        const isReviewOnly = completedTasks.length === 0 ||
+                             (ratings.length > 0 && completedTasks.length < 3);
+
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(33, 33, 33);
         doc.text('QUALITY REVIEW', col2X, col2Y);
         col2Y += 10;
-
-        doc.setFontSize(6);
-        doc.setFont('helvetica', 'normal');
 
         // Find the rating section
         const ratingSection = checklistDef.sections.find(s => s.type === 'rating');
@@ -5366,42 +5367,75 @@
             const ratingRecord = ratings.find(r => r.category_name === category.name);
 
             if (ratingRecord) {
+              // REVIEW-ONLY: Bigger fonts and more spacing
+              const categoryFontSize = isReviewOnly ? 8 : 6;
+              const starFontSize = isReviewOnly ? 10 : 8;
+              const noteFontSize = isReviewOnly ? 7 : 5;
+              const lineSpacing = isReviewOnly ? 10 : 7;
+
               // Category name
+              doc.setFontSize(categoryFontSize);
+              doc.setFont('helvetica', 'bold');
               doc.setTextColor(33, 33, 33);
               doc.text(`${category.name}:`, col2X, col2Y);
 
-              // Stars (compact)
+              // Stars (larger for reviews)
               const starX = col2X + doc.getTextWidth(`${category.name}: `) + 3;
-              doc.setFontSize(8);
+              doc.setFontSize(starFontSize);
+              const starSpacing = isReviewOnly ? 9 : 7;
               for (let i = 0; i < 5; i++) {
                 if (i < ratingRecord.rating) {
                   doc.setTextColor(59, 130, 246); // Blue filled star
-                  doc.text('\u2605', starX + (i * 7), col2Y);
+                  doc.text('\u2605', starX + (i * starSpacing), col2Y);
                 } else {
                   doc.setTextColor(200, 200, 200); // Gray empty star
-                  doc.text('\u2606', starX + (i * 7), col2Y);
+                  doc.text('\u2606', starX + (i * starSpacing), col2Y);
                 }
               }
 
               // Rating number
-              doc.setFontSize(6);
+              doc.setFontSize(categoryFontSize);
               doc.setTextColor(100, 100, 100);
-              doc.text(`(${ratingRecord.rating}/5)`, starX + 38, col2Y);
-              col2Y += 7;
+              const ratingNumX = isReviewOnly ? starX + 48 : starX + 38;
+              doc.text(`(${ratingRecord.rating}/5)`, ratingNumX, col2Y);
+              col2Y += lineSpacing;
 
-              // Notes (if any) - very compact
-              if (ratingRecord.notes && ratingRecord.notes.trim()) {
-                doc.setFont('helvetica', 'italic');
-                doc.setFontSize(5);
-                doc.setTextColor(100, 100, 100);
-                const noteLines = doc.splitTextToSize(`"${ratingRecord.notes}"`, colWidth - 10);
-                noteLines.slice(0, 1).forEach(line => { // Max 1 line per note
-                  doc.text(line, col2X + 5, col2Y);
-                  col2Y += 6;
-                });
+              // REVIEW-ONLY: Add name and timestamp
+              if (isReviewOnly && ratingRecord.rated_by) {
                 doc.setFont('helvetica', 'normal');
                 doc.setFontSize(6);
+                doc.setTextColor(100, 100, 100);
+
+                const ratedTime = ratingRecord.rated_at ?
+                  new Date(ratingRecord.rated_at).toLocaleString('en-US', {
+                    timeZone: 'America/Los_Angeles',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  }) : 'Unknown time';
+
+                doc.text(`By: ${ratingRecord.rated_by} at ${ratedTime}`, col2X + 5, col2Y);
+                col2Y += 8;
               }
+
+              // Notes (MUCH more readable for reviews)
+              if (ratingRecord.notes && ratingRecord.notes.trim()) {
+                doc.setFont('helvetica', 'italic');
+                doc.setFontSize(noteFontSize);
+                doc.setTextColor(66, 66, 66); // Darker for readability
+                const noteLines = doc.splitTextToSize(`"${ratingRecord.notes}"`, colWidth - 10);
+                const maxLines = isReviewOnly ? 3 : 1; // More lines for reviews
+                noteLines.slice(0, maxLines).forEach(line => {
+                  doc.text(line, col2X + 5, col2Y);
+                  col2Y += isReviewOnly ? 8 : 6;
+                });
+                doc.setFont('helvetica', 'normal');
+                col2Y += isReviewOnly ? 6 : 0;
+              }
+
+              col2Y += isReviewOnly ? 4 : 0; // Extra spacing between ratings for reviews
             }
           });
         }
