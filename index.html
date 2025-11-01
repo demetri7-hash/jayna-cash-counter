@@ -3293,6 +3293,12 @@
 
       console.log(`📦 Found ${prepCounts?.length || 0} prep count actions`);
 
+      // Log prep count names for debugging
+      if (prepCounts && prepCounts.length > 0) {
+        const prepNames = prepCounts.map(p => p.counted_by);
+        console.log('📦 Prep count names:', prepNames);
+      }
+
       // Combine counts
       const leaderboard = {};
 
@@ -3339,7 +3345,11 @@
           return b.lastActivity - a.lastActivity;
         });
 
-      console.log('🥇 Top leader:', sortedLeaderboard[0]);
+      console.log('📊 Full leaderboard breakdown:');
+      sortedLeaderboard.forEach((player, index) => {
+        console.log(`  ${index + 1}. ${player.name}: ${player.count} points`);
+      });
+      console.log('🥇 Top leader:', sortedLeaderboard[0].name, 'with', sortedLeaderboard[0].count, 'points');
 
       updateTopLeaderDisplay(sortedLeaderboard[0]);
 
