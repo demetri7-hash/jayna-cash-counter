@@ -5224,15 +5224,27 @@
 
       y += 12;
 
-      // Staff names + Status on same line
+      // ========== GROUP TASKS BY PERSON (needed for staff list) ==========
+      const completedTasks = tasks.filter(t => t.is_completed);
+      const notCompletedTasks = tasks.filter(t => !t.is_completed);
+
+      // Group completed tasks by person
+      const tasksByPerson = {};
+      completedTasks.forEach(task => {
+        const person = task.completed_by || 'Unknown';
+        if (!tasksByPerson[person]) {
+          tasksByPerson[person] = [];
+        }
+        tasksByPerson[person].push(task);
+      });
+
+      // Staff names (people who completed tasks on this page) + Status on same line
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(66, 66, 66);
       doc.text('STAFF:', margin, y);
 
-      const staffNames = [session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4]
-        .filter(n => n)
-        .join(', ') || 'Unknown';
+      const staffNames = Object.keys(tasksByPerson).join(', ') || 'Unknown';
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(33, 33, 33);
       doc.text(staffNames, margin + 32, y);
@@ -5258,19 +5270,7 @@
       doc.line(margin, y, pageWidth - margin, y);
       y += 8;
 
-      // ========== GROUP TASKS BY PERSON ==========
-      const completedTasks = tasks.filter(t => t.is_completed);
-      const notCompletedTasks = tasks.filter(t => !t.is_completed);
-
-      // Group completed tasks by person
-      const tasksByPerson = {};
-      completedTasks.forEach(task => {
-        const person = task.completed_by || 'Unknown';
-        if (!tasksByPerson[person]) {
-          tasksByPerson[person] = [];
-        }
-        tasksByPerson[person].push(task);
-      });
+      // tasksByPerson already created above for staff names list
 
       // Calculate column widths for 2-column layout
       const col1X = margin;
@@ -5463,24 +5463,48 @@
         insightY += 8;
       }
 
-      // Session duration
-      const sessionStart = new Date(session.started_at);
-      const sessionEnd = session.completed_at ? new Date(session.completed_at) : new Date();
-      const sessionDuration = Math.round((sessionEnd - sessionStart) / (1000 * 60));
+      // First and Last task timestamps
+      const taskTimestamps = completedTasks
+        .filter(t => t.completed_at)
+        .map(t => new Date(t.completed_at))
+        .sort((a, b) => a - b);
 
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(66, 66, 66);
-      doc.text('Duration:', insightCol1X, insightY);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(33, 33, 33);
-      doc.text(`${sessionDuration} min`, insightCol1X + 26, insightY);
+      if (taskTimestamps.length > 0) {
+        const firstTaskTime = taskTimestamps[0].toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(66, 66, 66);
+        doc.text('First:', insightCol1X, insightY);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(33, 33, 33);
+        doc.text(firstTaskTime, insightCol1X + 26, insightY);
+        insightY += 8;
+
+        const lastTaskTime = taskTimestamps[taskTimestamps.length - 1].toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(66, 66, 66);
+        doc.text('Last:', insightCol1X, insightY);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(33, 33, 33);
+        doc.text(lastTaskTime, insightCol1X + 26, insightY);
+      }
 
       // Right metrics
       insightY = col2Y;
 
-      // Staff count
-      const staffCount = [session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4]
-        .filter(n => n).length;
+      // Staff count (people who completed tasks on this page)
+      const staffCount = Object.keys(tasksByPerson).length;
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(66, 66, 66);
       doc.text('Staff:', insightCol2X, insightY);
@@ -5667,29 +5691,8 @@
         isFirstSession = false;
       }
 
-      // Update page numbers on all pages
-      const totalPages = finalDoc.internal.getNumberOfPages();
-      const generatedTime = new Date().toLocaleString('en-US', {
-        timeZone: 'America/Los_Angeles',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      }) + ' PT';
-
-      for (let i = 1; i <= totalPages; i++) {
-        finalDoc.setPage(i);
-        finalDoc.setFontSize(8);
-        finalDoc.setTextColor(100, 100, 100);
-        finalDoc.text(
-          `Page ${i} of ${totalPages} • Generated ${generatedTime}`,
-          finalDoc.internal.pageSize.width / 2,
-          finalDoc.internal.pageSize.height - 20,
-          { align: 'center' }
-        );
-      }
+      // Individual session PDFs already have footers with page numbers and credit
+      // No need to add wrapper footer (would create duplicates)
 
       // Download the combined PDF
       const yesterdayFormatted = new Date(yesterday + 'T12:00:00').toLocaleDateString('en-US', {
