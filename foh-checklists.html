@@ -5190,22 +5190,42 @@
       const margin = 40;
       let y = margin;
 
-      // Header
-      doc.setFontSize(16);
+      // Header with better formatting
+      doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       doc.text(checklistDef.title.toUpperCase(), margin, y);
-      y += 20;
+      y += 25;
 
-      // Session info
-      doc.setFontSize(9);
+      // Session info with improved spacing
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('STAFF:', margin, y);
       doc.setFont('helvetica', 'normal');
       const staffNames = [session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).join(', ') || 'Unknown';
-      doc.text(`Staff: ${staffNames}`, margin, y);
-      y += 12;
-      doc.text(`Date: ${new Date(session.started_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}`, margin, y);
-      y += 12;
-      doc.text(`Status: ${session.is_complete ? 'COMPLETE' : 'IN PROGRESS'}`, margin, y);
-      y += 20;
+      doc.text(staffNames, margin + 35, y);
+      y += 15;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('DATE:', margin, y);
+      doc.setFont('helvetica', 'normal');
+      const sessionDate = new Date(session.started_at).toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      doc.text(sessionDate + ' PT', margin + 35, y);
+      y += 15;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('STATUS:', margin, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(session.is_complete ? 'COMPLETE ✓' : 'IN PROGRESS', margin + 35, y);
+      y += 25;
 
       // Render each section from checklist definition
       checklistDef.sections.forEach(section => {
@@ -5222,37 +5242,55 @@
 
         if (section.type === 'checkbox') {
           // Checkbox tasks section
-          doc.setFontSize(8);
+          doc.setFontSize(9);
           doc.setFont('helvetica', 'normal');
 
           section.tasks.forEach(taskDef => {
             const taskText = typeof taskDef === 'string' ? taskDef : taskDef.text;
             const taskRecord = tasks.find(t => t.section_name === section.name && t.task_text === taskText);
 
-            if (y > doc.internal.pageSize.height - 60) {
+            if (y > doc.internal.pageSize.height - 70) {
               doc.addPage();
               y = margin;
             }
 
             const isCompleted = taskRecord?.is_completed || false;
             const checkbox = isCompleted ? '☑' : '☐';
-            const displayText = `${checkbox} ${taskText}`;
 
-            doc.text(displayText, margin, y);
-            y += 12;
+            // Task text
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(0, 0, 0);
+            doc.text(`${checkbox} ${taskText}`, margin, y);
+            y += 14;
 
-            // Show who completed it
+            // Show who completed it and when (on same line)
             if (isCompleted && taskRecord?.completed_by) {
+              const completedTime = taskRecord.completed_at
+                ? new Date(taskRecord.completed_at).toLocaleString('en-US', {
+                    timeZone: 'America/Los_Angeles',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  }) + ' PT'
+                : 'Time unknown';
+
               doc.setFont('helvetica', 'italic');
-              doc.setTextColor(80, 80, 80);
-              doc.text(`   ✓ ${taskRecord.completed_by}`, margin + 10, y);
-              y += 10;
+              doc.setFontSize(8);
+              doc.setTextColor(100, 100, 100);
+              doc.text(`     ✓ Completed by ${taskRecord.completed_by} at ${completedTime}`, margin, y);
+              y += 12;
+              doc.setFontSize(9);
               doc.setTextColor(0, 0, 0);
               doc.setFont('helvetica', 'normal');
+            } else {
+              // Add small spacing even for uncompleted tasks for consistency
+              y += 3;
             }
           });
 
-          y += 10;
+          y += 15;
 
         } else if (section.type === 'rating') {
           // Rating section
@@ -5297,6 +5335,115 @@
         }
       });
 
+      // INSIGHTS & ANALYTICS SECTION
+      const completedTasks = tasks.filter(t => t.is_completed);
+      const totalTasks = tasks.length;
+      const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+
+      // Count tasks by person
+      const tasksByPerson = {};
+      completedTasks.forEach(task => {
+        const person = task.completed_by || 'Unknown';
+        tasksByPerson[person] = (tasksByPerson[person] || 0) + 1;
+      });
+
+      // Find top performer
+      const topPerformer = Object.entries(tasksByPerson)
+        .sort((a, b) => b[1] - a[1])[0];
+
+      // Calculate average completion time (time between session start and task completion)
+      const completionTimes = completedTasks
+        .filter(t => t.completed_at)
+        .map(t => {
+          const taskTime = new Date(t.completed_at);
+          const sessionStart = new Date(session.started_at);
+          return (taskTime - sessionStart) / (1000 * 60); // minutes
+        });
+      const avgCompletionTime = completionTimes.length > 0
+        ? Math.round(completionTimes.reduce((sum, time) => sum + time, 0) / completionTimes.length)
+        : 0;
+
+      // Session duration
+      const sessionStart = new Date(session.started_at);
+      const sessionEnd = session.completed_at ? new Date(session.completed_at) : new Date();
+      const sessionDuration = Math.round((sessionEnd - sessionStart) / (1000 * 60)); // minutes
+
+      if (y > doc.internal.pageSize.height - 180) {
+        doc.addPage();
+        y = margin;
+      }
+
+      doc.setFillColor(240, 240, 240);
+      doc.rect(margin - 10, y - 5, pageWidth - (margin * 2) + 20, 140, 'F');
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('📊 SESSION INSIGHTS', margin, y + 10);
+      y += 30;
+
+      // Insights in two columns
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+
+      // Left column
+      const leftX = margin + 10;
+      const rightX = pageWidth / 2 + 20;
+      let insightY = y;
+
+      doc.text('Tasks Completed:', leftX, insightY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${completedTasks.length} of ${totalTasks}`, leftX + 90, insightY);
+      insightY += 18;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Completion Rate:', leftX, insightY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${completionRate}%`, leftX + 90, insightY);
+      insightY += 18;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Session Duration:', leftX, insightY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${sessionDuration} minutes`, leftX + 90, insightY);
+      insightY += 18;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Staff Count:', leftX, insightY);
+      doc.setFont('helvetica', 'normal');
+      const staffCount = [session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).length;
+      doc.text(`${staffCount} team member${staffCount !== 1 ? 's' : ''}`, leftX + 90, insightY);
+
+      // Right column
+      insightY = y;
+
+      if (topPerformer) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Top Performer:', rightX, insightY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${topPerformer[0]} (${topPerformer[1]} tasks)`, rightX + 85, insightY);
+        insightY += 18;
+      }
+
+      if (avgCompletionTime > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Avg Task Time:', rightX, insightY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${avgCompletionTime} min`, rightX + 85, insightY);
+        insightY += 18;
+      }
+
+      // Rating insights if available
+      if (ratings && ratings.length > 0) {
+        const avgRating = (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Avg Rating:', rightX, insightY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${avgRating}/5 ⭐`, rightX + 85, insightY);
+      }
+
+      y += 125;
+
       // Notes for next shift
       const sessionNotes = session.notes_for_next_shift || session.notes || '';
       if (sessionNotes.trim()) {
@@ -5307,17 +5454,17 @@
 
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.text('NOTES FOR INCOMING CREW', margin, y);
-        y += 15;
+        doc.text('📝 NOTES FOR INCOMING CREW', margin, y);
+        y += 18;
 
-        doc.setFontSize(8);
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         const noteLines = doc.splitTextToSize(sessionNotes, pageWidth - margin * 2);
         noteLines.forEach(line => {
           doc.text(line, margin, y);
-          y += 10;
+          y += 12;
         });
-        y += 10;
+        y += 15;
       }
 
       // Photos count
@@ -5346,17 +5493,29 @@
         });
       }
 
-      // Footer
+      // Footer with Pacific time
       const pageCount = doc.internal.getNumberOfPages();
+      const generatedTime = new Date().toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }) + ' PT';
+
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
         doc.text(
-          `Page ${i} of ${pageCount} - Generated ${new Date().toLocaleString()}`,
+          `Page ${i} of ${pageCount} • Generated ${generatedTime}`,
           pageWidth / 2,
           doc.internal.pageSize.height - 20,
           { align: 'center' }
         );
+        doc.setTextColor(0, 0, 0);
       }
 
       return doc;
@@ -5379,6 +5538,68 @@
     const filename = `Checklist_${sessionId}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(filename);
     showMessage('✅ PDF downloaded!', 'success');
+  }
+
+  /**
+   * Test PDF generation using yesterday's data (no email sent)
+   */
+  async function testYesterdayPDF() {
+    try {
+      showLoading('Generating Test PDF...', 'Looking for yesterday\'s checklist data...');
+
+      const yesterday = getPacificDate(-1); // Yesterday's date in Pacific timezone
+      const today = getPacificDate(0);
+
+      console.log(`📄 Searching for checklist sessions from ${yesterday}...`);
+
+      // Fetch all checklist sessions from yesterday
+      const { data: sessions, error } = await supabase
+        .from('foh_checklist_sessions')
+        .select('*')
+        .gte('started_at', `${yesterday}T00:00:00`)
+        .lt('started_at', `${today}T00:00:00`)
+        .eq('is_complete', true)
+        .order('started_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!sessions || sessions.length === 0) {
+        hideLoading();
+        showMessage('❌ No completed checklists found from yesterday. Try completing a checklist first.', 'error');
+        return;
+      }
+
+      console.log(`📋 Found ${sessions.length} completed session(s) from yesterday`);
+
+      // Use the most recent completed session
+      const session = sessions[0];
+      const checklistDef = getChecklistByType(session.checklist_type);
+      const checklistTitle = checklistDef ? checklistDef.title : session.checklist_type;
+
+      console.log(`📄 Generating PDF for: ${checklistTitle} (Session ID: ${session.id})`);
+
+      // Generate and download the PDF
+      const doc = await generateChecklistPDF(session.id);
+      if (!doc) return;
+
+      const yesterdayFormatted = new Date(yesterday + 'T12:00:00').toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'America/Los_Angeles'
+      }).replace(/\s/g, '_');
+
+      const filename = `TEST_Checklist_${yesterdayFormatted}.pdf`;
+      doc.save(filename);
+
+      hideLoading();
+      showMessage(`✅ Test PDF downloaded! Using data from ${yesterday}`, 'success');
+
+    } catch (error) {
+      console.error('Error generating test PDF:', error);
+      hideLoading();
+      showMessage('❌ Error generating test PDF: ' + error.message, 'error');
+    }
   }
 
   /**
@@ -7508,6 +7729,37 @@
         <p style="color: var(--blue-text); font-size: 13px; font-weight: 600; margin: 0;">
           📊 ${sessions.length} checklist session${sessions.length !== 1 ? 's' : ''} found
         </p>
+      </div>
+
+      <div style="margin-bottom: 20px; padding: 16px; background: var(--gray-100); border: 2px solid var(--gray-300); border-radius: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">
+              📄 Test PDF Report
+            </p>
+            <p style="margin: 0; font-size: 12px; color: var(--gray-600);">
+              Generate a PDF using yesterday's data without sending email
+            </p>
+          </div>
+          <button
+            onclick="testYesterdayPDF()"
+            style="
+              padding: 12px 24px;
+              background: var(--gray-900);
+              color: white;
+              border: 2px solid var(--gray-900);
+              border-radius: 0;
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              white-space: nowrap;
+            "
+          >
+            Generate Test PDF
+          </button>
+        </div>
       </div>
     `;
 
