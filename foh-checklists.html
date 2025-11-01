@@ -10285,30 +10285,59 @@
       const [month, day, year] = todayPacific.split(', ')[0].split('/');
       const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
-      const { data: tasks, error } = await supabase
+      // Fetch FOH tasks
+      const { data: tasks, error: tasksError } = await supabase
         .from('foh_checklist_tasks')
         .select('completed_by, completed_at, is_completed')
         .eq('is_completed', true)
         .gte('completed_at', `${today}T00:00:00`)
         .lt('completed_at', `${today}T23:59:59`);
 
-      if (error || !tasks || tasks.length === 0) {
+      // Fetch prep counts
+      const { data: prepCounts, error: prepError } = await supabase
+        .from('inventory_items')
+        .select('counted_by, counted_at')
+        .not('counted_by', 'is', null)
+        .not('counted_at', 'is', null)
+        .gte('counted_at', `${today}T00:00:00`)
+        .lt('counted_at', `${today}T23:59:59`);
+
+      if ((!tasks || tasks.length === 0) && (!prepCounts || prepCounts.length === 0)) {
         updateTopLeaderDisplay(null);
         return;
       }
 
       const leaderboard = {};
-      tasks.forEach(task => {
-        const name = task.completed_by || 'Unknown';
-        if (!leaderboard[name]) {
-          leaderboard[name] = { name, count: 0, lastCompleted: null };
-        }
-        leaderboard[name].count++;
-        const completedAt = new Date(task.completed_at);
-        if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
-          leaderboard[name].lastCompleted = completedAt;
-        }
-      });
+
+      // Count FOH tasks
+      if (tasks && tasks.length > 0) {
+        tasks.forEach(task => {
+          const name = task.completed_by || 'Unknown';
+          if (!leaderboard[name]) {
+            leaderboard[name] = { name, count: 0, lastCompleted: null };
+          }
+          leaderboard[name].count++;
+          const completedAt = new Date(task.completed_at);
+          if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
+            leaderboard[name].lastCompleted = completedAt;
+          }
+        });
+      }
+
+      // Count prep items
+      if (prepCounts && prepCounts.length > 0) {
+        prepCounts.forEach(prep => {
+          const name = prep.counted_by || 'Unknown';
+          if (!leaderboard[name]) {
+            leaderboard[name] = { name, count: 0, lastCompleted: null };
+          }
+          leaderboard[name].count++;
+          const countedAt = new Date(prep.counted_at);
+          if (!leaderboard[name].lastCompleted || countedAt > leaderboard[name].lastCompleted) {
+            leaderboard[name].lastCompleted = countedAt;
+          }
+        });
+      }
 
       const sortedLeaderboard = Object.values(leaderboard)
         .sort((a, b) => {
