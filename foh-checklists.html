@@ -5190,24 +5190,45 @@
       const margin = 40;
       let y = margin;
 
-      // Header with better formatting
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text(checklistDef.title.toUpperCase(), margin, y);
-      y += 25;
+      // ========== BEAUTIFUL HEADER ==========
+      // Blue accent bar at top
+      doc.setFillColor(59, 130, 246); // Jayna blue
+      doc.rect(0, 0, pageWidth, 8, 'F');
 
-      // Session info with improved spacing
+      y += 20;
+
+      // Title with larger, bolder font
+      doc.setFontSize(22);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(33, 33, 33);
+      doc.text(checklistDef.title.toUpperCase(), margin, y);
+      y += 28;
+
+      // Horizontal line under title
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(1);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 20;
+
+      // ========== SESSION INFO BOX ==========
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(66, 66, 66);
+
+      // STAFF
       doc.text('STAFF:', margin, y);
       doc.setFont('helvetica', 'normal');
+      doc.setTextColor(33, 33, 33);
       const staffNames = [session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).join(', ') || 'Unknown';
-      doc.text(staffNames, margin + 35, y);
-      y += 15;
+      doc.text(staffNames, margin + 40, y);
+      y += 16;
 
+      // DATE
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(66, 66, 66);
       doc.text('DATE:', margin, y);
       doc.setFont('helvetica', 'normal');
+      doc.setTextColor(33, 33, 33);
       const sessionDate = new Date(session.started_at).toLocaleString('en-US', {
         timeZone: 'America/Los_Angeles',
         weekday: 'long',
@@ -5218,14 +5239,28 @@
         minute: '2-digit',
         hour12: true
       });
-      doc.text(sessionDate + ' PT', margin + 35, y);
-      y += 15;
+      doc.text(sessionDate + ' PT', margin + 40, y);
+      y += 16;
 
+      // STATUS with proper rendering
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(66, 66, 66);
       doc.text('STATUS:', margin, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text(session.is_complete ? 'COMPLETE ✓' : 'IN PROGRESS', margin + 35, y);
-      y += 25;
+      doc.setFont('helvetica', 'bold');
+      if (session.is_complete) {
+        doc.setTextColor(5, 150, 105); // Green
+        doc.text('COMPLETE', margin + 40, y);
+        // Checkmark
+        doc.setFontSize(12);
+        doc.text('✓', margin + 95, y);
+        doc.setFontSize(10);
+      } else {
+        doc.setTextColor(245, 158, 11); // Orange
+        doc.text('IN PROGRESS', margin + 40, y);
+      }
+      y += 28;
+
+      doc.setTextColor(33, 33, 33);
 
       // Render each section from checklist definition
       checklistDef.sections.forEach(section => {
@@ -5293,7 +5328,7 @@
           y += 15;
 
         } else if (section.type === 'rating') {
-          // Rating section
+          // ========== QUALITY REVIEW (RATING) SECTION ==========
           doc.setFontSize(8);
           doc.setFont('helvetica', 'normal');
 
@@ -5306,28 +5341,57 @@
             }
 
             if (ratingRecord) {
-              // Rating exists - use simple star characters that jsPDF can render
-              const stars = '\u2605'.repeat(ratingRecord.rating);
-              doc.text(`${category.name}: ${stars} (${ratingRecord.rating}/5)`, margin, y);
+              // Category name
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(33, 33, 33);
+              doc.text(`${category.name}:`, margin, y);
+
+              // Render stars using filled/unfilled circles (better jsPDF compatibility)
+              const starX = margin + doc.getTextWidth(`${category.name}: `) + 5;
+              const filledStars = ratingRecord.rating;
+              const totalStars = 5;
+
+              doc.setFontSize(10);
+              for (let i = 0; i < totalStars; i++) {
+                if (i < filledStars) {
+                  // Filled star (using ★)
+                  doc.setTextColor(59, 130, 246); // Blue
+                  doc.text('★', starX + (i * 10), y);
+                } else {
+                  // Empty star (using ☆)
+                  doc.setTextColor(200, 200, 200); // Light gray
+                  doc.text('☆', starX + (i * 10), y);
+                }
+              }
+
+              // Rating number
+              doc.setFontSize(8);
+              doc.setTextColor(100, 100, 100);
+              doc.text(`(${ratingRecord.rating}/5)`, starX + 55, y);
+              doc.setTextColor(33, 33, 33);
               y += 12;
 
+              // Notes if any
               if (ratingRecord.notes && ratingRecord.notes.trim()) {
                 doc.setFont('helvetica', 'italic');
+                doc.setFontSize(7);
                 doc.setTextColor(100, 100, 100);
-                const noteLines = doc.splitTextToSize(`   "${ratingRecord.notes}"`, pageWidth - margin * 2 - 20);
+                const noteLines = doc.splitTextToSize(`"${ratingRecord.notes}"`, pageWidth - margin * 2 - 20);
                 noteLines.forEach(line => {
                   doc.text(line, margin + 10, y);
-                  y += 10;
+                  y += 9;
                 });
-                doc.setTextColor(0, 0, 0);
+                doc.setTextColor(33, 33, 33);
+                doc.setFontSize(8);
                 doc.setFont('helvetica', 'normal');
+                y += 3;
               }
             } else {
               // No rating - show that staff skipped it
               doc.setTextColor(150, 150, 150);
               doc.text(`${category.name}: (not rated)`, margin, y);
               y += 12;
-              doc.setTextColor(0, 0, 0);
+              doc.setTextColor(33, 33, 33);
             }
           });
 
@@ -5368,84 +5432,134 @@
       const sessionEnd = session.completed_at ? new Date(session.completed_at) : new Date();
       const sessionDuration = Math.round((sessionEnd - sessionStart) / (1000 * 60)); // minutes
 
-      if (y > doc.internal.pageSize.height - 180) {
+      // ========== BEAUTIFUL SESSION INSIGHTS BOX ==========
+      if (y > doc.internal.pageSize.height - 200) {
         doc.addPage();
         y = margin;
       }
 
-      doc.setFillColor(240, 240, 240);
-      doc.rect(margin - 10, y - 5, pageWidth - (margin * 2) + 20, 140, 'F');
+      y += 10;
 
+      // Blue accent bar with white text
+      doc.setFillColor(59, 130, 246); // Jayna blue
+      doc.rect(margin - 10, y, pageWidth - (margin * 2) + 20, 25, 'F');
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('SESSION INSIGHTS', margin, y + 10);
+      doc.setTextColor(255, 255, 255); // White text
+      doc.text('SESSION INSIGHTS', margin, y + 17);
       y += 30;
 
-      // Insights in two columns
+      // Light blue background box for content
+      doc.setFillColor(239, 246, 255); // Very light blue
+      const boxHeight = 110;
+      doc.rect(margin - 10, y, pageWidth - (margin * 2) + 20, boxHeight, 'F');
+
+      // Subtle border
+      doc.setDrawColor(59, 130, 246);
+      doc.setLineWidth(1);
+      doc.rect(margin - 10, y, pageWidth - (margin * 2) + 20, boxHeight);
+
+      y += 20;
+
+      // ========== TWO COLUMN LAYOUT ==========
       doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(33, 33, 33);
 
       // Left column
-      const leftX = margin + 10;
-      const rightX = pageWidth / 2 + 20;
+      const leftX = margin;
+      const rightX = pageWidth / 2 + 10;
       let insightY = y;
 
       // Only show task completion metrics if there are checkbox tasks
       if (totalTasks > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(66, 66, 66);
         doc.text('Tasks Completed:', leftX, insightY);
         doc.setFont('helvetica', 'normal');
-        doc.text(`${completedTasks.length} of ${totalTasks}`, leftX + 90, insightY);
-        insightY += 18;
+        doc.setTextColor(33, 33, 33);
+        doc.text(`${completedTasks.length} of ${totalTasks}`, leftX + 85, insightY);
+        insightY += 16;
 
         doc.setFont('helvetica', 'bold');
+        doc.setTextColor(66, 66, 66);
         doc.text('Completion Rate:', leftX, insightY);
         doc.setFont('helvetica', 'normal');
-        doc.text(`${completionRate}%`, leftX + 90, insightY);
-        insightY += 18;
+        // Color code the completion rate
+        if (completionRate >= 90) {
+          doc.setTextColor(5, 150, 105); // Green
+        } else if (completionRate >= 70) {
+          doc.setTextColor(245, 158, 11); // Orange
+        } else {
+          doc.setTextColor(220, 38, 38); // Red
+        }
+        doc.text(`${completionRate}%`, leftX + 85, insightY);
+        insightY += 16;
       }
 
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(66, 66, 66);
       doc.text('Session Duration:', leftX, insightY);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${sessionDuration} minutes`, leftX + 90, insightY);
-      insightY += 18;
+      doc.setTextColor(33, 33, 33);
+      doc.text(`${sessionDuration} minutes`, leftX + 85, insightY);
+      insightY += 16;
 
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(66, 66, 66);
       doc.text('Staff Count:', leftX, insightY);
       doc.setFont('helvetica', 'normal');
+      doc.setTextColor(33, 33, 33);
       const staffCount = [session.staff_name, session.staff_name_2, session.staff_name_3, session.staff_name_4].filter(n => n).length;
-      doc.text(`${staffCount} team member${staffCount !== 1 ? 's' : ''}`, leftX + 90, insightY);
+      doc.text(`${staffCount} team member${staffCount !== 1 ? 's' : ''}`, leftX + 85, insightY);
 
       // Right column
       insightY = y;
 
       if (topPerformer) {
         doc.setFont('helvetica', 'bold');
+        doc.setTextColor(66, 66, 66);
         doc.text('Top Performer:', rightX, insightY);
         doc.setFont('helvetica', 'normal');
-        doc.text(`${topPerformer[0]} (${topPerformer[1]} tasks)`, rightX + 85, insightY);
-        insightY += 18;
+        doc.setTextColor(59, 130, 246); // Highlight in blue
+        doc.text(`${topPerformer[0]}`, rightX + 75, insightY);
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(8);
+        doc.text(`(${topPerformer[1]} tasks)`, rightX + 75 + doc.getTextWidth(topPerformer[0]) + 3, insightY);
+        doc.setFontSize(9);
+        insightY += 16;
       }
 
       if (avgCompletionTime > 0) {
         doc.setFont('helvetica', 'bold');
+        doc.setTextColor(66, 66, 66);
         doc.text('Avg Task Time:', rightX, insightY);
         doc.setFont('helvetica', 'normal');
-        doc.text(`${avgCompletionTime} min`, rightX + 85, insightY);
-        insightY += 18;
+        doc.setTextColor(33, 33, 33);
+        doc.text(`${avgCompletionTime} min`, rightX + 75, insightY);
+        insightY += 16;
       }
 
-      // Rating insights if available
+      // Rating insights if available - with FIXED star rendering
       if (ratings && ratings.length > 0) {
         const avgRating = (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1);
         doc.setFont('helvetica', 'bold');
+        doc.setTextColor(66, 66, 66);
         doc.text('Avg Rating:', rightX, insightY);
         doc.setFont('helvetica', 'normal');
-        doc.text(`${avgRating}/5 \u2605`, rightX + 85, insightY);
+        doc.setTextColor(33, 33, 33);
+
+        const ratingText = `${avgRating}/5`;
+        doc.text(ratingText, rightX + 75, insightY);
+
+        // Add a single blue star after the rating
+        doc.setFontSize(10);
+        doc.setTextColor(59, 130, 246);
+        doc.text('★', rightX + 75 + doc.getTextWidth(ratingText) + 3, insightY);
+        doc.setFontSize(9);
       }
 
-      y += 125;
+      y += boxHeight + 15;
+      doc.setTextColor(33, 33, 33);
 
       // Notes for next shift
       const sessionNotes = session.notes_for_next_shift || session.notes || '';
