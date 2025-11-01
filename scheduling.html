@@ -1154,6 +1154,7 @@ async function loadEmployees() {
     const { data, error } = await supabase
       .from('employees')
       .select('*')
+      .order('display_order', { ascending: true })
       .order('last_name', { ascending: true });
 
     if (error) throw error;
@@ -1383,11 +1384,24 @@ function generateCalendarGrid() {
   // Generate one row per employee
   activeEmployees.forEach(emp => {
     const row = document.createElement('tr');
+    row.dataset.employeeId = emp.id;
+    row.dataset.displayOrder = emp.display_order || 0;
 
-    // Employee name cell
+    // Employee name cell (draggable for reordering)
     const empCell = document.createElement('td');
     empCell.className = 'employee-cell';
     empCell.textContent = `${emp.first_name} ${emp.last_name}`;
+    empCell.draggable = true;
+    empCell.style.cursor = 'grab';
+    empCell.dataset.employeeId = emp.id;
+
+    // Add drag event listeners for employee reordering
+    empCell.addEventListener('dragstart', handleEmployeeDragStart);
+    empCell.addEventListener('dragend', handleEmployeeDragEnd);
+    empCell.addEventListener('dragover', handleEmployeeDragOver);
+    empCell.addEventListener('drop', handleEmployeeDrop);
+    empCell.addEventListener('dragleave', handleEmployeeDragLeave);
+
     row.appendChild(empCell);
 
     // Day cells (7 days)
@@ -1598,6 +1612,7 @@ function renderDayTotals() {
 // ============================================
 
 let draggedShiftId = null;
+let draggedEmployeeId = null;
 
 function handleDragStart(e) {
   draggedShiftId = e.target.dataset.shiftId;
@@ -1658,6 +1673,127 @@ async function handleDrop(e) {
     hideLoading();
     console.error('Error moving shift:', error);
     showError(`Failed to move shift: ${error.message}`);
+  }
+}
+
+// ============================================
+// EMPLOYEE REORDERING DRAG AND DROP
+// ============================================
+
+function handleEmployeeDragStart(e) {
+  draggedEmployeeId = e.target.dataset.employeeId;
+  e.target.style.cursor = 'grabbing';
+  e.target.style.opacity = '0.5';
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/html', e.target.innerHTML);
+}
+
+function handleEmployeeDragEnd(e) {
+  e.target.style.cursor = 'grab';
+  e.target.style.opacity = '1';
+  draggedEmployeeId = null;
+
+  // Remove all drag-over highlighting
+  document.querySelectorAll('.employee-cell').forEach(cell => {
+    cell.style.background = '';
+    cell.style.borderTop = '';
+  });
+}
+
+function handleEmployeeDragOver(e) {
+  if (!draggedEmployeeId) return;
+
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+
+  // Highlight drop target
+  const targetCell = e.currentTarget;
+  if (targetCell.dataset.employeeId !== draggedEmployeeId) {
+    targetCell.style.background = 'var(--blue-bg)';
+    targetCell.style.borderTop = '3px solid var(--primary-blue)';
+  }
+}
+
+function handleEmployeeDragLeave(e) {
+  e.currentTarget.style.background = '';
+  e.currentTarget.style.borderTop = '';
+}
+
+async function handleEmployeeDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.style.background = '';
+  e.currentTarget.style.borderTop = '';
+
+  if (!draggedEmployeeId) return;
+
+  const targetEmployeeId = e.currentTarget.dataset.employeeId;
+
+  // Don't do anything if dropping on self
+  if (draggedEmployeeId === targetEmployeeId) return;
+
+  try {
+    showLoading('REORDERING EMPLOYEES', 'Updating employee order...');
+
+    // Find the dragged and target employees
+    const draggedEmp = employees.find(emp => emp.id === draggedEmployeeId);
+    const targetEmp = employees.find(emp => emp.id === targetEmployeeId);
+
+    if (!draggedEmp || !targetEmp) {
+      hideLoading();
+      return;
+    }
+
+    const draggedOrder = draggedEmp.display_order || 0;
+    const targetOrder = targetEmp.display_order || 0;
+
+    // Update display_order for all employees
+    // If dragging down (increasing order), shift employees up
+    // If dragging up (decreasing order), shift employees down
+    if (draggedOrder < targetOrder) {
+      // Dragging down: move employees between draggedOrder and targetOrder up by 1
+      for (const emp of employees) {
+        if (emp.id === draggedEmployeeId) {
+          await supabase
+            .from('employees')
+            .update({ display_order: targetOrder })
+            .eq('id', emp.id);
+        } else if (emp.display_order > draggedOrder && emp.display_order <= targetOrder) {
+          await supabase
+            .from('employees')
+            .update({ display_order: emp.display_order - 1 })
+            .eq('id', emp.id);
+        }
+      }
+    } else {
+      // Dragging up: move employees between targetOrder and draggedOrder down by 1
+      for (const emp of employees) {
+        if (emp.id === draggedEmployeeId) {
+          await supabase
+            .from('employees')
+            .update({ display_order: targetOrder })
+            .eq('id', emp.id);
+        } else if (emp.display_order >= targetOrder && emp.display_order < draggedOrder) {
+          await supabase
+            .from('employees')
+            .update({ display_order: emp.display_order + 1 })
+            .eq('id', emp.id);
+        }
+      }
+    }
+
+    hideLoading();
+
+    // Reload employees to get updated order
+    await loadEmployees();
+
+    // Reload schedule to refresh grid with new employee order
+    await loadWeekSchedule();
+
+  } catch (error) {
+    hideLoading();
+    console.error('Error reordering employees:', error);
+    showError(`Failed to reorder employees: ${error.message}`);
   }
 }
 
