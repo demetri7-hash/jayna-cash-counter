@@ -411,11 +411,51 @@
     /* Drop Zone */
     .drop-zone {
       min-height: 60px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .drop-zone:hover {
+      background: var(--blue-bg) !important;
+      border-color: var(--primary-blue) !important;
     }
 
     .drop-zone.drag-over {
       background: var(--success-bg) !important;
       border: 2px dashed var(--success-border) !important;
+    }
+
+    /* Employee row hover */
+    .calendar-table tr:hover .employee-cell {
+      background: var(--gray-200) !important;
+      font-weight: 700;
+    }
+
+    /* Day totals row */
+    .day-totals-row {
+      background: var(--gray-100);
+      font-weight: 700;
+      border-top: 3px solid var(--gray-700);
+    }
+
+    .day-totals-cell {
+      padding: 12px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--gray-700);
+    }
+
+    .day-totals-hours {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 2px;
+    }
+
+    .day-totals-cost {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--success-text);
     }
 
     /* Modal */
@@ -819,6 +859,9 @@
         <tbody id="calendarBody">
           <!-- Generated dynamically -->
         </tbody>
+        <tfoot id="calendarFooter">
+          <!-- Day totals generated dynamically -->
+        </tfoot>
       </table>
     </div>
   </div>
@@ -1402,6 +1445,7 @@ async function loadWeekSchedule() {
 
     renderShifts();
     updateLaborSummary();
+    renderDayTotals();
 
   } catch (error) {
     hideLoading();
@@ -1492,6 +1536,61 @@ function updateLaborSummary() {
   document.getElementById('totalHours').textContent = totalHours.toFixed(1);
   document.getElementById('totalLaborCost').textContent = `$${totalCost.toFixed(2)}`;
   document.getElementById('totalShifts').textContent = totalShiftCount;
+}
+
+function renderDayTotals() {
+  const footer = document.getElementById('calendarFooter');
+  footer.innerHTML = '';
+
+  const row = document.createElement('tr');
+  row.className = 'day-totals-row';
+
+  // Employee column (empty or label)
+  const labelCell = document.createElement('td');
+  labelCell.className = 'day-totals-cell employee-cell';
+  labelCell.textContent = 'DAY TOTALS';
+  labelCell.style.fontWeight = '700';
+  labelCell.style.textTransform = 'uppercase';
+  labelCell.style.fontSize = '11px';
+  labelCell.style.letterSpacing = '0.5px';
+  row.appendChild(labelCell);
+
+  // Calculate totals for each day (7 days)
+  for (let day = 0; day < 7; day++) {
+    const date = new Date(currentWeekStart);
+    date.setDate(currentWeekStart.getDate() + day);
+    const dateStr = date.toISOString().split('T')[0];
+
+    // Filter shifts for this date
+    const dayShifts = shifts.filter(shift => shift.shift_date === dateStr);
+
+    // Calculate totals
+    const dayHours = dayShifts.reduce((sum, shift) => sum + (shift.total_hours || 0), 0);
+    const dayCost = dayShifts.reduce((sum, shift) => sum + (shift.shift_cost || 0), 0);
+
+    // Create cell
+    const cell = document.createElement('td');
+    cell.className = 'day-totals-cell';
+
+    if (dayHours > 0) {
+      const hoursDiv = document.createElement('div');
+      hoursDiv.className = 'day-totals-hours';
+      hoursDiv.textContent = `${dayHours.toFixed(1)} hrs`;
+      cell.appendChild(hoursDiv);
+
+      const costDiv = document.createElement('div');
+      costDiv.className = 'day-totals-cost';
+      costDiv.textContent = `$${dayCost.toFixed(2)}`;
+      cell.appendChild(costDiv);
+    } else {
+      cell.textContent = '-';
+      cell.style.color = 'var(--gray-400)';
+    }
+
+    row.appendChild(cell);
+  }
+
+  footer.appendChild(row);
 }
 
 // ============================================
