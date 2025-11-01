@@ -3165,6 +3165,30 @@
     displayDiv.innerHTML = html;
   }
 
+  function updateLastUpdatedTime() {
+    const lastUpdatedDiv = document.getElementById('tipsLastUpdated');
+    if (!lastUpdatedDiv || !lastTipsUpdate) return;
+
+    const now = new Date();
+    const diffMs = now - lastTipsUpdate;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+
+    let timeAgo = '';
+    if (diffMin < 1) {
+      timeAgo = 'Just now';
+    } else if (diffMin === 1) {
+      timeAgo = '1 minute ago';
+    } else if (diffMin < 60) {
+      timeAgo = `${diffMin} minutes ago`;
+    } else {
+      const diffHour = Math.floor(diffMin / 60);
+      timeAgo = diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
+    }
+
+    lastUpdatedDiv.textContent = `LAST UPDATED: ${timeAgo}`;
+  }
+
   // Fetch on page load
   document.addEventListener('DOMContentLoaded', function() {
     fetchClockedInEmployees();
@@ -3173,6 +3197,9 @@
     // Auto-refresh every 5 minutes
     setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
     setInterval(fetchTipsPerHour, 5 * 60 * 1000);
+
+    // Update "time ago" display every 30 seconds
+    setInterval(updateLastUpdatedTime, 30 * 1000);
   });
 
   // ==================== END CLOCKED IN DISPLAY ====================
