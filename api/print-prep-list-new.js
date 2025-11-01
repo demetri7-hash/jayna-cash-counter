@@ -320,6 +320,90 @@ function toTitleCase(str) {
 }
 
 /**
+ * Helper: Extract and calculate protein pans from BYO items
+ * Returns array of protein prep items with pan calculations
+ */
+function calculateProteinPans(byoItems) {
+  const proteins = {};
+
+  // Parse BYO items and extract protein types
+  byoItems.forEach(item => {
+    const itemName = (item.name || '').toUpperCase();
+    const qty = parseFloat(item.qty || 0);
+
+    let proteinKey = null;
+    let proteinName = null;
+    let equipment = null;
+
+    // Match protein types (catch all variations)
+    if (itemName.includes('BEEF') && (itemName.includes('LAMB') || itemName.includes('&'))) {
+      proteinKey = 'BEEF_LAMB';
+      proteinName = 'Beef & Lamb Gyro Meat';
+      equipment = '1 tong';
+    } else if (itemName.includes('CHICKEN')) {
+      proteinKey = 'CHICKEN';
+      proteinName = 'Chicken Gyro Meat';
+      equipment = '1 tong';
+    } else if (itemName.includes('FALAFEL')) {
+      proteinKey = 'FALAFEL';
+      proteinName = 'Falafel Portions';
+      equipment = '1 tong';
+    } else if (itemName.includes('ROASTED') && itemName.includes('CHICKPEA')) {
+      proteinKey = 'ROASTED_CHICKPEAS';
+      proteinName = 'Roasted Chickpeas Portions';
+      equipment = '1 large serving spoon';
+    }
+
+    // Aggregate protein quantities
+    if (proteinKey) {
+      if (!proteins[proteinKey]) {
+        proteins[proteinKey] = { name: proteinName, qty: 0, equipment };
+      }
+      proteins[proteinKey].qty += qty;
+    }
+  });
+
+  // Calculate pans for each protein type
+  const proteinPrep = [];
+  Object.values(proteins).forEach(protein => {
+    const qty = protein.qty;
+    let containerType = '';
+
+    // Pan calculation logic:
+    // <5 = brown bowls
+    // 6-20 = 1 half pan
+    // 21+ = calculate half pans, combine 2 half pans into full pans
+    if (qty < 5) {
+      containerType = 'brown bowls';
+    } else if (qty <= 20) {
+      containerType = '1 half pan';
+    } else {
+      // Calculate half pans needed (10 portions per half pan for proteins)
+      const halfPansNeeded = Math.ceil(qty / 10);
+      const fullPans = Math.floor(halfPansNeeded / 2);
+      const remainingHalfPans = halfPansNeeded % 2;
+
+      if (fullPans > 0 && remainingHalfPans > 0) {
+        containerType = `${fullPans} full pan${fullPans > 1 ? 's' : ''} + 1 half pan`;
+      } else if (fullPans > 0) {
+        containerType = `${fullPans} full pan${fullPans > 1 ? 's' : ''}`;
+      } else {
+        containerType = '1 half pan';
+      }
+    }
+
+    proteinPrep.push({
+      qty,
+      name: protein.name,
+      container: containerType,
+      equipment: protein.equipment
+    });
+  });
+
+  return proteinPrep;
+}
+
+/**
  * Helper: Convert 1/2 pan count to full pans + 1/2 pan format
  * Example: 9 half pans → "4 full pans + 1 1/2 pan"
  * Example: 8 half pans → "4 full pans"
@@ -718,6 +802,19 @@ function generatePrepListPDF(prep, order, lineItems) {
     yPos += 13;
 
     doc.setFont('helvetica', 'normal');
+
+    // === PROTEINS (ALWAYS AT TOP) ===
+    const proteinPans = calculateProteinPans(prep.byoGyros.items || []);
+    proteinPans.forEach(protein => {
+      doc.text(`[ ] ${protein.qty}x ${protein.name} (${protein.container}) - ${protein.equipment}`, 50, yPos);
+      yPos += 12;
+    });
+
+    // Add spacing after proteins if they exist
+    if (proteinPans.length > 0) {
+      yPos += 6;
+    }
+
     doc.text(`[ ] ${sets}x 16oz Tzatziki (no dill) - 1 small spoon`, 50, yPos); yPos += 12;
     doc.text(`[ ] ${sets}x 16oz Spicy Aioli - 1 small spoon`, 50, yPos); yPos += 12;
     doc.text(`[ ] ${sets}x 16oz Lemon Vinaigrette - 1 small spoon`, 50, yPos); yPos += 12;
