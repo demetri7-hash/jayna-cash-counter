@@ -2981,6 +2981,94 @@
      * Generate prep list HTML for display in modal
      */
     /**
+     * Helper: Extract and calculate protein pans from BYO items
+     * Returns array of protein prep items with pan calculations
+     */
+    function calculateProteinPans(byoItems) {
+      const proteins = {};
+
+      // Parse BYO items and extract protein types
+      byoItems.forEach(item => {
+        const itemName = (item.name || '').toUpperCase();
+        const qty = parseFloat(item.qty || 0);
+
+        let proteinKey = null;
+        let proteinName = null;
+        let equipment = null;
+
+        // Match protein types (catch all variations)
+        if (itemName.includes('BEEF') && (itemName.includes('LAMB') || itemName.includes('&'))) {
+          proteinKey = 'BEEF_LAMB';
+          proteinName = 'BEEF & LAMB GYRO MEAT';
+          equipment = '1 TONG';
+        } else if (itemName.includes('CHICKEN')) {
+          proteinKey = 'CHICKEN';
+          proteinName = 'CHICKEN GYRO MEAT';
+          equipment = '1 TONG';
+        } else if (itemName.includes('FALAFEL')) {
+          proteinKey = 'FALAFEL';
+          proteinName = 'FALAFEL PORTIONS';
+          equipment = '1 TONG';
+        } else if (itemName.includes('ROASTED') && itemName.includes('CHICKPEA')) {
+          proteinKey = 'ROASTED_CHICKPEAS';
+          proteinName = 'ROASTED CHICKPEAS PORTIONS';
+          equipment = '1 LARGE SERVING SPOON';
+        }
+
+        // Aggregate protein quantities
+        if (proteinKey) {
+          if (!proteins[proteinKey]) {
+            proteins[proteinKey] = { name: proteinName, qty: 0, equipment };
+          }
+          proteins[proteinKey].qty += qty;
+        }
+      });
+
+      // Calculate pans for each protein type
+      const proteinPrep = [];
+      Object.values(proteins).forEach(protein => {
+        const qty = protein.qty;
+        let containerType = '';
+        let containerCount = 0;
+
+        // Pan calculation logic:
+        // <5 = brown bowls
+        // 6-20 = 1 half pan
+        // 21+ = calculate half pans, combine 2 half pans into full pans
+        if (qty < 5) {
+          containerType = 'BROWN BOWLS';
+          containerCount = 0; // Individual portions, no container count
+        } else if (qty <= 20) {
+          containerType = '1 HALF PAN';
+          containerCount = 0;
+        } else {
+          // Calculate half pans needed (10 portions per half pan for proteins)
+          const halfPansNeeded = Math.ceil(qty / 10);
+          const fullPans = Math.floor(halfPansNeeded / 2);
+          const remainingHalfPans = halfPansNeeded % 2;
+
+          if (fullPans > 0 && remainingHalfPans > 0) {
+            containerType = `${fullPans} FULL PAN${fullPans > 1 ? 'S' : ''}, 1 HALF PAN`;
+          } else if (fullPans > 0) {
+            containerType = `${fullPans} FULL PAN${fullPans > 1 ? 'S' : ''}`;
+          } else {
+            containerType = '1 HALF PAN';
+          }
+          containerCount = halfPansNeeded;
+        }
+
+        proteinPrep.push({
+          qty,
+          name: protein.name,
+          container: containerType,
+          equipment: protein.equipment
+        });
+      });
+
+      return proteinPrep;
+    }
+
+    /**
      * Helper: Convert 1/2 pan count to full pans + 1/2 pan format
      * Example: 9 half pans → "4 full pans + 1 1/2 pan"
      * Example: 8 half pans → "4 full pans"
@@ -3031,6 +3119,18 @@
 
         html += `<div style="margin-left: 16px; font-weight: 700; margin-bottom: 8px;">PREP ITEMS:</div>`;
         html += `<div style="margin-left: 16px;">`;
+
+        // === PROTEINS (ALWAYS AT TOP) ===
+        const proteinPans = calculateProteinPans(prep.byoGyros.items || []);
+        proteinPans.forEach(protein => {
+          html += `<div style="font-weight: 700; color: var(--primary-blue);">☐ ${protein.qty}X ${protein.name} (${protein.container}) - ${protein.equipment}</div>`;
+        });
+
+        // Add spacing after proteins if they exist
+        if (proteinPans.length > 0) {
+          html += `<div style="margin-top: 12px;"></div>`;
+        }
+
         html += `<div>☐ ${sets}x 16oz Tzatziki (no dill) – 1 SMALL SPOON</div>`;
         html += `<div>☐ ${sets}x 16oz Spicy Aioli – 1 SMALL SPOON</div>`;
         html += `<div>☐ ${sets}x 16oz Lemon Vinaigrette – 1 SMALL SPOON</div>`;
@@ -3775,6 +3875,32 @@
       // BYO GYRO PITAS
       if (prep.byoGyros.total > 0) {
         const sets = Math.ceil(prep.byoGyros.total / 10);
+
+        // === PROTEIN LABELS (ALWAYS FIRST) ===
+        const proteinPans = calculateProteinPans(prep.byoGyros.items || []);
+        proteinPans.forEach(protein => {
+          // Extract container type for label
+          let containerLabel = '';
+          if (protein.container.includes('BROWN BOWLS')) {
+            containerLabel = 'BROWN BOWLS';
+          } else if (protein.container.includes('HALF PAN')) {
+            // Parse "1 HALF PAN" or "3 FULL PANS, 1 HALF PAN"
+            containerLabel = protein.container;
+          } else if (protein.container.includes('FULL PAN')) {
+            containerLabel = protein.container;
+          }
+
+          labels.push({
+            item: protein.name,
+            qty: containerLabel,
+            pan: '',
+            category: 'BYO Gyros - Proteins',
+            orderNum,
+            customerLastName,
+            phoneNumber,
+            packDate
+          });
+        });
 
         // Sauce containers (16oz deli, 3 per set)
         for (let i = 1; i <= sets; i++) {
