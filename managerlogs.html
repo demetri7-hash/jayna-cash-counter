@@ -401,6 +401,115 @@
     #incidentForm.active {
       display: block;
     }
+
+    /* Tab Styles */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--gray-300);
+    }
+
+    .tab-btn {
+      padding: 12px 24px;
+      background: var(--gray-100);
+      border: 2px solid var(--gray-300);
+      border-bottom: none;
+      color: var(--gray-700);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.15s ease;
+      margin-bottom: -2px;
+    }
+
+    .tab-btn:hover {
+      background: var(--gray-200);
+    }
+
+    .tab-btn.active {
+      background: var(--white);
+      color: var(--gray-900);
+      border-color: var(--gray-300);
+      border-bottom-color: var(--white);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Tracking Table Styles */
+    .tracking-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 12px;
+    }
+
+    .tracking-table thead {
+      background: var(--gray-100);
+    }
+
+    .tracking-table th {
+      padding: 10px 8px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: 1px solid var(--gray-300);
+      color: var(--gray-700);
+    }
+
+    .tracking-table td {
+      padding: 8px;
+      border: 1px solid var(--gray-300);
+      color: var(--gray-700);
+    }
+
+    .tracking-table tbody tr:hover {
+      background: var(--gray-100);
+    }
+
+    .week-selector {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .week-selector button {
+      padding: 8px 16px;
+      font-size: 12px;
+    }
+
+    .stat-card {
+      background: var(--gray-100);
+      border: 2px solid var(--gray-300);
+      padding: 16px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-600);
+    }
   </style>
 </head>
 <body>
@@ -465,6 +574,15 @@
           display: inline-block;
         " onmouseover="this.style.background='var(--gray-700)'; this.style.borderColor='var(--gray-700)';" onmouseout="this.style.background='var(--gray-900)'; this.style.borderColor='var(--gray-900)';">AMEX RECEIPTS</a>
       </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('incidents')">Incident Reports</button>
+        <button class="tab-btn" onclick="switchTab('tracking')">Void & Discount Tracking</button>
+      </div>
+
+    <!-- Tab Content: Incident Reports -->
+    <div id="incidentsTab" class="tab-content active">
 
     <!-- Incident Report Form -->
     <div id="incidentForm" class="section">
@@ -556,6 +674,154 @@
           <div class="loading">Loading incidents...</div>
         </div>
       </div>
+
+    </div>
+    <!-- End Incidents Tab -->
+
+    <!-- Tab Content: Void & Discount Tracking -->
+    <div id="trackingTab" class="tab-content">
+
+      <!-- Week Selector -->
+      <div class="section">
+        <div class="week-selector">
+          <button onclick="changeWeek(-1)">◄ Previous Week</button>
+          <div style="flex: 1; text-align: center;">
+            <div style="font-size: 14px; font-weight: 700; color: var(--gray-900);" id="weekDisplay">Loading...</div>
+            <div style="font-size: 11px; color: var(--gray-600);" id="dateRangeDisplay"></div>
+          </div>
+          <button onclick="changeWeek(1)">Next Week ►</button>
+          <button onclick="changeWeek(0)" class="secondary">Current Week</button>
+          <button onclick="toggleToday()" id="todayBtn" class="secondary">Today</button>
+        </div>
+
+        <!-- Stats Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">
+          <div class="stat-card">
+            <div class="stat-value" id="voidedCount">-</div>
+            <div class="stat-label">Voided Orders</div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--gray-700); margin-top: 4px;" id="voidedTotal">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="discountsCount">-</div>
+            <div class="stat-label">Discounts</div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--gray-700); margin-top: 4px;" id="discountsTotal">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="refundsCount">-</div>
+            <div class="stat-label">Refunds</div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--gray-700); margin-top: 4px;" id="refundsTotal">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="voidedPaymentsCount">-</div>
+            <div class="stat-label">Voided Payments</div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--gray-700); margin-top: 4px;" id="voidedPaymentsTotal">$0.00</div>
+          </div>
+        </div>
+
+        <div style="text-align: right; margin-bottom: 12px;">
+          <button onclick="exportTrackingCSV()" class="secondary">Export to CSV</button>
+        </div>
+      </div>
+
+      <!-- Voided Orders Table -->
+      <div class="section">
+        <h2>Voided Orders</h2>
+        <div style="overflow-x: auto;">
+          <table class="tracking-table">
+            <thead>
+              <tr>
+                <th onclick="sortTable('voidedOrders', 'date')" style="cursor: pointer;">Date <span id="voidedOrders-date-sort"></span></th>
+                <th onclick="sortTable('voidedOrders', 'time')" style="cursor: pointer;">Time (PT) <span id="voidedOrders-time-sort"></span></th>
+                <th onclick="sortTable('voidedOrders', 'orderNumber')" style="cursor: pointer;">Order # <span id="voidedOrders-orderNumber-sort"></span></th>
+                <th onclick="sortTable('voidedOrders', 'server')" style="cursor: pointer;">Server <span id="voidedOrders-server-sort"></span></th>
+                <th onclick="sortTable('voidedOrders', 'tabName')" style="cursor: pointer;">Tab Name <span id="voidedOrders-tabName-sort"></span></th>
+                <th onclick="sortTable('voidedOrders', 'reason')" style="cursor: pointer;">Reason <span id="voidedOrders-reason-sort"></span></th>
+                <th onclick="sortTable('voidedOrders', 'amount')" style="cursor: pointer;">Amount <span id="voidedOrders-amount-sort"></span></th>
+              </tr>
+            </thead>
+            <tbody id="voidedOrdersTable">
+              <tr><td colspan="7" style="text-align: center; padding: 20px;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Discounts Table -->
+      <div class="section">
+        <h2>Discounts</h2>
+        <div style="overflow-x: auto;">
+          <table class="tracking-table">
+            <thead>
+              <tr>
+                <th onclick="sortTable('discounts', 'date')" style="cursor: pointer;">Date <span id="discounts-date-sort"></span></th>
+                <th onclick="sortTable('discounts', 'time')" style="cursor: pointer;">Time (PT) <span id="discounts-time-sort"></span></th>
+                <th onclick="sortTable('discounts', 'orderNumber')" style="cursor: pointer;">Order # <span id="discounts-orderNumber-sort"></span></th>
+                <th onclick="sortTable('discounts', 'server')" style="cursor: pointer;">Server <span id="discounts-server-sort"></span></th>
+                <th onclick="sortTable('discounts', 'tabName')" style="cursor: pointer;">Tab Name <span id="discounts-tabName-sort"></span></th>
+                <th onclick="sortTable('discounts', 'discountName')" style="cursor: pointer;">Discount Name <span id="discounts-discountName-sort"></span></th>
+                <th onclick="sortTable('discounts', 'discountType')" style="cursor: pointer;">Type <span id="discounts-discountType-sort"></span></th>
+                <th onclick="sortTable('discounts', 'level')" style="cursor: pointer;">Level <span id="discounts-level-sort"></span></th>
+                <th onclick="sortTable('discounts', 'amount')" style="cursor: pointer;">Amount <span id="discounts-amount-sort"></span></th>
+              </tr>
+            </thead>
+            <tbody id="discountsTable">
+              <tr><td colspan="9" style="text-align: center; padding: 20px;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Refunds Table -->
+      <div class="section">
+        <h2>Refunds</h2>
+        <div style="overflow-x: auto;">
+          <table class="tracking-table">
+            <thead>
+              <tr>
+                <th onclick="sortTable('refunds', 'date')" style="cursor: pointer;">Date <span id="refunds-date-sort"></span></th>
+                <th onclick="sortTable('refunds', 'time')" style="cursor: pointer;">Time (PT) <span id="refunds-time-sort"></span></th>
+                <th onclick="sortTable('refunds', 'orderNumber')" style="cursor: pointer;">Order # <span id="refunds-orderNumber-sort"></span></th>
+                <th onclick="sortTable('refunds', 'server')" style="cursor: pointer;">Server <span id="refunds-server-sort"></span></th>
+                <th onclick="sortTable('refunds', 'tabName')" style="cursor: pointer;">Tab Name <span id="refunds-tabName-sort"></span></th>
+                <th onclick="sortTable('refunds', 'refundType')" style="cursor: pointer;">Type <span id="refunds-refundType-sort"></span></th>
+                <th onclick="sortTable('refunds', 'refundAmount')" style="cursor: pointer;">Amount <span id="refunds-refundAmount-sort"></span></th>
+                <th onclick="sortTable('refunds', 'reason')" style="cursor: pointer;">Reason <span id="refunds-reason-sort"></span></th>
+              </tr>
+            </thead>
+            <tbody id="refundsTable">
+              <tr><td colspan="8" style="text-align: center; padding: 20px;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Voided Payments Table -->
+      <div class="section">
+        <h2>Voided Payments</h2>
+        <div style="overflow-x: auto;">
+          <table class="tracking-table">
+            <thead>
+              <tr>
+                <th onclick="sortTable('voidedPayments', 'date')" style="cursor: pointer;">Date <span id="voidedPayments-date-sort"></span></th>
+                <th onclick="sortTable('voidedPayments', 'time')" style="cursor: pointer;">Time (PT) <span id="voidedPayments-time-sort"></span></th>
+                <th onclick="sortTable('voidedPayments', 'orderNumber')" style="cursor: pointer;">Order # <span id="voidedPayments-orderNumber-sort"></span></th>
+                <th onclick="sortTable('voidedPayments', 'server')" style="cursor: pointer;">Server <span id="voidedPayments-server-sort"></span></th>
+                <th onclick="sortTable('voidedPayments', 'tabName')" style="cursor: pointer;">Tab Name <span id="voidedPayments-tabName-sort"></span></th>
+                <th onclick="sortTable('voidedPayments', 'paymentType')" style="cursor: pointer;">Payment Type <span id="voidedPayments-paymentType-sort"></span></th>
+                <th onclick="sortTable('voidedPayments', 'amount')" style="cursor: pointer;">Amount <span id="voidedPayments-amount-sort"></span></th>
+                <th onclick="sortTable('voidedPayments', 'tipAmount')" style="cursor: pointer;">Tip <span id="voidedPayments-tipAmount-sort"></span></th>
+              </tr>
+            </thead>
+            <tbody id="voidedPaymentsTable">
+              <tr><td colspan="8" style="text-align: center; padding: 20px;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+    <!-- End Tracking Tab -->
+
     </div>
   </div>
 
@@ -1205,6 +1471,403 @@
       // Auto-refresh clocked in every 5 minutes
       setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
     });
+
+    // ==================== TAB SWITCHING ====================
+    function switchTab(tabName) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+      // Show selected tab
+      if (tabName === 'incidents') {
+        document.getElementById('incidentsTab').classList.add('active');
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+      } else if (tabName === 'tracking') {
+        document.getElementById('trackingTab').classList.add('active');
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        // Load tracking data when tab is opened
+        if (!window.trackingDataLoaded) {
+          loadTrackingData();
+          window.trackingDataLoaded = true;
+        }
+      }
+    }
+
+    // ==================== VOID & DISCOUNT TRACKING ====================
+    let currentWeekOffset = 0; // 0 = current week, -1 = last week, +1 = next week
+    let trackingData = null;
+
+    // Get Monday of the week (weeks start Monday, end Sunday)
+    function getMondayOfWeek(date, weekOffset = 0) {
+      const d = new Date(date);
+      d.setDate(d.getDate() + (weekOffset * 7));
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+      return new Date(d.setDate(diff));
+    }
+
+    function getWeekDates(weekOffset) {
+      const monday = getMondayOfWeek(new Date(), weekOffset);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      return {
+        startDate: monday.toISOString().split('T')[0],
+        endDate: sunday.toISOString().split('T')[0],
+        monday: monday,
+        sunday: sunday
+      };
+    }
+
+    function changeWeek(offset) {
+      if (offset === 0) {
+        currentWeekOffset = 0; // Reset to current week
+      } else {
+        currentWeekOffset += offset;
+      }
+      loadTrackingData();
+    }
+
+    async function loadTrackingData() {
+      try {
+        console.log('📊 Loading void/discount tracking data...');
+
+        const week = getWeekDates(currentWeekOffset);
+
+        // Update week display
+        const weekDisplay = document.getElementById('weekDisplay');
+        const dateRangeDisplay = document.getElementById('dateRangeDisplay');
+
+        const mondayFormatted = week.monday.toLocaleDateString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        const sundayFormatted = week.sunday.toLocaleDateString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        if (currentWeekOffset === 0) {
+          weekDisplay.textContent = 'Current Week';
+        } else if (currentWeekOffset === -1) {
+          weekDisplay.textContent = 'Last Week';
+        } else if (currentWeekOffset === 1) {
+          weekDisplay.textContent = 'Next Week';
+        } else {
+          weekDisplay.textContent = `Week of ${mondayFormatted}`;
+        }
+
+        dateRangeDisplay.textContent = `${mondayFormatted} - ${sundayFormatted}`;
+
+        // Authenticate with Toast
+        const authResponse = await fetch('/api/toast-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!authResponse.ok) {
+          throw new Error('Failed to authenticate with Toast API');
+        }
+
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) {
+          throw new Error('Toast authentication failed');
+        }
+
+        const token = authData.data.accessToken;
+
+        // Fetch tracking data
+        const trackingUrl = `/api/toast-void-discount-tracking?startDate=${week.startDate}&endDate=${week.endDate}&token=${encodeURIComponent(token)}`;
+        const response = await fetch(trackingUrl);
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch tracking data: ${response.status}`);
+        }
+
+        trackingData = await response.json();
+
+        if (!trackingData.success) {
+          throw new Error(trackingData.error || 'Unknown error');
+        }
+
+        console.log('✅ Tracking data loaded:', trackingData);
+
+        // Update UI
+        renderTrackingData();
+
+      } catch (error) {
+        console.error('❌ Error loading tracking data:', error);
+        // Show error in tables
+        document.getElementById('voidedOrdersTable').innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--error-text);">Error: ${error.message}</td></tr>`;
+        document.getElementById('discountsTable').innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 20px; color: var(--error-text);">Error: ${error.message}</td></tr>`;
+        document.getElementById('refundsTable').innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--error-text);">Error: ${error.message}</td></tr>`;
+        document.getElementById('voidedPaymentsTable').innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--error-text);">Error: ${error.message}</td></tr>`;
+      }
+    }
+
+    function renderTrackingData() {
+      if (!trackingData) return;
+
+      // Get today's date in Pacific timezone for filtering
+      const todayPacific = new Date().toLocaleDateString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+
+      // Filter function based on showTodayOnly flag
+      const filterItems = (items) => {
+        if (!showTodayOnly) return items;
+        return items.filter(item => item.date === todayPacific);
+      };
+
+      // Apply filters to each data set
+      const filteredVoidedOrders = filterItems(trackingData.voidedOrders.items);
+      const filteredDiscounts = filterItems(trackingData.discounts.items);
+      const filteredRefunds = filterItems(trackingData.refunds.items);
+      const filteredVoidedPayments = filterItems(trackingData.voidedPayments.items);
+
+      // Calculate filtered totals
+      const voidedTotal = filteredVoidedOrders.reduce((sum, item) => sum + item.amount, 0);
+      const discountsTotal = filteredDiscounts.reduce((sum, item) => sum + item.amount, 0);
+      const refundsTotal = filteredRefunds.reduce((sum, item) => sum + item.refundAmount, 0);
+      const voidedPaymentsTotal = filteredVoidedPayments.reduce((sum, item) => sum + item.amount, 0);
+
+      // Update stats
+      document.getElementById('voidedCount').textContent = filteredVoidedOrders.length;
+      document.getElementById('voidedTotal').textContent = `$${voidedTotal.toFixed(2)}`;
+
+      document.getElementById('discountsCount').textContent = filteredDiscounts.length;
+      document.getElementById('discountsTotal').textContent = `$${discountsTotal.toFixed(2)}`;
+
+      document.getElementById('refundsCount').textContent = filteredRefunds.length;
+      document.getElementById('refundsTotal').textContent = `$${refundsTotal.toFixed(2)}`;
+
+      document.getElementById('voidedPaymentsCount').textContent = filteredVoidedPayments.length;
+      document.getElementById('voidedPaymentsTotal').textContent = `$${voidedPaymentsTotal.toFixed(2)}`;
+
+      // Render Voided Orders table
+      const voidedOrdersTable = document.getElementById('voidedOrdersTable');
+      if (filteredVoidedOrders.length === 0) {
+        voidedOrdersTable.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px;">No voided orders ${showTodayOnly ? 'today' : 'this week'}</td></tr>`;
+      } else {
+        voidedOrdersTable.innerHTML = filteredVoidedOrders.map(item => `
+          <tr>
+            <td>${item.date}</td>
+            <td>${item.time}</td>
+            <td>${item.orderNumber}</td>
+            <td>${item.server}</td>
+            <td>${item.tabName}</td>
+            <td>${item.reason}</td>
+            <td>$${item.amount.toFixed(2)}</td>
+          </tr>
+        `).join('');
+      }
+
+      // Render Discounts table
+      const discountsTable = document.getElementById('discountsTable');
+      if (filteredDiscounts.length === 0) {
+        discountsTable.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 20px;">No discounts ${showTodayOnly ? 'today' : 'this week'}</td></tr>`;
+      } else {
+        discountsTable.innerHTML = filteredDiscounts.map(item => `
+          <tr>
+            <td>${item.date}</td>
+            <td>${item.time}</td>
+            <td>${item.orderNumber}</td>
+            <td>${item.server}</td>
+            <td>${item.tabName}</td>
+            <td>${item.discountName}</td>
+            <td>${item.discountType}</td>
+            <td>${item.level}${item.itemName ? `: ${item.itemName}` : ''}</td>
+            <td>$${item.amount.toFixed(2)}</td>
+          </tr>
+        `).join('');
+      }
+
+      // Render Refunds table
+      const refundsTable = document.getElementById('refundsTable');
+      if (filteredRefunds.length === 0) {
+        refundsTable.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px;">No refunds ${showTodayOnly ? 'today' : 'this week'}</td></tr>`;
+      } else {
+        refundsTable.innerHTML = filteredRefunds.map(item => `
+          <tr>
+            <td>${item.date}</td>
+            <td>${item.time}</td>
+            <td>${item.orderNumber}</td>
+            <td>${item.server}</td>
+            <td>${item.tabName}</td>
+            <td>${item.refundType}</td>
+            <td>$${item.refundAmount.toFixed(2)}</td>
+            <td>${item.reason}</td>
+          </tr>
+        `).join('');
+      }
+
+      // Render Voided Payments table
+      const voidedPaymentsTable = document.getElementById('voidedPaymentsTable');
+      if (filteredVoidedPayments.length === 0) {
+        voidedPaymentsTable.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px;">No voided payments ${showTodayOnly ? 'today' : 'this week'}</td></tr>`;
+      } else {
+        voidedPaymentsTable.innerHTML = filteredVoidedPayments.map(item => `
+          <tr>
+            <td>${item.date}</td>
+            <td>${item.time}</td>
+            <td>${item.orderNumber}</td>
+            <td>${item.server}</td>
+            <td>${item.tabName}</td>
+            <td>${item.paymentType}${item.cardType && item.cardType !== 'N/A' ? ` (${item.cardType})` : ''}</td>
+            <td>$${item.amount.toFixed(2)}</td>
+            <td>$${item.tipAmount.toFixed(2)}</td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    function exportTrackingCSV() {
+      if (!trackingData) {
+        alert('No data to export');
+        return;
+      }
+
+      let csv = '';
+
+      // Voided Orders
+      csv += 'VOIDED ORDERS\n';
+      csv += 'Date,Time (PT),Order #,Server,Tab Name,Reason,Amount\n';
+      trackingData.voidedOrders.items.forEach(item => {
+        csv += `${item.date},${item.time},${item.orderNumber},${item.server},${item.tabName},${item.reason},$${item.amount.toFixed(2)}\n`;
+      });
+      csv += `\nTotal Voided Orders: ${trackingData.voidedOrders.count}, $${trackingData.voidedOrders.total.toFixed(2)}\n\n`;
+
+      // Discounts
+      csv += 'DISCOUNTS\n';
+      csv += 'Date,Time (PT),Order #,Server,Tab Name,Discount Name,Type,Level,Amount\n';
+      trackingData.discounts.items.forEach(item => {
+        const level = item.level + (item.itemName ? `: ${item.itemName}` : '');
+        csv += `${item.date},${item.time},${item.orderNumber},${item.server},${item.tabName},${item.discountName},${item.discountType},${level},$${item.amount.toFixed(2)}\n`;
+      });
+      csv += `\nTotal Discounts: ${trackingData.discounts.count}, $${trackingData.discounts.total.toFixed(2)}\n\n`;
+
+      // Refunds
+      csv += 'REFUNDS\n';
+      csv += 'Date,Time (PT),Order #,Server,Tab Name,Type,Amount,Reason\n';
+      trackingData.refunds.items.forEach(item => {
+        csv += `${item.date},${item.time},${item.orderNumber},${item.server},${item.tabName},${item.refundType},$${item.refundAmount.toFixed(2)},${item.reason}\n`;
+      });
+      csv += `\nTotal Refunds: ${trackingData.refunds.count}, $${trackingData.refunds.total.toFixed(2)}\n\n`;
+
+      // Voided Payments
+      csv += 'VOIDED PAYMENTS\n';
+      csv += 'Date,Time (PT),Order #,Server,Tab Name,Payment Type,Amount,Tip\n';
+      trackingData.voidedPayments.items.forEach(item => {
+        const paymentType = item.paymentType + (item.cardType && item.cardType !== 'N/A' ? ` (${item.cardType})` : '');
+        csv += `${item.date},${item.time},${item.orderNumber},${item.server},${item.tabName},${paymentType},$${item.amount.toFixed(2)},$${item.tipAmount.toFixed(2)}\n`;
+      });
+      csv += `\nTotal Voided Payments: ${trackingData.voidedPayments.count}, $${trackingData.voidedPayments.total.toFixed(2)}\n`;
+
+      // Download CSV
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const week = getWeekDates(currentWeekOffset);
+      a.download = `Void_Discount_Tracking_${week.startDate}_to_${week.endDate}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
+
+    // ==================== TODAY TOGGLE ====================
+    let showTodayOnly = false;
+
+    function toggleToday() {
+      showTodayOnly = !showTodayOnly;
+      const btn = document.getElementById('todayBtn');
+
+      if (showTodayOnly) {
+        btn.style.background = 'var(--gray-900)';
+        btn.style.color = 'white';
+        btn.style.borderColor = 'var(--gray-900)';
+      } else {
+        btn.style.background = 'var(--gray-100)';
+        btn.style.color = 'var(--gray-900)';
+        btn.style.borderColor = 'var(--gray-300)';
+      }
+
+      renderTrackingData();
+    }
+
+    // ==================== TABLE SORTING ====================
+    let sortState = {
+      table: null,
+      column: null,
+      direction: 'asc' // 'asc' or 'desc'
+    };
+
+    function sortTable(tableName, columnName) {
+      // Toggle direction if clicking the same column
+      if (sortState.table === tableName && sortState.column === columnName) {
+        sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortState.table = tableName;
+        sortState.column = columnName;
+        sortState.direction = 'asc';
+      }
+
+      // Clear all sort indicators
+      document.querySelectorAll('.tracking-table th span[id$="-sort"]').forEach(span => {
+        span.textContent = '';
+      });
+
+      // Set current sort indicator
+      const sortIndicator = document.getElementById(`${tableName}-${columnName}-sort`);
+      if (sortIndicator) {
+        sortIndicator.textContent = sortState.direction === 'asc' ? ' ▲' : ' ▼';
+      }
+
+      // Sort the data
+      const dataKey = tableName; // 'voidedOrders', 'discounts', 'refunds', 'voidedPayments'
+      if (trackingData && trackingData[dataKey]) {
+        trackingData[dataKey].items.sort((a, b) => {
+          let aVal = a[columnName];
+          let bVal = b[columnName];
+
+          // Handle numeric fields
+          if (columnName === 'amount' || columnName === 'refundAmount' || columnName === 'tipAmount') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+          }
+          // Handle date fields
+          else if (columnName === 'date') {
+            aVal = new Date(aVal).getTime();
+            bVal = new Date(bVal).getTime();
+          }
+          // Handle time fields
+          else if (columnName === 'time') {
+            // Convert time string to comparable format
+            aVal = a.timestamp || 0;
+            bVal = b.timestamp || 0;
+          }
+          // String fields (default)
+          else {
+            aVal = String(aVal || '').toLowerCase();
+            bVal = String(bVal || '').toLowerCase();
+          }
+
+          if (sortState.direction === 'asc') {
+            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+          } else {
+            return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+          }
+        });
+
+        renderTrackingData();
+      }
+    }
   </script>
 </body>
 </html>
