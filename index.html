@@ -17108,11 +17108,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     }
 
     try {
+      // Get active prep counter name and timestamp
+      const countedBy = getActivePrepCounterName();
+      const countedAt = new Date().toISOString();
+
       const { error } = await supabase
         .from('inventory_items')
         .update({
           current_stock: stockValue,
-          last_counted_date: new Date().toISOString()
+          last_counted_date: countedAt,
+          counted_by: countedBy,
+          counted_at: countedAt
         })
         .eq('id', itemId);
 
@@ -17122,7 +17128,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const item = orderingSystemState.items.find(i => i.id === itemId);
       if (item) {
         item.currentStock = stockValue;
-        item.lastCountedDate = new Date().toISOString();
+        item.lastCountedDate = countedAt;
+        item.countedBy = countedBy;
+        item.countedAt = countedAt;
       }
 
       // PREP CONSUMPTION TRACKING: Track consumption between sessions
@@ -17191,6 +17199,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       calculateUpcomingOrders();
       await refreshUpcomingOrdersUI();
       refreshBottleCount(); // Refresh bottle count after stock update
+      renderPrepCountList(); // Re-render to show counted_by name
 
     } catch (error) {
       console.error('Auto-save failed:', error);
@@ -17885,6 +17894,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       calculateUpcomingOrders();
       await refreshUpcomingOrdersUI();
       refreshBottleCount();
+      renderPrepCountList(); // Re-render to show counted_by name
 
     } catch (error) {
       console.error('Auto-save location failed:', error);
