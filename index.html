@@ -11378,36 +11378,46 @@
         return;
       }
 
-      const accessToken = authData.data.accessToken;
+      const token = authData.data.accessToken;
 
-      // STEP 2: Fetch labor entries for today
-      const laborUrl = `/api/toast-labor-summary?startDate=${today}&endDate=${today}&token=${accessToken}`;
-      const laborResponse = await fetch(laborUrl);
+      // STEP 2: Fetch clocked-in employees via serverless function (same as FOH checklists)
+      const clockedInUrl = `/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`;
 
-      if (!laborResponse.ok) {
-        console.error('❌ Failed to fetch labor data from Toast');
+      console.log('🔍 Fetching clocked-in employees from serverless function');
+
+      const response = await fetch(clockedInUrl);
+
+      if (!response.ok) {
+        console.error('❌ Failed to fetch clocked-in employees:', response.status);
         prepCountingState.clockedInEmployees = [];
         return;
       }
 
-      const laborData = await laborResponse.json();
-      console.log('📊 Toast labor data:', laborData);
+      const result = await response.json();
 
-      // STEP 3: Extract unique employee names from current shifts
-      const currentlyClocked = new Set();
-      const now = new Date();
-
-      if (laborData.laborEntries && Array.isArray(laborData.laborEntries)) {
-        laborData.laborEntries.forEach(entry => {
-          // If entry has no out time (inDate exists but outDate is null), they're currently clocked in
-          if (entry.inDate && !entry.outDate) {
-            const employeeName = entry.employeeName || 'Unknown';
-            currentlyClocked.add(employeeName);
-          }
-        });
+      if (!result.success) {
+        console.error('❌ Clocked-in API error:', result.error);
+        prepCountingState.clockedInEmployees = [];
+        return;
       }
 
-      const clockedInList = Array.from(currentlyClocked).sort();
+      console.log(`📊 Total time entries today: ${result.totalTimeEntries}`);
+      console.log(`🟢 Currently clocked in: ${result.count} employees`);
+
+      if (result.clockedIn.length > 0) {
+        console.log('✅ Clocked in employees:', result.clockedIn);
+      }
+
+      // Extract first names only (same pattern as FOH checklists)
+      const clockedInList = result.clockedIn
+        .map(emp => {
+          const fullName = emp.fullName || emp.name || 'Unknown';
+          const firstName = fullName.split(' ')[0]; // Get first name only
+          return firstName;
+        })
+        .filter(name => name) // Remove any nulls/undefined
+        .sort();
+
       prepCountingState.clockedInEmployees = clockedInList;
 
       // Update teamNames array
