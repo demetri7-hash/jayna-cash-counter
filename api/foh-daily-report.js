@@ -278,530 +278,455 @@ function calculateAnalytics(sessions, expectedChecklists, definitionsMap) {
 }
 
 /**
- * Generate PDF with executive summary + detailed breakdowns
+ * Generate PDF with NEW landscape compact format (NO executive summary)
+ * Uses the perfected layout from foh-checklists.html
  */
 async function generateChecklistsPDF(sessions, definitionsMap, reportDate, analytics, expectedChecklists) {
   const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'in',
+    orientation: 'landscape',
+    unit: 'pt',
     format: 'letter'
   });
 
-  // Colors (grayscale + Jayna Blue)
-  const jaynaBlue = [0, 168, 225];
-  const black = [33, 33, 33];
-  const darkGray = [66, 66, 66];
-  const mediumGray = [117, 117, 117];
-  const lightGray = [189, 189, 189];
-  const veryLightGray = [245, 245, 245];
-  const successGreen = [5, 150, 105];
-  const warningOrange = [245, 158, 11];
-  const errorRed = [220, 38, 38];
+  const pageWidth = doc.internal.pageSize.width; // 792pt
+  const pageHeight = doc.internal.pageSize.height; // 612pt
+  const margin = 14.4; // 0.2 inches = 14.4pt
 
-  // Font settings (using Helvetica as Aptos substitute in jsPDF)
-  doc.setFont('helvetica');
+  let isFirstSession = true;
 
-  // ========================================
-  // PAGE 1: EXECUTIVE SUMMARY
-  // ========================================
-
-  let yPos = 0.6;
-
-  // Header
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(black[0], black[1], black[2]);
-  doc.text('DAILY CHECKLIST REPORT', 4.25, yPos, { align: 'center' });
-  yPos += 0.25;
-
-  doc.setFontSize(14);
-  doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-  doc.text(`EXECUTIVE SUMMARY - ${reportDate.toUpperCase()}`, 4.25, yPos, { align: 'center' });
-  yPos += 0.15;
-
-  // Blue line
-  doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
-  doc.setLineWidth(0.03);
-  doc.line(0.5, yPos, 8, yPos);
-  yPos += 0.3;
-
-  // Overall Stats Box
-  doc.setFillColor(veryLightGray[0], veryLightGray[1], veryLightGray[2]);
-  doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
-  doc.setLineWidth(0.01);
-  doc.rect(0.5, yPos, 7.5, 0.8, 'FD');
-
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(black[0], black[1], black[2]);
-  doc.text('OVERALL COMPLETION STATUS', 0.7, yPos + 0.2);
-
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-
-  const completionRate = analytics.totalSessions > 0
-    ? ((analytics.completedSessions / analytics.totalSessions) * 100).toFixed(1)
-    : 0;
-
-  doc.text(`TOTAL CHECKLISTS: ${analytics.totalSessions}`, 0.7, yPos + 0.4);
-  doc.text(`COMPLETED: ${analytics.completedSessions}`, 3, yPos + 0.4);
-  doc.text(`INCOMPLETE: ${analytics.incompleteSessions}`, 5, yPos + 0.4);
-
-  // Completion rate with color coding
-  const rateColor = completionRate >= 90 ? successGreen : completionRate >= 70 ? warningOrange : errorRed;
-  doc.setTextColor(rateColor[0], rateColor[1], rateColor[2]);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`COMPLETION RATE: ${completionRate}%`, 0.7, yPos + 0.65);
-
-  yPos += 1.0;
-
-  // Missing Checklists
-  if (analytics.missingChecklists.length > 0) {
-    doc.setFillColor(errorRed[0], errorRed[1], errorRed[2]);
-    doc.setDrawColor(errorRed[0], errorRed[1], errorRed[2]);
-    doc.setLineWidth(0.03);
-    doc.line(0.5, yPos, 8, yPos);
-    yPos += 0.02;
-
-    doc.setFillColor(255, 245, 245); // Very light red
-    doc.rect(0.5, yPos, 7.5, 0.15 + (analytics.missingChecklists.length * 0.12), 'F');
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(errorRed[0], errorRed[1], errorRed[2]);
-    doc.text('MISSING CHECKLISTS (NOT STARTED)', 0.7, yPos + 0.12);
-    yPos += 0.25;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    analytics.missingChecklists.forEach(checklist => {
-      doc.text(`- ${checklist}`, 0.8, yPos);
-      yPos += 0.12;
-    });
-
-    yPos += 0.1;
-  }
-
-  // Staff Performance Section
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(black[0], black[1], black[2]);
-  doc.text('STAFF PERFORMANCE ANALYSIS', 0.5, yPos);
-  yPos += 0.2;
-
-  // Top Performers
-  if (analytics.topPerformers.length > 0) {
-    doc.setFillColor(successGreen[0], successGreen[1], successGreen[2]);
-    doc.setDrawColor(successGreen[0], successGreen[1], successGreen[2]);
-    doc.setLineWidth(0.02);
-    doc.line(0.5, yPos, 8, yPos);
-    yPos += 0.02;
-
-    doc.setFillColor(240, 253, 244); // Very light green
-    doc.rect(0.5, yPos, 7.5, 0.15 + (analytics.topPerformers.length * 0.12), 'F');
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(successGreen[0], successGreen[1], successGreen[2]);
-    doc.text('TOP PERFORMERS (95%+ COMPLETION, 4.5+ AVG RATING)', 0.7, yPos + 0.12);
-    yPos += 0.25;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    analytics.topPerformers.forEach(name => {
-      const perf = analytics.staffPerformance[name];
-      const taskRate = ((perf.completedTasks / perf.totalTasks) * 100).toFixed(0);
-      doc.text(`- ${name} (${taskRate}% tasks, ${perf.averageRating.toFixed(1)} avg rating)`, 0.8, yPos);
-      yPos += 0.12;
-    });
-
-    yPos += 0.1;
-  }
-
-  // Needs Attention
-  if (analytics.needsAttention.length > 0) {
-    doc.setFillColor(warningOrange[0], warningOrange[1], warningOrange[2]);
-    doc.setDrawColor(warningOrange[0], warningOrange[1], warningOrange[2]);
-    doc.setLineWidth(0.02);
-    doc.line(0.5, yPos, 8, yPos);
-    yPos += 0.02;
-
-    doc.setFillColor(255, 251, 235); // Very light orange
-    doc.rect(0.5, yPos, 7.5, 0.15 + (analytics.needsAttention.length * 0.12), 'F');
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(warningOrange[0], warningOrange[1], warningOrange[2]);
-    doc.text('NEEDS ATTENTION (<70% COMPLETION OR <3.0 RATING)', 0.7, yPos + 0.12);
-    yPos += 0.25;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    analytics.needsAttention.forEach(name => {
-      const perf = analytics.staffPerformance[name];
-      const taskRate = perf.totalTasks > 0 ? ((perf.completedTasks / perf.totalTasks) * 100).toFixed(0) : 'N/A';
-      const rating = perf.ratingCount > 0 ? perf.averageRating.toFixed(1) : 'N/A';
-      doc.text(`- ${name} (${taskRate}% tasks, ${rating} avg rating)`, 0.8, yPos);
-      yPos += 0.12;
-    });
-
-    yPos += 0.1;
-  }
-
-  // All Staff Summary Table
-  yPos += 0.1;
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(black[0], black[1], black[2]);
-  doc.text('ALL STAFF SUMMARY', 0.5, yPos);
-  yPos += 0.2;
-
-  // Table header
-  doc.setFillColor(darkGray[0], darkGray[1], darkGray[2]);
-  doc.rect(0.5, yPos - 0.05, 7.5, 0.2, 'F');
-
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text('STAFF NAME', 0.6, yPos + 0.08);
-  doc.text('CHECKLISTS', 2.3, yPos + 0.08);
-  doc.text('TASKS', 3.5, yPos + 0.08);
-  doc.text('COMPLETION', 4.6, yPos + 0.08);
-  doc.text('AVG RATING', 6, yPos + 0.08);
-
-  yPos += 0.25;
-
-  // Table rows
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-
-  Object.entries(analytics.staffPerformance).forEach(([name, perf], index) => {
-    if (yPos > 10) {
-      doc.addPage();
-      yPos = 0.7;
-    }
-
-    // Alternating row background
-    if (index % 2 === 0) {
-      doc.setFillColor(veryLightGray[0], veryLightGray[1], veryLightGray[2]);
-      doc.rect(0.5, yPos - 0.05, 7.5, 0.15, 'F');
-    }
-
-    const taskCompletionRate = perf.totalTasks > 0
-      ? ((perf.completedTasks / perf.totalTasks) * 100).toFixed(0)
-      : '0';
-    const avgRating = perf.ratingCount > 0 ? perf.averageRating.toFixed(1) : 'N/A';
-
-    doc.text(name, 0.6, yPos + 0.08);
-    doc.text(`${perf.checklistsCompleted}/${perf.checklistsCompleted + perf.checklistsIncomplete}`, 2.3, yPos + 0.08);
-    doc.text(`${perf.completedTasks}/${perf.totalTasks}`, 3.5, yPos + 0.08);
-    doc.text(`${taskCompletionRate}%`, 4.6, yPos + 0.08);
-    doc.text(avgRating, 6, yPos + 0.08);
-
-    yPos += 0.15;
-  });
-
-  yPos += 0.2;
-
-  // Problem Tasks Section
-  if (analytics.problemTasks.length > 0) {
-    if (yPos > 9.5) {
-      doc.addPage();
-      yPos = 0.7;
-    }
-
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(black[0], black[1], black[2]);
-    doc.text('RECURRING INCOMPLETE TASKS (2+ OCCURRENCES)', 0.5, yPos);
-    yPos += 0.2;
-
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(errorRed[0], errorRed[1], errorRed[2]);
-
-    analytics.problemTasks.slice(0, 10).forEach(({ task, count }) => {
-      if (yPos > 10.2) {
-        doc.addPage();
-        yPos = 0.7;
-      }
-
-      const wrappedLines = doc.splitTextToSize(`[${count}x] ${task}`, 7);
-      wrappedLines.forEach(line => {
-        doc.text(line, 0.6, yPos);
-        yPos += 0.1;
-      });
-    });
-  }
-
-  // Footer
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(lightGray[0], lightGray[1], lightGray[2]);
-  doc.text('GENERATED BY JAYNA CHECKLIST SYSTEM', 4.25, 10.7, { align: 'center' });
-
-  // ========================================
-  // SUBSEQUENT PAGES: DETAILED BREAKDOWNS
-  // ========================================
-
+  // Loop through each session and generate a landscape page
   for (const session of sessions) {
-    doc.addPage();
+    // Add page for each session (skip first page since doc starts with one)
+    if (!isFirstSession) {
+      doc.addPage();
+    }
+    isFirstSession = false;
 
     const definition = definitionsMap[session.checklist_type] || {};
     const checklistTitle = definition.title || session.checklist_type.replace(/_/g, ' ').toUpperCase();
 
-    yPos = 0.6;
+    let y = margin + 10;
 
-    // Header
+    // ========== BLUE ACCENT BAR AT TOP ==========
+    doc.setFillColor(59, 130, 246); // Jayna blue
+    doc.rect(0, 0, pageWidth, 6, 'F');
+
+    y += 10;
+
+    // ========== COMPACT HEADER (SINGLE LINE) ==========
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(black[0], black[1], black[2]);
-    doc.text(checklistTitle, 4.25, yPos, { align: 'center' });
-    yPos += 0.2;
+    doc.setTextColor(33, 33, 33);
+    doc.text(checklistTitle, margin, y);
 
-    // Date
-    doc.setFontSize(11);
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-    doc.text(reportDate.toUpperCase(), 4.25, yPos, { align: 'center' });
-    yPos += 0.1;
-
-    // Blue line
-    doc.setDrawColor(jaynaBlue[0], jaynaBlue[1], jaynaBlue[2]);
-    doc.setLineWidth(0.02);
-    doc.line(0.5, yPos, 8, yPos);
-    yPos += 0.25;
-
-    // Staff and timestamps
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-
-    // Get unique staff names from completed tasks
-    const tasks = session.foh_checklist_tasks || [];
-    const staffNames = [...new Set(
-      tasks
-        .filter(t => t.completed_by)
-        .map(t => t.completed_by)
-    )].join(', ') || 'No tasks completed';
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('STAFF: ', 0.5, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(staffNames, 0.9, yPos);
-    yPos += 0.15;
-
-    const startTime = new Date(session.started_at).toLocaleTimeString('en-US', {
+    // Session date on same line (right side)
+    const sessionDate = new Date(session.started_at).toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
+    }) + ' PT';
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(sessionDate, pageWidth - margin, y, { align: 'right' });
+
+    y += 12;
+
+    // ========== GROUP TASKS BY PERSON (needed for staff list) ==========
+    const tasks = session.foh_checklist_tasks || [];
+    const completedTasks = tasks.filter(t => t.is_completed);
+    const notCompletedTasks = tasks.filter(t => !t.is_completed);
+
+    // Group completed tasks by person
+    const tasksByPerson = {};
+    completedTasks.forEach(task => {
+      const person = task.completed_by || 'Unknown';
+      if (!tasksByPerson[person]) {
+        tasksByPerson[person] = [];
+      }
+      tasksByPerson[person].push(task);
     });
 
+    // Staff names (people who completed tasks on this page) + Status on same line
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('STARTED: ', 0.5, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(startTime, 1.0, yPos);
+    doc.setTextColor(66, 66, 66);
+    doc.text('STAFF:', margin, y);
 
-    if (session.is_complete && session.completed_at) {
-      const completedTime = new Date(session.completed_at).toLocaleTimeString('en-US', {
+    const staffNames = Object.keys(tasksByPerson).join(', ') || 'Unknown';
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(33, 33, 33);
+    doc.text(staffNames, margin + 32, y);
+
+    // Status on right side
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(66, 66, 66);
+    const statusX = pageWidth - margin - 90;
+    doc.text('STATUS:', statusX, y);
+    if (session.is_complete) {
+      doc.setTextColor(5, 150, 105); // Green
+      doc.text('COMPLETE ✓', statusX + 40, y);
+    } else {
+      doc.setTextColor(245, 158, 11); // Orange
+      doc.text('IN PROGRESS', statusX + 40, y);
+    }
+
+    y += 10;
+
+    // ========== HORIZONTAL DIVIDER ==========
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    // Calculate column widths for 2-column layout
+    const col1X = margin;
+    const col2X = pageWidth / 2 + 10;
+    const colWidth = (pageWidth / 2) - margin - 20;
+
+    // ========== LEFT COLUMN: COMPLETED TASKS (GROUPED BY PERSON) ==========
+    let col1Y = y;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(33, 33, 33);
+    doc.text('TASKS COMPLETED', col1X, col1Y);
+    col1Y += 10;
+
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'normal');
+
+    // Render each person's completed tasks compactly
+    Object.entries(tasksByPerson).forEach(([person, personTasks]) => {
+      // Person name in bold
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(59, 130, 246); // Blue
+      doc.text(`${person.toUpperCase()} COMPLETED:`, col1X, col1Y);
+      col1Y += 7;
+
+      // List tasks as compact bullets
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(33, 33, 33);
+
+      personTasks.forEach(task => {
+        const taskText = `• ${task.task_text}`;
+        const lines = doc.splitTextToSize(taskText, colWidth - 10);
+        lines.forEach(line => {
+          doc.text(line, col1X + 5, col1Y);
+          col1Y += 6;
+        });
+      });
+
+      col1Y += 3; // Space between people
+    });
+
+    // ========== NOT COMPLETED SECTION (STILL IN LEFT COLUMN) ==========
+    if (notCompletedTasks.length > 0) {
+      col1Y += 6;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(220, 38, 38); // Red
+      doc.text('NOT COMPLETED', col1X, col1Y);
+      col1Y += 10;
+
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+
+      notCompletedTasks.forEach(task => {
+        const taskText = `• ${task.task_text}`;
+        const lines = doc.splitTextToSize(taskText, colWidth - 10);
+        lines.forEach(line => {
+          doc.text(line, col1X + 5, col1Y);
+          col1Y += 6;
+        });
+      });
+    }
+
+    // ========== RIGHT COLUMN: QUALITY RATINGS + SESSION INSIGHTS ==========
+    let col2Y = y;
+
+    // QUALITY REVIEW SECTION (if ratings exist)
+    const ratings = session.foh_checklist_ratings || [];
+    if (ratings && ratings.length > 0) {
+      // Detect if this is a REVIEW-only checklist (few/no tasks, mostly ratings)
+      const isReviewOnly = completedTasks.length === 0 ||
+                           (ratings.length > 0 && completedTasks.length < 3);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(33, 33, 33);
+      doc.text('QUALITY REVIEW', col2X, col2Y);
+      col2Y += 10;
+
+      // Find the rating section
+      const ratingSection = definition.sections ? definition.sections.find(s => s.type === 'rating') : null;
+      if (ratingSection) {
+        ratingSection.categories.forEach(category => {
+          const ratingRecord = ratings.find(r => r.category_name === category.name);
+
+          if (ratingRecord) {
+            // REVIEW-ONLY: Bigger fonts and more spacing
+            const categoryFontSize = isReviewOnly ? 8 : 6;
+            const starFontSize = isReviewOnly ? 10 : 8;
+            const noteFontSize = isReviewOnly ? 7 : 5;
+            const lineSpacing = isReviewOnly ? 10 : 7;
+
+            // Category name
+            doc.setFontSize(categoryFontSize);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(33, 33, 33);
+            doc.text(`${category.name}:`, col2X, col2Y);
+
+            // Stars (larger for reviews)
+            const starX = col2X + doc.getTextWidth(`${category.name}: `) + 3;
+            doc.setFontSize(starFontSize);
+            const starSpacing = isReviewOnly ? 9 : 7;
+            for (let i = 0; i < 5; i++) {
+              if (i < ratingRecord.rating) {
+                doc.setTextColor(59, 130, 246); // Blue filled star
+                doc.text('★', starX + (i * starSpacing), col2Y);
+              } else {
+                doc.setTextColor(200, 200, 200); // Gray empty star
+                doc.text('☆', starX + (i * starSpacing), col2Y);
+              }
+            }
+
+            // Rating number
+            doc.setFontSize(categoryFontSize);
+            doc.setTextColor(100, 100, 100);
+            const ratingNumX = isReviewOnly ? starX + 48 : starX + 38;
+            doc.text(`(${ratingRecord.rating}/5)`, ratingNumX, col2Y);
+            col2Y += lineSpacing;
+
+            // REVIEW-ONLY: Add name and timestamp
+            if (isReviewOnly && ratingRecord.rated_by) {
+              doc.setFont('helvetica', 'normal');
+              doc.setFontSize(6);
+              doc.setTextColor(100, 100, 100);
+
+              const ratedTime = ratingRecord.rated_at ?
+                new Date(ratingRecord.rated_at).toLocaleString('en-US', {
+                  timeZone: 'America/Los_Angeles',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                }) : 'Unknown time';
+
+              doc.text(`By: ${ratingRecord.rated_by} at ${ratedTime}`, col2X + 5, col2Y);
+              col2Y += 8;
+            }
+
+            // Notes (MUCH more readable for reviews)
+            if (ratingRecord.notes && ratingRecord.notes.trim()) {
+              doc.setFont('helvetica', 'italic');
+              doc.setFontSize(noteFontSize);
+              doc.setTextColor(66, 66, 66); // Darker for readability
+              const noteLines = doc.splitTextToSize(`"${ratingRecord.notes}"`, colWidth - 10);
+              const maxLines = isReviewOnly ? 3 : 1; // More lines for reviews
+              noteLines.slice(0, maxLines).forEach(line => {
+                doc.text(line, col2X + 5, col2Y);
+                col2Y += isReviewOnly ? 8 : 6;
+              });
+              doc.setFont('helvetica', 'normal');
+              col2Y += isReviewOnly ? 6 : 0;
+            }
+
+            col2Y += isReviewOnly ? 4 : 0; // Extra spacing between ratings for reviews
+          }
+        });
+      }
+
+      col2Y += 6;
+    }
+
+    // ========== SESSION INSIGHTS BOX ==========
+    doc.setFillColor(239, 246, 255); // Very light blue background
+    const insightsBoxY = col2Y;
+    const insightsBoxHeight = 55;
+    doc.rect(col2X - 5, insightsBoxY, colWidth + 10, insightsBoxHeight, 'F');
+
+    // Border
+    doc.setDrawColor(59, 130, 246);
+    doc.setLineWidth(1);
+    doc.rect(col2X - 5, insightsBoxY, colWidth + 10, insightsBoxHeight);
+
+    col2Y += 10;
+
+    // Header
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(33, 33, 33);
+    doc.text('SESSION INSIGHTS', col2X, col2Y);
+    col2Y += 11;
+
+    // Metrics (compact 2-column)
+    doc.setFontSize(6);
+    const insightCol1X = col2X;
+    const insightCol2X = col2X + (colWidth / 2);
+
+    let insightY = col2Y;
+
+    // Left metrics
+    const totalTasks = tasks.length;
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+
+    if (totalTasks > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(66, 66, 66);
+      doc.text('Tasks:', insightCol1X, insightY);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(33, 33, 33);
+      doc.text(`${completedTasks.length}/${totalTasks}`, insightCol1X + 26, insightY);
+      insightY += 8;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Rate:', insightCol1X, insightY);
+      doc.setFont('helvetica', 'normal');
+      if (completionRate >= 90) {
+        doc.setTextColor(5, 150, 105); // Green
+      } else if (completionRate >= 70) {
+        doc.setTextColor(245, 158, 11); // Orange
+      } else {
+        doc.setTextColor(220, 38, 38); // Red
+      }
+      doc.text(`${completionRate}%`, insightCol1X + 26, insightY);
+      insightY += 8;
+    }
+
+    // First and Last task timestamps
+    const taskTimestamps = completedTasks
+      .filter(t => t.completed_at)
+      .map(t => new Date(t.completed_at))
+      .sort((a, b) => a - b);
+
+    if (taskTimestamps.length > 0) {
+      const firstTaskTime = taskTimestamps[0].toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
         hour: 'numeric',
         minute: '2-digit',
         hour12: true
       });
+
       doc.setFont('helvetica', 'bold');
-      doc.text('COMPLETED: ', 3.5, yPos);
+      doc.setTextColor(66, 66, 66);
+      doc.text('First:', insightCol1X, insightY);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(successGreen[0], successGreen[1], successGreen[2]);
-      doc.text(completedTime, 4.3, yPos);
-    } else {
-      doc.setFont('helvetica', 'bold');
-      doc.text('STATUS: ', 3.5, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(errorRed[0], errorRed[1], errorRed[2]);
-      doc.text('INCOMPLETE', 4.1, yPos);
-    }
+      doc.setTextColor(33, 33, 33);
+      doc.text(firstTaskTime, insightCol1X + 26, insightY);
+      insightY += 8;
 
-    yPos += 0.3;
-
-    // Tasks section
-    const sessionTasks = session.foh_checklist_tasks || [];
-    if (sessionTasks.length > 0) {
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(black[0], black[1], black[2]);
-      doc.text('TASKS', 0.5, yPos);
-      yPos += 0.2;
-
-      const completedTasks = sessionTasks.filter(t => t.is_completed);
-      const incompleteTasks = sessionTasks.filter(t => !t.is_completed);
-
-      // Summary stats
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(successGreen[0], successGreen[1], successGreen[2]);
-      doc.text(`COMPLETED: ${completedTasks.length}/${sessionTasks.length}`, 0.5, yPos);
-
-      if (incompleteTasks.length > 0) {
-        doc.setTextColor(errorRed[0], errorRed[1], errorRed[2]);
-        doc.text(`INCOMPLETE: ${incompleteTasks.length}`, 3.5, yPos);
-      }
-
-      yPos += 0.2;
-
-      // Show COMPLETED tasks
-      if (completedTasks.length > 0) {
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(successGreen[0], successGreen[1], successGreen[2]);
-        doc.text('COMPLETED TASKS:', 0.5, yPos);
-        yPos += 0.15;
-
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-
-        completedTasks.forEach(task => {
-          if (yPos > 10.2) {
-            doc.addPage();
-            yPos = 0.7;
-          }
-
-          const wrappedLines = doc.splitTextToSize(`[DONE] ${task.task_text}`, 7);
-          wrappedLines.forEach(line => {
-            doc.text(line, 0.7, yPos);
-            yPos += 0.09;
-          });
-        });
-
-        yPos += 0.15;
-      }
-
-      // Show INCOMPLETE tasks
-      if (incompleteTasks.length > 0) {
-        if (yPos > 9.5) {
-          doc.addPage();
-          yPos = 0.7;
-        }
-
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(errorRed[0], errorRed[1], errorRed[2]);
-        doc.text('INCOMPLETE TASKS:', 0.5, yPos);
-        yPos += 0.15;
-
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-
-        incompleteTasks.forEach(task => {
-          if (yPos > 10.2) {
-            doc.addPage();
-            yPos = 0.7;
-          }
-
-          const wrappedLines = doc.splitTextToSize(`[MISSING] ${task.task_text}`, 7);
-          wrappedLines.forEach(line => {
-            doc.text(line, 0.7, yPos);
-            yPos += 0.09;
-          });
-        });
-
-        yPos += 0.15;
-      }
-    }
-
-    // Ratings section
-    const ratings = session.foh_checklist_ratings || [];
-    if (ratings.length > 0) {
-      if (yPos > 9.5) {
-        doc.addPage();
-        yPos = 0.7;
-      }
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(black[0], black[1], black[2]);
-      doc.text('QUALITY RATINGS', 0.5, yPos);
-      yPos += 0.2;
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-
-      ratings.forEach(rating => {
-        if (yPos > 10.2) {
-          doc.addPage();
-          yPos = 0.7;
-        }
-
-        // Rating color coding
-        const ratingColor = rating.rating >= 4 ? successGreen : rating.rating >= 3 ? warningOrange : errorRed;
-
-        doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${rating.category_name}:`, 0.5, yPos);
-
-        doc.setTextColor(ratingColor[0], ratingColor[1], ratingColor[2]);
-        doc.text(`${rating.rating}/5`, 6.5, yPos);
-
-        yPos += 0.12;
-
-        if (rating.notes) {
-          doc.setFontSize(7);
-          doc.setFont('helvetica', 'italic');
-          doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-          const notesLines = doc.splitTextToSize(`"${rating.notes}"`, 7);
-          notesLines.forEach(line => {
-            doc.text(line, 0.7, yPos);
-            yPos += 0.08;
-          });
-          doc.setFontSize(9);
-          yPos += 0.03;
-        }
+      const lastTaskTime = taskTimestamps[taskTimestamps.length - 1].toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
       });
 
-      yPos += 0.15;
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(66, 66, 66);
+      doc.text('Last:', insightCol1X, insightY);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(33, 33, 33);
+      doc.text(lastTaskTime, insightCol1X + 26, insightY);
     }
 
-    // Session notes
-    if (session.notes) {
-      if (yPos > 9.5) {
-        doc.addPage();
-        yPos = 0.7;
-      }
+    // Right metrics
+    insightY = col2Y;
 
-      doc.setFontSize(11);
+    // Staff count (people who completed tasks on this page)
+    const staffCount = Object.keys(tasksByPerson).length;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(66, 66, 66);
+    doc.text('Staff:', insightCol2X, insightY);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(33, 33, 33);
+    doc.text(`${staffCount}`, insightCol2X + 22, insightY);
+    insightY += 8;
+
+    // Top performer
+    const topPerformer = Object.entries(tasksByPerson).sort((a, b) => b[1].length - a[1].length)[0];
+    if (topPerformer) {
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(black[0], black[1], black[2]);
-      doc.text('NOTES', 0.5, yPos);
-      yPos += 0.2;
-
-      doc.setFontSize(9);
+      doc.setTextColor(66, 66, 66);
+      doc.text('Top:', insightCol2X, insightY);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(darkGray[0], darkGray[1], darkGray[2]);
-      const notesLines = doc.splitTextToSize(session.notes, 7);
-      notesLines.forEach(line => {
-        if (yPos > 10.2) {
-          doc.addPage();
-          yPos = 0.7;
-        }
-        doc.text(line, 0.5, yPos);
-        yPos += 0.12;
+      doc.setTextColor(59, 130, 246); // Blue
+      doc.text(topPerformer[0], insightCol2X + 22, insightY);
+      insightY += 8;
+    }
+
+    // Average rating
+    if (ratings && ratings.length > 0) {
+      const avgRating = (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(66, 66, 66);
+      doc.text('Rating:', insightCol2X, insightY);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(33, 33, 33);
+      doc.text(`${avgRating}/5`, insightCol2X + 22, insightY);
+      doc.setFontSize(7);
+      doc.setTextColor(59, 130, 246);
+      doc.text('★', insightCol2X + 22 + doc.getTextWidth(`${avgRating}/5`) + 2, insightY);
+      doc.setFontSize(6);
+    }
+
+    col2Y = insightsBoxY + insightsBoxHeight + 8;
+
+    // ========== NOTES FOR NEXT SHIFT (if any) ==========
+    const sessionNotes = session.notes_for_next_shift || session.notes || '';
+    if (sessionNotes.trim()) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(33, 33, 33);
+      doc.text('NOTES FOR INCOMING CREW', col2X, col2Y);
+      col2Y += 8;
+
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(66, 66, 66);
+      const noteLines = doc.splitTextToSize(sessionNotes, colWidth);
+      noteLines.forEach(line => {
+        doc.text(line, col2X, col2Y);
+        col2Y += 6;
       });
     }
+  }
 
-    // Photos
-    const photos = session.foh_checklist_session_photos || [];
-    if (photos.length > 0) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(mediumGray[0], mediumGray[1], mediumGray[2]);
-      doc.text(`PHOTOS ATTACHED: ${photos.length}`, 0.5, 10.5);
-    }
+  // ========== FOOTER ON EVERY PAGE ==========
+  const pageCount = doc.internal.getNumberOfPages();
+  const generatedTime = new Date().toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  }) + ' PT';
 
-    // Footer
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+
+    // Page number (left)
     doc.setFontSize(7);
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(lightGray[0], lightGray[1], lightGray[2]);
-    doc.text('GENERATED BY JAYNA CHECKLIST SYSTEM', 4.25, 10.7, { align: 'center' });
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Page ${i} of ${pageCount}`, margin, pageHeight - 8);
+
+    // Generated time (center)
+    doc.text(`Generated ${generatedTime}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+
+    // Credit (right)
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100, 100, 100);
+    doc.text('APP CREATED BY DEMETRI GREGORAKIS', pageWidth - margin, pageHeight - 8, { align: 'right' });
   }
 
   return Buffer.from(doc.output('arraybuffer'));
