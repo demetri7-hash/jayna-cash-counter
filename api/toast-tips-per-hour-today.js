@@ -7,8 +7,10 @@
  * - Calculates hours for currently clocked-in employees
  * - Applies 30-min lunch deduction for shifts >6 hours
  * - Sums credit card tips from today's orders
- * - Compares to yesterday for trending
- * - Saves snapshot to database
+ * - Hour-over-hour trending for main display (green/red arrow)
+ * - Saves hourly snapshots to hourly_tips_metrics table
+ * - Compares to yesterday/week/month for context lines
+ * - Saves daily snapshot to daily_tips_metrics table
  *
  * Endpoint: POST /api/toast-tips-per-hour-today
  */
@@ -150,6 +152,72 @@ export default async function handler(req, res) {
     const tipsPerHour = totalHours > 0 ? totalCCTips / totalHours : 0;
     console.log(`🎯 Tips Per Hour: $${tipsPerHour.toFixed(2)}`);
 
+    // STEP 6.5: Save hourly snapshot and get hour-over-hour trending
+    const now = new Date();
+    const currentHour = new Date(now);
+    currentHour.setMinutes(0, 0, 0); // Round to hour
+    const currentHourTimestamp = currentHour.toISOString();
+
+    // Save current hour's data to hourly_tips_metrics
+    const hourlyData = {
+      business_date: businessDate,
+      hour_timestamp: currentHourTimestamp,
+      calculated_at: now.toISOString(),
+      total_cc_tips: totalCCTips,
+      total_hours_worked: totalHours,
+      tips_per_hour: tipsPerHour,
+      total_orders_count: orderCount,
+      employees_worked: employeeCount,
+      employees_clocked_in: currentlyClockedIn,
+      updated_at: now.toISOString()
+    };
+
+    const { error: hourlyError } = await supabase
+      .from('hourly_tips_metrics')
+      .upsert(hourlyData, {
+        onConflict: 'business_date,hour_timestamp',
+        ignoreDuplicates: false
+      });
+
+    if (hourlyError) {
+      console.error('Error saving hourly data:', hourlyError);
+      // Continue anyway
+    } else {
+      console.log(`✅ Saved hourly snapshot for ${currentHourTimestamp}`);
+    }
+
+    // Fetch previous hour's data for hour-over-hour comparison
+    const previousHour = new Date(currentHour);
+    previousHour.setHours(previousHour.getHours() - 1);
+    const previousHourTimestamp = previousHour.toISOString();
+
+    const { data: previousHourData } = await supabase
+      .from('hourly_tips_metrics')
+      .select('tips_per_hour')
+      .eq('business_date', businessDate)
+      .eq('hour_timestamp', previousHourTimestamp)
+      .single();
+
+    // Calculate hour-over-hour trending (THIS DRIVES THE MAIN LINE COLOR)
+    let previousHourTipsPerHour = null;
+    let hourOverHourChange = null;
+    let trendingUp = null;
+
+    if (previousHourData && previousHourData.tips_per_hour) {
+      previousHourTipsPerHour = parseFloat(previousHourData.tips_per_hour);
+      hourOverHourChange = ((tipsPerHour - previousHourTipsPerHour) / previousHourTipsPerHour) * 100;
+      trendingUp = hourOverHourChange >= 0;
+
+      console.log(`📊 Previous Hour Tips/Hour: $${previousHourTipsPerHour.toFixed(2)}`);
+      console.log(`📈 Hour-over-Hour Change: ${hourOverHourChange > 0 ? '+' : ''}${hourOverHourChange.toFixed(1)}%`);
+      console.log(`${trendingUp ? '✅ TRENDING UP' : '❌ TRENDING DOWN'} (hour-over-hour)`);
+    } else {
+      // First hour of the day - default to trending up if we have any tips
+      trendingUp = tipsPerHour > 0;
+      console.log(`📊 No previous hour data - first hour of the day`);
+      console.log(`${trendingUp ? '✅ TRENDING UP (first hour)' : '⚪ NEUTRAL'}`);
+    }
+
     // STEP 7: Get comparison data from database (yesterday, last week, last month)
     const yesterday = new Date(businessDate);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -187,18 +255,16 @@ export default async function handler(req, res) {
       .eq('is_end_of_day', true)
       .single();
 
-    // Calculate yesterday comparison
+    // Calculate yesterday comparison (for display only, NOT for trending)
     let previousDayTipsPerHour = null;
     let percentChange = null;
-    let trendingUp = null;
 
     if (yesterdayData && yesterdayData.tips_per_hour) {
       previousDayTipsPerHour = parseFloat(yesterdayData.tips_per_hour);
       percentChange = ((tipsPerHour - previousDayTipsPerHour) / previousDayTipsPerHour) * 100;
-      trendingUp = percentChange >= 0;
 
       console.log(`📊 Yesterday's Tips/Hour: $${previousDayTipsPerHour.toFixed(2)}`);
-      console.log(`📈 Change: ${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%`);
+      console.log(`📈 Yesterday Change: ${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%`);
     }
 
     // Calculate last week comparison
