@@ -213,6 +213,9 @@ export default async function handler(req, res) {
 async function generateOrderReceiptPDF(order, lineItems) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
+  // Set normal character spacing (fixes spacing issues)
+  doc.setCharSpace(0);
+
   let yPos = 40;
 
   // Header - JAYNA GYRO
@@ -517,22 +520,39 @@ async function generateOrderReceiptPDF(order, lineItems) {
 
   yPos += 30;
 
-  // Special Notes
+  // Special Notes - Improved formatting
   if (order.delivery_notes) {
     yPos += 10;
-    doc.setFillColor(255, 240, 200);
-    doc.rect(40, yPos, 515, 50, 'F');
-    doc.setDrawColor(200, 150, 0);
-    doc.rect(40, yPos, 515, 50, 'S');
 
-    yPos += 20;
-    doc.setFontSize(10);
+    // Calculate dynamic box height based on text content
+    const notesLines = doc.splitTextToSize(order.delivery_notes, 495);
+    const boxHeight = Math.max(60, 40 + (notesLines.length * 14));
+
+    doc.setFillColor(255, 240, 200);
+    doc.rect(40, yPos, 515, boxHeight, 'F');
+    doc.setDrawColor(200, 150, 0);
+    doc.setLineWidth(1.5);
+    doc.rect(40, yPos, 515, boxHeight, 'S');
+
+    yPos += 22;
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('SPECIAL NOTES:', 50, yPos);
-    yPos += 15;
+    yPos += 18;
+
+    // Render notes with better spacing and readability
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    const notesLines = doc.splitTextToSize(order.delivery_notes, 495);
-    doc.text(notesLines, 50, yPos);
+    doc.setCharSpace(0); // Explicitly ensure no extra character spacing
+
+    notesLines.forEach((line, index) => {
+      if (index < 5) { // Limit to 5 lines max
+        doc.text(line, 50, yPos);
+        yPos += 14;
+      }
+    });
+
+    yPos += 10; // Bottom padding
   }
 
   // Footer
