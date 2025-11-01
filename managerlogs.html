@@ -1139,7 +1139,10 @@
         return;
       }
 
-      list.innerHTML = data.map(incident => {
+      // Store incidents globally for access by onclick handlers
+      window.allIncidents = data;
+
+      list.innerHTML = data.map((incident, idx) => {
         const preview = incident.incident_report.substring(0, 120) + (incident.incident_report.length > 120 ? '...' : '');
         const date = new Date(incident.incident_date).toLocaleDateString('en-US', {
           weekday: 'short',
@@ -1149,7 +1152,7 @@
         });
 
         return `
-          <div class="incident-card" onclick='viewIncident(${JSON.stringify(incident)})'>
+          <div class="incident-card" data-incident-index="${idx}" onclick="viewIncidentByIndex(${idx})">
             <div class="incident-header">
               <div class="incident-date">${date} at ${incident.incident_time}</div>
               <div class="incident-manager">${incident.manager_name}</div>
@@ -1161,6 +1164,12 @@
           </div>
         `;
       }).join('');
+    }
+
+    function viewIncidentByIndex(index) {
+      if (window.allIncidents && window.allIncidents[index]) {
+        viewIncident(window.allIncidents[index]);
+      }
     }
 
     function viewIncident(incident) {
