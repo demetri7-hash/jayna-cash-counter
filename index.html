@@ -1821,37 +1821,7 @@
 
           <!-- PREP Item Counting Section -->
           <div style="margin-bottom: 30px;">
-            <h3 style="margin-bottom: 12px; color: var(--gray-900); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Update Prep Stock Counts</h3>
-
-            <!-- Staff Counter Display -->
-            <div id="prepCounterDisplay" style="margin-bottom: 16px; padding: 12px 16px; background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); border: 2px solid #2196F3; border-radius: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <div id="prepCounterColorDot" style="width: 12px; height: 12px; border-radius: 50%; background: #0094D6; flex-shrink: 0;"></div>
-                <span style="font-size: 13px; font-weight: 600; color: var(--gray-900);">
-                  Counting as: <span id="prepCounterName" style="font-weight: 700;">Loading...</span>
-                </span>
-              </div>
-              <button
-                onclick="cycleToNextPrepCounter()"
-                style="
-                  padding: 6px 14px;
-                  background: white;
-                  color: var(--gray-900);
-                  border: 2px solid var(--gray-300);
-                  border-radius: 0;
-                  font-size: 11px;
-                  font-weight: 700;
-                  text-transform: uppercase;
-                  letter-spacing: 0.5px;
-                  cursor: pointer;
-                  transition: all 0.15s ease;
-                "
-                onmouseover="this.style.background='var(--gray-100)'"
-                onmouseout="this.style.background='white'"
-                title="Click to switch to next clocked-in staff member">
-                SWITCH COUNTER
-              </button>
-            </div>
+            <h3 style="margin-bottom: 16px; color: var(--gray-900); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Update Prep Stock Counts</h3>
 
             <div id="prepCountList" style="width: 100%;">
               <p style="text-align: center; padding: 20px; color: var(--gray-500);">Loading prep items...</p>
@@ -3169,12 +3139,18 @@
 
     let html = '';
 
-    // Main tips/hr with color
+    // Main tips/hr with color and hour-over-hour percentage
     const mainColor = data.trendingUp ? '#059669' : '#dc2626';
     const arrow = data.trendingUp ? '↑' : '↓';
 
     html += `<div style="color: ${mainColor}; font-weight: 600; margin-bottom: 2px;">`;
     html += `${arrow} $${data.tipsPerHour.toFixed(2)}/hr`;
+
+    // Add hour-over-hour percentage if available
+    if (data.percentChangeFromLastHour !== null && data.percentChangeFromLastHour !== undefined) {
+      html += ` ${data.percentChangeFromLastHour > 0 ? '+' : ''}${data.percentChangeFromLastHour}% vs. last hour`;
+    }
+
     html += `</div>`;
 
     // Yesterday comparison (check actual sign of percentChangeFromYesterday)
@@ -11306,6 +11282,66 @@
   }
 
   /**
+   * Change Prep Item User - Cycle through team members for a counted item
+   * (Same pattern as FOH checklists' changeTaskUser)
+   */
+  async function changePrepItemUser(itemId) {
+    const item = orderingSystemState.items.find(i => i.id === itemId);
+    if (!item || !item.countedBy) return;
+
+    // Ensure teamNames includes all clocked-in employees
+    if (prepCountingState.clockedInEmployees.length > 0) {
+      if (prepCountingState.teamNames.length < prepCountingState.clockedInEmployees.length) {
+        prepCountingState.teamNames = prepCountingState.clockedInEmployees.map((name, index) => ({
+          name: name,
+          color: getUserColor(index)
+        }));
+      }
+    }
+
+    if (prepCountingState.teamNames.length === 0) {
+      showMessage('No team members available to cycle through', 'error');
+      return;
+    }
+
+    // Find current user index
+    const currentUserIndex = prepCountingState.teamNames.findIndex(u => u.name === item.countedBy);
+
+    // Cycle to next user
+    const nextUserIndex = (currentUserIndex + 1) % prepCountingState.teamNames.length;
+    const nextUser = prepCountingState.teamNames[nextUserIndex];
+
+    try {
+      // Update item in database
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({
+          counted_by: nextUser.name,
+          counted_at: new Date().toISOString()
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      item.countedBy = nextUser.name;
+      item.countedAt = new Date().toISOString();
+
+      // Set this as active user
+      setActivePrepCounter(nextUserIndex);
+
+      // Re-render prep count list to show new user
+      renderPrepCountList();
+
+      console.log(`✏️ Changed prep item user to: ${nextUser.name}`);
+
+    } catch (error) {
+      console.error('Error changing prep item user:', error);
+      showMessage('Failed to change user', 'error');
+    }
+  }
+
+  /**
    * Fetch Currently Clocked-In Employees from Toast API for prep counting
    */
   async function fetchClockedInEmployeesForPrep() {
@@ -11345,13 +11381,8 @@
       const accessToken = authData.data.accessToken;
 
       // STEP 2: Fetch labor entries for today
-      const laborUrl = `/api/toast-labor-summary?businessDate=${today}`;
-      const laborResponse = await fetch(laborUrl, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Toast-Restaurant-External-ID': authData.data.restaurantGuid
-        }
-      });
+      const laborUrl = `/api/toast-labor-summary?startDate=${today}&endDate=${today}&token=${accessToken}`;
+      const laborResponse = await fetch(laborUrl);
 
       if (!laborResponse.ok) {
         console.error('❌ Failed to fetch labor data from Toast');
@@ -16350,6 +16381,50 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                     SHOW IN BOTTLE COUNT
                   </label>
                 </div>
+
+                <!-- Counted By Display (shows after item is counted) -->
+                ${item.countedBy ? `
+                  <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--gray-600); margin-top: 10px; font-style: italic; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--gray-200);">
+                    <!-- Color dot for user -->
+                    ${(() => {
+                      const userIndex = prepCountingState.teamNames.findIndex(u => u.name === item.countedBy);
+                      const userColor = userIndex >= 0 ? prepCountingState.teamNames[userIndex].color : getUserColor(0);
+                      return `<div style="width: 12px; height: 12px; border-radius: 50%; background: ${userColor}; flex-shrink: 0;"></div>`;
+                    })()}
+                    <!-- CLICKABLE NAME: Click entire name text to cycle through clocked-in users -->
+                    ${prepCountingState.teamNames.length > 1 || prepCountingState.clockedInEmployees.length > 0 ? `
+                      <a href="javascript:void(0)"
+                         onclick="event.stopPropagation(); changePrepItemUser(${item.id})"
+                         style="
+                           color: var(--gray-600);
+                           font-size: 11px;
+                           text-decoration: none;
+                           cursor: pointer;
+                           font-style: italic;
+                           padding: 2px 4px;
+                           border-radius: 0;
+                           transition: all 0.15s ease;
+                         "
+                         onmouseover="this.style.color='var(--primary-blue)'"
+                         onmouseout="this.style.color='var(--gray-600)'"
+                         title="Click to cycle to next user (${prepCountingState.clockedInEmployees.length} clocked in)">
+                        ✓ ${item.countedBy}${item.countedAt ? ` • ${formatPacificDateDisplay(new Date(item.countedAt), {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        })}` : ''}
+                      </a>
+                    ` : `
+                      <span>
+                        ✓ ${item.countedBy}${item.countedAt ? ` • ${formatPacificDateDisplay(new Date(item.countedAt), {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        })}` : ''}
+                      </span>
+                    `}
+                  </div>
+                ` : ''}
               </div>
             `;
             }).join('')}
