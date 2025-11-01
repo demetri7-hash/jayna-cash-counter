@@ -315,9 +315,10 @@
       min-width: 120px;
     }
 
-    .calendar-table th.time-col {
-      width: 80px;
-      min-width: 80px;
+    .calendar-table th.employee-col {
+      width: 150px;
+      min-width: 150px;
+      text-align: left;
     }
 
     .calendar-table td {
@@ -325,16 +326,18 @@
       text-align: center;
       font-size: 12px;
       border: 1px solid var(--gray-200);
-      height: 60px;
+      height: 80px;
       vertical-align: top;
       position: relative;
     }
 
-    .calendar-table td.time-cell {
+    .calendar-table td.employee-cell {
       background: var(--gray-50);
       font-weight: 600;
-      color: var(--gray-600);
-      font-size: 11px;
+      color: var(--gray-700);
+      font-size: 12px;
+      text-align: left;
+      padding-left: 12px;
     }
 
     .day-header {
@@ -803,14 +806,14 @@
       <table class="calendar-table">
         <thead>
           <tr>
-            <th class="time-col">TIME</th>
-            <th id="daySun"><div class="day-header"><span class="day-name">SUNDAY</span><span class="day-date"></span></div></th>
-            <th id="dayMon"><div class="day-header"><span class="day-name">MONDAY</span><span class="day-date"></span></div></th>
-            <th id="dayTue"><div class="day-header"><span class="day-name">TUESDAY</span><span class="day-date"></span></div></th>
-            <th id="dayWed"><div class="day-header"><span class="day-name">WEDNESDAY</span><span class="day-date"></span></div></th>
-            <th id="dayThu"><div class="day-header"><span class="day-name">THURSDAY</span><span class="day-date"></span></div></th>
-            <th id="dayFri"><div class="day-header"><span class="day-name">FRIDAY</span><span class="day-date"></span></div></th>
-            <th id="daySat"><div class="day-header"><span class="day-name">SATURDAY</span><span class="day-date"></span></div></th>
+            <th class="employee-col">EMPLOYEE</th>
+            <th id="daySun"><div class="day-header"><span class="day-name">SUN</span><span class="day-date"></span></div></th>
+            <th id="dayMon"><div class="day-header"><span class="day-name">MON</span><span class="day-date"></span></div></th>
+            <th id="dayTue"><div class="day-header"><span class="day-name">TUE</span><span class="day-date"></span></div></th>
+            <th id="dayWed"><div class="day-header"><span class="day-name">WED</span><span class="day-date"></span></div></th>
+            <th id="dayThu"><div class="day-header"><span class="day-name">THU</span><span class="day-date"></span></div></th>
+            <th id="dayFri"><div class="day-header"><span class="day-name">FRI</span><span class="day-date"></span></div></th>
+            <th id="daySat"><div class="day-header"><span class="day-name">SAT</span><span class="day-date"></span></div></th>
           </tr>
         </thead>
         <tbody id="calendarBody">
@@ -847,12 +850,16 @@
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
         <div class="form-group">
           <label class="form-label" for="shiftStartTime">Start Time</label>
-          <input type="time" class="form-input" id="shiftStartTime" required>
+          <select class="form-select" id="shiftStartTime" required>
+            <option value="">Select time...</option>
+          </select>
         </div>
 
         <div class="form-group">
           <label class="form-label" for="shiftEndTime">End Time</label>
-          <input type="time" class="form-input" id="shiftEndTime" required>
+          <select class="form-select" id="shiftEndTime" required>
+            <option value="">Select time...</option>
+          </select>
         </div>
       </div>
 
@@ -1002,6 +1009,9 @@ async function init() {
 
   console.log('✅ Supabase initialized');
 
+  // Populate time dropdowns
+  populateTimeDropdowns();
+
   // Load initial data
   await loadEmployees();
 
@@ -1010,6 +1020,32 @@ async function init() {
 
   // Load tips per hour
   fetchTipsPerHour();
+}
+
+// Generate time options (15-minute intervals from 1:00 AM to 11:45 PM)
+function populateTimeDropdowns() {
+  const startSelect = document.getElementById('shiftStartTime');
+  const endSelect = document.getElementById('shiftEndTime');
+
+  // Generate times from 1:00 AM (01:00) to 11:45 PM (23:45)
+  for (let hour = 1; hour <= 23; hour++) {
+    for (let minute = 0; minute < 60; minute += 15) {
+      const timeValue = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+      const period = hour >= 12 ? 'PM' : 'AM';
+      const timeLabel = `${displayHour}:${String(minute).padStart(2, '0')} ${period}`;
+
+      const startOption = document.createElement('option');
+      startOption.value = timeValue;
+      startOption.textContent = timeLabel;
+      startSelect.appendChild(startOption);
+
+      const endOption = document.createElement('option');
+      endOption.value = timeValue;
+      endOption.textContent = timeLabel;
+      endSelect.appendChild(endOption);
+    }
+  }
 }
 
 // Initialize on page load
@@ -1285,17 +1321,31 @@ function generateCalendarGrid() {
   const tbody = document.getElementById('calendarBody');
   tbody.innerHTML = '';
 
-  // Generate hourly rows from 6 AM to 11 PM
-  for (let hour = 6; hour <= 23; hour++) {
+  // Get active employees only
+  const activeEmployees = employees.filter(emp => emp.is_active);
+
+  if (activeEmployees.length === 0) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 8;
+    cell.style.textAlign = 'center';
+    cell.style.padding = '40px';
+    cell.style.color = 'var(--gray-500)';
+    cell.textContent = 'No active employees. Sync employees from Toast POS first.';
+    row.appendChild(cell);
+    tbody.appendChild(row);
+    return;
+  }
+
+  // Generate one row per employee
+  activeEmployees.forEach(emp => {
     const row = document.createElement('tr');
 
-    // Time cell
-    const timeCell = document.createElement('td');
-    timeCell.className = 'time-cell';
-    const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-    const period = hour >= 12 ? 'PM' : 'AM';
-    timeCell.textContent = `${displayHour}:00 ${period}`;
-    row.appendChild(timeCell);
+    // Employee name cell
+    const empCell = document.createElement('td');
+    empCell.className = 'employee-cell';
+    empCell.textContent = `${emp.first_name} ${emp.last_name}`;
+    row.appendChild(empCell);
 
     // Day cells (7 days)
     for (let day = 0; day < 7; day++) {
@@ -1307,18 +1357,19 @@ function generateCalendarGrid() {
       const dateStr = date.toISOString().split('T')[0];
 
       cell.dataset.date = dateStr;
-      cell.dataset.hour = hour;
+      cell.dataset.employeeId = emp.id;
+      cell.dataset.employeeName = `${emp.first_name} ${emp.last_name}`;
 
       // Add drop event listeners
       cell.addEventListener('dragover', handleDragOver);
       cell.addEventListener('drop', handleDrop);
       cell.addEventListener('dragleave', handleDragLeave);
 
-      // Add click event listener to open shift modal
+      // Add click event listener to open shift modal with pre-filled employee and date
       cell.addEventListener('click', (e) => {
         // Only open modal if clicking empty cell (not a shift block)
         if (!e.target.closest('.shift-block')) {
-          openAddShiftModalWithDateTime(dateStr, hour);
+          openAddShiftModalWithEmployeeAndDate(emp.id, dateStr);
         }
       });
 
@@ -1326,7 +1377,7 @@ function generateCalendarGrid() {
     }
 
     tbody.appendChild(row);
-  }
+  });
 }
 
 async function loadWeekSchedule() {
@@ -1366,11 +1417,11 @@ function renderShifts() {
   shifts.forEach(shift => {
     const shiftBlock = createShiftBlock(shift);
 
-    // Find the cell to place it in
+    // Find the cell to place it in (by employee and date)
     const date = shift.shift_date;
-    const startHour = parseInt(shift.start_time.split(':')[0]);
+    const employeeId = shift.employee_id;
 
-    const cell = document.querySelector(`td[data-date="${date}"][data-hour="${startHour}"]`);
+    const cell = document.querySelector(`td[data-date="${date}"][data-employee-id="${employeeId}"]`);
     if (cell) {
       cell.appendChild(shiftBlock);
     }
@@ -1393,15 +1444,23 @@ function createShiftBlock(shift) {
     block.classList.add('position-manager');
   }
 
-  const employeeName = document.createElement('div');
-  employeeName.className = 'shift-employee-name';
-  employeeName.textContent = shift.employee ? `${shift.employee.first_name} ${shift.employee.last_name}` : 'Open Shift';
-  block.appendChild(employeeName);
-
+  // Only show time (employee name is already in the row header)
   const timeInfo = document.createElement('div');
   timeInfo.className = 'shift-time';
+  timeInfo.style.fontSize = '12px';
+  timeInfo.style.fontWeight = '700';
   timeInfo.textContent = `${formatTime(shift.start_time)} - ${formatTime(shift.end_time)}`;
   block.appendChild(timeInfo);
+
+  // Show position if available
+  if (shift.position) {
+    const positionInfo = document.createElement('div');
+    positionInfo.style.fontSize = '10px';
+    positionInfo.style.marginTop = '2px';
+    positionInfo.style.opacity = '0.9';
+    positionInfo.textContent = shift.position;
+    block.appendChild(positionInfo);
+  }
 
   // Drag events
   block.addEventListener('dragstart', handleDragStart);
@@ -1470,31 +1529,21 @@ async function handleDrop(e) {
 
   const targetCell = e.currentTarget;
   const newDate = targetCell.dataset.date;
-  const newHour = parseInt(targetCell.dataset.hour);
+  const newEmployeeId = targetCell.dataset.employeeId;
 
   // Find the shift
   const shift = shifts.find(s => s.id === draggedShiftId);
   if (!shift) return;
 
-  // Calculate new times (keep duration same)
-  const [oldStartHour, oldStartMinute] = shift.start_time.split(':').map(Number);
-  const [oldEndHour, oldEndMinute] = shift.end_time.split(':').map(Number);
-  const duration = (oldEndHour * 60 + oldEndMinute) - (oldStartHour * 60 + oldStartMinute);
-
-  const newStartTime = `${String(newHour).padStart(2, '0')}:${String(oldStartMinute).padStart(2, '0')}:00`;
-  const newEndHour = Math.floor((newHour * 60 + oldStartMinute + duration) / 60);
-  const newEndMinute = (newHour * 60 + oldStartMinute + duration) % 60;
-  const newEndTime = `${String(newEndHour).padStart(2, '0')}:${String(newEndMinute).padStart(2, '0')}:00`;
-
   try {
     showLoading('MOVING SHIFT', 'Updating schedule...');
 
+    // Update employee and date, keep times the same
     const { error } = await supabase
       .from('shifts')
       .update({
+        employee_id: newEmployeeId,
         shift_date: newDate,
-        start_time: newStartTime,
-        end_time: newEndTime,
         updated_at: new Date().toISOString()
       })
       .eq('id', draggedShiftId);
@@ -1531,24 +1580,19 @@ function openAddShiftModal() {
   document.getElementById('shiftModal').classList.add('active');
 }
 
-function openAddShiftModalWithDateTime(date, hour) {
+function openAddShiftModalWithEmployeeAndDate(employeeId, date) {
   document.getElementById('shiftModalTitle').textContent = 'ADD SHIFT';
   document.getElementById('shiftForm').reset();
   document.getElementById('shiftId').value = '';
   document.getElementById('shiftCostPreview').style.display = 'none';
 
+  // Pre-fill employee
+  document.getElementById('shiftEmployee').value = employeeId;
+
   // Pre-fill date
   document.getElementById('shiftDate').value = date;
 
-  // Pre-fill start time (clicked hour)
-  const startTime = `${String(hour).padStart(2, '0')}:00`;
-  document.getElementById('shiftStartTime').value = startTime;
-
-  // Pre-fill end time (default 8 hours later)
-  let endHour = hour + 8;
-  if (endHour >= 24) endHour = 23; // Cap at 11 PM
-  const endTime = `${String(endHour).padStart(2, '0')}:00`;
-  document.getElementById('shiftEndTime').value = endTime;
+  // No time pre-filled - user selects from dropdown
 
   document.getElementById('shiftModal').classList.add('active');
 }
