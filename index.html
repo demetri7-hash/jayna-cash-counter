@@ -3273,12 +3273,25 @@
 
   async function fetchTopLeader() {
     try {
-      // Get Pacific time start/end of today
+      // Get Pacific time start/end of today (STARTING AT 5AM, NOT MIDNIGHT)
       const nowPacific = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      const currentHour = nowPacific.getHours();
+
+      // If it's before 5 AM, we're still in "yesterday's" shift
       const todayStart = new Date(nowPacific);
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(nowPacific);
-      todayEnd.setHours(23, 59, 59, 999);
+      if (currentHour < 5) {
+        // Use yesterday at 5 AM
+        todayStart.setDate(todayStart.getDate() - 1);
+        todayStart.setHours(5, 0, 0, 0);
+      } else {
+        // Use today at 5 AM
+        todayStart.setHours(5, 0, 0, 0);
+      }
+
+      // End time is tomorrow at 4:59:59 AM (covers the full shift)
+      const todayEnd = new Date(todayStart);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+      todayEnd.setHours(4, 59, 59, 999);
 
       const startISO = todayStart.toISOString();
       const endISO = todayEnd.toISOString();
