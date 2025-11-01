@@ -691,7 +691,11 @@
       CURRENT TIPS PER HOUR
     </div>
     <div id="tipsPerHourText" style="margin-top: 4px; font-size: 9px; line-height: 1.3;">
-      <!-- Tips/hr will display here -->
+      </div>
+      <div id="tipsLastUpdated" style="margin-top: 4px; font-size: 8px; color: #999; font-weight: 500;">
+        <!-- Last updated timestamp -->
+      </div>
+      <div id="tipsLastUpdated" style="margin-top: 4px; font-size: 8px; color: #999; font-weight: 500;">
     </div>
   </div>
 
@@ -706,6 +710,7 @@
       <a href="drivers.html" class="menu-btn" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-700); background: var(--gray-700); font-size: 11px; font-weight: 700; color: white; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px;">Drivers</a>
       <button class="menu-btn primary" style="cursor: default; background: var(--gray-300) !important; border-color: var(--gray-400) !important; padding: 16px 12px; font-size: 11px; font-weight: 700; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; border: 2px solid;">Scheduling</button>
       <a href="manager.html" class="menu-btn" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-700); background: var(--gray-700); font-size: 11px; font-weight: 700; color: white; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px;">Manager</a>
+        <a href="teamupdates.html" class="menu-btn primary">Team Updates</a>
     </div>
   </div>
 
@@ -1658,6 +1663,9 @@ function hideError() {
 
 // ==================== TIPS PER HOUR DISPLAY ====================
 
+    let lastTipsUpdate = null;
+
+
 async function fetchTipsPerHour() {
   try {
     const response = await fetch('/api/toast-tips-per-hour-today', {
@@ -1672,7 +1680,11 @@ async function fetchTipsPerHour() {
     const result = await response.json();
 
     if (result.success && result.data) {
+          lastTipsUpdate = new Date();
+
       updateTipsPerHourDisplay(result.data);
+          updateLastUpdatedTime();
+
     } else {
       updateTipsPerHourDisplay(null);
     }
@@ -1730,6 +1742,35 @@ function updateTipsPerHourDisplay(data) {
 
 // Auto-refresh tips/hr every 5 minutes
 setInterval(fetchTipsPerHour, 5 * 60 * 1000);
+
+
+    function updateLastUpdatedTime() {
+      const lastUpdatedDiv = document.getElementById('tipsLastUpdated');
+      if (!lastUpdatedDiv || !lastTipsUpdate) return;
+
+      const now = new Date();
+      const diffMs = now - lastTipsUpdate;
+      const diffSec = Math.floor(diffMs / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+
+      let timeAgo = '';
+      if (diffMin < 1) {
+        timeAgo = 'Just now';
+      } else if (diffMin === 1) {
+        timeAgo = '1 minute ago';
+      } else if (diffMin < 60) {
+        timeAgo = `${diffMin} minutes ago`;
+      } else {
+        const diffHour = Math.floor(diffMin / 60);
+        timeAgo = diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
+      }
+
+      lastUpdatedDiv.textContent = `LAST UPDATED: ${timeAgo}`;
+    }
+
+    // Update "time ago" display every 30 seconds
+    setInterval(updateLastUpdatedTime, 30 * 1000);
+
 
 // ==================== END TIPS PER HOUR DISPLAY ====================
 </script>
