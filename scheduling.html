@@ -1314,6 +1314,14 @@ function generateCalendarGrid() {
       cell.addEventListener('drop', handleDrop);
       cell.addEventListener('dragleave', handleDragLeave);
 
+      // Add click event listener to open shift modal
+      cell.addEventListener('click', (e) => {
+        // Only open modal if clicking empty cell (not a shift block)
+        if (!e.target.closest('.shift-block')) {
+          openAddShiftModalWithDateTime(dateStr, hour);
+        }
+      });
+
       row.appendChild(cell);
     }
 
@@ -1519,6 +1527,28 @@ function openAddShiftModal() {
   const monday = new Date(currentWeekStart);
   monday.setDate(currentWeekStart.getDate() + 1);
   document.getElementById('shiftDate').value = monday.toISOString().split('T')[0];
+
+  document.getElementById('shiftModal').classList.add('active');
+}
+
+function openAddShiftModalWithDateTime(date, hour) {
+  document.getElementById('shiftModalTitle').textContent = 'ADD SHIFT';
+  document.getElementById('shiftForm').reset();
+  document.getElementById('shiftId').value = '';
+  document.getElementById('shiftCostPreview').style.display = 'none';
+
+  // Pre-fill date
+  document.getElementById('shiftDate').value = date;
+
+  // Pre-fill start time (clicked hour)
+  const startTime = `${String(hour).padStart(2, '0')}:00`;
+  document.getElementById('shiftStartTime').value = startTime;
+
+  // Pre-fill end time (default 8 hours later)
+  let endHour = hour + 8;
+  if (endHour >= 24) endHour = 23; // Cap at 11 PM
+  const endTime = `${String(endHour).padStart(2, '0')}:00`;
+  document.getElementById('shiftEndTime').value = endTime;
 
   document.getElementById('shiftModal').classList.add('active');
 }
