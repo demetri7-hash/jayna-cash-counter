@@ -304,17 +304,17 @@
 
     <!-- Leaderboard Content -->
     <div class="content">
-      <h2>🏆 FOH CHECKLIST LEADERBOARD 🏆</h2>
+      <h2>🏆 TEAM LEADERBOARD 🏆</h2>
 
       <div style="text-align: center; margin-bottom: 16px; font-size: 12px; color: var(--gray-600); font-weight: 600;">
-        Today's Top Performers
+        Today's Top Performers • Tasks + Prep Counts
       </div>
 
       <!-- Stats Grid -->
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-value" id="totalTasksToday">0</div>
-          <div class="stat-label">Tasks Completed</div>
+          <div class="stat-label">Total Points</div>
         </div>
         <div class="stat-card">
           <div class="stat-value" id="activePlayersToday">0</div>
@@ -330,7 +330,7 @@
       </div>
 
       <div style="text-align: center; font-size: 10px; color: var(--gray-500); margin-top: 20px;">
-        Updates every 30 seconds • Based on FOH checklist task completions
+        Updates every 30 seconds • FOH Tasks + Prep Counts (1 point each)
       </div>
     </div>
   </div>
@@ -468,30 +468,59 @@
         const [month, day, year] = todayPacific.split(', ')[0].split('/');
         const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
-        const { data: tasks, error } = await supabase
+        // Fetch FOH tasks
+        const { data: tasks, error: tasksError } = await supabase
           .from('foh_checklist_tasks')
           .select('completed_by, completed_at, is_completed')
           .eq('is_completed', true)
           .gte('completed_at', `${today}T00:00:00`)
           .lt('completed_at', `${today}T23:59:59`);
 
-        if (error || !tasks || tasks.length === 0) {
+        // Fetch prep counts
+        const { data: prepCounts, error: prepError } = await supabase
+          .from('inventory_items')
+          .select('counted_by, counted_at')
+          .not('counted_by', 'is', null)
+          .not('counted_at', 'is', null)
+          .gte('counted_at', `${today}T00:00:00`)
+          .lt('counted_at', `${today}T23:59:59`);
+
+        if ((!tasks || tasks.length === 0) && (!prepCounts || prepCounts.length === 0)) {
           updateTopLeaderDisplay(null);
           return;
         }
 
         const leaderboard = {};
-        tasks.forEach(task => {
-          const name = task.completed_by || 'Unknown';
-          if (!leaderboard[name]) {
-            leaderboard[name] = { name, count: 0, lastCompleted: null };
-          }
-          leaderboard[name].count++;
-          const completedAt = new Date(task.completed_at);
-          if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
-            leaderboard[name].lastCompleted = completedAt;
-          }
-        });
+
+        // Count FOH tasks
+        if (tasks && tasks.length > 0) {
+          tasks.forEach(task => {
+            const name = task.completed_by || 'Unknown';
+            if (!leaderboard[name]) {
+              leaderboard[name] = { name, count: 0, lastCompleted: null };
+            }
+            leaderboard[name].count++;
+            const completedAt = new Date(task.completed_at);
+            if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
+              leaderboard[name].lastCompleted = completedAt;
+            }
+          });
+        }
+
+        // Count prep items
+        if (prepCounts && prepCounts.length > 0) {
+          prepCounts.forEach(prep => {
+            const name = prep.counted_by || 'Unknown';
+            if (!leaderboard[name]) {
+              leaderboard[name] = { name, count: 0, lastCompleted: null };
+            }
+            leaderboard[name].count++;
+            const countedAt = new Date(prep.counted_at);
+            if (!leaderboard[name].lastCompleted || countedAt > leaderboard[name].lastCompleted) {
+              leaderboard[name].lastCompleted = countedAt;
+            }
+          });
+        }
 
         const sortedLeaderboard = Object.values(leaderboard)
           .sort((a, b) => {
@@ -512,11 +541,11 @@
       if (!displayDiv) return;
 
       if (!leader) {
-        displayDiv.textContent = 'No tasks completed yet today! 🎯';
+        displayDiv.textContent = 'No activity yet today! 🎯';
         return;
       }
 
-      displayDiv.textContent = `${leader.name} is crushing it with ${leader.count} task${leader.count !== 1 ? 's' : ''}! 🔥`;
+      displayDiv.textContent = `${leader.name} is crushing it with ${leader.count} point${leader.count !== 1 ? 's' : ''}! 🔥`;
     }
 
     // Fetch on page load and refresh every 2 minutes
@@ -542,55 +571,102 @@
         const [month, day, year] = todayPacific.split(', ')[0].split('/');
         const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
-        // Fetch all completed tasks for today
-        const { data: tasks, error } = await supabase
+        // Fetch all completed FOH checklist tasks for today
+        const { data: tasks, error: tasksError } = await supabase
           .from('foh_checklist_tasks')
           .select('completed_by, completed_at, is_completed')
           .eq('is_completed', true)
           .gte('completed_at', `${today}T00:00:00`)
           .lt('completed_at', `${today}T23:59:59`);
 
-        if (error) {
-          console.error('Error loading tasks:', error);
+        if (tasksError) {
+          console.error('Error loading tasks:', tasksError);
+        }
+
+        // Fetch all prep items counted today
+        const { data: prepCounts, error: prepError } = await supabase
+          .from('inventory_items')
+          .select('counted_by, counted_at, item_name')
+          .not('counted_by', 'is', null)
+          .not('counted_at', 'is', null)
+          .gte('counted_at', `${today}T00:00:00`)
+          .lt('counted_at', `${today}T23:59:59`);
+
+        if (prepError) {
+          console.error('Error loading prep counts:', prepError);
+        }
+
+        // If both queries failed or no data at all, show empty state
+        if ((!tasks || tasks.length === 0) && (!prepCounts || prepCounts.length === 0)) {
           showEmptyState();
           return;
         }
 
-        if (!tasks || tasks.length === 0) {
-          showEmptyState();
-          return;
-        }
-
-        // Count tasks by person
+        // Count tasks and prep counts by person
         const leaderboard = {};
-        tasks.forEach(task => {
-          const name = task.completed_by || 'Unknown';
-          if (!leaderboard[name]) {
-            leaderboard[name] = {
-              name: name,
-              count: 0,
-              lastCompleted: null
-            };
-          }
-          leaderboard[name].count++;
 
-          // Track most recent completion
-          const completedAt = new Date(task.completed_at);
-          if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
-            leaderboard[name].lastCompleted = completedAt;
-          }
-        });
+        // Add FOH checklist tasks (1 point each)
+        if (tasks && tasks.length > 0) {
+          tasks.forEach(task => {
+            const name = task.completed_by || 'Unknown';
+            if (!leaderboard[name]) {
+              leaderboard[name] = {
+                name: name,
+                taskCount: 0,
+                prepCount: 0,
+                totalPoints: 0,
+                lastCompleted: null
+              };
+            }
+            leaderboard[name].taskCount++;
+            leaderboard[name].totalPoints++;
 
-        // Convert to array and sort by count
+            // Track most recent completion
+            const completedAt = new Date(task.completed_at);
+            if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
+              leaderboard[name].lastCompleted = completedAt;
+            }
+          });
+        }
+
+        // Add prep counts (1 point per prep item counted)
+        if (prepCounts && prepCounts.length > 0) {
+          prepCounts.forEach(prep => {
+            const name = prep.counted_by || 'Unknown';
+            if (!leaderboard[name]) {
+              leaderboard[name] = {
+                name: name,
+                taskCount: 0,
+                prepCount: 0,
+                totalPoints: 0,
+                lastCompleted: null
+              };
+            }
+            leaderboard[name].prepCount++;
+            leaderboard[name].totalPoints++;
+
+            // Track most recent activity
+            const countedAt = new Date(prep.counted_at);
+            if (!leaderboard[name].lastCompleted || countedAt > leaderboard[name].lastCompleted) {
+              leaderboard[name].lastCompleted = countedAt;
+            }
+          });
+        }
+
+        // Convert to array and sort by total points
         const sortedLeaderboard = Object.values(leaderboard)
           .sort((a, b) => {
-            if (b.count !== a.count) return b.count - a.count;
+            if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
             // Tie-breaker: most recent completion wins
             return b.lastCompleted - a.lastCompleted;
           });
 
         // Update stats
-        document.getElementById('totalTasksToday').textContent = tasks.length;
+        const totalTasks = tasks ? tasks.length : 0;
+        const totalPrep = prepCounts ? prepCounts.length : 0;
+        const totalPoints = totalTasks + totalPrep;
+
+        document.getElementById('totalTasksToday').textContent = totalPoints;
         document.getElementById('activePlayersToday').textContent = sortedLeaderboard.length;
 
         // Render leaderboard
@@ -626,16 +702,26 @@
         // Format last completed time
         const timeSince = getTimeSince(player.lastCompleted);
 
+        // Build stats breakdown
+        const statsBreakdown = [];
+        if (player.taskCount > 0) {
+          statsBreakdown.push(`${player.taskCount} task${player.taskCount !== 1 ? 's' : ''}`);
+        }
+        if (player.prepCount > 0) {
+          statsBreakdown.push(`${player.prepCount} prep`);
+        }
+        const statsText = statsBreakdown.length > 0 ? statsBreakdown.join(' • ') : 'No activity';
+
         html += `
           <div class="leaderboard-item ${rankClass}">
             <div class="rank-badge">${rankDisplay}</div>
             <div class="player-info">
               <div class="player-name">${player.name} ${rank > 3 ? randomEmoji : ''}</div>
-              <div class="player-stats">Last task: ${timeSince}</div>
+              <div class="player-stats">${statsText} • ${timeSince}</div>
             </div>
             <div class="score">
-              <div class="score-number">${player.count}</div>
-              <div class="score-label">TASKS</div>
+              <div class="score-number">${player.totalPoints}</div>
+              <div class="score-label">POINTS</div>
             </div>
           </div>
         `;
@@ -665,8 +751,8 @@
       container.innerHTML = `
         <div class="empty-state">
           <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
-          <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">No tasks completed yet today</div>
-          <div style="font-size: 12px; color: var(--gray-500);">Start completing FOH checklist tasks to appear on the leaderboard!</div>
+          <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">No activity yet today</div>
+          <div style="font-size: 12px; color: var(--gray-500);">Complete FOH tasks or count prep items to earn points!</div>
         </div>
       `;
       document.getElementById('totalTasksToday').textContent = '0';
