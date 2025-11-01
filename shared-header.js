@@ -226,8 +226,15 @@ function updateTipsPerHourDisplay(data) {
     return;
   }
 
-  // Display tips per hour
-  displayDiv.textContent = `$${data.tipsPerHour.toFixed(2)}/hr`;
+  // Display tips per hour with hour-over-hour percentage
+  let mainDisplayText = `$${data.tipsPerHour.toFixed(2)}/hr`;
+
+  // Add hour-over-hour percentage and "vs. last hour" if available
+  if (data.percentChangeFromLastHour !== null && data.percentChangeFromLastHour !== undefined) {
+    mainDisplayText += ` ${data.percentChangeFromLastHour > 0 ? '+' : ''}${data.percentChangeFromLastHour}% vs. last hour`;
+  }
+
+  displayDiv.textContent = mainDisplayText;
 
   // Build trend indicators
   let trendHTML = '';

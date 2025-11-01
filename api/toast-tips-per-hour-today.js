@@ -338,10 +338,14 @@ export default async function handler(req, res) {
         employeesWorkedToday: employeeCount,
         currentlyClockedIn: currentlyClockedIn,
 
+        // Hour-over-hour comparison (main line trending)
+        previousHourTipsPerHour: previousHourTipsPerHour ? parseFloat(previousHourTipsPerHour.toFixed(2)) : null,
+        percentChangeFromLastHour: hourOverHourChange ? parseFloat(hourOverHourChange.toFixed(1)) : null,
+        trendingUp: trendingUp,
+
         // Yesterday comparison
         previousDayTipsPerHour: previousDayTipsPerHour ? parseFloat(previousDayTipsPerHour.toFixed(2)) : null,
         percentChangeFromYesterday: percentChange ? parseFloat(percentChange.toFixed(1)) : null,
-        trendingUp: trendingUp,
 
         // Week comparison
         lastWeekTipsPerHour: lastWeekTipsPerHour ? parseFloat(lastWeekTipsPerHour.toFixed(2)) : null,
