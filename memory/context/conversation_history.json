@@ -1,6 +1,48 @@
 {
   "conversations": [
     {
+      "date": "2025-11-01T19:15:00Z",
+      "summary": "Deployed NEW landscape PDF format to production 4AM cron job. Replaced old portrait executive summary with compact 2-column layout, enhanced review format, and added session insights.",
+      "key_decisions": [
+        "Remove executive summary page entirely (start directly with checklist pages)",
+        "Use landscape orientation (792x612pt) with 0.2\" margins for compact layout",
+        "Group tasks by person compactly: 'AKATERINA COMPLETED: task1, task2, task3'",
+        "Detect review-only checklists (0-2 tasks, mostly ratings) and use bigger fonts",
+        "Show staff names from tasksByPerson (actual task completers, not session fields)",
+        "Add First/Last task timestamps to Session Insights box"
+      ],
+      "action_items": [
+        "Monitor 4AM email reports for new landscape format starting next day",
+        "Verify all checklist types render correctly (tasks vs reviews)",
+        "Confirm staff names match actual task completers",
+        "Check that review-only checklists use bigger fonts and readable notes"
+      ],
+      "topics": ["PDF Generation", "jsPDF", "Production Deployment", "Landscape Layout", "Review Format", "Session Insights", "4AM Cron Job"],
+      "important_details": [
+        "FILE MODIFIED: api/foh-daily-report.js (generateChecklistsPDF function, lines 284-733)",
+        "REPLACED: 448 lines of old portrait format with 373 lines of new landscape format",
+        "OLD FORMAT: Portrait orientation, executive summary page 1, staff performance tables, problem tasks",
+        "NEW FORMAT: Landscape orientation, NO executive summary, each session gets clean page",
+        "LAYOUT: 2-column design - left: tasks grouped by person, right: ratings + insights box",
+        "STAFF LINE: Changed from session fields (staff_name, staff_name_2) to Object.keys(tasksByPerson)",
+        "STAFF COUNT: Fixed to count actual task completers from tasksByPerson (not session fields)",
+        "INSIGHTS BOX: Tasks, Rate, First/Last timestamps, Staff count, Top performer, Avg rating",
+        "REVIEW FORMAT: Detected via isReviewOnly (completedTasks < 3 && ratings > 0)",
+        "REVIEW FONTS: Category 6pt→8pt, Stars 8pt→10pt, Notes 5pt→7pt, 3 lines max (vs 1)",
+        "REVIEW METADATA: Added 'By: [name] at [time]' under each rating for review-only checklists",
+        "FOOTER: Page numbers (left), Generated time (center), APP CREATED BY DEMETRI GREGORAKIS (right)",
+        "COMMIT: 4483395 - feat(foh-daily-report): Deploy landscape PDF format to production 4AM cron job",
+        "PUSHED: To main branch, will deploy automatically via Vercel",
+        "SCREENSHOTS REVIEWED: '/Users/demetrigregorakis/Downloads/last test page 4 reviews format.jpg' (review format)",
+        "SCREENSHOTS REVIEWED: '/Users/demetrigregorakis/Downloads/screenshot test 5 landascape.jpg' (landscape test)",
+        "USER FEEDBACK: 'everything is perffect lets deploy it to the MAIN cron job'",
+        "DATA SOURCE: Uses previous day's data via getPacificYesterday() (NOT yesterday-only test data)",
+        "EMAIL: Sends via nodemailer with Buffer.from(doc.output('arraybuffer'))",
+        "COMPATIBILITY: Works with existing analytics.js calculations and email HTML template",
+        "User satisfaction: Extremely high (PDF perfected, ready for production)"
+      ]
+    },
+    {
       "date": "2025-11-01T17:40:00Z",
       "summary": "Added 'APP CREATED BY DEMETRI GREGORAKIS' credit line to all 12 HTML pages. User reinforced ALWAYS commit/push after changes and maintain memory system automatically.",
       "key_decisions": [
