@@ -467,30 +467,30 @@
 
     async function fetchTopLeader() {
       try {
-        const todayPacific = new Date().toLocaleString('en-US', {
-          timeZone: 'America/Los_Angeles',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
+        // Get Pacific time start/end of today (CORRECT TIMEZONE HANDLING)
+        const nowPacific = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+        const todayStart = new Date(nowPacific);
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(nowPacific);
+        todayEnd.setHours(23, 59, 59, 999);
 
-        const [month, day, year] = todayPacific.split(', ')[0].split('/');
-        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        const startISO = todayStart.toISOString();
+        const endISO = todayEnd.toISOString();
 
         // Fetch FOH tasks
         const { data: tasks, error: tasksError } = await supabase
           .from('foh_checklist_tasks')
           .select('completed_by, completed_at, is_completed')
           .eq('is_completed', true)
-          .gte('completed_at', `${today}T00:00:00`)
-          .lt('completed_at', `${today}T23:59:59`);
+          .gte('completed_at', startISO)
+          .lte('completed_at', endISO);
 
         // Fetch prep count actions
         const { data: prepCounts, error: prepError } = await supabase
           .from('prep_count_log')
           .select('counted_by, counted_at')
-          .gte('counted_at', `${today}T00:00:00`)
-          .lte('counted_at', `${today}T23:59:59`);
+          .gte('counted_at', startISO)
+          .lte('counted_at', endISO);
 
         if ((!tasks || tasks.length === 0) && (!prepCounts || prepCounts.length === 0)) {
           updateTopLeaderDisplay(null);
@@ -567,35 +567,40 @@
 
     async function loadLeaderboard() {
       try {
-        // Get today's date in Pacific Time
-        const todayPacific = new Date().toLocaleString('en-US', {
-          timeZone: 'America/Los_Angeles',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
+        // Get Pacific time start/end of today (CORRECT TIMEZONE HANDLING)
+        const nowPacific = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+        const todayStart = new Date(nowPacific);
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(nowPacific);
+        todayEnd.setHours(23, 59, 59, 999);
 
-        const [month, day, year] = todayPacific.split(', ')[0].split('/');
-        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        const startISO = todayStart.toISOString();
+        const endISO = todayEnd.toISOString();
+
+        console.log('🏆 Fetching teamupdates leaderboard for range:', startISO, 'to', endISO);
 
         // Fetch all completed FOH checklist tasks for today
         const { data: tasks, error: tasksError } = await supabase
           .from('foh_checklist_tasks')
           .select('completed_by, completed_at, is_completed')
           .eq('is_completed', true)
-          .gte('completed_at', `${today}T00:00:00`)
-          .lt('completed_at', `${today}T23:59:59`);
+          .gte('completed_at', startISO)
+          .lte('completed_at', endISO);
 
         if (tasksError) {
           console.error('Error loading tasks:', tasksError);
         }
 
+        console.log(`📋 Found ${tasks?.length || 0} completed FOH tasks`);
+
         // Fetch all prep count actions today
         const { data: prepCounts, error: prepError } = await supabase
           .from('prep_count_log')
           .select('counted_by, counted_at')
-          .gte('counted_at', `${today}T00:00:00`)
-          .lte('counted_at', `${today}T23:59:59`);
+          .gte('counted_at', startISO)
+          .lte('counted_at', endISO);
+
+        console.log(`📦 Found ${prepCounts?.length || 0} prep count actions`);
 
         if (prepError) {
           console.error('Error loading prep counts:', prepError);
@@ -665,6 +670,12 @@
             // Tie-breaker: most recent completion wins
             return b.lastCompleted - a.lastCompleted;
           });
+
+        // Log full leaderboard breakdown for debugging
+        console.log('📊 Full teamupdates leaderboard breakdown:');
+        sortedLeaderboard.forEach((player, index) => {
+          console.log(`  ${index + 1}. ${player.name}: ${player.totalPoints} points (${player.taskCount} tasks + ${player.prepCount} prep)`);
+        });
 
         // Update stats
         const totalTasks = tasks ? tasks.length : 0;
