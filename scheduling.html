@@ -921,6 +921,15 @@
       </div>
 
       <div class="form-group">
+        <label class="form-label" for="shiftColor">Shift Color (optional)</label>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <input type="color" class="form-input" id="shiftColor" style="width: 80px; height: 48px; padding: 4px; cursor: pointer;">
+          <button type="button" class="btn btn-secondary" onclick="resetShiftColor()" style="padding: 8px 16px; font-size: 11px;">RESET TO DEFAULT</button>
+        </div>
+        <div style="font-size: 11px; color: var(--gray-600); margin-top: 6px;">Choose a custom color for this shift block. Leave as default for position-based color.</div>
+      </div>
+
+      <div class="form-group">
         <label class="form-label" for="shiftBreakMinutes">Break Time (minutes)</label>
         <input type="number" class="form-input" id="shiftBreakMinutes" value="0" min="0" max="120">
       </div>
@@ -1492,14 +1501,19 @@ function createShiftBlock(shift) {
   block.draggable = true;
   block.dataset.shiftId = shift.id;
 
-  // Position-based color
-  const position = shift.position?.toLowerCase() || '';
-  if (position.includes('server') || position.includes('host')) {
-    block.classList.add('position-foh');
-  } else if (position.includes('cook') || position.includes('prep') || position.includes('dish')) {
-    block.classList.add('position-boh');
-  } else if (position.includes('manager')) {
-    block.classList.add('position-manager');
+  // Use custom color if set, otherwise use position-based color
+  if (shift.color) {
+    block.style.background = shift.color;
+  } else {
+    // Position-based color
+    const position = shift.position?.toLowerCase() || '';
+    if (position.includes('server') || position.includes('host')) {
+      block.classList.add('position-foh');
+    } else if (position.includes('cook') || position.includes('prep') || position.includes('dish')) {
+      block.classList.add('position-boh');
+    } else if (position.includes('manager')) {
+      block.classList.add('position-manager');
+    }
   }
 
   // Only show time (employee name is already in the row header)
@@ -1812,7 +1826,14 @@ function openAddShiftModal() {
   monday.setDate(currentWeekStart.getDate() + 1);
   document.getElementById('shiftDate').value = monday.toISOString().split('T')[0];
 
+  // Set default color (primary blue)
+  document.getElementById('shiftColor').value = '#00A8E1';
+
   document.getElementById('shiftModal').classList.add('active');
+}
+
+function resetShiftColor() {
+  document.getElementById('shiftColor').value = '#00A8E1';
 }
 
 function openAddShiftModalWithEmployeeAndDate(employeeId, date) {
@@ -1826,6 +1847,9 @@ function openAddShiftModalWithEmployeeAndDate(employeeId, date) {
 
   // Pre-fill date
   document.getElementById('shiftDate').value = date;
+
+  // Set default color (primary blue)
+  document.getElementById('shiftColor').value = '#00A8E1';
 
   // No time pre-filled - user selects from dropdown
 
@@ -1842,6 +1866,7 @@ function editShift(shift) {
   document.getElementById('shiftPosition').value = shift.position;
   document.getElementById('shiftBreakMinutes').value = shift.break_minutes || 0;
   document.getElementById('shiftNotes').value = shift.notes || '';
+  document.getElementById('shiftColor').value = shift.color || '#00A8E1';
 
   updateShiftCostPreview();
 
@@ -1900,6 +1925,7 @@ async function saveShift(e) {
     const position = document.getElementById('shiftPosition').value;
     const breakMinutes = parseInt(document.getElementById('shiftBreakMinutes').value) || 0;
     const notes = document.getElementById('shiftNotes').value;
+    const color = document.getElementById('shiftColor').value;
 
     // Get employee wage
     const employee = employees.find(emp => emp.id === employeeId);
@@ -1913,6 +1939,7 @@ async function saveShift(e) {
       position: position,
       break_minutes: breakMinutes,
       hourly_wage: hourlyWage,
+      color: color,
       notes: notes,
       updated_at: new Date().toISOString()
     };
