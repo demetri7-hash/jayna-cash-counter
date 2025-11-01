@@ -5306,8 +5306,8 @@
             }
 
             if (ratingRecord) {
-              // Rating exists
-              const stars = '⭐'.repeat(ratingRecord.rating);
+              // Rating exists - use simple star characters that jsPDF can render
+              const stars = '\u2605'.repeat(ratingRecord.rating);
               doc.text(`${category.name}: ${stars} (${ratingRecord.rating}/5)`, margin, y);
               y += 12;
 
@@ -5379,7 +5379,7 @@
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
-      doc.text('📊 SESSION INSIGHTS', margin, y + 10);
+      doc.text('SESSION INSIGHTS', margin, y + 10);
       y += 30;
 
       // Insights in two columns
@@ -5391,16 +5391,19 @@
       const rightX = pageWidth / 2 + 20;
       let insightY = y;
 
-      doc.text('Tasks Completed:', leftX, insightY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`${completedTasks.length} of ${totalTasks}`, leftX + 90, insightY);
-      insightY += 18;
+      // Only show task completion metrics if there are checkbox tasks
+      if (totalTasks > 0) {
+        doc.text('Tasks Completed:', leftX, insightY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${completedTasks.length} of ${totalTasks}`, leftX + 90, insightY);
+        insightY += 18;
 
-      doc.setFont('helvetica', 'bold');
-      doc.text('Completion Rate:', leftX, insightY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`${completionRate}%`, leftX + 90, insightY);
-      insightY += 18;
+        doc.setFont('helvetica', 'bold');
+        doc.text('Completion Rate:', leftX, insightY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${completionRate}%`, leftX + 90, insightY);
+        insightY += 18;
+      }
 
       doc.setFont('helvetica', 'bold');
       doc.text('Session Duration:', leftX, insightY);
@@ -5439,7 +5442,7 @@
         doc.setFont('helvetica', 'bold');
         doc.text('Avg Rating:', rightX, insightY);
         doc.setFont('helvetica', 'normal');
-        doc.text(`${avgRating}/5 ⭐`, rightX + 85, insightY);
+        doc.text(`${avgRating}/5 \u2605`, rightX + 85, insightY);
       }
 
       y += 125;
@@ -5454,7 +5457,7 @@
 
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.text('📝 NOTES FOR INCOMING CREW', margin, y);
+        doc.text('NOTES FOR INCOMING CREW', margin, y);
         y += 18;
 
         doc.setFontSize(9);
