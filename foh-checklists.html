@@ -5249,14 +5249,14 @@
       doc.setFont('helvetica', 'bold');
       if (session.is_complete) {
         doc.setTextColor(5, 150, 105); // Green
-        doc.text('COMPLETE', margin + 40, y);
-        // Checkmark
-        doc.setFontSize(12);
-        doc.text('✓', margin + 95, y);
+        doc.text('COMPLETE', margin + 50, y);
+        // Checkmark using a more compatible character
+        doc.setFontSize(11);
+        doc.text('\u2713', margin + 105, y); // Unicode checkmark
         doc.setFontSize(10);
       } else {
         doc.setTextColor(245, 158, 11); // Orange
-        doc.text('IN PROGRESS', margin + 40, y);
+        doc.text('IN PROGRESS', margin + 50, y);
       }
       y += 28;
 
@@ -5346,7 +5346,7 @@
               doc.setTextColor(33, 33, 33);
               doc.text(`${category.name}:`, margin, y);
 
-              // Render stars using filled/unfilled circles (better jsPDF compatibility)
+              // Render stars using jsPDF-safe Unicode characters
               const starX = margin + doc.getTextWidth(`${category.name}: `) + 5;
               const filledStars = ratingRecord.rating;
               const totalStars = 5;
@@ -5354,13 +5354,13 @@
               doc.setFontSize(10);
               for (let i = 0; i < totalStars; i++) {
                 if (i < filledStars) {
-                  // Filled star (using ★)
+                  // Filled star using Unicode 0x2605
                   doc.setTextColor(59, 130, 246); // Blue
-                  doc.text('★', starX + (i * 10), y);
+                  doc.text('\u2605', starX + (i * 10), y);
                 } else {
-                  // Empty star (using ☆)
+                  // Empty star using Unicode 0x2606
                   doc.setTextColor(200, 200, 200); // Light gray
-                  doc.text('☆', starX + (i * 10), y);
+                  doc.text('\u2606', starX + (i * 10), y);
                 }
               }
 
@@ -5551,10 +5551,10 @@
         const ratingText = `${avgRating}/5`;
         doc.text(ratingText, rightX + 75, insightY);
 
-        // Add a single blue star after the rating
+        // Add a single blue star after the rating using Unicode
         doc.setFontSize(10);
         doc.setTextColor(59, 130, 246);
-        doc.text('★', rightX + 75 + doc.getTextWidth(ratingText) + 3, insightY);
+        doc.text('\u2605', rightX + 75 + doc.getTextWidth(ratingText) + 3, insightY);
         doc.setFontSize(9);
       }
 
@@ -5658,25 +5658,25 @@
   }
 
   /**
-   * Test PDF generation using yesterday's data (no email sent)
+   * Test PDF generation using yesterday's data - MULTI-PAGE with ALL sessions
    */
   async function testYesterdayPDF() {
     try {
-      showLoading('Generating Test PDF...', 'Looking for yesterday\'s checklist data...');
+      showLoading('Generating Multi-Page PDF...', 'Loading all checklist sessions from yesterday...');
 
       const yesterday = getPacificDate(-1); // Yesterday's date in Pacific timezone
       const today = getPacificDate(0);
 
       console.log(`📄 Searching for checklist sessions from ${yesterday}...`);
 
-      // Fetch all checklist sessions from yesterday
+      // Fetch ALL checklist sessions from yesterday
       const { data: sessions, error } = await supabase
         .from('foh_checklist_sessions')
         .select('*')
         .gte('started_at', `${yesterday}T00:00:00`)
         .lt('started_at', `${today}T00:00:00`)
         .eq('is_complete', true)
-        .order('started_at', { ascending: false });
+        .order('started_at', { ascending: true }); // Chronological order
 
       if (error) throw error;
 
@@ -5687,18 +5687,80 @@
       }
 
       console.log(`📋 Found ${sessions.length} completed session(s) from yesterday`);
+      console.log(`📄 Generating multi-page PDF with ALL ${sessions.length} session(s)...`);
 
-      // Use the most recent completed session
-      const session = sessions[0];
-      const checklistDef = getChecklistByType(session.checklist_type);
-      const checklistTitle = checklistDef ? checklistDef.title : session.checklist_type;
+      // Create ONE PDF document
+      const { jsPDF } = window.jspdf;
+      const finalDoc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+      let isFirstSession = true;
 
-      console.log(`📄 Generating PDF for: ${checklistTitle} (Session ID: ${session.id})`);
+      // Generate each session and append to the final PDF
+      for (let i = 0; i < sessions.length; i++) {
+        const session = sessions[i];
+        const checklistDef = getChecklistByType(session.checklist_type);
+        const checklistTitle = checklistDef ? checklistDef.title : session.checklist_type;
 
-      // Generate and download the PDF
-      const doc = await generateChecklistPDF(session.id);
-      if (!doc) return;
+        console.log(`  ${i + 1}/${sessions.length}: ${checklistTitle} (${session.staff_name || 'Unknown'})`);
 
+        // Generate individual session PDF
+        const sessionPDF = await generateChecklistPDF(session.id);
+        if (!sessionPDF) {
+          console.warn(`  ⚠️ Skipping session ${session.id} - failed to generate`);
+          continue;
+        }
+
+        // Merge sessionPDF pages into finalDoc
+        const pageCount = sessionPDF.internal.getNumberOfPages();
+        console.log(`  ✓ Generated ${pageCount} page(s)`);
+
+        for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
+          // Add page break between sessions (but not before first session's first page)
+          if (!isFirstSession || pageNum > 1) {
+            finalDoc.addPage();
+          }
+
+          // Copy page content from sessionPDF to finalDoc
+          const pageDimensions = sessionPDF.internal.pageSize;
+          const pageContent = sessionPDF.internal.pages[pageNum];
+
+          // Set the current page in finalDoc
+          const currentPageNum = finalDoc.internal.getNumberOfPages();
+          finalDoc.setPage(currentPageNum);
+
+          // Import the page - use internal jsPDF methods
+          if (pageContent && pageContent.length > 0) {
+            finalDoc.internal.write(...pageContent);
+          }
+        }
+
+        isFirstSession = false;
+      }
+
+      // Update page numbers on all pages
+      const totalPages = finalDoc.internal.getNumberOfPages();
+      const generatedTime = new Date().toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }) + ' PT';
+
+      for (let i = 1; i <= totalPages; i++) {
+        finalDoc.setPage(i);
+        finalDoc.setFontSize(8);
+        finalDoc.setTextColor(100, 100, 100);
+        finalDoc.text(
+          `Page ${i} of ${totalPages} • Generated ${generatedTime}`,
+          finalDoc.internal.pageSize.width / 2,
+          finalDoc.internal.pageSize.height - 20,
+          { align: 'center' }
+        );
+      }
+
+      // Download the combined PDF
       const yesterdayFormatted = new Date(yesterday + 'T12:00:00').toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -5706,8 +5768,8 @@
         timeZone: 'America/Los_Angeles'
       }).replace(/\s/g, '_');
 
-      const filename = `TEST_Checklist_${yesterdayFormatted}.pdf`;
-      doc.save(filename);
+      const filename = `TEST_Daily_Report_${yesterdayFormatted}_${sessions.length}sessions.pdf`;
+      finalDoc.save(filename);
 
       hideLoading();
       showMessage(`✅ Test PDF downloaded! Using data from ${yesterday}`, 'success');
