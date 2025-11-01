@@ -868,6 +868,15 @@
       </div>
       <div id="tipsLastUpdated" style="margin-top: 4px; font-size: 8px; color: #999; font-weight: 500;">
           </div>
+
+          <!-- TOP LEADER DISPLAY -->
+          <div id="topLeaderDisplay" onclick="window.location.href='teamupdates.html'" style="margin-top: 12px; padding: 8px 12px; background: linear-gradient(135deg, #FFD700 0%, #FFF9E6 100%); border: 2px solid #FFD700; border-radius: 0; cursor: pointer; transition: all 0.15s ease;">
+            <div style="font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-bottom: 2px;">🏆 TODAY'S LEADER</div>
+            <div id="topLeaderText" style="font-size: 13px; font-weight: 700; color: #212121;">
+              Loading...
+            </div>
+          </div>
+
         </div>
       </div>
       <div class="nav-links">
@@ -3478,11 +3487,80 @@
     document.addEventListener('DOMContentLoaded', function() {
       fetchClockedInEmployees();
       fetchTipsPerHour();
+      fetchTopLeader();
       setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
       setInterval(fetchTipsPerHour, 5 * 60 * 1000);
+      setInterval(fetchTopLeader, 2 * 60 * 1000);
     });
 
     // ==================== END CLOCKED IN DISPLAY ====================
+
+    // ==================== TOP LEADER DISPLAY ====================
+
+    async function fetchTopLeader() {
+      try {
+        const todayPacific = new Date().toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+
+        const [month, day, year] = todayPacific.split(', ')[0].split('/');
+        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+        const { data: tasks, error } = await supabase
+          .from('foh_checklist_tasks')
+          .select('completed_by, completed_at, is_completed')
+          .eq('is_completed', true)
+          .gte('completed_at', `${today}T00:00:00`)
+          .lt('completed_at', `${today}T23:59:59`);
+
+        if (error || !tasks || tasks.length === 0) {
+          updateTopLeaderDisplay(null);
+          return;
+        }
+
+        const leaderboard = {};
+        tasks.forEach(task => {
+          const name = task.completed_by || 'Unknown';
+          if (!leaderboard[name]) {
+            leaderboard[name] = { name, count: 0, lastCompleted: null };
+          }
+          leaderboard[name].count++;
+          const completedAt = new Date(task.completed_at);
+          if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
+            leaderboard[name].lastCompleted = completedAt;
+          }
+        });
+
+        const sortedLeaderboard = Object.values(leaderboard)
+          .sort((a, b) => {
+            if (b.count !== a.count) return b.count - a.count;
+            return b.lastCompleted - a.lastCompleted;
+          });
+
+        updateTopLeaderDisplay(sortedLeaderboard[0]);
+
+      } catch (error) {
+        console.error('Error fetching top leader:', error);
+        updateTopLeaderDisplay(null);
+      }
+    }
+
+    function updateTopLeaderDisplay(leader) {
+      const displayDiv = document.getElementById('topLeaderText');
+      if (!displayDiv) return;
+
+      if (!leader) {
+        displayDiv.textContent = 'No tasks completed yet today! 🎯';
+        return;
+      }
+
+      displayDiv.textContent = `${leader.name} is crushing it with ${leader.count} task${leader.count !== 1 ? 's' : ''}! 🔥`;
+    }
+
+    // ==================== END TOP LEADER DISPLAY ====================
 
     // ==================== PASSWORD PROTECTION FOR MANAGER LOGS ====================
     const ADMIN_PASSWORD = 'JaynaGyro2025!';
