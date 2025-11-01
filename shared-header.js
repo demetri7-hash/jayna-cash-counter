@@ -232,51 +232,44 @@ function updateTipsPerHourDisplay(data) {
   // Build trend indicators
   let trendHTML = '';
 
-  // Yesterday comparison
+  // Main tips/hr display color (hour-over-hour trending)
   if (data.trendingUp === true) {
-    displayDiv.style.color = '#059669'; // Green
-    trendHTML += `
-      <div style="color: #059669; margin-bottom: 4px;">
-        ↑ ${data.percentChangeFromYesterday > 0 ? '+' : ''}${data.percentChangeFromYesterday}% vs yesterday
-      </div>
-    `;
+    displayDiv.style.color = '#059669'; // Green (hour-over-hour up)
   } else if (data.trendingUp === false) {
-    displayDiv.style.color = '#dc2626'; // Red
-    trendHTML += `
-      <div style="color: #dc2626; margin-bottom: 4px;">
-        ↓ ${data.percentChangeFromYesterday}% vs yesterday
-      </div>
-    `;
+    displayDiv.style.color = '#dc2626'; // Red (hour-over-hour down)
   } else {
     displayDiv.style.color = 'var(--gray-900)';
   }
 
-  // Week comparison
-  if (data.trendingUpWeek === true) {
+  // Yesterday comparison (check actual sign of percentChangeFromYesterday)
+  if (data.percentChangeFromYesterday !== null && data.percentChangeFromYesterday !== undefined) {
+    const color = data.percentChangeFromYesterday >= 0 ? '#059669' : '#dc2626';
+    const arrow = data.percentChangeFromYesterday >= 0 ? '↑' : '↓';
     trendHTML += `
-      <div style="color: #059669; margin-bottom: 4px;">
-        ↑ ${data.percentChangeFromLastWeek > 0 ? '+' : ''}${data.percentChangeFromLastWeek}% vs last week
-      </div>
-    `;
-  } else if (data.trendingUpWeek === false) {
-    trendHTML += `
-      <div style="color: #dc2626; margin-bottom: 4px;">
-        ↓ ${data.percentChangeFromLastWeek}% vs last week
+      <div style="color: ${color}; margin-bottom: 4px;">
+        ${arrow} ${data.percentChangeFromYesterday > 0 ? '+' : ''}${data.percentChangeFromYesterday}% vs yesterday
       </div>
     `;
   }
 
-  // Month comparison
-  if (data.trendingUpMonth === true) {
+  // Week comparison (check actual sign of percentChangeFromLastWeek)
+  if (data.percentChangeFromLastWeek !== null && data.percentChangeFromLastWeek !== undefined) {
+    const color = data.percentChangeFromLastWeek >= 0 ? '#059669' : '#dc2626';
+    const arrow = data.percentChangeFromLastWeek >= 0 ? '↑' : '↓';
     trendHTML += `
-      <div style="color: #059669;">
-        ↑ ${data.percentChangeFromLastMonth > 0 ? '+' : ''}${data.percentChangeFromLastMonth}% vs last month
+      <div style="color: ${color}; margin-bottom: 4px;">
+        ${arrow} ${data.percentChangeFromLastWeek > 0 ? '+' : ''}${data.percentChangeFromLastWeek}% vs last week
       </div>
     `;
-  } else if (data.trendingUpMonth === false) {
+  }
+
+  // Month comparison (check actual sign of percentChangeFromLastMonth)
+  if (data.percentChangeFromLastMonth !== null && data.percentChangeFromLastMonth !== undefined) {
+    const color = data.percentChangeFromLastMonth >= 0 ? '#059669' : '#dc2626';
+    const arrow = data.percentChangeFromLastMonth >= 0 ? '↑' : '↓';
     trendHTML += `
-      <div style="color: #dc2626;">
-        ↓ ${data.percentChangeFromLastMonth}% vs last month
+      <div style="color: ${color};">
+        ${arrow} ${data.percentChangeFromLastMonth > 0 ? '+' : ''}${data.percentChangeFromLastMonth}% vs last month
       </div>
     `;
   }
