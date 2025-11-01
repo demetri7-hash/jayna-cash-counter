@@ -10275,32 +10275,40 @@
 
   async function fetchTopLeader() {
     try {
-      const todayPacific = new Date().toLocaleString('en-US', {
-        timeZone: 'America/Los_Angeles',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      });
+      // Get Pacific time start/end of today
+      const nowPacific = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      const todayStart = new Date(nowPacific);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(nowPacific);
+      todayEnd.setHours(23, 59, 59, 999);
 
-      const [month, day, year] = todayPacific.split(', ')[0].split('/');
-      const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      const startISO = todayStart.toISOString();
+      const endISO = todayEnd.toISOString();
 
-      // Fetch FOH tasks
+      console.log('🏆 Fetching leaderboard data for range:', startISO, 'to', endISO);
+
+      // Fetch FOH tasks (ALL completed tasks today, regardless of checklist type)
       const { data: tasks, error: tasksError } = await supabase
         .from('foh_checklist_tasks')
-        .select('completed_by, completed_at, is_completed')
+        .select('completed_by, completed_at, is_completed, checklist_type')
         .eq('is_completed', true)
-        .gte('completed_at', `${today}T00:00:00`)
-        .lt('completed_at', `${today}T23:59:59`);
+        .gte('completed_at', startISO)
+        .lte('completed_at', endISO);
+
+      console.log(`📋 Found ${tasks?.length || 0} completed FOH tasks`);
+      if (tasksError) console.error('❌ FOH tasks error:', tasksError);
 
       // Fetch prep counts
       const { data: prepCounts, error: prepError } = await supabase
         .from('inventory_items')
-        .select('counted_by, counted_at')
+        .select('counted_by, counted_at, item_name')
         .not('counted_by', 'is', null)
         .not('counted_at', 'is', null)
-        .gte('counted_at', `${today}T00:00:00`)
-        .lt('counted_at', `${today}T23:59:59`);
+        .gte('counted_at', startISO)
+        .lte('counted_at', endISO);
+
+      console.log(`🥗 Found ${prepCounts?.length || 0} prep items counted`);
+      if (prepError) console.error('❌ Prep counts error:', prepError);
 
       if ((!tasks || tasks.length === 0) && (!prepCounts || prepCounts.length === 0)) {
         updateTopLeaderDisplay(null);
@@ -10311,6 +10319,14 @@
 
       // Count FOH tasks
       if (tasks && tasks.length > 0) {
+        // Log checklist types to verify all types are included
+        const checklistTypes = {};
+        tasks.forEach(task => {
+          const type = task.checklist_type || 'unknown';
+          checklistTypes[type] = (checklistTypes[type] || 0) + 1;
+        });
+        console.log('📊 Checklist types included:', checklistTypes);
+
         tasks.forEach(task => {
           const name = task.completed_by || 'Unknown';
           if (!leaderboard[name]) {
@@ -10344,6 +10360,8 @@
           if (b.count !== a.count) return b.count - a.count;
           return b.lastCompleted - a.lastCompleted;
         });
+
+      console.log('🏆 Leaderboard results:', sortedLeaderboard);
 
       updateTopLeaderDisplay(sortedLeaderboard[0]);
 
