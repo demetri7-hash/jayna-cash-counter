@@ -3211,50 +3211,84 @@
 
   async function fetchTopLeader() {
     try {
-      // Get today's date in Pacific Time
-      const todayPacific = new Date().toLocaleString('en-US', {
-        timeZone: 'America/Los_Angeles',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      });
+      // Get Pacific time start/end of today
+      const nowPacific = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      const todayStart = new Date(nowPacific);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(nowPacific);
+      todayEnd.setHours(23, 59, 59, 999);
 
-      const [month, day, year] = todayPacific.split(', ')[0].split('/');
-      const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      const startISO = todayStart.toISOString();
+      const endISO = todayEnd.toISOString();
 
-      // Fetch all completed tasks for today
-      const { data: tasks, error } = await supabase
+      console.log('🏆 Fetching leaderboard data for range:', startISO, 'to', endISO);
+
+      // Fetch FOH tasks
+      const { data: tasks, error: tasksError } = await supabase
         .from('foh_checklist_tasks')
         .select('completed_by, completed_at, is_completed')
         .eq('is_completed', true)
-        .gte('completed_at', `${today}T00:00:00`)
-        .lt('completed_at', `${today}T23:59:59`);
+        .gte('completed_at', startISO)
+        .lte('completed_at', endISO);
 
-      if (error || !tasks || tasks.length === 0) {
+      console.log(`📋 Found ${tasks?.length || 0} completed FOH tasks`);
+
+      // Fetch prep count actions
+      const { data: prepCounts, error: prepError } = await supabase
+        .from('prep_count_log')
+        .select('counted_by, counted_at')
+        .gte('counted_at', startISO)
+        .lte('counted_at', endISO);
+
+      console.log(`📦 Found ${prepCounts?.length || 0} prep count actions`);
+
+      // Combine counts
+      const leaderboard = {};
+
+      // Count FOH tasks
+      if (tasks && tasks.length > 0) {
+        tasks.forEach(task => {
+          const name = task.completed_by || 'Unknown';
+          if (!leaderboard[name]) {
+            leaderboard[name] = { name, count: 0, lastActivity: null };
+          }
+          leaderboard[name].count++;
+          const activityTime = new Date(task.completed_at);
+          if (!leaderboard[name].lastActivity || activityTime > leaderboard[name].lastActivity) {
+            leaderboard[name].lastActivity = activityTime;
+          }
+        });
+      }
+
+      // Count prep actions
+      if (prepCounts && prepCounts.length > 0) {
+        prepCounts.forEach(prep => {
+          const name = prep.counted_by || 'Unknown';
+          if (!leaderboard[name]) {
+            leaderboard[name] = { name, count: 0, lastActivity: null };
+          }
+          leaderboard[name].count++;
+          const activityTime = new Date(prep.counted_at);
+          if (!leaderboard[name].lastActivity || activityTime > leaderboard[name].lastActivity) {
+            leaderboard[name].lastActivity = activityTime;
+          }
+        });
+      }
+
+      // Check if we have any data
+      if (Object.keys(leaderboard).length === 0) {
         updateTopLeaderDisplay(null);
         return;
       }
-
-      // Count tasks by person
-      const leaderboard = {};
-      tasks.forEach(task => {
-        const name = task.completed_by || 'Unknown';
-        if (!leaderboard[name]) {
-          leaderboard[name] = { name, count: 0, lastCompleted: null };
-        }
-        leaderboard[name].count++;
-        const completedAt = new Date(task.completed_at);
-        if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
-          leaderboard[name].lastCompleted = completedAt;
-        }
-      });
 
       // Sort and get top leader
       const sortedLeaderboard = Object.values(leaderboard)
         .sort((a, b) => {
           if (b.count !== a.count) return b.count - a.count;
-          return b.lastCompleted - a.lastCompleted;
+          return b.lastActivity - a.lastActivity;
         });
+
+      console.log('🥇 Top leader:', sortedLeaderboard[0]);
 
       updateTopLeaderDisplay(sortedLeaderboard[0]);
 
@@ -3269,11 +3303,11 @@
     if (!displayDiv) return;
 
     if (!leader) {
-      displayDiv.textContent = 'No tasks completed yet today! 🎯';
+      displayDiv.textContent = 'No activity yet today! 🎯';
       return;
     }
 
-    displayDiv.textContent = `${leader.name} is crushing it with ${leader.count} task${leader.count !== 1 ? 's' : ''}! 🔥`;
+    displayDiv.textContent = `${leader.name} is crushing it with ${leader.count} action${leader.count !== 1 ? 's' : ''}! 🔥`;
   }
 
   // ==================== END TOP LEADER DISPLAY ====================
@@ -17122,6 +17156,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const countedBy = getActivePrepCounterName();
       const countedAt = new Date().toISOString();
 
+      // Get item info for logging
+      const item = orderingSystemState.items.find(i => i.id === itemId);
+      const previousCount = item ? item.currentStock : 0;
+      const itemName = item ? item.itemName : 'Unknown Item';
+
       const { error } = await supabase
         .from('inventory_items')
         .update({
@@ -17134,8 +17173,23 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
       if (error) throw error;
 
+      // Log this counting action for leaderboard (don't fail save if log fails)
+      try {
+        await supabase
+          .from('prep_count_log')
+          .insert({
+            item_id: itemId,
+            item_name: itemName,
+            counted_by: countedBy,
+            counted_at: countedAt,
+            new_count: stockValue,
+            previous_count: previousCount
+          });
+      } catch (logError) {
+        console.warn('Failed to log prep count action:', logError);
+      }
+
       // Update local state
-      const item = orderingSystemState.items.find(i => i.id === itemId);
       if (item) {
         item.currentStock = stockValue;
         item.lastCountedDate = countedAt;
@@ -17856,6 +17910,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const countedBy = getActivePrepCounterName();
       const countedAt = new Date().toISOString();
 
+      // Get item info for logging
+      const previousCount = item.currentStock || 0;
+      const itemName = item.itemName || 'Unknown Item';
+
       const { error } = await supabase
         .from('inventory_items')
         .update({
@@ -17868,6 +17926,22 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         .eq('id', itemId);
 
       if (error) throw error;
+
+      // Log this counting action for leaderboard (don't fail save if log fails)
+      try {
+        await supabase
+          .from('prep_count_log')
+          .insert({
+            item_id: itemId,
+            item_name: itemName,
+            counted_by: countedBy,
+            counted_at: countedAt,
+            new_count: totalStock,
+            previous_count: previousCount
+          });
+      } catch (logError) {
+        console.warn('Failed to log prep count action (location):', logError);
+      }
 
       // Update local state
       item.locationCounts = updatedLocationCounts;

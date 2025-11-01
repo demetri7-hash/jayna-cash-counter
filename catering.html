@@ -6114,14 +6114,12 @@
           .gte('completed_at', `${today}T00:00:00`)
           .lt('completed_at', `${today}T23:59:59`);
 
-        // Fetch prep counts
+        // Fetch prep count actions
         const { data: prepCounts, error: prepError } = await supabase
-          .from('inventory_items')
+          .from('prep_count_log')
           .select('counted_by, counted_at')
-          .not('counted_by', 'is', null)
-          .not('counted_at', 'is', null)
           .gte('counted_at', `${today}T00:00:00`)
-          .lt('counted_at', `${today}T23:59:59`);
+          .lte('counted_at', `${today}T23:59:59`);
 
         if ((!tasks || tasks.length === 0) && (!prepCounts || prepCounts.length === 0)) {
           updateTopLeaderDisplay(null);
