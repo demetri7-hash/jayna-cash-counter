@@ -28,7 +28,7 @@ function initializeSharedHeader() {
 
   headerContainer.innerHTML = `
     <div class="header" style="background: var(--white); color: var(--gray-900); text-align: center; padding: 12px; border-radius: 0; border-bottom: 1px solid var(--gray-300);">
-      <img src="jayna-logo.png" alt="Jayna Gyro Logo" style="width: 80px; height: 80px; margin-bottom: 12px;">
+      <img src="jayna-logo.png" alt="Jayna Gyro Logo" style="margin-bottom: 12px;">
       <h1 style="margin-bottom: 4px; font-size: 18px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">JAYNA GYRO</h1>
       <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 4px; letter-spacing: 1.5px;">MANAGER PORTAL</h2>
       <p style="font-size: 11px; font-weight: 500; letter-spacing: 1px; margin-bottom: 8px;">FOR AUTHORIZED USE ONLY</p>
