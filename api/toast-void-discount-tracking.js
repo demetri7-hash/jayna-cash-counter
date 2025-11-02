@@ -124,18 +124,38 @@ export default async function handler(req, res) {
 
               // Calculate total amount from checks
               let totalAmount = 0;
+              const allItems = [];
               if (order.checks && Array.isArray(order.checks)) {
                 totalAmount = order.checks.reduce((sum, check) => sum + (check.amount || 0), 0);
+
+                // Collect all items from all checks
+                order.checks.forEach(check => {
+                  if (check.selections && Array.isArray(check.selections)) {
+                    check.selections.forEach(sel => {
+                      allItems.push({
+                        name: sel.itemDisplayName || sel.item?.name || 'Unknown Item',
+                        quantity: sel.quantity || 1,
+                        price: sel.price || 0
+                      });
+                    });
+                  }
+                });
               }
 
               voidedOrders.push({
                 date: displayDate,
                 time: orderTime,
                 orderNumber: order.orderNumber || 'N/A',
+                orderGuid: order.guid || 'N/A',
                 server: serverName,
                 tabName: order.checks?.[0]?.tabName || 'N/A',
                 reason: voidReason,
                 amount: totalAmount,
+                diningOption: order.diningOption?.behavior || 'N/A',
+                items: allItems,
+                openedDate: order.openedDate || null,
+                closedDate: order.closedDate || null,
+                voidedBy: order.voidedBy || null,
                 businessDate: order.businessDate,
                 timestamp: orderDate ? orderDate.getTime() : 0
               });
@@ -153,12 +173,16 @@ export default async function handler(req, res) {
                       date: displayDate,
                       time: orderTime,
                       orderNumber: order.orderNumber || 'N/A',
+                      orderGuid: order.guid || 'N/A',
                       server: serverName,
                       tabName: tabName,
                       discountName: discount.name || 'Unknown Discount',
                       discountType: discount.type || 'N/A',
                       amount: discount.discountAmount || 0,
                       level: 'Check',
+                      diningOption: order.diningOption?.behavior || 'N/A',
+                      checkAmount: check.amount || 0,
+                      approvedBy: discount.approvalUser || null,
                       businessDate: order.businessDate,
                       timestamp: orderDate ? orderDate.getTime() : 0
                     });
@@ -174,6 +198,7 @@ export default async function handler(req, res) {
                           date: displayDate,
                           time: orderTime,
                           orderNumber: order.orderNumber || 'N/A',
+                          orderGuid: order.guid || 'N/A',
                           server: serverName,
                           tabName: tabName,
                           discountName: discount.name || 'Unknown Discount',
@@ -181,6 +206,11 @@ export default async function handler(req, res) {
                           amount: discount.discountAmount || 0,
                           level: 'Item',
                           itemName: selection.itemDisplayName || 'Unknown Item',
+                          itemPrice: selection.price || 0,
+                          itemQuantity: selection.quantity || 1,
+                          diningOption: order.diningOption?.behavior || 'N/A',
+                          checkAmount: check.amount || 0,
+                          approvedBy: discount.approvalUser || null,
                           businessDate: order.businessDate,
                           timestamp: orderDate ? orderDate.getTime() : 0
                         });
@@ -201,13 +231,19 @@ export default async function handler(req, res) {
                         date: displayDate,
                         time: orderTime,
                         orderNumber: order.orderNumber || 'N/A',
+                        orderGuid: order.guid || 'N/A',
                         server: serverName,
                         tabName: tabName,
                         refundAmount: refundAmount,
                         originalAmount: payment.amount || 0,
                         refundType: refundType,
                         paymentType: payment.type || 'N/A',
+                        cardType: payment.cardType || 'N/A',
+                        tipAmount: payment.tipAmount || 0,
                         reason: payment.refund?.reason || 'No reason provided',
+                        diningOption: order.diningOption?.behavior || 'N/A',
+                        checkAmount: check.amount || 0,
+                        refundDate: payment.refund?.refundDate || null,
                         businessDate: order.businessDate,
                         timestamp: orderDate ? orderDate.getTime() : 0
                       });
@@ -219,12 +255,16 @@ export default async function handler(req, res) {
                         date: displayDate,
                         time: orderTime,
                         orderNumber: order.orderNumber || 'N/A',
+                        orderGuid: order.guid || 'N/A',
                         server: serverName,
                         tabName: tabName,
                         paymentType: payment.type || 'N/A',
                         amount: payment.amount || 0,
                         tipAmount: payment.tipAmount || 0,
                         cardType: payment.cardType || 'N/A',
+                        diningOption: order.diningOption?.behavior || 'N/A',
+                        checkAmount: check.amount || 0,
+                        voidDate: payment.voidDate || null,
                         businessDate: order.businessDate,
                         timestamp: orderDate ? orderDate.getTime() : 0
                       });

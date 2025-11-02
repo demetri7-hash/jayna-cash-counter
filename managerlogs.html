@@ -895,6 +895,18 @@
     </div>
   </div>
 
+  <!-- Tracking Details Modal -->
+  <div id="trackingDetailsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="trackingModalTitle">Order Details</h2>
+        <button class="modal-close" onclick="closeTrackingModal()">CLOSE</button>
+      </div>
+
+      <div id="trackingModalBody"></div>
+    </div>
+  </div>
+
   <script>
     // Supabase client
     const supabase = window.supabase.createClient(
@@ -1377,8 +1389,318 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeModal();
+        closeTrackingModal();
       }
     });
+
+    // ==================== TRACKING DETAILS MODAL ====================
+    function closeTrackingModal() {
+      document.getElementById('trackingDetailsModal').classList.remove('active');
+    }
+
+    function viewVoidedOrderDetails(index) {
+      if (!trackingData || !trackingData.voidedOrders.items[index]) return;
+      const order = trackingData.voidedOrders.items[index];
+
+      document.getElementById('trackingModalTitle').textContent = `Voided Order #${order.orderNumber}`;
+
+      let itemsList = '';
+      if (order.items && order.items.length > 0) {
+        itemsList = `
+          <div class="modal-detail-row">
+            <div class="modal-detail-label">Items Ordered</div>
+            <div class="modal-detail-value">
+              ${order.items.map(item => `
+                <div style="padding: 6px 0; border-bottom: 1px solid var(--gray-200);">
+                  <span style="font-weight: 600;">${item.quantity}x</span> ${item.name}
+                  <span style="float: right; color: var(--gray-600);">$${item.price.toFixed(2)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      document.getElementById('trackingModalBody').innerHTML = `
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Date & Time</div>
+          <div class="modal-detail-value">${order.date} at ${order.time}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Order Number</div>
+          <div class="modal-detail-value">${order.orderNumber}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Server</div>
+          <div class="modal-detail-value">${order.server}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Tab Name</div>
+          <div class="modal-detail-value">${order.tabName}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Dining Option</div>
+          <div class="modal-detail-value">${order.diningOption || 'N/A'}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Void Reason</div>
+          <div class="modal-detail-value">${order.reason}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Total Amount</div>
+          <div class="modal-detail-value" style="font-size: 18px; font-weight: 700; color: var(--error-text);">$${order.amount.toFixed(2)}</div>
+        </div>
+
+        ${itemsList}
+
+        ${order.orderGuid && order.orderGuid !== 'N/A' ? `
+          <div class="modal-detail-row">
+            <div class="modal-detail-label">Order GUID</div>
+            <div class="modal-detail-value" style="font-size: 10px; font-family: monospace; color: var(--gray-600);">${order.orderGuid}</div>
+          </div>
+        ` : ''}
+      `;
+
+      document.getElementById('trackingDetailsModal').classList.add('active');
+    }
+
+    function viewDiscountDetails(index) {
+      if (!trackingData || !trackingData.discounts.items[index]) return;
+      const discount = trackingData.discounts.items[index];
+
+      document.getElementById('trackingModalTitle').textContent = `Discount: ${discount.discountName}`;
+
+      document.getElementById('trackingModalBody').innerHTML = `
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Date & Time</div>
+          <div class="modal-detail-value">${discount.date} at ${discount.time}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Order Number</div>
+          <div class="modal-detail-value">${discount.orderNumber}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Server</div>
+          <div class="modal-detail-value">${discount.server}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Tab Name</div>
+          <div class="modal-detail-value">${discount.tabName}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Dining Option</div>
+          <div class="modal-detail-value">${discount.diningOption || 'N/A'}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Discount Name</div>
+          <div class="modal-detail-value">${discount.discountName}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Discount Type</div>
+          <div class="modal-detail-value">${discount.discountType}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Level</div>
+          <div class="modal-detail-value">${discount.level}${discount.itemName ? `: ${discount.itemName}` : ''}</div>
+        </div>
+
+        ${discount.level === 'Item' && discount.itemPrice ? `
+          <div class="modal-detail-row">
+            <div class="modal-detail-label">Item Details</div>
+            <div class="modal-detail-value">
+              ${discount.itemQuantity}x ${discount.itemName} @ $${discount.itemPrice.toFixed(2)}
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Discount Amount</div>
+          <div class="modal-detail-value" style="font-size: 18px; font-weight: 700; color: var(--warning-text);">$${discount.amount.toFixed(2)}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Check Total</div>
+          <div class="modal-detail-value">$${discount.checkAmount ? discount.checkAmount.toFixed(2) : 'N/A'}</div>
+        </div>
+
+        ${discount.approvedBy ? `
+          <div class="modal-detail-row">
+            <div class="modal-detail-label">Approved By</div>
+            <div class="modal-detail-value">${discount.approvedBy}</div>
+          </div>
+        ` : ''}
+
+        ${discount.orderGuid && discount.orderGuid !== 'N/A' ? `
+          <div class="modal-detail-row">
+            <div class="modal-detail-label">Order GUID</div>
+            <div class="modal-detail-value" style="font-size: 10px; font-family: monospace; color: var(--gray-600);">${discount.orderGuid}</div>
+          </div>
+        ` : ''}
+      `;
+
+      document.getElementById('trackingDetailsModal').classList.add('active');
+    }
+
+    function viewRefundDetails(index) {
+      if (!trackingData || !trackingData.refunds.items[index]) return;
+      const refund = trackingData.refunds.items[index];
+
+      document.getElementById('trackingModalTitle').textContent = `Refund: Order #${refund.orderNumber}`;
+
+      document.getElementById('trackingModalBody').innerHTML = `
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Date & Time</div>
+          <div class="modal-detail-value">${refund.date} at ${refund.time}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Order Number</div>
+          <div class="modal-detail-value">${refund.orderNumber}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Server</div>
+          <div class="modal-detail-value">${refund.server}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Tab Name</div>
+          <div class="modal-detail-value">${refund.tabName}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Dining Option</div>
+          <div class="modal-detail-value">${refund.diningOption || 'N/A'}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Refund Type</div>
+          <div class="modal-detail-value">${refund.refundType}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Payment Type</div>
+          <div class="modal-detail-value">${refund.paymentType}${refund.cardType && refund.cardType !== 'N/A' ? ` (${refund.cardType})` : ''}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Original Amount</div>
+          <div class="modal-detail-value">$${refund.originalAmount.toFixed(2)}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Refund Amount</div>
+          <div class="modal-detail-value" style="font-size: 18px; font-weight: 700; color: var(--error-text);">$${refund.refundAmount.toFixed(2)}</div>
+        </div>
+
+        ${refund.tipAmount > 0 ? `
+          <div class="modal-detail-row">
+            <div class="modal-detail-label">Tip Amount</div>
+            <div class="modal-detail-value">$${refund.tipAmount.toFixed(2)}</div>
+          </div>
+        ` : ''}
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Check Total</div>
+          <div class="modal-detail-value">$${refund.checkAmount ? refund.checkAmount.toFixed(2) : 'N/A'}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Reason</div>
+          <div class="modal-detail-value">${refund.reason}</div>
+        </div>
+
+        ${refund.orderGuid && refund.orderGuid !== 'N/A' ? `
+          <div class="modal-detail-row">
+            <div class="modal-detail-label">Order GUID</div>
+            <div class="modal-detail-value" style="font-size: 10px; font-family: monospace; color: var(--gray-600);">${refund.orderGuid}</div>
+          </div>
+        ` : ''}
+      `;
+
+      document.getElementById('trackingDetailsModal').classList.add('active');
+    }
+
+    function viewVoidedPaymentDetails(index) {
+      if (!trackingData || !trackingData.voidedPayments.items[index]) return;
+      const payment = trackingData.voidedPayments.items[index];
+
+      document.getElementById('trackingModalTitle').textContent = `Voided Payment: Order #${payment.orderNumber}`;
+
+      document.getElementById('trackingModalBody').innerHTML = `
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Date & Time</div>
+          <div class="modal-detail-value">${payment.date} at ${payment.time}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Order Number</div>
+          <div class="modal-detail-value">${payment.orderNumber}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Server</div>
+          <div class="modal-detail-value">${payment.server}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Tab Name</div>
+          <div class="modal-detail-value">${payment.tabName}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Dining Option</div>
+          <div class="modal-detail-value">${payment.diningOption || 'N/A'}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Payment Type</div>
+          <div class="modal-detail-value">${payment.paymentType}${payment.cardType && payment.cardType !== 'N/A' ? ` (${payment.cardType})` : ''}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Payment Amount</div>
+          <div class="modal-detail-value" style="font-size: 18px; font-weight: 700; color: var(--error-text);">$${payment.amount.toFixed(2)}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Tip Amount</div>
+          <div class="modal-detail-value">$${payment.tipAmount.toFixed(2)}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Total with Tip</div>
+          <div class="modal-detail-value" style="font-weight: 600;">$${(payment.amount + payment.tipAmount).toFixed(2)}</div>
+        </div>
+
+        <div class="modal-detail-row">
+          <div class="modal-detail-label">Check Total</div>
+          <div class="modal-detail-value">$${payment.checkAmount ? payment.checkAmount.toFixed(2) : 'N/A'}</div>
+        </div>
+
+        ${payment.orderGuid && payment.orderGuid !== 'N/A' ? `
+          <div class="modal-detail-row">
+            <div class="modal-detail-label">Order GUID</div>
+            <div class="modal-detail-value" style="font-size: 10px; font-family: monospace; color: var(--gray-600);">${payment.orderGuid}</div>
+          </div>
+        ` : ''}
+      `;
+
+      document.getElementById('trackingDetailsModal').classList.add('active');
+    }
 
     // ==================== CLOCKED IN DISPLAY ====================
     async function fetchClockedInEmployees() {
@@ -1737,17 +2059,23 @@
       if (filteredVoidedOrders.length === 0) {
         voidedOrdersTable.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px;">No voided orders ${showTodayOnly ? 'today' : 'this week'}</td></tr>`;
       } else {
-        voidedOrdersTable.innerHTML = filteredVoidedOrders.map(item => `
-          <tr>
-            <td>${item.date}</td>
-            <td>${item.time}</td>
-            <td>${item.orderNumber}</td>
-            <td>${item.server}</td>
-            <td>${item.tabName}</td>
-            <td>${item.reason}</td>
-            <td>$${item.amount.toFixed(2)}</td>
-          </tr>
-        `).join('');
+        voidedOrdersTable.innerHTML = filteredVoidedOrders.map((item, idx) => {
+          // Find original index in trackingData.voidedOrders.items
+          const originalIndex = trackingData.voidedOrders.items.findIndex(orig =>
+            orig.orderNumber === item.orderNumber && orig.timestamp === item.timestamp
+          );
+          return `
+            <tr onclick="viewVoidedOrderDetails(${originalIndex})" style="cursor: pointer;">
+              <td>${item.date}</td>
+              <td>${item.time}</td>
+              <td>${item.orderNumber}</td>
+              <td>${item.server}</td>
+              <td>${item.tabName}</td>
+              <td>${item.reason}</td>
+              <td>$${item.amount.toFixed(2)}</td>
+            </tr>
+          `;
+        }).join('');
       }
 
       // Render Discounts table
@@ -1755,19 +2083,25 @@
       if (filteredDiscounts.length === 0) {
         discountsTable.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 20px;">No discounts ${showTodayOnly ? 'today' : 'this week'}</td></tr>`;
       } else {
-        discountsTable.innerHTML = filteredDiscounts.map(item => `
-          <tr>
-            <td>${item.date}</td>
-            <td>${item.time}</td>
-            <td>${item.orderNumber}</td>
-            <td>${item.server}</td>
-            <td>${item.tabName}</td>
-            <td>${item.discountName}</td>
-            <td>${item.discountType}</td>
-            <td>${item.level}${item.itemName ? `: ${item.itemName}` : ''}</td>
-            <td>$${item.amount.toFixed(2)}</td>
-          </tr>
-        `).join('');
+        discountsTable.innerHTML = filteredDiscounts.map((item, idx) => {
+          // Find original index in trackingData.discounts.items
+          const originalIndex = trackingData.discounts.items.findIndex(orig =>
+            orig.orderNumber === item.orderNumber && orig.timestamp === item.timestamp && orig.discountName === item.discountName
+          );
+          return `
+            <tr onclick="viewDiscountDetails(${originalIndex})" style="cursor: pointer;">
+              <td>${item.date}</td>
+              <td>${item.time}</td>
+              <td>${item.orderNumber}</td>
+              <td>${item.server}</td>
+              <td>${item.tabName}</td>
+              <td>${item.discountName}</td>
+              <td>${item.discountType}</td>
+              <td>${item.level}${item.itemName ? `: ${item.itemName}` : ''}</td>
+              <td>$${item.amount.toFixed(2)}</td>
+            </tr>
+          `;
+        }).join('');
       }
 
       // Render Refunds table
@@ -1775,18 +2109,24 @@
       if (filteredRefunds.length === 0) {
         refundsTable.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px;">No refunds ${showTodayOnly ? 'today' : 'this week'}</td></tr>`;
       } else {
-        refundsTable.innerHTML = filteredRefunds.map(item => `
-          <tr>
-            <td>${item.date}</td>
-            <td>${item.time}</td>
-            <td>${item.orderNumber}</td>
-            <td>${item.server}</td>
-            <td>${item.tabName}</td>
-            <td>${item.refundType}</td>
-            <td>$${item.refundAmount.toFixed(2)}</td>
-            <td>${item.reason}</td>
-          </tr>
-        `).join('');
+        refundsTable.innerHTML = filteredRefunds.map((item, idx) => {
+          // Find original index in trackingData.refunds.items
+          const originalIndex = trackingData.refunds.items.findIndex(orig =>
+            orig.orderNumber === item.orderNumber && orig.timestamp === item.timestamp && orig.refundAmount === item.refundAmount
+          );
+          return `
+            <tr onclick="viewRefundDetails(${originalIndex})" style="cursor: pointer;">
+              <td>${item.date}</td>
+              <td>${item.time}</td>
+              <td>${item.orderNumber}</td>
+              <td>${item.server}</td>
+              <td>${item.tabName}</td>
+              <td>${item.refundType}</td>
+              <td>$${item.refundAmount.toFixed(2)}</td>
+              <td>${item.reason}</td>
+            </tr>
+          `;
+        }).join('');
       }
 
       // Render Voided Payments table
@@ -1794,18 +2134,24 @@
       if (filteredVoidedPayments.length === 0) {
         voidedPaymentsTable.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px;">No voided payments ${showTodayOnly ? 'today' : 'this week'}</td></tr>`;
       } else {
-        voidedPaymentsTable.innerHTML = filteredVoidedPayments.map(item => `
-          <tr>
-            <td>${item.date}</td>
-            <td>${item.time}</td>
-            <td>${item.orderNumber}</td>
-            <td>${item.server}</td>
-            <td>${item.tabName}</td>
-            <td>${item.paymentType}${item.cardType && item.cardType !== 'N/A' ? ` (${item.cardType})` : ''}</td>
-            <td>$${item.amount.toFixed(2)}</td>
-            <td>$${item.tipAmount.toFixed(2)}</td>
-          </tr>
-        `).join('');
+        voidedPaymentsTable.innerHTML = filteredVoidedPayments.map((item, idx) => {
+          // Find original index in trackingData.voidedPayments.items
+          const originalIndex = trackingData.voidedPayments.items.findIndex(orig =>
+            orig.orderNumber === item.orderNumber && orig.timestamp === item.timestamp && orig.amount === item.amount
+          );
+          return `
+            <tr onclick="viewVoidedPaymentDetails(${originalIndex})" style="cursor: pointer;">
+              <td>${item.date}</td>
+              <td>${item.time}</td>
+              <td>${item.orderNumber}</td>
+              <td>${item.server}</td>
+              <td>${item.tabName}</td>
+              <td>${item.paymentType}${item.cardType && item.cardType !== 'N/A' ? ` (${item.cardType})` : ''}</td>
+              <td>$${item.amount.toFixed(2)}</td>
+              <td>$${item.tipAmount.toFixed(2)}</td>
+            </tr>
+          `;
+        }).join('');
       }
     }
 
