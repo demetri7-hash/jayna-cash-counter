@@ -1267,6 +1267,17 @@
         </div>
 
         <div class="form-group">
+          <label for="ezcaterSales">EZCater Sales (Optional):</label>
+          <input type="number" id="ezcaterSales" class="form-input" step="0.01" placeholder="e.g., 1500.00" inputmode="decimal">
+          <div style="font-size: 12px; color: #666; margin-top: 5px;">
+            <strong>Add EZCater catering sales</strong> to the total net sales for labor percentage calculations.
+          </div>
+          <div style="font-size: 11px; color: #999; margin-top: 3px;">
+            This amount will be added to the net sales (manual or API) when calculating labor summary
+          </div>
+        </div>
+
+        <div class="form-group">
           <label for="calculatedByName">Tips Calculated By:</label>
           <input type="text" id="calculatedByName" class="form-input" placeholder="Your Full Name">
         </div>
@@ -7913,8 +7924,13 @@
                 <!-- Labor Percentage Analysis -->
                 <div style="background: ${tipPoolSummary.laborData.laborVariance > 0 ? '#ffe6e6' : '#e8f5e8'}; padding: 12px; border-radius: 0; border: 2px solid ${tipPoolSummary.laborData.laborVariance > 0 ? '#dc3545' : '#28a745'}; margin-top: 12px;">
                   <div style="text-align: center; margin-bottom: 8px;">
-                    <div style="font-size: 11px; color: #666; margin-bottom: 4px;">NET SALES</div>
+                    <div style="font-size: 11px; color: #666; margin-bottom: 4px;">NET SALES ${tipPoolSummary.laborData.usingEzcaterSales ? '(includes EZCater)' : ''}</div>
                     <div style="font-size: 16px; font-weight: bold;">$${tipPoolSummary.laborData.netSales.toFixed(2)}</div>
+                    ${tipPoolSummary.laborData.usingEzcaterSales ? `
+                    <div style="font-size: 9px; color: #666; margin-top: 4px;">
+                      Base: $${tipPoolSummary.laborData.baseNetSales.toFixed(2)} + EZCater: $${tipPoolSummary.laborData.ezcaterSales.toFixed(2)}
+                    </div>
+                    ` : ''}
                   </div>
                   <div style="text-align: center; margin-bottom: 8px;">
                     <div style="font-size: 11px; color: #666; margin-bottom: 4px;">LABOR PERCENTAGE</div>
@@ -8832,19 +8848,24 @@
 
       // Handle manual net sales override
       const manualNetSalesInput = parseFloat(document.getElementById('manualNetSales').value) || 0;
+      const ezcaterSalesInput = parseFloat(document.getElementById('ezcaterSales').value) || 0;
       const apiNetSales = netSales; // Store original API value
 
-      // Use manual net sales if provided, otherwise use API
-      const finalNetSales = manualNetSalesInput > 0 ? manualNetSalesInput : apiNetSales;
+      // Use manual net sales if provided, otherwise use API, then add EZCater sales
+      const baseNetSales = manualNetSalesInput > 0 ? manualNetSalesInput : apiNetSales;
+      const finalNetSales = baseNetSales + ezcaterSalesInput;
 
-      // Log the difference for transparency
-      if (manualNetSalesInput > 0 && apiNetSales > 0) {
+      // Log the breakdown for transparency
+      console.log(`Net Sales Breakdown:`);
+      console.log(`  API Net Sales: $${apiNetSales.toFixed(2)}`);
+      if (manualNetSalesInput > 0) {
         const difference = manualNetSalesInput - apiNetSales;
-        console.log(`Net Sales Comparison:`);
-        console.log(`  Manual Net Sales: $${manualNetSalesInput.toFixed(2)}`);
-        console.log(`  API Net Sales: $${apiNetSales.toFixed(2)}`);
-        console.log(`  Difference: $${difference.toFixed(2)} (${(difference/apiNetSales*100).toFixed(1)}%)`);
+        console.log(`  Manual Net Sales Override: $${manualNetSalesInput.toFixed(2)} (${difference >= 0 ? '+' : ''}$${difference.toFixed(2)})`);
       }
+      if (ezcaterSalesInput > 0) {
+        console.log(`  + EZCater Sales: $${ezcaterSalesInput.toFixed(2)}`);
+      }
+      console.log(`  Final Net Sales (for labor %): $${finalNetSales.toFixed(2)}`);
 
       const demetriSalary = 85000 / 52; // $85k annual salary / 52 weeks
       const subtotalLabor = baseLaborCost + demetriSalary;
@@ -8927,9 +8948,12 @@
           payrollBurden: payrollBurden,
           trueTotalLaborCost: trueTotalLaborCost,
           netSales: finalNetSales,
+          baseNetSales: baseNetSales,
           apiNetSales: apiNetSales,
           manualNetSales: manualNetSalesInput,
+          ezcaterSales: ezcaterSalesInput,
           usingManualNetSales: manualNetSalesInput > 0,
+          usingEzcaterSales: ezcaterSalesInput > 0,
           laborPercentage: laborPercentage,
           industryBenchmark: industryBenchmark,
           laborVariance: laborVariance
@@ -9461,8 +9485,11 @@
                 <div style="font-size: 18px; font-weight: bold; color: #28a745;">$${tipPoolSummary.laborData.trueTotalLaborCost.toFixed(2)}</div>
               </div>
               <div style="padding: 10px; background: #f8f9fa; border-left: 3px solid #007bff; margin-bottom: 8px;">
-                <div style="font-size: 11px; color: #666;">NET SALES</div>
+                <div style="font-size: 11px; color: #666;">NET SALES${tipPoolSummary.laborData.usingEzcaterSales ? ' (includes EZCater)' : ''}</div>
                 <div style="font-size: 18px; font-weight: bold; color: #007bff;">$${tipPoolSummary.laborData.netSales.toFixed(2)}</div>
+                ${tipPoolSummary.laborData.usingEzcaterSales ? `
+                  <div style="font-size: 9px; color: #999; margin-top: 4px;">Base: $${tipPoolSummary.laborData.baseNetSales.toFixed(2)} + EZCater: $${tipPoolSummary.laborData.ezcaterSales.toFixed(2)}</div>
+                ` : ''}
               </div>
               <div style="padding: 15px; background: ${tipPoolSummary.laborData.laborVariance > 0 ? '#ffebee' : '#e8f5e9'}; border-left: 4px solid ${tipPoolSummary.laborData.laborVariance > 0 ? '#dc3545' : '#28a745'}; text-align: center;">
                 <div style="font-size: 11px; color: #666; margin-bottom: 5px;">LABOR PERCENTAGE</div>
@@ -10349,9 +10376,17 @@
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(6); // Reduced from 7
           doc.setTextColor(0, 0, 0);
-          doc.text('NET SALES', rightBoxX + 10, laborY + 5);
+          doc.text(`NET SALES${ld.usingEzcaterSales ? ' (incl. EZCater)' : ''}`, rightBoxX + 10, laborY + 5);
           doc.setFont('helvetica', 'bold');
           doc.text(`$${ld.netSales.toFixed(2)}`, rightBoxX + boxWidth - 10, laborY + 5, { align: 'right' });
+
+          // Show EZCater breakdown if applicable
+          if (ld.usingEzcaterSales) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(5);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Base: $${ld.baseNetSales.toFixed(2)} + EZCater: $${ld.ezcaterSales.toFixed(2)}`, rightBoxX + 10, laborY + 9);
+          }
 
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(6); // Reduced from 7
