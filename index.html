@@ -13313,7 +13313,7 @@ async function renderOrdersTab() {
         if (item.inventoryItemId && receivedQty > 0) {
           const { data: currentItem, error: fetchError } = await supabase
             .from('inventory_items')
-            .select('current_stock')
+            .select('current_stock, current_unit_cost, vendor')
             .eq('id', item.inventoryItemId)
             .single();
 
@@ -13321,18 +13321,44 @@ async function renderOrdersTab() {
 
           const currentStock = Number(currentItem?.current_stock) || 0;
           const newStock = currentStock + receivedQty;
+          const oldPrice = Number(currentItem?.current_unit_cost) || 0;
+          const newPrice = Number(item.price) || 0;
 
           const { error: inventoryError } = await supabase
             .from('inventory_items')
             .update({
               current_stock: newStock,
               last_counted_date: getPacificDate(),
-              current_unit_cost: item.price,
+              current_unit_cost: newPrice,
               last_cost_update: new Date().toISOString()
             })
             .eq('id', item.inventoryItemId);
 
           if (inventoryError) throw inventoryError;
+
+          // Save price history if price changed
+          if (oldPrice > 0 && newPrice > 0 && oldPrice !== newPrice) {
+            const priceChangePercent = ((newPrice - oldPrice) / oldPrice) * 100;
+
+            const { error: priceHistoryError } = await supabase
+              .from('price_history')
+              .insert({
+                inventory_item_id: item.inventoryItemId,
+                vendor: currentItem.vendor,
+                old_price: oldPrice,
+                new_price: newPrice,
+                price_change_percent: priceChangePercent,
+                source: 'pending_order',
+                source_id: orderId,
+                updated_at: new Date().toISOString()
+              });
+
+            if (priceHistoryError) {
+              console.error('Failed to save price history:', priceHistoryError);
+            } else {
+              console.log(`💰 Price history saved: ${item.name} - $${oldPrice.toFixed(2)} → $${newPrice.toFixed(2)} (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(1)}%)`);
+            }
+          }
         }
       }
 
@@ -13782,6 +13808,7 @@ async function renderReceivePendingOrders() {
           receiving_notes
         )
       `)
+      .in('status', ['pending', 'partial'])
       .order('expected_delivery_date', { ascending: true });
 
     if (error) throw error;
