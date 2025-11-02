@@ -3168,20 +3168,36 @@
         html += `<div>☐ ${sets}x 16oz Lemon Vinaigrette – 1 SMALL SPOON</div>`;
         html += `<div>☐ ${formatPanCount(sets)} Mixed Greens – 1 TONG</div>`;
 
+        // COORDINATED BROWN BOWL LOGIC FOR TOMATOES, ONIONS, PEPPERONCINI
+        // If ANY of these 3 items naturally gets a brown bowl, ALL 3 get brown bowls
+        let useBrownBowlForAll = false;
+
+        // Check if tomatoes would naturally use brown bowl (10-20 portions)
+        const tomatoNaturallyUsesBrownBowl = (prep.byoGyros.total >= 10 && prep.byoGyros.total <= 20);
+
+        // Check if onions would naturally use brown bowl (20-45 portions)
+        const onionNaturallyUsesBrownBowl = (prep.byoGyros.total >= 20 && prep.byoGyros.total <= 45);
+
+        // If either naturally gets brown bowl, all three get brown bowls
+        if (tomatoNaturallyUsesBrownBowl || onionNaturallyUsesBrownBowl) {
+          useBrownBowlForAll = true;
+        }
+
         // DICED TOMATO LOGIC
         // 30 portions per half pan
         // Below 10: 16oz deli container
         // 10-20: Brown Jayna bowl
         // 21+: Calculate half pans (30 portions per half pan)
         let tomatoContainer = '';
-        let tomatoUsesBrownBowl = false; // Flag for coordinated brown bowl logic
-        if (prep.byoGyros.total < 10) {
+        if (useBrownBowlForAll) {
+          brownBowls += 1;
+          tomatoContainer = 'brown Jayna bowl';
+        } else if (prep.byoGyros.total < 10) {
           deliContainers += 1;
           tomatoContainer = '16oz deli container';
         } else if (prep.byoGyros.total <= 20) {
           brownBowls += 1;
           tomatoContainer = 'brown Jayna bowl';
-          tomatoUsesBrownBowl = true; // Set flag when tomatoes use brown bowl
         } else {
           const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 30);
           halfPans += tomatoHalfPans;
@@ -3194,9 +3210,8 @@
         // Below 20: 16oz deli container
         // 20-45: Brown Jayna bowl
         // 46+: Calculate half pans (50 portions per half pan)
-        // COORDINATED LOGIC: If tomatoes use brown bowl, onions must also use brown bowl
         let onionContainer = '';
-        if (tomatoUsesBrownBowl) {
+        if (useBrownBowlForAll) {
           brownBowls += 1;
           onionContainer = 'brown Jayna bowl';
         } else if (prep.byoGyros.total < 20) {
@@ -3217,9 +3232,9 @@
         // 10-20: 32oz deli container
         // 21-99: Half pan
         // 100+: Full pan(s) + half pan if remainder
-        // COORDINATED LOGIC: If tomatoes use brown bowl, pepperoncini must also use brown bowl
+        // COORDINATED LOGIC: If tomatoes OR onions use brown bowl, pepperoncini also uses brown bowl
         let pepperonciniContainer = '';
-        if (tomatoUsesBrownBowl) {
+        if (useBrownBowlForAll) {
           brownBowls += 1;
           pepperonciniContainer = 'brown Jayna bowl';
         } else if (prep.byoGyros.total < 10) {
@@ -3948,6 +3963,21 @@
           labels.push({ item: getLabelName('Mixed Greens'), qty: greensFullPans > 1 ? `FULL PAN - ${i} OF ${greensFullPans}` : `FULL PAN - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
         }
 
+        // COORDINATED BROWN BOWL LOGIC FOR TOMATOES, ONIONS, PEPPERONCINI (PDF Labels)
+        // If ANY of these 3 items naturally gets a brown bowl, ALL 3 get brown bowls
+        let useBrownBowlForAllLabels = false;
+
+        // Check if tomatoes would naturally use brown bowl (10-20 portions)
+        const tomatoNaturallyUsesBrownBowlLabels = (prep.byoGyros.total >= 10 && prep.byoGyros.total <= 20);
+
+        // Check if onions would naturally use brown bowl (20-45 portions)
+        const onionNaturallyUsesBrownBowlLabels = (prep.byoGyros.total >= 20 && prep.byoGyros.total <= 45);
+
+        // If either naturally gets brown bowl, all three get brown bowls
+        if (tomatoNaturallyUsesBrownBowlLabels || onionNaturallyUsesBrownBowlLabels) {
+          useBrownBowlForAllLabels = true;
+        }
+
         // DICED TOMATOES - Calculate actual container type and count
         // 30 portions per half pan
         // Below 10: 16oz deli container
@@ -3955,15 +3985,16 @@
         // 21+: Calculate half pans (30 portions per half pan)
         let tomatoContainerType = '';
         let tomatoContainerCount = 0;
-        let tomatoUsesBrownBowl = false; // Flag for coordinated brown bowl logic
 
-        if (prep.byoGyros.total < 10) {
+        if (useBrownBowlForAllLabels) {
+          tomatoContainerType = 'brown bowl';
+          tomatoContainerCount = 1;
+        } else if (prep.byoGyros.total < 10) {
           tomatoContainerType = '16oz deli';
           tomatoContainerCount = 1;
         } else if (prep.byoGyros.total <= 20) {
           tomatoContainerType = 'brown bowl';
           tomatoContainerCount = 1;
-          tomatoUsesBrownBowl = true; // Set flag when tomatoes use brown bowl
         } else {
           tomatoContainerType = 'half pan';
           tomatoContainerCount = Math.ceil(prep.byoGyros.total / 30);
@@ -3989,11 +4020,10 @@
         // Below 20: 16oz deli container
         // 20-45: Brown Jayna bowl
         // 46+: Calculate half pans (50 portions per half pan)
-        // COORDINATED LOGIC: If tomatoes use brown bowl, onions must also use brown bowl
         let onionContainerType = '';
         let onionContainerCount = 0;
 
-        if (tomatoUsesBrownBowl) {
+        if (useBrownBowlForAllLabels) {
           onionContainerType = 'brown bowl';
           onionContainerCount = 1;
         } else if (prep.byoGyros.total < 20) {
@@ -4027,11 +4057,11 @@
         // 10-20: 32oz deli container
         // 21-99: Half pan
         // 100+: Full pan(s) + half pan if remainder
-        // COORDINATED LOGIC: If tomatoes use brown bowl, pepperoncini must also use brown bowl
+        // COORDINATED LOGIC: If tomatoes OR onions use brown bowl, pepperoncini also uses brown bowl
         let pepperonciniContainerType = '';
         let pepperonciniContainerCount = 0;
 
-        if (tomatoUsesBrownBowl) {
+        if (useBrownBowlForAllLabels) {
           pepperonciniContainerType = 'brown bowl';
           pepperonciniContainerCount = 1;
         } else if (prep.byoGyros.total < 10) {
