@@ -239,13 +239,21 @@ export default async function handler(req, res) {
       const customerEmail = customer.email || null;
 
       // EXTRACT DELIVERY DATE from promisedDate (scheduled delivery/pickup time), NOT businessDate (order creation date)
-      // promisedDate format: "2025-10-25T13:00:00.000+0000" (ISO 8601 with time)
-      // Extract just the date portion (YYYY-MM-DD)
+      // promisedDate format: "2025-10-25T13:00:00.000+0000" (ISO 8601 UTC time)
+      // CRITICAL: Must convert to Pacific time before extracting date!
       let deliveryDate = null;
       if (order.promisedDate) {
-        // Parse promisedDate to get date only (ignore time)
-        const promisedDateStr = order.promisedDate.split('T')[0]; // Get "2025-10-25" from "2025-10-25T13:00:00.000+0000"
-        deliveryDate = promisedDateStr; // Already in YYYY-MM-DD format
+        // Parse promisedDate and convert to Pacific timezone to get correct date
+        const promisedUTC = new Date(order.promisedDate);
+        // Convert to Pacific timezone
+        const promisedPacific = new Date(promisedUTC.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+        // Extract date in YYYY-MM-DD format
+        const year = promisedPacific.getFullYear();
+        const month = String(promisedPacific.getMonth() + 1).padStart(2, '0');
+        const day = String(promisedPacific.getDate()).padStart(2, '0');
+        deliveryDate = `${year}-${month}-${day}`;
+
+        console.log(`📅 Date conversion: UTC=${order.promisedDate} → Pacific=${deliveryDate}`);
       } else {
         // Fallback to businessDate if no promisedDate (shouldn't happen for catering orders)
         const dateStr = order.businessDate?.toString() || '';
