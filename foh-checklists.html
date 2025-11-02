@@ -2119,11 +2119,11 @@
       clearTimeout(fohSystemState.activeUserTimeout);
     }
 
-    // Set new timeout to reset to first user after 1 minute
+    // Set new timeout to reset to first user after 30 minutes
     fohSystemState.activeUserTimeout = setTimeout(() => {
       fohSystemState.activeUserIndex = 0;
       console.log('⏰ User timeout - reset to default user');
-    }, 60000); // 1 minute
+    }, 1800000); // 30 minutes
   }
 
   /**
@@ -4475,16 +4475,30 @@
     const taskRecord = fohSystemState.tasks.find(t => t.id === taskId);
     if (!taskRecord || !taskRecord.is_completed) return;
 
-    // Ensure teamNames includes all clocked-in employees
+    // Build available team names list with Demetri Gregorakis ALWAYS available
+    let availableNames = [];
+
+    // ALWAYS add Demetri Gregorakis as first option
+    availableNames.push({
+      name: 'Demetri Gregorakis',
+      color: '#FF6B6B' // Distinct red color for Demetri
+    });
+
+    // Add all clocked-in employees
     if (fohSystemState.clockedInEmployees.length > 0) {
-      // Repopulate teamNames from clocked-in employees if needed
-      if (fohSystemState.teamNames.length < fohSystemState.clockedInEmployees.length) {
-        fohSystemState.teamNames = fohSystemState.clockedInEmployees.map((name, index) => ({
-          name: name,
-          color: getUserColor(index)
-        }));
-      }
+      fohSystemState.clockedInEmployees.forEach((name, index) => {
+        // Don't duplicate if Demetri is already clocked in
+        if (name !== 'Demetri Gregorakis' && name !== 'Demetri') {
+          availableNames.push({
+            name: name,
+            color: getUserColor(index + 1) // Offset by 1 since Demetri uses index 0
+          });
+        }
+      });
     }
+
+    // Update teamNames with the complete list
+    fohSystemState.teamNames = availableNames;
 
     if (fohSystemState.teamNames.length === 0) {
       showMessage('No team members available to cycle through', 'error');
@@ -4515,6 +4529,10 @@
 
       // Set this as active user
       setActiveUser(nextUserIndex);
+
+      // Save selected user to localStorage for 30-minute persistence
+      localStorage.setItem('foh_username', nextUser.name);
+      localStorage.setItem('foh_username_timestamp', Date.now().toString());
 
       // Re-render checklist to show new user
       renderChecklist();
