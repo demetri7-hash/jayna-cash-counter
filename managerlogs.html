@@ -510,6 +510,51 @@
       letter-spacing: 0.5px;
       color: var(--gray-600);
     }
+
+    /* Loading Overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20000;
+    }
+
+    .loading-overlay.active {
+      display: flex;
+    }
+
+    .loading-spinner-container {
+      text-align: center;
+    }
+
+    .loading-spinner {
+      border: 6px solid var(--gray-300);
+      border-top: 6px solid white;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
   </style>
 </head>
 <body>
@@ -839,6 +884,14 @@
         <button onclick="downloadPDF()">📥 DOWNLOAD PDF</button>
         <button onclick="printIncident()">🖨️ SEND TO PRINTER</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner-container">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Loading Tracking Data...</div>
     </div>
   </div>
 
@@ -1506,6 +1559,15 @@
     let currentWeekOffset = 0; // 0 = current week, -1 = last week, +1 = next week
     let trackingData = null;
 
+    // Loading overlay functions
+    function showLoadingOverlay() {
+      document.getElementById('loadingOverlay').classList.add('active');
+    }
+
+    function hideLoadingOverlay() {
+      document.getElementById('loadingOverlay').classList.remove('active');
+    }
+
     // Get Monday of the week (weeks start Monday, end Sunday)
     function getMondayOfWeek(date, weekOffset = 0) {
       const d = new Date(date);
@@ -1539,6 +1601,9 @@
 
     async function loadTrackingData() {
       try {
+        // Show loading overlay
+        showLoadingOverlay();
+
         console.log('📊 Loading void/discount tracking data...');
 
         const week = getWeekDates(currentWeekOffset);
@@ -1608,8 +1673,15 @@
         // Update UI
         renderTrackingData();
 
+        // Hide loading overlay
+        hideLoadingOverlay();
+
       } catch (error) {
         console.error('❌ Error loading tracking data:', error);
+
+        // Hide loading overlay
+        hideLoadingOverlay();
+
         // Show error in tables
         document.getElementById('voidedOrdersTable').innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--error-text);">Error: ${error.message}</td></tr>`;
         document.getElementById('discountsTable').innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 20px; color: var(--error-text);">Error: ${error.message}</td></tr>`;
