@@ -1,6 +1,46 @@
 {
   "conversations": [
     {
+      "date": "2025-11-03T14:00:00Z",
+      "summary": "Added void/discount tracking filter and display to index.html. Excluded REWARD DOLLARS and ONLINE ORDER from discount counts. Confirmed clocked-in API uses Pacific→UTC conversion.",
+      "key_decisions": [
+        "Filter out 'REWARD DOLLARS' and 'ONLINE ORDER' discounts in toast-void-discount-tracking.js API",
+        "Add text-only display to index.html showing VOIDED ORDERS | DISCOUNTS | REFUNDS | VOIDED PAYMENTS",
+        "Place display between Tips/HR section and 'APP CREATED BY' text",
+        "Use same API pattern as managerlogs.html for consistency",
+        "Show TODAY's data only (Pacific timezone), auto-refresh every 5 minutes"
+      ],
+      "action_items": [
+        "Monitor discount counts to verify REWARD DOLLARS and ONLINE ORDER are excluded",
+        "User confirmed yesterday's 4 discounts should show 0 after applying both filters",
+        "Verify display shows correct counts on production",
+        "All changes committed and pushed to main branch"
+      ],
+      "topics": ["Discount Filtering", "Toast API", "Void Tracking", "index.html Display", "Pacific Time", "Data Display"],
+      "important_details": [
+        "FILE MODIFIED: api/toast-void-discount-tracking.js - Added filter for 'REWARD DOLLARS' and 'ONLINE ORDER' discounts",
+        "FILTER LOCATION: Lines 174-177 (check-level discounts), Lines 206-209 (item-level discounts)",
+        "FILTER LOGIC: if (discountName === 'REWARD DOLLARS' || discountName === 'ONLINE ORDER') { return; }",
+        "FILE MODIFIED: index.html - Added void/discount tracking display",
+        "DISPLAY HTML: Lines 813-816 - Text-only display with gray background and border",
+        "DISPLAY JAVASCRIPT: Lines 3435-3509 - fetchVoidDiscountTracking() and updateVoidDiscountDisplay()",
+        "API CALL: Uses /api/toast-void-discount-tracking with today's date (startDate=today, endDate=today)",
+        "TIMEZONE: Pacific time calculated via toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })",
+        "REFRESH RATE: Every 5 minutes (setInterval at line 3522)",
+        "DISPLAY FORMAT: 'VOIDED ORDERS: # | DISCOUNTS: # | REFUNDS: # | VOIDED PAYMENTS: #'",
+        "CONFIRMED: toast-clocked-in.js (lines 65-98) uses pacificDateToUTC() function with DST detection",
+        "PACIFIC→UTC: Start time (yesterday 00:00 PT → UTC), End time (today 23:59 PT → UTC)",
+        "DST HANDLING: Automatically detects PDT vs PST and applies correct offset (-07:00 or -08:00)",
+        "USER REQUIREMENT: 'ALWAYS PACIFIC TIME' for all date filtering",
+        "USER VALIDATION: User confirmed yesterday's data showed 4 discounts, should show 0 after filter",
+        "COMMIT 1: b180473 - fix(tracking): Exclude REWARD DOLLARS and ONLINE ORDER from discount count",
+        "COMMIT 2: 856f751 - feat(index): Add void/discount tracking display to homepage",
+        "DEPLOYMENT: Pushed to main branch, will deploy automatically via Vercel",
+        "MANAGERLOGS: Also uses same API, so managerlogs.html automatically gets filtered discount counts",
+        "User satisfaction: High (task completed exactly as requested)"
+      ]
+    },
+    {
       "date": "2025-11-01T23:30:00Z",
       "summary": "MASSIVE REPO CLEANUP: Archived 204 files + 11 folders (25MB) into COLLATERAL_ARCHIVE. Scanned ALL HTML files for collateral references, moved unused testing tools, guides, PDFs, and folders. Protected memory/ and chat sessions/ as critical brain system.",
       "key_decisions": [
