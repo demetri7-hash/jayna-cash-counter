@@ -1,11 +1,68 @@
 # CURRENT STATUS - Jayna Cash Counter
-**Last Updated:** 2025-10-26
-**Current Session:** Role-Based Access Control System - Complete Implementation
+**Last Updated:** 2025-11-02
+**Current Session:** Toast Clocked-In API Timezone Fix
 
 ---
 
 ## 🎯 Current Work Status
-**Status:** ✅ **COMPLETE - RBAC System LIVE!**
+**Status:** ✅ **COMPLETE - Timezone Fix Deployed**
+
+---
+
+## 🚀 Session 2025-11-02 - Toast Clocked-In API Timezone Fix
+
+**Duration:** Brief session
+**Commits:** 1
+**Status:** ✅ Complete - DEPLOYED
+
+### Critical Issue Fixed ✅
+
+**Problem:** Toast clocked-in API only showing 2 employees when more were actually clocked in
+
+**Root Cause:** Using UTC timestamps directly instead of converting Pacific time to UTC
+
+**Solution:** Implemented proper Pacific → UTC conversion with DST handling
+
+**File Modified:** `api/toast-clocked-in.js`
+**Commit:** `510f2d6` "fix(clocked-in): Convert Pacific time to UTC properly for Toast API"
+
+### Key Changes:
+
+1. **Created `pacificDateToUTC()` helper function** (lines 69-87)
+   - Converts Pacific dates (YYYY-MM-DD) to UTC ISO timestamps
+   - Automatically detects DST (PST -08:00 vs PDT -07:00)
+   - Uses proper timezone offset for accurate conversion
+
+2. **Extended time range to catch overnight shifts** (lines 89-98)
+   - Fetches yesterday 00:00 Pacific through today 23:59 Pacific
+   - Converted to UTC before sending to Toast API
+   - Catches employees who clocked in yesterday and are still working
+
+3. **Before (BROKEN):**
+   ```javascript
+   const startDateTime = `${date}T00:00:00.000-0000`; // UTC
+   const endDateTime = `${date}T23:59:59.999-0000`;   // UTC
+   ```
+
+4. **After (FIXED):**
+   ```javascript
+   const startDateTime = pacificDateToUTC(yesterdayDate, 0, 0, 0);
+   const endDateTime = pacificDateToUTC(date, 23, 59, 59);
+   ```
+
+5. **Added diagnostic logging** (lines 102-105)
+   - Shows Pacific input date
+   - Shows UTC conversion results
+   - Helps debug future timezone issues
+
+### Deployment Status:
+- ✅ Committed to main branch
+- ✅ Deployed to Vercel production
+- ✅ Should now show all currently clocked-in employees
+
+### User Verification Needed:
+- Test clocked-in employees display on production
+- Verify all employees showing correctly
 
 ---
 
