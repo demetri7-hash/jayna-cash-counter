@@ -2312,15 +2312,8 @@
    * 2AM-7AM PT: No flow available
    */
   function startSmartCashFlow() {
-    // Check if session is valid
-    if (isCashSessionValid()) {
-      // Session valid, proceed directly
-      loadCashFlowByTime();
-      return;
-    }
-
-    // No valid session, show password modal
-    showCashPasswordModal();
+    // No password needed - handled by app-header navigation
+    loadCashFlowByTime();
   }
 
   function showCashPasswordModal() {
@@ -2391,22 +2384,24 @@
     const now = new Date();
     const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
     const hour = pacificTime.getHours();
+    const minutes = pacificTime.getMinutes();
 
-    console.log(`Smart Cash Flow: Pacific hour is ${hour}`);
+    console.log(`Smart Cash Flow: Current time is ${hour}:${minutes.toString().padStart(2, '0')} PT`);
+    console.log(`Pacific time object:`, pacificTime);
 
     // 7AM-7PM (07:00-19:00): AM Count
     if (hour >= 7 && hour < 19) {
-      console.log('Loading AM Count (7AM-7PM)');
+      console.log('✅ Loading AM Count (7AM-7PM window)');
       startAMCount();
     }
     // 7PM-2AM (19:00-02:00): PM Close
     else if (hour >= 19 || hour < 2) {
-      console.log('Loading PM Close (7PM-2AM)');
+      console.log('✅ Loading PM Close (7PM-2AM window)');
       startPMCount();
     }
     // 2AM-7AM: No flow available
     else {
-      console.log('No cash flow available (2AM-7AM)');
+      console.log('⏰ No cash flow available (2AM-7AM window)');
       showMessage('Cash counting is not available at this time. Please try between 7:00 AM and 2:00 AM Pacific Time.', 'error');
     }
   }
