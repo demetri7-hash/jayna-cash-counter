@@ -169,6 +169,13 @@ export default async function handler(req, res) {
                 // Check-level discounts
                 if (check.appliedDiscounts && Array.isArray(check.appliedDiscounts)) {
                   check.appliedDiscounts.forEach(discount => {
+                    const discountName = discount.name || 'Unknown Discount';
+
+                    // FILTER: Exclude "REWARD DOLLARS" and "ONLINE ORDER" discounts
+                    if (discountName === 'REWARD DOLLARS' || discountName === 'ONLINE ORDER') {
+                      return; // Skip this discount
+                    }
+
                     discounts.push({
                       date: displayDate,
                       time: orderTime,
@@ -176,7 +183,7 @@ export default async function handler(req, res) {
                       orderGuid: order.guid || 'N/A',
                       server: serverName,
                       tabName: tabName,
-                      discountName: discount.name || 'Unknown Discount',
+                      discountName: discountName,
                       discountType: discount.type || 'N/A',
                       amount: discount.discountAmount || 0,
                       level: 'Check',
@@ -194,6 +201,13 @@ export default async function handler(req, res) {
                   check.selections.forEach(selection => {
                     if (selection.appliedDiscounts && Array.isArray(selection.appliedDiscounts)) {
                       selection.appliedDiscounts.forEach(discount => {
+                        const discountName = discount.name || 'Unknown Discount';
+
+                        // FILTER: Exclude "REWARD DOLLARS" and "ONLINE ORDER" discounts
+                        if (discountName === 'REWARD DOLLARS' || discountName === 'ONLINE ORDER') {
+                          return; // Skip this discount
+                        }
+
                         discounts.push({
                           date: displayDate,
                           time: orderTime,
@@ -201,7 +215,7 @@ export default async function handler(req, res) {
                           orderGuid: order.guid || 'N/A',
                           server: serverName,
                           tabName: tabName,
-                          discountName: discount.name || 'Unknown Discount',
+                          discountName: discountName,
                           discountType: discount.type || 'N/A',
                           amount: discount.discountAmount || 0,
                           level: 'Item',
