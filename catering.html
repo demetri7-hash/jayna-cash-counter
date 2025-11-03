@@ -3129,8 +3129,9 @@
       // BYO Gyros
       if (prep.byoGyros.total > 0) {
         const sets = Math.ceil(prep.byoGyros.total / 10);
+        const greensSets = Math.ceil(prep.byoGyros.total / 15); // UPDATED: 1 set per 15 portions
         deliContainers += sets * 3; // tzatziki, aioli, lemon vin
-        halfPans += sets; // mixed greens
+        halfPans += greensSets; // mixed greens - UPDATED to use greensSets
         smallSpoons += 3; // tzatziki (no dill), spicy aioli, lemon vinaigrette
         largeServingSpoons += 1; // diced tomatoes
 
@@ -3166,28 +3167,32 @@
         html += `<div>☐ ${sets}x 16oz Tzatziki (no dill) – 1 SMALL SPOON</div>`;
         html += `<div>☐ ${sets}x 16oz Spicy Aioli – 1 SMALL SPOON</div>`;
         html += `<div>☐ ${sets}x 16oz Lemon Vinaigrette – 1 SMALL SPOON</div>`;
-        html += `<div>☐ ${formatPanCount(sets)} Mixed Greens – 1 TONG</div>`;
+        html += `<div>☐ ${formatPanCount(greensSets)} Mixed Greens – 1 TONG</div>`;
 
         // COORDINATED BROWN BOWL LOGIC FOR TOMATOES, ONIONS, PEPPERONCINI
         // If ANY of these 3 items naturally gets a brown bowl, ALL 3 get brown bowls
         let useBrownBowlForAll = false;
 
-        // Check if tomatoes would naturally use brown bowl (10-20 portions)
-        const tomatoNaturallyUsesBrownBowl = (prep.byoGyros.total >= 10 && prep.byoGyros.total <= 20);
+        // UPDATED THRESHOLDS:
+        // Check if tomatoes would naturally use brown bowl (10-25 portions)
+        const tomatoNaturallyUsesBrownBowl = (prep.byoGyros.total >= 10 && prep.byoGyros.total <= 25);
 
         // Check if onions would naturally use brown bowl (20-45 portions)
         const onionNaturallyUsesBrownBowl = (prep.byoGyros.total >= 20 && prep.byoGyros.total <= 45);
 
-        // If either naturally gets brown bowl, all three get brown bowls
-        if (tomatoNaturallyUsesBrownBowl || onionNaturallyUsesBrownBowl) {
+        // Check if pepperoncini would naturally use 32oz (which acts like brown bowl - 10-30 portions)
+        const pepperonciniNaturallyUses32oz = (prep.byoGyros.total >= 10 && prep.byoGyros.total <= 30);
+
+        // If any naturally gets brown bowl or 32oz, all three get brown bowls
+        if (tomatoNaturallyUsesBrownBowl || onionNaturallyUsesBrownBowl || pepperonciniNaturallyUses32oz) {
           useBrownBowlForAll = true;
         }
 
-        // DICED TOMATO LOGIC
-        // 30 portions per half pan
+        // DICED TOMATO LOGIC - UPDATED
+        // 50 portions per half pan (was 30)
         // Below 10: 16oz deli container
-        // 10-20: Brown Jayna bowl
-        // 21+: Calculate half pans (30 portions per half pan)
+        // 10-25: Brown Jayna bowl (was 10-20)
+        // 26+: Calculate half pans (50 portions per half pan)
         let tomatoContainer = '';
         if (useBrownBowlForAll) {
           brownBowls += 1;
@@ -3195,21 +3200,21 @@
         } else if (prep.byoGyros.total < 10) {
           deliContainers += 1;
           tomatoContainer = '16oz deli container';
-        } else if (prep.byoGyros.total <= 20) {
+        } else if (prep.byoGyros.total <= 25) {
           brownBowls += 1;
           tomatoContainer = 'brown Jayna bowl';
         } else {
-          const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 30);
+          const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 50);
           halfPans += tomatoHalfPans;
           tomatoContainer = formatPanCount(tomatoHalfPans);
         }
         html += `<div>☐ ${prep.byoGyros.total} portions Diced Tomatoes (${tomatoContainer}) – 1 LARGE SERVING SPOON</div>`;
 
-        // SLICED RED ONION LOGIC
-        // 50 portions per half pan
+        // SLICED RED ONION LOGIC - UPDATED
+        // 75 portions per half pan (was 50)
         // Below 20: 16oz deli container
         // 20-45: Brown Jayna bowl
-        // 46+: Calculate half pans (50 portions per half pan)
+        // 46+: Calculate half pans (75 portions per half pan)
         let onionContainer = '';
         if (useBrownBowlForAll) {
           brownBowls += 1;
@@ -3221,16 +3226,16 @@
           brownBowls += 1;
           onionContainer = 'brown Jayna bowl';
         } else {
-          const onionHalfPans = Math.ceil(prep.byoGyros.total / 50);
+          const onionHalfPans = Math.ceil(prep.byoGyros.total / 75);
           halfPans += onionHalfPans;
           onionContainer = formatPanCount(onionHalfPans);
         }
         html += `<div>☐ ${prep.byoGyros.total} portions Sliced Red Onion (${onionContainer}) – 1 TONG</div>`;
 
-        // PEPPERONCINI LOGIC
+        // PEPPERONCINI LOGIC - UPDATED
         // Below 10: 16oz deli container
-        // 10-20: 32oz deli container
-        // 21-99: Half pan
+        // 10-30: 32oz deli container (was 10-20)
+        // 31-99: Half pan (was 21-99)
         // 100+: Full pan(s) + half pan if remainder
         // COORDINATED LOGIC: If tomatoes OR onions use brown bowl, pepperoncini also uses brown bowl
         let pepperonciniContainer = '';
@@ -3240,7 +3245,7 @@
         } else if (prep.byoGyros.total < 10) {
           deliContainers += 1;
           pepperonciniContainer = '16oz deli container';
-        } else if (prep.byoGyros.total <= 20) {
+        } else if (prep.byoGyros.total <= 30) {
           deli32ozContainers += 1;
           pepperonciniContainer = '32oz deli container';
         } else if (prep.byoGyros.total < 100) {
@@ -3259,28 +3264,77 @@
         }
         html += `<div>☐ ${prep.byoGyros.total} Whole Pepperoncini (${pepperonciniContainer}) – 1 TONG</div>`;
 
-        // PITA LOGIC
-        // 25 whole pita fit in one FULL pan
+        // PITA LOGIC - UPDATED WITH NEW TIERED SYSTEM
+        // 2-12: Half pan
+        // 13-25: Full pan
+        // 26+: Full pans, then half pan if remainder <12, or full pan if remainder 13-25
         const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
-        const pitaFullPans = Math.ceil(pitasNeeded / 25);
-        fullPans += pitaFullPans;
-        html += `<div>☐ ${pitasNeeded} Whole Grilled Pita (${pitaFullPans} full pan${pitaFullPans > 1 ? 's' : ''}) – 1 TONG</div>`;
+        let pitaContainer = '';
+
+        if (pitasNeeded >= 2 && pitasNeeded <= 12) {
+          halfPans += 1;
+          pitaContainer = '1 half pan';
+        } else if (pitasNeeded >= 13 && pitasNeeded <= 25) {
+          fullPans += 1;
+          pitaContainer = '1 full pan';
+        } else if (pitasNeeded >= 26) {
+          const pitaFullPansNeeded = Math.floor(pitasNeeded / 25);
+          const pitaRemainder = pitasNeeded % 25;
+
+          fullPans += pitaFullPansNeeded;
+
+          if (pitaRemainder >= 2 && pitaRemainder <= 12) {
+            halfPans += 1;
+            pitaContainer = `${pitaFullPansNeeded} full pan${pitaFullPansNeeded > 1 ? 's' : ''} + 1 half pan`;
+          } else if (pitaRemainder >= 13 && pitaRemainder <= 25) {
+            fullPans += 1;
+            pitaContainer = `${pitaFullPansNeeded + 1} full pan${pitaFullPansNeeded + 1 > 1 ? 's' : ''}`;
+          } else {
+            pitaContainer = `${pitaFullPansNeeded} full pan${pitaFullPansNeeded > 1 ? 's' : ''}`;
+          }
+        } else {
+          // Less than 2 pitas (edge case)
+          pitaContainer = 'individual wrapping';
+        }
+
+        html += `<div>☐ ${pitasNeeded} Whole Grilled Pita (${pitaContainer}) – 1 TONG</div>`;
         html += `</div>`;
 
         tongs += byoTongs;
       }
 
-      // SALADS
+      // SALADS - UPDATED: Combine 2 orders into 1 full pan
       if (prep.salads.length > 0) {
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">SALADS</h4>`;
         html += `<div style="margin-left: 16px; font-style: italic; color: var(--gray-600); margin-bottom: 8px;">(2 LARGE SERVING SPOONS TOTAL FOR ALL SALADS)</div>`;
         html += `<div style="margin-left: 16px;">`;
         prep.salads.forEach(salad => {
-          // Calculate pan count: 1/2 pan each if < 4, or 2 half pans per salad if >= 4
-          const saladHalfPans = salad.qty < 4 ? salad.qty : salad.qty * 2;
-          halfPans += saladHalfPans;
+          // NEW LOGIC:
+          // < 2 orders → 1 half pan each
+          // 2+ orders → Combine 2 orders into 1 full pan
+          let panContainer = '';
+          if (salad.qty < 2) {
+            halfPans += salad.qty; // 1 half pan per order
+            panContainer = salad.qty === 1 ? '1 half pan' : `${salad.qty} half pans`;
+          } else {
+            // Combine 2 orders per full pan
+            const fullPansNeeded = Math.floor(salad.qty / 2);
+            const remainderHalfPans = salad.qty % 2;
+
+            fullPans += fullPansNeeded;
+            halfPans += remainderHalfPans;
+
+            if (fullPansNeeded > 0 && remainderHalfPans > 0) {
+              panContainer = `${fullPansNeeded} full pan${fullPansNeeded > 1 ? 's' : ''} (combined 2 orders each) + ${remainderHalfPans} half pan`;
+            } else if (fullPansNeeded > 0) {
+              panContainer = `${fullPansNeeded} full pan${fullPansNeeded > 1 ? 's' : ''} (combined 2 orders each)`;
+            } else {
+              panContainer = `${remainderHalfPans} half pan${remainderHalfPans > 1 ? 's' : ''}`;
+            }
+          }
+
           deliContainers += salad.qty; // lemon vinaigrette
-          html += `<div>☐ ${salad.qty}x ${salad.name} (${formatPanCount(saladHalfPans)}) – 1 TONG</div>`;
+          html += `<div>☐ ${salad.qty}x ${salad.name} (${panContainer}) – 1 TONG</div>`;
           html += `<div style="margin-left: 16px;">→ ${salad.qty}x 16oz Lemon Vinaigrette – 1 SMALL SPOON</div>`;
         });
         html += `</div>`;
@@ -3320,11 +3374,12 @@
           }
           if (hasGFPita && gfPitaMod) {
             const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
-            // Assume each GF pita needs roughly same pan space as regular (1 half pan per 6 pitas)
-            const gfPitaHalfPans = Math.ceil(gfQty / 6);
-            halfPans += gfPitaHalfPans;
+            // UPDATED: Use brown bowls - up to 6 GF pitas sliced per brown bowl
+            const gfPitaBrownBowls = Math.ceil(gfQty / 6);
+            brownBowls += gfPitaBrownBowls;
             hasPitaInAnyDip = true;
-            html += `<div style="margin-left: 16px;">→ ${gfQty} GF Pitas sliced 8 pieces (${formatPanCount(gfPitaHalfPans)}) – 1 TONG</div>`;
+            const gfBowlLabel = gfPitaBrownBowls === 1 ? '1 brown bowl' : `${gfPitaBrownBowls} brown bowls`;
+            html += `<div style="margin-left: 16px;">→ ${gfQty} GF Pitas sliced 8 pieces (${gfBowlLabel}) – 1 TONG</div>`;
           }
           if (!hasVeggies && !hasPita && !hasGFPita) {
             halfPans += dip.qty;
@@ -3338,23 +3393,57 @@
         if (hasPitaInAnyDip) tongs += 1; // 1 for pita
       }
 
-      // GREEK FRIES BAR
+      // GREEK FRIES (Regular & BYO Bar) - UPDATED
       if (prep.greekFries.length > 0) {
-        html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">GREEK FRIES BAR</h4>`;
+        html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">GREEK FRIES</h4>`;
         html += `<div style="margin-left: 16px;">`;
         prep.greekFries.forEach(fries => {
-          // Greek fries: 1 half pan if qty < 2, or 2 half pans per order if >= 2
-          const friesHalfPans = fries.qty < 2 ? fries.qty : fries.qty * 2;
-          halfPans += friesHalfPans;
-          deliContainers += 3; // aioli, tzatziki, feta per order
-          html += `<div>☐ ${fries.qty}x ${fries.name} – 1 TONG</div>`;
-          html += `<div style="margin-left: 16px;">→ ${formatPanCount(friesHalfPans)} Greek Fries topped with protein</div>`;
-          html += `<div style="margin-left: 16px;">→ 16oz Spicy Aioli, 16oz Tzatziki, 16oz Crumbled Feta</div>`;
-          html += `<div style="margin-left: 16px;">→ 3 SMALL SPOONS (Aioli, Tzatziki, Feta)</div>`;
+          // Detect if this is Greek Fries BYO Bar (check for keywords BYO or BAR)
+          const friesName = (fries.name || '').toUpperCase();
+          const isByoBar = friesName.includes('BYO') || friesName.includes('BAR');
+
+          // NEW PAN LOGIC:
+          // < 2 orders → 1 half pan per order
+          // 2+ orders → Combine 2 orders into 1 full pan
+          let panContainer = '';
+          if (fries.qty < 2) {
+            halfPans += fries.qty;
+            panContainer = fries.qty === 1 ? '1 half pan' : `${fries.qty} half pans`;
+          } else {
+            const fullPansNeeded = Math.floor(fries.qty / 2);
+            const remainderHalfPans = fries.qty % 2;
+
+            fullPans += fullPansNeeded;
+            halfPans += remainderHalfPans;
+
+            if (fullPansNeeded > 0 && remainderHalfPans > 0) {
+              panContainer = `${fullPansNeeded} full pan${fullPansNeeded > 1 ? 's' : ''} (combined 2 orders each) + ${remainderHalfPans} half pan`;
+            } else if (fullPansNeeded > 0) {
+              panContainer = `${fullPansNeeded} full pan${fullPansNeeded > 1 ? 's' : ''} (combined 2 orders each)`;
+            } else {
+              panContainer = `${remainderHalfPans} half pan${remainderHalfPans > 1 ? 's' : ''}`;
+            }
+          }
+
+          // Sauces: BYO Bar gets all 3, regular gets Aioli only
+          if (isByoBar) {
+            deliContainers += 3; // aioli, tzatziki, feta
+            html += `<div>☐ ${fries.qty}x ${fries.name} – 1 TONG</div>`;
+            html += `<div style="margin-left: 16px;">→ ${panContainer} Greek Fries topped with protein</div>`;
+            html += `<div style="margin-left: 16px;">→ 16oz Spicy Aioli, 16oz Tzatziki, 16oz Crumbled Feta</div>`;
+            html += `<div style="margin-left: 16px;">→ 3 SMALL SPOONS (Aioli, Tzatziki, Feta)</div>`;
+            smallSpoons += 3; // 3 sauces for BYO bar
+          } else {
+            deliContainers += 1; // aioli only
+            html += `<div>☐ ${fries.qty}x ${fries.name} – 1 TONG</div>`;
+            html += `<div style="margin-left: 16px;">→ ${panContainer} Greek Fries topped with protein</div>`;
+            html += `<div style="margin-left: 16px;">→ 16oz Spicy Aioli</div>`;
+            html += `<div style="margin-left: 16px;">→ 1 SMALL SPOON (Aioli)</div>`;
+            smallSpoons += 1; // 1 sauce for regular
+          }
         });
         html += `</div>`;
         tongs += prep.greekFries.length; // 1 tong per greek fries type
-        smallSpoons += 3; // aioli, tzatziki, feta (3 types total, not per order)
       }
 
       // DOLMAS
@@ -3367,6 +3456,17 @@
         prep.dolmas.forEach(dolma => {
           const totalOrders = dolma.qty;
           const totalPieces = totalOrders * 12;
+
+          // UPDATED: Detect "cut in half" keywords in dolma name or modifiers
+          const dolmaName = (dolma.name || '').toUpperCase();
+          const modifiersText = (dolma.modifiers || []).map(m => (m.name || '').toUpperCase()).join(' ');
+          const isCutInHalf = dolmaName.includes('CUT IN HALF') || dolmaName.includes('HALF') ||
+                             modifiersText.includes('CUT IN HALF') || modifiersText.includes('HALF');
+
+          // If cut in half, add bamboo picks (1 per half dolma piece = 24 per order)
+          if (isCutInHalf) {
+            bambooPicks += totalPieces * 2; // 12 dolmas cut in half = 24 pieces, need 24 picks
+          }
 
           // Calculate tzatziki: 1x 16oz per 2 orders (round up)
           const tzatzikiCount = Math.ceil(totalOrders / 2);
@@ -3382,28 +3482,42 @@
             containerInfo = 'Brown Jayna bowl';
             dolmaInstructions = `
               <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
-                → If WHOLE dolmas: Brown Jayna bowl + bed of arugula + 8 lemon wedges
-              </div>
-              <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
-                → If CUT IN HALF (24 pieces): Round tray with dome lid + bed of arugula + 10-15 smaller lemon wedges + bamboo picks in half+ pieces
+                → Bed of arugula + 6 lemon wedges
               </div>`;
-            // Note: We can't track round trays here since we don't know cut preference
+            if (isCutInHalf) {
+              dolmaInstructions += `
+              <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
+                → 24 bamboo picks (dolmas cut in half)
+              </div>`;
+            }
           } else if (totalOrders >= 2 && totalOrders <= 4) {
             // 2-4 orders (24-48 pieces)
             roundTrays += totalOrders; // estimate 1 tray per order for stacking
             containerInfo = `${totalOrders}x Round trays with dome lids (stack neatly)`;
             dolmaInstructions = `
               <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
-                → Bed of arugula on each tray + lemon wedges
+                → Bed of arugula on each tray + 6 lemon wedges per tray (${totalOrders * 6} total)
               </div>`;
+            if (isCutInHalf) {
+              dolmaInstructions += `
+              <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
+                → ${totalPieces * 2} bamboo picks (dolmas cut in half)
+              </div>`;
+            }
           } else {
             // 5+ orders (60+ pieces)
             halfPans += 1;
             containerInfo = 'Half pan';
             dolmaInstructions = `
               <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
-                → Bed of arugula + lemon wedges
+                → Bed of arugula + ${totalOrders * 6} lemon wedges (6 per order)
               </div>`;
+            if (isCutInHalf) {
+              dolmaInstructions += `
+              <div style="margin-left: 16px; font-style: italic; color: var(--gray-600);">
+                → ${totalPieces * 2} bamboo picks (dolmas cut in half)
+              </div>`;
+            }
           }
 
           html += `<div>☐ ${totalOrders}x ${dolma.name} (${totalPieces} pieces total) – ${containerInfo} – 1 TONG</div>`;
@@ -3416,13 +3530,13 @@
         smallSpoons += prep.dolmas.length; // 1 small spoon per dolma type for tzatziki
       }
 
-      // SPANAKOPITA
+      // SPANAKOPITA - UPDATED: Specify black 18" catering tray
       if (prep.spanakopita.length > 0) {
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">SPANAKOPITA</h4>`;
         html += `<div style="margin-left: 16px;">`;
         prep.spanakopita.forEach(span => {
           deliContainers += span.qty; // 16oz tzatziki per order
-          html += `<div>☐ ${span.qty}x ${span.name} (round tray on arugula OR ½/full pan) – 1 TONG</div>`;
+          html += `<div>☐ ${span.qty}x ${span.name} (black round 18" catering tray with clear dome lid, on arugula OR ½/full pan) – 1 TONG</div>`;
           html += `<div style="margin-left: 16px;">→ ${span.qty}x 16oz Tzatziki (dill stripe) – 1 SMALL SPOON</div>`;
         });
         html += `</div>`;
@@ -3430,42 +3544,51 @@
         smallSpoons += prep.spanakopita.length; // 1 small spoon per spanakopita type for tzatziki
       }
 
-      // SIDES
+      // SIDES - UPDATED: Rice in half pan with SPOON only
       if (prep.sides.length > 0) {
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">SIDES</h4>`;
         html += `<div style="margin-left: 16px;">`;
         prep.sides.forEach(side => {
           const sideName = (side.name || '').toUpperCase();
           const isRice = sideName.includes('RICE');
-          html += `<div>☐ ${side.qty}x ${side.name} – 1 TONG${isRice ? ' + 1 LARGE SERVING SPOON' : ''}</div>`;
           if (isRice) {
+            html += `<div>☐ ${side.qty}x ${side.name} (Half Pan) – 1 LARGE SERVING SPOON</div>`;
             largeServingSpoons += 1; // 1 large serving spoon for rice
+          } else {
+            html += `<div>☐ ${side.qty}x ${side.name} – <em>Packer must decide: 1 TONG or 1 SPOON</em></div>`;
+            tongs += 1; // Default to tong for count, packer will decide
           }
         });
         html += `</div>`;
-        tongs += prep.sides.length; // 1 tong per side type
       }
 
-      // DESSERTS
+      // DESSERTS - UPDATED: No tong for rice pudding
       if (prep.desserts.length > 0) {
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">DESSERTS</h4>`;
         html += `<div style="margin-left: 16px;">`;
         prep.desserts.forEach(dessert => {
-          html += `<div>☐ ${dessert.qty}x ${dessert.name} – 1 TONG</div>`;
+          const dessertName = (dessert.name || '').toUpperCase();
+          const isRicePudding = dessertName.includes('RICE PUDDING');
+          if (isRicePudding) {
+            html += `<div>☐ ${dessert.qty}x ${dessert.name}</div>`;
+            // No tong for rice pudding
+          } else {
+            html += `<div>☐ ${dessert.qty}x ${dessert.name} – 1 TONG</div>`;
+            tongs += 1; // 1 tong per non-rice-pudding dessert
+          }
         });
         html += `</div>`;
-        tongs += prep.desserts.length; // 1 tong per dessert type
       }
 
-      // PINWHEELS
+      // PINWHEELS - UPDATED: Specify black 18" tray on arugula
       if (prep.pinwheels.length > 0) {
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">PINWHEELS</h4>`;
         html += `<div style="margin-left: 16px;">`;
         prep.pinwheels.forEach(pinwheel => {
-          html += `<div>☐ ${pinwheel.qty}x ${pinwheel.name} – 1 TONG</div>`;
+          html += `<div>☐ ${pinwheel.qty}x ${pinwheel.name} (black round 18" catering tray with clear dome lid, on bed of arugula) – 1 TONG</div>`;
+          tongs += 1; // 1 tong per pinwheel type
         });
         html += `</div>`;
-        tongs += prep.pinwheels.length; // 1 tong per pinwheel type
       }
 
       // SPECIAL NOTES
@@ -3922,6 +4045,7 @@
       // BYO GYRO PITAS
       if (prep.byoGyros.total > 0) {
         const sets = Math.ceil(prep.byoGyros.total / 10);
+        const greensSets = Math.ceil(prep.byoGyros.total / 15); // UPDATED: 1 set per 15 portions
 
         // === PROTEIN LABELS (ALWAYS FIRST) ===
         const proteinPans = calculateProteinPans(prep.byoGyros.items || []);
@@ -3956,9 +4080,9 @@
           labels.push({ item: getLabelName('Lemon Vinaigrette'), qty: sets > 1 ? `16OZ DELI - ${i} OF ${sets}` : `16OZ DELI - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
         }
 
-        // Mixed Greens (half pan per set, but label should indicate full pan usage)
-        const greensHalfPans = sets;
-        const greensFullPans = Math.ceil(sets / 2);
+        // Mixed Greens - UPDATED to use greensSets (1 per 15 portions)
+        const greensHalfPans = greensSets;
+        const greensFullPans = Math.ceil(greensSets / 2);
         for (let i = 1; i <= greensFullPans; i++) {
           labels.push({ item: getLabelName('Mixed Greens'), qty: greensFullPans > 1 ? `FULL PAN - ${i} OF ${greensFullPans}` : `FULL PAN - 1 OF 1`, pan: '', category: 'BYO Gyros', orderNum, customerLastName, phoneNumber, packDate });
         }
@@ -3967,22 +4091,26 @@
         // If ANY of these 3 items naturally gets a brown bowl, ALL 3 get brown bowls
         let useBrownBowlForAllLabels = false;
 
-        // Check if tomatoes would naturally use brown bowl (10-20 portions)
-        const tomatoNaturallyUsesBrownBowlLabels = (prep.byoGyros.total >= 10 && prep.byoGyros.total <= 20);
+        // UPDATED THRESHOLDS:
+        // Check if tomatoes would naturally use brown bowl (10-25 portions)
+        const tomatoNaturallyUsesBrownBowlLabels = (prep.byoGyros.total >= 10 && prep.byoGyros.total <= 25);
 
         // Check if onions would naturally use brown bowl (20-45 portions)
         const onionNaturallyUsesBrownBowlLabels = (prep.byoGyros.total >= 20 && prep.byoGyros.total <= 45);
 
-        // If either naturally gets brown bowl, all three get brown bowls
-        if (tomatoNaturallyUsesBrownBowlLabels || onionNaturallyUsesBrownBowlLabels) {
+        // Check if pepperoncini would naturally use 32oz (which acts like brown bowl - 10-30 portions)
+        const pepperonciniNaturallyUses32ozLabels = (prep.byoGyros.total >= 10 && prep.byoGyros.total <= 30);
+
+        // If any naturally gets brown bowl or 32oz, all three get brown bowls
+        if (tomatoNaturallyUsesBrownBowlLabels || onionNaturallyUsesBrownBowlLabels || pepperonciniNaturallyUses32ozLabels) {
           useBrownBowlForAllLabels = true;
         }
 
-        // DICED TOMATOES - Calculate actual container type and count
-        // 30 portions per half pan
+        // DICED TOMATOES - UPDATED
+        // 50 portions per half pan (was 30)
         // Below 10: 16oz deli container
-        // 10-20: Brown Jayna bowl
-        // 21+: Calculate half pans (30 portions per half pan)
+        // 10-25: Brown Jayna bowl (was 10-20)
+        // 26+: Calculate half pans (50 portions per half pan)
         let tomatoContainerType = '';
         let tomatoContainerCount = 0;
 
@@ -3992,12 +4120,12 @@
         } else if (prep.byoGyros.total < 10) {
           tomatoContainerType = '16oz deli';
           tomatoContainerCount = 1;
-        } else if (prep.byoGyros.total <= 20) {
+        } else if (prep.byoGyros.total <= 25) {
           tomatoContainerType = 'brown bowl';
           tomatoContainerCount = 1;
         } else {
           tomatoContainerType = 'half pan';
-          tomatoContainerCount = Math.ceil(prep.byoGyros.total / 30);
+          tomatoContainerCount = Math.ceil(prep.byoGyros.total / 50);
         }
 
         // Generate tomato labels (one per container)
@@ -4015,11 +4143,11 @@
           });
         }
 
-        // SLICED RED ONION - Calculate actual container type and count
-        // 50 portions per half pan
+        // SLICED RED ONION - UPDATED
+        // 75 portions per half pan (was 50)
         // Below 20: 16oz deli container
         // 20-45: Brown Jayna bowl
-        // 46+: Calculate half pans (50 portions per half pan)
+        // 46+: Calculate half pans (75 portions per half pan)
         let onionContainerType = '';
         let onionContainerCount = 0;
 
@@ -4034,7 +4162,7 @@
           onionContainerCount = 1;
         } else {
           onionContainerType = 'half pan';
-          onionContainerCount = Math.ceil(prep.byoGyros.total / 50);
+          onionContainerCount = Math.ceil(prep.byoGyros.total / 75);
         }
 
         // Generate onion labels (one per container)
@@ -4052,10 +4180,10 @@
           });
         }
 
-        // WHOLE PEPPERONCINI - Calculate actual container type and count
+        // WHOLE PEPPERONCINI - UPDATED
         // Below 10: 16oz deli container
-        // 10-20: 32oz deli container
-        // 21-99: Half pan
+        // 10-30: 32oz deli container (was 10-20)
+        // 31-99: Half pan (was 21-99)
         // 100+: Full pan(s) + half pan if remainder
         // COORDINATED LOGIC: If tomatoes OR onions use brown bowl, pepperoncini also uses brown bowl
         let pepperonciniContainerType = '';
@@ -4067,7 +4195,7 @@
         } else if (prep.byoGyros.total < 10) {
           pepperonciniContainerType = '16oz deli';
           pepperonciniContainerCount = 1;
-        } else if (prep.byoGyros.total <= 20) {
+        } else if (prep.byoGyros.total <= 30) {
           pepperonciniContainerType = '32oz deli';
           pepperonciniContainerCount = 1;
         } else if (prep.byoGyros.total < 100) {
@@ -4124,16 +4252,16 @@
           });
         }
 
-        // PITAS - Calculate actual pan count
-        // 25 whole pita fit in one FULL pan
+        // PITAS - UPDATED WITH NEW TIERED LOGIC
+        // 2-12: Half pan
+        // 13-25: Full pan
+        // 26+: Full pans (25 per pan), then half pan if remainder <12, or full pan if remainder 13-25
         const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
-        const pitaFullPans = Math.ceil(pitasNeeded / 25);
 
-        // Generate pita labels (one per pan)
-        for (let i = 1; i <= pitaFullPans; i++) {
+        if (pitasNeeded >= 2 && pitasNeeded <= 12) {
           labels.push({
             item: getLabelName('Grilled Pita Bread'),
-            qty: pitaFullPans > 1 ? `FULL PAN - ${i} OF ${pitaFullPans}` : `FULL PAN - 1 OF 1`,
+            qty: 'HALF PAN - 1 OF 1',
             pan: '',
             category: 'BYO Gyros',
             orderNum,
@@ -4141,26 +4269,112 @@
             phoneNumber,
             packDate
           });
-        }
-      }
-
-      // SALADS
-      prep.salads.forEach(salad => {
-        // Calculate pan count: 1/2 pan each if < 4, or 2 half pans per salad if >= 4
-        const saladHalfPans = salad.qty < 4 ? salad.qty : salad.qty * 2;
-
-        // Salad pans
-        for (let i = 1; i <= saladHalfPans; i++) {
+        } else if (pitasNeeded >= 13 && pitasNeeded <= 25) {
           labels.push({
-            item: getLabelName(salad.name),
-            qty: saladHalfPans > 1 ? `HALF PAN - ${i} OF ${saladHalfPans}` : `HALF PAN - 1 OF 1`,
+            item: getLabelName('Grilled Pita Bread'),
+            qty: 'FULL PAN - 1 OF 1',
             pan: '',
-            category: 'Salad',
+            category: 'BYO Gyros',
             orderNum,
             customerLastName,
             phoneNumber,
             packDate
           });
+        } else if (pitasNeeded >= 26) {
+          const pitaFullPansNeeded = Math.floor(pitasNeeded / 25);
+          const pitaRemainder = pitasNeeded % 25;
+
+          // Generate full pan labels
+          for (let i = 1; i <= pitaFullPansNeeded; i++) {
+            labels.push({
+              item: getLabelName('Grilled Pita Bread'),
+              qty: pitaFullPansNeeded > 1 ? `FULL PAN - ${i} OF ${pitaFullPansNeeded}` : `FULL PAN - 1 OF 1`,
+              pan: '',
+              category: 'BYO Gyros',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+
+          // Generate half pan label if remainder is 2-12
+          if (pitaRemainder >= 2 && pitaRemainder <= 12) {
+            labels.push({
+              item: getLabelName('Grilled Pita Bread'),
+              qty: 'HALF PAN - 1 OF 1',
+              pan: '',
+              category: 'BYO Gyros',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          } else if (pitaRemainder >= 13 && pitaRemainder <= 25) {
+            // Generate additional full pan for remainder
+            labels.push({
+              item: getLabelName('Grilled Pita Bread'),
+              qty: `FULL PAN - ${pitaFullPansNeeded + 1} OF ${pitaFullPansNeeded + 1}`,
+              pan: '',
+              category: 'BYO Gyros',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+        }
+      }
+
+      // SALADS - UPDATED: Combine 2 orders into 1 full pan
+      prep.salads.forEach(salad => {
+        // Combine 2 orders into 1 full pan
+        if (salad.qty < 2) {
+          // Less than 2 orders: use half pans
+          for (let i = 1; i <= salad.qty; i++) {
+            labels.push({
+              item: getLabelName(salad.name),
+              qty: salad.qty > 1 ? `HALF PAN - ${i} OF ${salad.qty}` : `HALF PAN - 1 OF 1`,
+              pan: '',
+              category: 'Salad',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+        } else {
+          // 2 or more orders: combine 2 into 1 full pan
+          const fullPansNeeded = Math.floor(salad.qty / 2);
+          const remainderHalfPans = salad.qty % 2;
+
+          // Generate full pan labels
+          for (let i = 1; i <= fullPansNeeded; i++) {
+            labels.push({
+              item: getLabelName(salad.name),
+              qty: fullPansNeeded > 1 ? `FULL PAN - ${i} OF ${fullPansNeeded}` : `FULL PAN - 1 OF 1`,
+              pan: '',
+              category: 'Salad',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+
+          // Generate half pan label if remainder
+          if (remainderHalfPans > 0) {
+            labels.push({
+              item: getLabelName(salad.name),
+              qty: 'HALF PAN - 1 OF 1',
+              pan: '',
+              category: 'Salad',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
         }
 
         // Dressing containers (16oz deli, 1 per portion)
@@ -4238,14 +4452,17 @@
           }
         }
 
-        // GF Pita sides if ordered
+        // GF Pita sides if ordered - UPDATED: Use brown bowls (up to 6 GF pitas per bowl)
         const gfPitaMod = dip.modifiers.find(m => m.name && m.name.includes('GLUTEN FREE PITA'));
         if (gfPitaMod) {
           const gfQty = gfPitaMod.gfPitaQty || (dip.qty * 6);
-          for (let i = 1; i <= dip.qty; i++) {
+          const gfPitaBrownBowls = Math.ceil(gfQty / 6);
+
+          // Generate brown bowl labels
+          for (let i = 1; i <= gfPitaBrownBowls; i++) {
             labels.push({
               item: getLabelName(`${dip.name} - GF Pita Bread`),
-              qty: `${gfQty} GF pitas`,
+              qty: gfPitaBrownBowls > 1 ? `BROWN BOWL - ${i} OF ${gfPitaBrownBowls}` : `BROWN BOWL - 1 OF 1`,
               pan: '',
               category: 'Dip Side',
               orderNum,
@@ -4257,8 +4474,12 @@
         }
       });
 
-      // GREEK FRIES BAR
+      // GREEK FRIES (Regular & BYO Bar) - UPDATED
       prep.greekFries.forEach(fries => {
+        // Detect if this is Greek Fries BYO Bar (check for keywords BYO or BAR)
+        const friesName = (fries.name || '').toUpperCase();
+        const isByoBar = friesName.includes('BYO') || friesName.includes('BAR');
+
         // Detect protein type from fries.name (e.g., "Greek Fries + Chicken Gyro" → "CHICKEN GYRO")
         let itemName = 'GREEK FRIES + PROTEIN';
         if (fries.name && fries.name.includes('+')) {
@@ -4266,10 +4487,63 @@
           itemName = `GREEK FRIES + ${protein}`;
         }
 
-        labels.push({ item: itemName, qty: `${fries.qty} portions`, pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: getLabelName('Greek Fries - Spicy Aioli'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: getLabelName('Greek Fries - Tzatziki'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
-        labels.push({ item: getLabelName('Greek Fries - Crumbled Feta'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        // NEW PAN LOGIC: Combine 2 orders into 1 full pan
+        if (fries.qty < 2) {
+          // Less than 2 orders: use half pans
+          for (let i = 1; i <= fries.qty; i++) {
+            labels.push({
+              item: itemName,
+              qty: fries.qty > 1 ? `HALF PAN - ${i} OF ${fries.qty}` : `HALF PAN - 1 OF 1`,
+              pan: '',
+              category: 'Greek Fries',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+        } else {
+          // 2 or more orders: combine 2 into 1 full pan
+          const fullPansNeeded = Math.floor(fries.qty / 2);
+          const remainderHalfPans = fries.qty % 2;
+
+          // Generate full pan labels
+          for (let i = 1; i <= fullPansNeeded; i++) {
+            labels.push({
+              item: itemName,
+              qty: fullPansNeeded > 1 ? `FULL PAN - ${i} OF ${fullPansNeeded}` : `FULL PAN - 1 OF 1`,
+              pan: '',
+              category: 'Greek Fries',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+
+          // Generate half pan label if remainder
+          if (remainderHalfPans > 0) {
+            labels.push({
+              item: itemName,
+              qty: 'HALF PAN - 1 OF 1',
+              pan: '',
+              category: 'Greek Fries',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+        }
+
+        // Sauces: BYO Bar gets all 3, regular gets Aioli only
+        if (isByoBar) {
+          labels.push({ item: getLabelName('Greek Fries - Spicy Aioli'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: getLabelName('Greek Fries - Tzatziki'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+          labels.push({ item: getLabelName('Greek Fries - Crumbled Feta'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        } else {
+          labels.push({ item: getLabelName('Greek Fries - Spicy Aioli'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
+        }
       });
 
       // DOLMAS

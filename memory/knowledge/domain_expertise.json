@@ -203,6 +203,66 @@
         "Font-family MUST be: 'Aptos', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
       ]
     },
+    "catering_prep_list_logic": {
+      "concepts_learned": [
+        "BYO Gyro prep items have portion-based container thresholds",
+        "Coordinated brown bowl logic for visual consistency",
+        "Container types: 16oz deli, 32oz deli, brown bowls, half pans, full pans",
+        "Different portion thresholds per item (tomatoes: 30/pan, onions: 50/pan, etc.)",
+        "Bidirectional coordination: if ANY item in group gets brown bowl, ALL get brown bowls"
+      ],
+      "tools_used": ["catering.html prep list generator", "PDF label generation"],
+      "patterns_identified": [
+        "Two locations must stay in sync: HTML display (line 3171+) and PDF labels (line 3966+)",
+        "Coordinated items: Tomatoes, Onions, Pepperoncini must use matching containers",
+        "Check natural thresholds FIRST, then apply coordination flag",
+        "Container escalation: deli → brown bowl → half pan → full pan",
+        "Proteins have separate scaling logic (5-portion threshold for brown bowls)"
+      ],
+      "resources": [
+        "catering.html lines 3171-3248: BYO Gyro prep list HTML display logic",
+        "catering.html lines 3966-4066: BYO Gyro PDF label generation logic",
+        "catering.html lines 3067-3071: Protein container logic (brown bowls <5 portions)"
+      ],
+      "notes": [
+        "SESSION: Nov 2, 2025 - Fixed coordinated brown bowl logic",
+        "ORIGINAL BUG: Only checked if tomatoes use brown bowl, then forced others to match",
+        "PROBLEM: At 24 portions, onions get brown bowl but tomatoes/pepperoncini get half pans",
+        "FIX: Check if tomatoes (10-20) OR onions (20-45) naturally get brown bowl → flag all three",
+        "RESULT: At 24 portions, onions trigger flag → all three get brown bowls for consistency",
+        "CRITICAL: Always update BOTH sections when changing container logic (HTML + PDF labels)",
+        "User quote: 'WHEN ONE of those three items calls for a brown bowl, the other two items also get a brown bowl'",
+        "Bidirectional coordination prevents mismatched containers in prep list"
+      ]
+    },
+    "toast_catering_date_timezone": {
+      "concepts_learned": [
+        "Toast API returns promisedDate in UTC format",
+        "Must convert UTC to Pacific timezone BEFORE extracting date",
+        "Timezone bug causes orders to appear on wrong day (off by 1)",
+        "Pacific timezone critical for California-based restaurant"
+      ],
+      "tools_used": ["Toast Catering Orders API", "JavaScript Date timezone conversion"],
+      "patterns_identified": [
+        "WRONG: Split promisedDate on 'T' to get date → gets UTC date, not Pacific",
+        "RIGHT: Convert to Pacific timezone first, then extract YYYY-MM-DD",
+        "Use: new Date(utc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })",
+        "Example bug: 9pm Pacific = 5am UTC next day → split gives wrong date"
+      ],
+      "resources": [
+        "api/toast-catering-orders.js lines 241-256: Fixed timezone conversion logic"
+      ],
+      "notes": [
+        "SESSION: Nov 2, 2025 - Fixed critical date bug in catering orders",
+        "USER REPORT: Order due Tuesday Nov 4th in Toast shows as Wednesday Nov 5th in app",
+        "User quote: 'im afraid i cant trust it if its oing to be like this' - high priority/critical",
+        "ROOT CAUSE: const promisedDateStr = order.promisedDate.split('T')[0]; (line 247 old code)",
+        "This extracted UTC date without timezone conversion",
+        "FIX: Convert promisedDate to Pacific timezone, then format as YYYY-MM-DD",
+        "Added logging: console.log('📅 Date conversion: UTC=... → Pacific=...')",
+        "CRITICAL: All date/time handling must use Pacific timezone for accuracy"
+      ]
+    },
     "repository_organization": {
       "concepts_learned": [
         "Systematic collateral archiving to keep repo clean",
