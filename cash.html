@@ -945,6 +945,138 @@
 
   </div></div>
 <script>
+  // Configuration
+   const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';  
+  const EMAILJS_CONFIG = {
+    PUBLIC_KEY: 'LHbq8j4mlt49O75eo',
+    SERVICE_ID: 'service_xm62z73',
+    TEMPLATE_ID: 'template_cash_report',
+    MANAGER_EMAIL: 'smanager@jaynagyro.com, GSS4168CTJJA73@PRINT.EPSONCONNECT.COM'
+  };
+  const BOTTLED_SAUCE_ITEMS = [
+    { label: 'Spicy Aioli Bottled', aliases: ['spicy aioli bottled', 'spicy aioli - bottled'] },
+    { label: 'Tzatziki Bottled', aliases: ['tzatziki bottled', 'tzatziki - bottled'] },
+    { label: 'Lemon Vinaigrette Bottled', aliases: ['lemon vinaigrette bottled', 'lemon vinaigrette - bottled'] }
+  ];
+
+  // Function to check if an item should be in bottled/to-go section
+  function isBottledOrToGoItem(itemName) {
+    const name = (itemName || '').trim().toLowerCase();
+    // Check if it's in the bottled sauce list
+    const isBottled = BOTTLED_SAUCE_ITEMS.some(config => 
+      config.aliases.some(alias => name.includes(alias))
+    );
+    // Check if it has "to go" or "to-go" in the name
+    const isToGo = name.includes('to go') || name.includes('to-go');
+    return isBottled || isToGo;
+  }
+
+  // Elegant Loading and Success Functions
+  function showLoading(title, message) {
+    const overlay = document.getElementById('loadingOverlay');
+    document.getElementById('loadingTitle').textContent = title;
+    document.getElementById('loadingMessage').textContent = message;
+    overlay.style.display = 'flex'; // Override inline style
+    // Don't hide sections - loading overlay should appear on top, not replace content
+  }
+
+  function hideLoading() {
+    document.getElementById('loadingOverlay').style.display = 'none';
+  }
+
+  function showAMSuccess(total) {
+    hideLoading();
+    hideAllSections();
+    document.getElementById('amSuccessTotal').textContent = `$${total.toFixed(2)}`;
+    document.getElementById('amSuccessTime').textContent = new Date().toLocaleString();
+    document.getElementById('amSuccessScreen').classList.add('active');
+  }
+
+  function showPMSuccess(depositAmount, returnAmount, discrepancy) {
+    hideLoading();
+    hideAllSections();
+    document.getElementById('depositAmount').textContent = `$${depositAmount}`;
+    document.getElementById('returnAmount').textContent = `$${returnAmount.toFixed(2)}`;
+    document.getElementById('pmSuccessScreen').classList.add('active');
+  }
+
+  function showReportSuccess(date) {
+    hideLoading();
+    hideAllSections();
+    document.getElementById('reportSuccessDate').textContent = date;
+    document.getElementById('reportSuccessTime').textContent = new Date().toLocaleString();
+    document.getElementById('reportSuccessScreen').classList.add('active');
+  }
+  
+  const DENOMINATIONS = [
+    { label: '$100', value: 100.00 },
+    { label: '$50', value: 50.00 },
+    { label: '$20', value: 20.00 },
+    { label: '$10', value: 10.00 },
+    { label: '$5', value: 5.00 },
+    { label: '$1', value: 1.00 },
+    { label: '$0.25', value: 0.25 },
+    { label: '$0.10', value: 0.10 },
+    { label: '$0.05', value: 0.05 },
+    { label: '$0.01', value: 0.01 }
+  ];
+  
+  // Password protection for date changes (only Demetri knows this)
+  const ADMIN_PASSWORD = 'JaynaGyro2025!';
+  const CASH_PASSWORD = 'jaynacash'; // Cash flow access password
+
+  // Session management for manager access (60 minutes)
+  function setManagerSession() {
+    const now = new Date().getTime();
+    const expiryTime = now + (60 * 60 * 1000); // 1 hour from now
+    localStorage.setItem('managerSession', expiryTime.toString());
+  }
+
+  function isManagerSessionValid() {
+    const sessionExpiry = localStorage.getItem('managerSession');
+    if (!sessionExpiry) return false;
+
+    const now = new Date().getTime();
+    const expiryTime = parseInt(sessionExpiry);
+
+    if (now > expiryTime) {
+      // Session expired, clean up
+      localStorage.removeItem('managerSession');
+      return false;
+    }
+
+    return true;
+  }
+
+  function clearManagerSession() {
+    localStorage.removeItem('managerSession');
+  }
+
+  // Session management for cash flow access (30 minutes)
+  function setCashSession() {
+    const now = new Date().getTime();
+    const expiryTime = now + (30 * 60 * 1000); // 30 minutes from now
+    localStorage.setItem('cashSession', expiryTime.toString());
+  }
+
+  function isCashSessionValid() {
+    const sessionExpiry = localStorage.getItem('cashSession');
+    if (!sessionExpiry) return false;
+
+    const now = new Date().getTime();
+    const expiryTime = parseInt(sessionExpiry);
+
+    if (now > expiryTime) {
+      // Session expired, clean up
+      localStorage.removeItem('cashSession');
+      return false;
+    }
+
+    return true;
+  }
+
+  function clearCashSession() {
     localStorage.removeItem('cashSession');
   }
   
