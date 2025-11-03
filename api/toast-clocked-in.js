@@ -62,11 +62,47 @@ export default async function handler(req, res) {
     });
 
     // STEP 2: Fetch time entries
-    const startDateTime = `${date}T00:00:00.000-0000`;
-    const endDateTime = `${date}T23:59:59.999-0000`;
+    // CRITICAL: Convert Pacific date to UTC for Toast API
+    // Toast expects UTC, but we think in Pacific time
+
+    // Helper function to convert Pacific date string to UTC ISO string
+    function pacificDateToUTC(dateStr, hours = 0, minutes = 0, seconds = 0) {
+      // Parse date components
+      const [year, month, day] = dateStr.split('-').map(Number);
+
+      // Create date in Pacific timezone by using toLocaleString
+      // This accounts for DST automatically
+      const pacificDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+      // Determine Pacific offset (PST = -08:00, PDT = -07:00)
+      const testDate = new Date(pacificDateStr);
+      const pacificOffset = new Date(testDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })).toString();
+      const isDST = pacificOffset.includes('PDT') || testDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', timeZoneName: 'short' }).includes('PDT');
+      const offset = isDST ? '-07:00' : '-08:00';
+
+      // Create date with explicit Pacific offset
+      const dateWithOffset = new Date(pacificDateStr + offset);
+
+      return dateWithOffset.toISOString();
+    }
+
+    // Get yesterday's date (for overnight shifts)
+    const dateObj = new Date(date);
+    dateObj.setDate(dateObj.getDate() - 1);
+    const yesterdayDate = dateObj.toISOString().split('T')[0];
+
+    // Start: Yesterday 00:00:00 Pacific → UTC
+    const startDateTime = pacificDateToUTC(yesterdayDate, 0, 0, 0);
+
+    // End: Today 23:59:59 Pacific → UTC
+    const endDateTime = pacificDateToUTC(date, 23, 59, 59);
+
     const timeEntriesUrl = `${toastApiUrl}/labor/v1/timeEntries?startDate=${startDateTime}&endDate=${endDateTime}`;
 
-    console.log(`Fetching time entries from: ${timeEntriesUrl}`);
+    console.log(`📅 Pacific Date (input): ${date}`);
+    console.log(`⏰ Start (Yesterday 00:00 Pacific → UTC): ${startDateTime}`);
+    console.log(`⏰ End (Today 23:59 Pacific → UTC): ${endDateTime}`);
+    console.log(`🔍 Fetching time entries from Toast...`);
 
     const timeEntriesResponse = await fetch(timeEntriesUrl, {
       method: 'GET',
