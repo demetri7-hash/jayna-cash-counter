@@ -946,6 +946,50 @@
 
   </div></div>
 <script>
+    localStorage.removeItem('cashSession');
+  }
+  
+  let supabase = null;
+  let currentAMData = null;
+  
+  // Initialize app
+  document.addEventListener('DOMContentLoaded', function() {
+    initializeSupabase();
+    initializeEmailJS();
+    setTodayDate();
+
+    // Load custom vendor formats from database
+    loadCustomVendorFormats();
+
+    // Load saved data (removed loadTipPoolData to reset tip pool fields every time)
+    loadCombinedReportData();
+
+    // Initialize TDS data and button state
+    resetTdsData();
+    updateCalculateButtonState();
+
+    // Add file upload listeners to show status when files are selected
+    document.getElementById('laborFile').addEventListener('change', handleFileUpload);
+    document.getElementById('salesFile').addEventListener('change', handleFileUpload);
+
+    // Event delegation for delete buttons in inventory list
+    document.addEventListener('click', function(event) {
+      if (event.target.classList.contains('delete-item-btn')) {
+        const itemId = parseInt(event.target.getAttribute('data-delete-item'));
+        if (itemId) {
+          deleteInventoryItem(itemId);
+        }
+      }
+    });
+
+    // Check auto-print status on initial page load (PREP tab is default)
+    setTimeout(() => checkAutoPrintStatus(), 500);
+
+    // Removed "App ready" message to prevent page bouncing
+  });
+  
+  function initializeSupabase() {
+    if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
       showMessage('Please configure Supabase credentials', 'error');
       return;
     }
