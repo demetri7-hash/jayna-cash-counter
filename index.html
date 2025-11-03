@@ -810,6 +810,11 @@
         </style>
       </div>
 
+      <!-- VOID & DISCOUNT TRACKING DISPLAY -->
+      <div id="voidDiscountDisplay" style="margin-top: 12px; padding: 8px 12px; background: var(--gray-100); border: 2px solid var(--gray-300); text-align: center; font-size: 10px; font-weight: 600; color: var(--gray-700); letter-spacing: 0.5px;">
+        Loading today's data...
+      </div>
+
       <p style="opacity: 0.7; margin-top: 12px;">APP CREATED BY DEMETRI GREGORAKIS</p>
       <div style="font-size: 12px; color: #666; margin-top: 5px;">
         <span id="sessionStatus"></span>
@@ -3427,16 +3432,94 @@
 
   // ==================== END TOP LEADER DISPLAY ====================
 
+  // ==================== VOID & DISCOUNT TRACKING DISPLAY ====================
+
+  async function fetchVoidDiscountTracking() {
+    try {
+      // Get TODAY in YYYY-MM-DD format (Pacific time)
+      const todayPacific = new Date().toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+
+      const [month, day, year] = todayPacific.split(', ')[0].split('/');
+      const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+      // Authenticate with Toast API
+      const authResponse = await fetch('/api/toast-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!authResponse.ok) {
+        updateVoidDiscountDisplay(null);
+        return;
+      }
+
+      const authData = await authResponse.json();
+      if (!authData.success || !authData.data?.accessToken) {
+        updateVoidDiscountDisplay(null);
+        return;
+      }
+
+      const token = authData.data.accessToken;
+
+      // Fetch tracking data (using today as both start and end date)
+      const trackingUrl = `/api/toast-void-discount-tracking?startDate=${today}&endDate=${today}&token=${encodeURIComponent(token)}`;
+      const response = await fetch(trackingUrl);
+
+      if (!response.ok) {
+        updateVoidDiscountDisplay(null);
+        return;
+      }
+
+      const trackingData = await response.json();
+
+      if (trackingData.success) {
+        updateVoidDiscountDisplay(trackingData);
+      } else {
+        updateVoidDiscountDisplay(null);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching void/discount tracking:', error);
+      updateVoidDiscountDisplay(null);
+    }
+  }
+
+  function updateVoidDiscountDisplay(data) {
+    const displayDiv = document.getElementById('voidDiscountDisplay');
+    if (!displayDiv) return;
+
+    if (!data) {
+      displayDiv.innerHTML = '<span style="color: var(--gray-500); font-style: italic;">Unable to load data</span>';
+      return;
+    }
+
+    // Display counts with | separator
+    const voidCount = data.voidedOrders?.count || 0;
+    const discountCount = data.discounts?.count || 0;
+    const refundCount = data.refunds?.count || 0;
+    const voidedPaymentCount = data.voidedPayments?.count || 0;
+
+    displayDiv.innerHTML = `VOIDED ORDERS: ${voidCount} | DISCOUNTS: ${discountCount} | REFUNDS: ${refundCount} | VOIDED PAYMENTS: ${voidedPaymentCount}`;
+  }
+
+  // ==================== END VOID & DISCOUNT TRACKING DISPLAY ====================
+
   // Fetch on page load
   document.addEventListener('DOMContentLoaded', function() {
     fetchClockedInEmployees();
     fetchTipsPerHour(); // Add tips/hr fetch
     fetchTopLeader(); // Add top leader fetch
+    fetchVoidDiscountTracking(); // Add void/discount tracking
 
     // Auto-refresh every 5 minutes
     setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
     setInterval(fetchTipsPerHour, 30 * 1000);
     setInterval(fetchTopLeader, 2 * 60 * 1000); // Refresh every 2 minutes
+    setInterval(fetchVoidDiscountTracking, 5 * 60 * 1000); // Refresh every 5 minutes
 
     // Update "time ago" display every 30 seconds
     setInterval(updateLastUpdatedTime, 30 * 1000);
