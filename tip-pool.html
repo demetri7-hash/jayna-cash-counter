@@ -1348,7 +1348,138 @@
     console.log('Tip pool localStorage loading disabled - fields start fresh every time');
     return false;
   }
-  
+
+  // ===== TIP POOL CASHBOX FUNCTIONS =====
+
+  function toggleTipPoolCashboxInputs() {
+    const counterSelect = document.getElementById('tipPoolCashboxCounter');
+    const otherNameGroup = document.getElementById('tipPoolCashboxOtherNameGroup');
+    const denominationInputs = document.getElementById('tipPoolCashboxDenominationInputs');
+
+    if (counterSelect.value === 'Other') {
+      otherNameGroup.style.display = 'block';
+      denominationInputs.style.display = 'block';
+    } else if (counterSelect.value) {
+      otherNameGroup.style.display = 'none';
+      denominationInputs.style.display = 'block';
+    } else {
+      otherNameGroup.style.display = 'none';
+      denominationInputs.style.display = 'none';
+    }
+  }
+
+  function calculateTipPoolCashboxTotal() {
+    const denominations = [
+      { id: 'tipPool_cashbox_hundreds', value: 100 },
+      { id: 'tipPool_cashbox_fifties', value: 50 },
+      { id: 'tipPool_cashbox_twenties', value: 20 },
+      { id: 'tipPool_cashbox_tens', value: 10 },
+      { id: 'tipPool_cashbox_fives', value: 5 },
+      { id: 'tipPool_cashbox_ones', value: 1 },
+      { id: 'tipPool_cashbox_quarters', value: 0.25 },
+      { id: 'tipPool_cashbox_dimes', value: 0.10 },
+      { id: 'tipPool_cashbox_nickels', value: 0.05 },
+      { id: 'tipPool_cashbox_pennies', value: 0.01 }
+    ];
+
+    const total = denominations.reduce((sum, denom) => {
+      const count = parseInt(document.getElementById(denom.id).value) || 0;
+      return sum + (count * denom.value);
+    }, 0);
+
+    document.getElementById('tipPoolCashboxTotal').textContent = `$${total.toFixed(2)}`;
+    return total;
+  }
+
+  function getTipPoolCashboxData() {
+    // Get counter name
+    const counterSelect = document.getElementById('tipPoolCashboxCounter');
+    let counterName = counterSelect.value;
+
+    if (counterName === 'Other') {
+      counterName = document.getElementById('tipPoolCashboxOtherName').value;
+    }
+
+    // If no counter selected, return null (cashbox count is optional)
+    if (!counterName) {
+      return null;
+    }
+
+    // Get total
+    const total = calculateTipPoolCashboxTotal();
+
+    // If total is 0, return null
+    if (total === 0) {
+      return null;
+    }
+
+    // Get denominations
+    const denominations = {
+      hundreds: parseInt(document.getElementById('tipPool_cashbox_hundreds').value) || 0,
+      fifties: parseInt(document.getElementById('tipPool_cashbox_fifties').value) || 0,
+      twenties: parseInt(document.getElementById('tipPool_cashbox_twenties').value) || 0,
+      tens: parseInt(document.getElementById('tipPool_cashbox_tens').value) || 0,
+      fives: parseInt(document.getElementById('tipPool_cashbox_fives').value) || 0,
+      ones: parseInt(document.getElementById('tipPool_cashbox_ones').value) || 0,
+      quarters: parseInt(document.getElementById('tipPool_cashbox_quarters').value) || 0,
+      dimes: parseInt(document.getElementById('tipPool_cashbox_dimes').value) || 0,
+      nickels: parseInt(document.getElementById('tipPool_cashbox_nickels').value) || 0,
+      pennies: parseInt(document.getElementById('tipPool_cashbox_pennies').value) || 0
+    };
+
+    return {
+      date: new Date().toISOString().split('T')[0],
+      counter: counterName,
+      total: total,
+      denominations: denominations
+    };
+  }
+
+  async function saveCashboxCountFromTipPool(cashboxData) {
+    try {
+      console.log('💾 Saving cashbox count from tip pool:', cashboxData);
+
+      // Save to database
+      const { data, error } = await supabase
+        .from('cashbox_counts')
+        .insert([{
+          date: cashboxData.date,
+          counter: cashboxData.counter,
+          total: cashboxData.total,
+          denominations: cashboxData.denominations,
+          notes: 'Entered from tip pool calculator'
+        }]);
+
+      if (error) {
+        // Check if it's a duplicate date error
+        if (error.code === '23505') {
+          console.log('⚠️ Cashbox count already exists for this date, updating instead...');
+          const { data: updateData, error: updateError } = await supabase
+            .from('cashbox_counts')
+            .update({
+              counter: cashboxData.counter,
+              total: cashboxData.total,
+              denominations: cashboxData.denominations,
+              notes: 'Updated from tip pool calculator'
+            })
+            .eq('date', cashboxData.date);
+
+          if (updateError) throw updateError;
+          console.log('✅ Cashbox count updated successfully');
+        } else {
+          throw error;
+        }
+      } else {
+        console.log('✅ Cashbox count saved successfully');
+      }
+
+      return cashboxData.total;
+    } catch (error) {
+      console.error('❌ Error saving cashbox count:', error);
+      throw error;
+    }
+  }
+
   // Save combined report data to localStorage
   function saveCombinedReportData() {
     try {
