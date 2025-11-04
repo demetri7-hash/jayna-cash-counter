@@ -1384,6 +1384,12 @@
   }
   
   function showPasswordModal(selectedDate, currentDate, callback) {
+    // Remove any existing password modal first
+    const existingModal = document.getElementById('passwordModal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+
     // Create modal HTML
     const modalHTML = `
       <div id="passwordModal" style="
@@ -1425,9 +1431,10 @@
             font-size: 16px;
             text-align: center;
             margin-bottom: 20px;
-          " placeholder="Password">
+          " placeholder="Password (JaynaGyro2025!)">
+          <div id="passwordError" style="color: #d32f2f; margin-bottom: 10px; font-size: 14px; display: none;"></div>
           <div>
-            <button onclick="submitPassword()" style="
+            <button onclick="window.cashPasswordSubmit()" style="
               background: var(--gray-700);
               color: white;
               border: none;
@@ -1437,7 +1444,7 @@
               cursor: pointer;
               font-size: 16px;
             ">Continue</button>
-            <button onclick="cancelPassword()" style="
+            <button onclick="window.cashPasswordCancel()" style="
               background: var(--error);
               color: white;
               border: none;
@@ -1451,44 +1458,74 @@
         </div>
       </div>
     `;
-    
+
     // Add modal to page
     document.body.insertAdjacentHTML('beforeend', modalHTML);
-    
-    // Focus password input
-    document.getElementById('passwordInput').focus();
-    
+
     // Store callback for button handlers
     window.passwordModalCallback = callback;
-    
-    // Add enter key support
-    document.getElementById('passwordInput').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        submitPassword();
+
+    // Focus password input after a short delay to ensure it's rendered
+    setTimeout(() => {
+      const input = document.getElementById('passwordInput');
+      if (input) {
+        input.focus();
+
+        // Add enter key support
+        input.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            window.cashPasswordSubmit();
+          }
+        });
       }
-    });
+    }, 100);
   }
   
-  function submitPassword() {
-    const password = document.getElementById('passwordInput').value;
+  // Make these globally accessible for onclick handlers
+  window.cashPasswordSubmit = function() {
+    const passwordInput = document.getElementById('passwordInput');
+    const passwordError = document.getElementById('passwordError');
     const modal = document.getElementById('passwordModal');
-    
+
+    if (!passwordInput || !modal) {
+      console.error('Password modal elements not found');
+      return;
+    }
+
+    const password = passwordInput.value;
+
+    console.log('Checking password...');
+
     if (password === ADMIN_PASSWORD) {
+      console.log('✅ Password correct!');
       // Silent success - no bouncing message
       modal.remove();
-      window.passwordModalCallback(true);
+      if (window.passwordModalCallback) {
+        window.passwordModalCallback(true);
+      }
     } else {
-      showMessage('Incorrect password. Date has been reset to today for safety.', 'error');
+      console.log('❌ Password incorrect');
+      // Show inline error instead of modal
+      if (passwordError) {
+        passwordError.textContent = '❌ Incorrect password. Try: JaynaGyro2025!';
+        passwordError.style.display = 'block';
+      }
+      passwordInput.value = '';
+      passwordInput.focus();
+      // Don't close modal or call callback on wrong password - let user try again
+    }
+  };
+
+  window.cashPasswordCancel = function() {
+    const modal = document.getElementById('passwordModal');
+    if (modal) {
       modal.remove();
+    }
+    if (window.passwordModalCallback) {
       window.passwordModalCallback(false);
     }
-  }
-  
-  function cancelPassword() {
-    const modal = document.getElementById('passwordModal');
-    modal.remove();
-    window.passwordModalCallback(false);
-  }
+  };
 
   // General password protection function for manager features
   function requirePasswordFor(featureName, callback) {
