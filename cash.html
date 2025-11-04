@@ -2205,7 +2205,7 @@
 
     editLinkContainer.innerHTML = `
       <a href="javascript:void(0)" onclick="editPMCount()" style="font-size: 11px; color: rgba(0,0,0,0.8); text-decoration: underline; cursor: pointer;">
-        Edit PM Count for This Date
+        Go to PM Count for This Date
       </a>
     `;
 
@@ -2230,9 +2230,9 @@
 
     modal.innerHTML = `
       <div style="background: white; padding: 40px; max-width: 450px; width: 90%; border: 3px solid var(--warning-border);">
-        <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 700; color: var(--warning-text); text-transform: uppercase; letter-spacing: 1px;">⚠️ WARNING: Edit PM Count</h3>
+        <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 700; color: var(--warning-text); text-transform: uppercase; letter-spacing: 1px;">⚠️ WARNING: Access PM Count</h3>
         <p style="margin-bottom: 20px; color: var(--gray-700); font-size: 14px; line-height: 1.5;">
-          You are about to edit a PM cash close for this date. This will allow you to modify the evening count that has already been submitted.
+          You are about to access the PM cash close for this date. This will allow you to add a new PM count or modify an existing one.
         </p>
         <p style="margin-bottom: 20px; color: var(--error-text); font-size: 13px; font-weight: 600;">
           Enter master password to proceed:
@@ -2297,55 +2297,65 @@
 
     const pmData = await getPMData(selectedDate);
 
-    if (!pmData) {
-      showMessage('No PM data found for this date', 'error');
-      return;
-    }
-
-    console.log('📝 Loading PM form with existing data:', pmData);
-
-    // Show PM form
+    // Show PM form (works for both new entry and editing)
     await startPMCount();
 
-    // Pre-populate PM form fields
-    document.getElementById('pmDate').value = pmData.date;
-    document.getElementById('pmCounter').value = pmData.counter;
-    document.getElementById('pmNotes').value = pmData.notes || '';
-    document.getElementById('depositAmount').value = pmData.deposit_amount || '';
-    document.getElementById('cashTips').value = pmData.cash_tips || '';
+    // Set the date to the selected date
+    document.getElementById('pmDate').value = selectedDate;
 
-    // Pre-populate drawers if they exist
-    if (pmData.drawer1) {
-      if (pmData.drawer1.skipped) {
-        document.getElementById('pmDrawer1Skip').checked = true;
-        toggleSkip('pm', 1);
-        document.getElementById('pmDrawer1Reason').value = pmData.drawer1.skipReason || '';
-      } else {
-        DENOMINATIONS.forEach((denom, index) => {
-          const key = getDenominationKey(denom.value);
-          const value = pmData.drawer1.counts[key] || 0;
-          document.getElementById(`pmD1Q${index}`).value = value;
-        });
-        updateCalculations('pm', 1);
+    if (pmData) {
+      // PM data EXISTS - pre-populate for editing
+      console.log('📝 Loading PM form with existing data:', pmData);
+
+      document.getElementById('pmCounter').value = pmData.counter;
+      document.getElementById('pmNotes').value = pmData.notes || '';
+      document.getElementById('depositAmount').value = pmData.deposit_amount || '';
+      document.getElementById('cashTips').value = pmData.cash_tips || '';
+
+      // Pre-populate drawers if they exist
+      if (pmData.drawer1) {
+        if (pmData.drawer1.skipped) {
+          document.getElementById('pmDrawer1Skip').checked = true;
+          toggleSkip('pm', 1);
+          document.getElementById('pmDrawer1Reason').value = pmData.drawer1.skipReason || '';
+        } else {
+          DENOMINATIONS.forEach((denom, index) => {
+            const key = getDenominationKey(denom.value);
+            const value = pmData.drawer1.counts[key] || 0;
+            document.getElementById(`pmD1Q${index}`).value = value;
+          });
+          updateCalculations('pm', 1);
+        }
+      }
+
+      if (pmData.drawer2) {
+        if (pmData.drawer2.skipped) {
+          document.getElementById('pmDrawer2Skip').checked = true;
+          toggleSkip('pm', 2);
+          document.getElementById('pmDrawer2Reason').value = pmData.drawer2.skipReason || '';
+        } else {
+          DENOMINATIONS.forEach((denom, index) => {
+            const key = getDenominationKey(denom.value);
+            const value = pmData.drawer2.counts[key] || 0;
+            document.getElementById(`pmD2Q${index}`).value = value;
+          });
+          updateCalculations('pm', 2);
+        }
+      }
+
+      showMessage('✏️ Editing existing PM count. Make your changes and resubmit.', 'info');
+    } else {
+      // NO PM data - blank form for NEW entry
+      console.log('📝 No PM data found - loading blank form for new entry');
+      showMessage('💡 No PM data exists for this date. Fill out the form to create a new PM count.', 'info');
+
+      // Fetch Toast sales for the selected date
+      try {
+        await fetchToastCashSalesForDate(selectedDate);
+      } catch (error) {
+        console.error('Failed to fetch Toast sales:', error);
       }
     }
-
-    if (pmData.drawer2) {
-      if (pmData.drawer2.skipped) {
-        document.getElementById('pmDrawer2Skip').checked = true;
-        toggleSkip('pm', 2);
-        document.getElementById('pmDrawer2Reason').value = pmData.drawer2.skipReason || '';
-      } else {
-        DENOMINATIONS.forEach((denom, index) => {
-          const key = getDenominationKey(denom.value);
-          const value = pmData.drawer2.counts[key] || 0;
-          document.getElementById(`pmD2Q${index}`).value = value;
-        });
-        updateCalculations('pm', 2);
-      }
-    }
-
-    showMessage('✏️ Editing existing PM count. Make your changes and resubmit.', 'info');
   }
 
   function getDenominationKey(value) {
