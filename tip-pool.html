@@ -714,7 +714,7 @@
   </style>
 </head>
 <body>
-  <!-- Loading Overlay -->
+  <!-- Loading Overlay with Water-Filling Logo -->
   <div id="loadingOverlay" style="
     display: none;
     position: fixed;
@@ -722,7 +722,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.9);
     z-index: 9999;
     justify-content: center;
     align-items: center;
@@ -735,44 +735,73 @@
         Demetri is a Genius 😉
       </p>
 
-      <!-- Animated Pie Chart Progress -->
-      <svg width="80" height="80" viewBox="0 0 80 80" style="margin: 0 auto; display: block;">
-        <!-- Background circle -->
-        <circle cx="40" cy="40" r="35" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="8"/>
+      <!-- Logo Container with Water Fill Effect -->
+      <div style="position: relative; width: 120px; height: 120px; margin: 0 auto;">
+        <!-- Background logo (grayed out) -->
+        <img src="jayna-logo-new.png" alt="Jayna Logo" style="
+          width: 120px;
+          height: 120px;
+          opacity: 0.2;
+          filter: grayscale(100%);
+          border-radius: 50%;
+        ">
 
-        <!-- Animated gradient progress circle -->
-        <defs>
-          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#007bff;stop-opacity:1">
-              <animate attributeName="stop-color" values="#007bff;#0056b3;#007bff" dur="2s" repeatCount="indefinite"/>
-            </stop>
-            <stop offset="100%" style="stop-color:#0056b3;stop-opacity:1">
-              <animate attributeName="stop-color" values="#0056b3;#007bff;#0056b3" dur="2s" repeatCount="indefinite"/>
-            </stop>
-          </linearGradient>
-        </defs>
+        <!-- Filling logo (clip-path reveals from bottom) -->
+        <img id="fillingLogo" src="jayna-logo-new.png" alt="Jayna Logo" style="
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 120px;
+          height: 120px;
+          clip-path: inset(100% 0 0 0);
+          transition: clip-path 0.5s ease-out;
+          filter: drop-shadow(0 0 20px rgba(0, 123, 255, 0.8));
+          border-radius: 50%;
+        ">
 
-        <!-- Progress circle (starts at top, fills clockwise) -->
-        <circle
-          id="progressCircle"
-          cx="40"
-          cy="40"
-          r="35"
-          fill="none"
-          stroke="url(#progressGradient)"
-          stroke-width="8"
-          stroke-linecap="round"
-          transform="rotate(-90 40 40)"
-          style="
-            stroke-dasharray: 220;
-            stroke-dashoffset: 220;
-            transition: stroke-dashoffset 0.5s ease;
-            filter: drop-shadow(0 0 8px rgba(0,123,255,0.6));
-          "
-        />
-      </svg>
+        <!-- Wave effect overlay -->
+        <div id="waveOverlay" style="
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          width: 120px;
+          height: 8px;
+          background: linear-gradient(90deg,
+            rgba(0, 123, 255, 0) 0%,
+            rgba(0, 123, 255, 0.5) 25%,
+            rgba(0, 123, 255, 0.8) 50%,
+            rgba(0, 123, 255, 0.5) 75%,
+            rgba(0, 123, 255, 0) 100%
+          );
+          animation: wave 2s ease-in-out infinite;
+          transform: translateY(100%);
+          transition: transform 0.5s ease-out;
+          border-radius: 0 0 60px 60px;
+          filter: blur(2px);
+        ">
+        </div>
+      </div>
+
+      <!-- Progress percentage (optional) -->
+      <div id="loadingPercentage" style="
+        margin-top: 20px;
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.7);
+        letter-spacing: 2px;
+      ">0%</div>
     </div>
   </div>
+
+  <style>
+    @keyframes wave {
+      0%, 100% {
+        background-position: 0 0;
+      }
+      50% {
+        background-position: 100px 0;
+      }
+    }
+  </style>
 
   <!-- App Header (Injected by app-header.js) -->
   <div id="appHeader"></div>
@@ -1236,11 +1265,25 @@
   }
 
   function updateLoadingProgress(percent) {
-    // Update pie chart fill (220 is the full circle circumference)
-    const progressCircle = document.getElementById('progressCircle');
-    if (progressCircle) {
-      const offset = 220 - (220 * percent / 100);
-      progressCircle.style.strokeDashoffset = offset;
+    // Update logo water fill effect from bottom to top
+    const fillingLogo = document.getElementById('fillingLogo');
+    const waveOverlay = document.getElementById('waveOverlay');
+    const percentageDisplay = document.getElementById('loadingPercentage');
+
+    if (fillingLogo) {
+      // Calculate how much to reveal (0% = fully hidden, 100% = fully visible)
+      const revealAmount = 100 - percent; // Invert: start at 100%, end at 0%
+      fillingLogo.style.clipPath = `inset(${revealAmount}% 0 0 0)`;
+    }
+
+    if (waveOverlay) {
+      // Move wave overlay up as fill increases
+      const wavePosition = 100 - percent; // Start at bottom (100%), move to top (0%)
+      waveOverlay.style.transform = `translateY(${wavePosition}%)`;
+    }
+
+    if (percentageDisplay) {
+      percentageDisplay.textContent = `${Math.round(percent)}%`;
     }
   }
   function showMessage(text, type) {
