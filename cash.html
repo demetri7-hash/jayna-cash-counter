@@ -1130,8 +1130,16 @@
       amDateEl.addEventListener('change', function() {
         const result = validateDateChange(this);
         if (result instanceof Promise) {
-          // Handle async validation - input value already reset if needed
+          result.then((success) => {
+            if (success) {
+              // Update edit PM link visibility after date change
+              updateEditLinks();
+            }
+          });
           return;
+        } else {
+          // Update edit PM link visibility after date change
+          updateEditLinks();
         }
       });
     }
@@ -1147,6 +1155,8 @@
               loadAMData();
               // Also reload Toast cash sales for the new date
               fetchToastCashSalesForDate(this.value);
+              // Update edit AM link visibility after date change
+              updateEditLinks();
             }
           });
         } else if (result) {
@@ -1154,6 +1164,8 @@
           loadAMData();
           // Also reload Toast cash sales for the new date
           fetchToastCashSalesForDate(this.value);
+          // Update edit AM link visibility after date change
+          updateEditLinks();
         }
       });
     }
@@ -1816,8 +1828,16 @@
     hideAllSections();
     document.getElementById('amForm').classList.add('active');
     setupDenominations('am');
+
+    // Show "Edit PM Count" link if viewing a past date
+    const selectedDate = document.getElementById('amDate').value;
+    const today = getPacificDate();
+    if (selectedDate && selectedDate !== today) {
+      console.log('📅 Past date selected in AM flow - showing Edit PM link');
+      showEditPMLink();
+    }
   }
-  
+
   async function startPMCount() {
     // Keep main menu visible at top
     hideAllSections();
@@ -1826,8 +1846,16 @@
 
     await loadAMData();
 
-    // ALWAYS show "Update AM Counts" link in PM flow
-    showEditAMLink();
+    // Show "Update AM Counts" link if viewing past date OR if it's today (existing behavior)
+    const selectedDate = document.getElementById('pmDate').value;
+    const today = getPacificDate();
+    if (selectedDate && selectedDate !== today) {
+      console.log('📅 Past date selected in PM flow - showing Edit AM link');
+      showEditAMLink();
+    } else if (selectedDate === today) {
+      // Keep existing behavior for today
+      showEditAMLink();
+    }
 
     // Automatically fetch Toast cash sales when PM section loads
     console.log('PM Count started - automatically fetching Toast cash sales...');
@@ -2128,6 +2156,196 @@
     }
 
     showMessage('✏️ Editing existing AM count. Make your changes and resubmit.', 'info');
+  }
+
+  // ===== EDIT PM COUNT WITH PASSWORD PROTECTION =====
+
+  function updateEditLinks() {
+    // Remove any existing edit links first
+    const existingAMLink = document.getElementById('editAMLinkContainer');
+    const existingPMLink = document.getElementById('editPMLinkContainer');
+    if (existingAMLink) existingAMLink.remove();
+    if (existingPMLink) existingPMLink.remove();
+
+    // Get current date
+    const today = getPacificDate();
+
+    // Check if AM form is visible
+    const amForm = document.getElementById('amForm');
+    if (amForm && amForm.classList.contains('active')) {
+      const selectedDate = document.getElementById('amDate').value;
+      if (selectedDate && selectedDate !== today) {
+        console.log('📅 Showing Edit PM link (past date in AM flow)');
+        showEditPMLink();
+      }
+    }
+
+    // Check if PM form is visible
+    const pmForm = document.getElementById('pmForm');
+    if (pmForm && pmForm.classList.contains('active')) {
+      const selectedDate = document.getElementById('pmDate').value;
+      // Always show edit AM link in PM flow (past date OR today)
+      console.log('📅 Showing Edit AM link in PM flow');
+      showEditAMLink();
+    }
+  }
+
+  function showEditPMLink() {
+    // Find AM form and add simple text link under title
+    const amForm = document.getElementById('amForm');
+    if (!amForm) return;
+
+    // Check if link already exists
+    if (document.getElementById('editPMLinkContainer')) return;
+
+    // Create simple text link
+    const editLinkContainer = document.createElement('div');
+    editLinkContainer.id = 'editPMLinkContainer';
+    editLinkContainer.style.cssText = 'text-align: center; margin: -15px 0 20px 0;';
+
+    editLinkContainer.innerHTML = `
+      <a href="javascript:void(0)" onclick="editPMCount()" style="font-size: 11px; color: rgba(0,0,0,0.8); text-decoration: underline; cursor: pointer;">
+        Edit PM Count for This Date
+      </a>
+    `;
+
+    // Insert right after the h2 title
+    const h2 = amForm.querySelector('h2');
+    if (h2 && h2.nextSibling) {
+      amForm.insertBefore(editLinkContainer, h2.nextSibling);
+    } else {
+      amForm.insertBefore(editLinkContainer, amForm.firstChild);
+    }
+  }
+
+  function editPMCount() {
+    console.log('🔐 Edit PM Count requested - showing password modal');
+    showEditPMPasswordModal();
+  }
+
+  function showEditPMPasswordModal() {
+    const modal = document.createElement('div');
+    modal.id = 'editPMPasswordModal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+    modal.innerHTML = `
+      <div style="background: white; padding: 40px; max-width: 450px; width: 90%; border: 3px solid var(--warning-border);">
+        <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 700; color: var(--warning-text); text-transform: uppercase; letter-spacing: 1px;">⚠️ WARNING: Edit PM Count</h3>
+        <p style="margin-bottom: 20px; color: var(--gray-700); font-size: 14px; line-height: 1.5;">
+          You are about to edit a PM cash close for this date. This will allow you to modify the evening count that has already been submitted.
+        </p>
+        <p style="margin-bottom: 20px; color: var(--error-text); font-size: 13px; font-weight: 600;">
+          Enter master password to proceed:
+        </p>
+        <input type="password" id="editPMPasswordInput" placeholder="Enter password" style="width: 100%; padding: 14px; border: 2px solid var(--gray-300); font-size: 14px; margin-bottom: 20px; box-sizing: border-box;" />
+        <div style="display: flex; gap: 12px;">
+          <button onclick="closeEditPMPasswordModal()" style="flex: 1; padding: 14px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">Cancel</button>
+          <button onclick="verifyEditPMPassword()" style="flex: 1; padding: 14px; background: var(--warning-border); border: 2px solid var(--warning-border); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">Proceed</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    setTimeout(() => {
+      const input = document.getElementById('editPMPasswordInput');
+      if (input) input.focus();
+    }, 100);
+
+    // Enter key support
+    document.getElementById('editPMPasswordInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') verifyEditPMPassword();
+    });
+  }
+
+  function closeEditPMPasswordModal() {
+    const modal = document.getElementById('editPMPasswordModal');
+    if (modal) modal.remove();
+  }
+
+  async function verifyEditPMPassword() {
+    const input = document.getElementById('editPMPasswordInput');
+    if (!input) return;
+
+    const password = input.value.trim();
+
+    // Master password
+    const masterPassword = 'JaynaGyro2025!';
+
+    // Custom passwords from localStorage
+    const customPasswords = JSON.parse(localStorage.getItem('customPasswords') || '[]');
+    const validPasswords = [masterPassword, ...customPasswords];
+
+    if (validPasswords.includes(password)) {
+      closeEditPMPasswordModal();
+      console.log('✅ Password verified - loading PM count for editing');
+
+      // Load PM form with existing data for the selected date
+      await loadAndShowPMFormForEditing();
+    } else {
+      showMessage('Incorrect password. Access denied.', 'error');
+      closeEditPMPasswordModal();
+    }
+  }
+
+  async function loadAndShowPMFormForEditing() {
+    const selectedDate = document.getElementById('amDate').value;
+    if (!selectedDate) {
+      showMessage('No date selected', 'error');
+      return;
+    }
+
+    const pmData = await getPMData(selectedDate);
+
+    if (!pmData) {
+      showMessage('No PM data found for this date', 'error');
+      return;
+    }
+
+    console.log('📝 Loading PM form with existing data:', pmData);
+
+    // Show PM form
+    await startPMCount();
+
+    // Pre-populate PM form fields
+    document.getElementById('pmDate').value = pmData.date;
+    document.getElementById('pmCounter').value = pmData.counter;
+    document.getElementById('pmNotes').value = pmData.notes || '';
+    document.getElementById('depositAmount').value = pmData.deposit_amount || '';
+    document.getElementById('cashTips').value = pmData.cash_tips || '';
+
+    // Pre-populate drawers if they exist
+    if (pmData.drawer1) {
+      if (pmData.drawer1.skipped) {
+        document.getElementById('pmDrawer1Skip').checked = true;
+        toggleSkip('pm', 1);
+        document.getElementById('pmDrawer1Reason').value = pmData.drawer1.skipReason || '';
+      } else {
+        DENOMINATIONS.forEach((denom, index) => {
+          const key = getDenominationKey(denom.value);
+          const value = pmData.drawer1.counts[key] || 0;
+          document.getElementById(`pmD1Q${index}`).value = value;
+        });
+        updateCalculations('pm', 1);
+      }
+    }
+
+    if (pmData.drawer2) {
+      if (pmData.drawer2.skipped) {
+        document.getElementById('pmDrawer2Skip').checked = true;
+        toggleSkip('pm', 2);
+        document.getElementById('pmDrawer2Reason').value = pmData.drawer2.skipReason || '';
+      } else {
+        DENOMINATIONS.forEach((denom, index) => {
+          const key = getDenominationKey(denom.value);
+          const value = pmData.drawer2.counts[key] || 0;
+          document.getElementById(`pmD2Q${index}`).value = value;
+        });
+        updateCalculations('pm', 2);
+      }
+    }
+
+    showMessage('✏️ Editing existing PM count. Make your changes and resubmit.', 'info');
   }
 
   function getDenominationKey(value) {
@@ -3353,7 +3571,7 @@
       .maybeSingle(); // Use maybeSingle() instead of single() to avoid 406 errors
 
     if (error || !data || !data.am_total) return null;
-    
+
     return {
       date: data.date,
       counter: data.am_counter,
@@ -3374,7 +3592,41 @@
       notes: data.am_notes
     };
   }
-  
+
+  async function getPMData(date) {
+    if (!supabase) return null;
+
+    const { data, error } = await supabase
+      .from('cash_counts')
+      .select('*')
+      .eq('date', date)
+      .maybeSingle();
+
+    if (error || !data || !data.pm_total) return null;
+
+    return {
+      date: data.date,
+      counter: data.pm_counter,
+      timestamp: data.pm_timestamp,
+      total: data.pm_total,
+      deposit_amount: data.pm_deposit_amount,
+      cash_tips: data.pm_cash_tips,
+      drawer1: {
+        total: data.pm_drawer1_total,
+        skipped: data.pm_drawer1_skip,
+        skipReason: data.pm_drawer1_skip_reason,
+        counts: data.pm_drawer1_data
+      },
+      drawer2: {
+        total: data.pm_drawer2_total,
+        skipped: data.pm_drawer2_skip,
+        skipReason: data.pm_drawer2_skip_reason,
+        counts: data.pm_drawer2_data
+      },
+      notes: data.pm_notes
+    };
+  }
+
   async function sendEmailReport(data, calculations) {
     // Format date with day of the week
     const dateObj = new Date(data.date + 'T00:00:00');
