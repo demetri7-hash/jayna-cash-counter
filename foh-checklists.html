@@ -608,8 +608,17 @@
 
   // Initialize Supabase
   function initializeSupabase() {
-    const { createClient } = window.supabase;
-    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if (!window.supabase) {
+      console.error('❌ Supabase library not loaded! Make sure CDN script is included.');
+      return;
+    }
+    try {
+      const { createClient } = window.supabase;
+      supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log('✅ Supabase initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize Supabase:', error);
+    }
   }
 
   // ============================================
@@ -10741,240 +10750,10 @@
   }
   // ==================== END PASSWORD PROTECTION ====================
 
-  // ==================== TIPS PER HOUR DISPLAY ====================
-
-    let lastTipsUpdate = null;
-
-
-  async function fetchTipsPerHour() {
-    try {
-      const response = await fetch('/api/toast-tips-per-hour-today', {
-        method: 'POST'
-      });
-
-      if (!response.ok) {
-        updateTipsPerHourDisplay(null);
-        return;
-      }
-
-      const result = await response.json();
-
-      if (result.success && result.data) {
-          lastTipsUpdate = new Date();
-
-        updateTipsPerHourDisplay(result.data);
-          updateLastUpdatedTime();
-
-      } else {
-        updateTipsPerHourDisplay(null);
-      }
-    } catch (error) {
-      console.error('Error fetching tips per hour:', error);
-      updateTipsPerHourDisplay(null);
-    }
-  }
-
-  function updateTipsPerHourDisplay(data) {
-    const displayDiv = document.getElementById('tipsPerHourText');
-    const cardDiv = document.getElementById('tipsPerHourCard');
-
-    if (!displayDiv) return;
-
-    if (!data) {
-      displayDiv.innerHTML = '<div style="font-size: 14px;">-</div>';
-      return;
-    }
-
-    // Dynamic card color based on trend
-    const bgGradient = data.trendingUp
-      ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
-      : 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)';
-    const borderColor = data.trendingUp ? '#059669' : '#dc2626';
-
-    if (cardDiv) {
-      cardDiv.style.background = bgGradient;
-      cardDiv.style.borderColor = borderColor;
-    }
-
-    const arrow = data.trendingUp ? '↑' : '↓';
-
-    // Main number (large and bold)
-    let html = `<div style="font-size: 28px; font-weight: 900; color: #fff; line-height: 1;">
-      ${arrow} $${data.tipsPerHour.toFixed(2)}/hr
-    </div>`;
-
-    // Comparison stats (smaller, below main number)
-    html += `<div style="margin-top: 6px; font-size: 10px; color: rgba(255,255,255,0.85); line-height: 1.4;">`;
-
-    if (data.percentChangeFromLastHour !== null && data.percentChangeFromLastHour !== undefined) {
-      const hourArrow = data.percentChangeFromLastHour >= 0 ? '↑' : '↓';
-      html += `<div>${hourArrow} ${data.percentChangeFromLastHour > 0 ? '+' : ''}${data.percentChangeFromLastHour}% vs last hour</div>`;
-    }
-
-    if (data.percentChangeFromYesterday !== null) {
-      const dayArrow = data.percentChangeFromYesterday >= 0 ? '↑' : '↓';
-      html += `<div>${dayArrow} ${data.percentChangeFromYesterday > 0 ? '+' : ''}${data.percentChangeFromYesterday.toFixed(1)}% vs yesterday</div>`;
-    }
-
-    if (data.percentChangeFromLastWeek !== null) {
-      const weekArrow = data.percentChangeFromLastWeek >= 0 ? '↑' : '↓';
-      html += `<div>${weekArrow} ${data.percentChangeFromLastWeek > 0 ? '+' : ''}${data.percentChangeFromLastWeek.toFixed(1)}% vs last week</div>`;
-    }
-
-    html += `</div>`;
-
-    displayDiv.innerHTML = html;
-  }
-
-  // Auto-refresh tips/hr every 30 seconds for LIVE updates
-  setInterval(fetchTipsPerHour, 30 * 1000);
-
-
-    function updateLastUpdatedTime() {
-      const lastUpdatedDiv = document.getElementById('tipsLastUpdated');
-      if (!lastUpdatedDiv || !lastTipsUpdate) return;
-
-      const now = new Date();
-      const diffMs = now - lastTipsUpdate;
-      const diffSec = Math.floor(diffMs / 1000);
-      const diffMin = Math.floor(diffSec / 60);
-
-      let timeAgo = '';
-      if (diffMin < 1) {
-        timeAgo = 'Just now';
-      } else if (diffMin === 1) {
-        timeAgo = '1 minute ago';
-      } else if (diffMin < 60) {
-        timeAgo = `${diffMin} minutes ago`;
-      } else {
-        const diffHour = Math.floor(diffMin / 60);
-        timeAgo = diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
-      }
-
-      lastUpdatedDiv.textContent = `LAST UPDATED: ${timeAgo}`;
-    }
-
-    // Update "time ago" display every 30 seconds
-    setInterval(updateLastUpdatedTime, 30 * 1000);
-
-
-  // ==================== TOP LEADER DISPLAY ====================
-
-  async function fetchTopLeader() {
-    try {
-      // Get Pacific time start/end of today
-      const nowPacific = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-      const todayStart = new Date(nowPacific);
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(nowPacific);
-      todayEnd.setHours(23, 59, 59, 999);
-
-      const startISO = todayStart.toISOString();
-      const endISO = todayEnd.toISOString();
-
-      console.log('🏆 Fetching leaderboard data for range:', startISO, 'to', endISO);
-
-      // Fetch FOH tasks (ALL completed tasks today, regardless of checklist type)
-      const { data: tasks, error: tasksError } = await supabase
-        .from('foh_checklist_tasks')
-        .select('completed_by, completed_at, is_completed, checklist_type')
-        .eq('is_completed', true)
-        .gte('completed_at', startISO)
-        .lte('completed_at', endISO);
-
-      console.log(`📋 Found ${tasks?.length || 0} completed FOH tasks`);
-      if (tasksError) console.error('❌ FOH tasks error:', tasksError);
-
-      // Fetch prep count actions
-      const { data: prepCounts, error: prepError } = await supabase
-        .from('prep_count_log')
-        .select('counted_by, counted_at')
-        .gte('counted_at', startISO)
-        .lte('counted_at', endISO);
-
-      console.log(`📦 Found ${prepCounts?.length || 0} prep count actions`);
-      if (prepError) console.error('❌ Prep counts error:', prepError);
-
-      if ((!tasks || tasks.length === 0) && (!prepCounts || prepCounts.length === 0)) {
-        updateTopLeaderDisplay(null);
-        return;
-      }
-
-      const leaderboard = {};
-
-      // Count FOH tasks
-      if (tasks && tasks.length > 0) {
-        // Log checklist types to verify all types are included
-        const checklistTypes = {};
-        tasks.forEach(task => {
-          const type = task.checklist_type || 'unknown';
-          checklistTypes[type] = (checklistTypes[type] || 0) + 1;
-        });
-        console.log('📊 Checklist types included:', checklistTypes);
-
-        tasks.forEach(task => {
-          const name = task.completed_by || 'Unknown';
-          if (!leaderboard[name]) {
-            leaderboard[name] = { name, count: 0, lastCompleted: null };
-          }
-          leaderboard[name].count++;
-          const completedAt = new Date(task.completed_at);
-          if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
-            leaderboard[name].lastCompleted = completedAt;
-          }
-        });
-      }
-
-      // Count prep items
-      if (prepCounts && prepCounts.length > 0) {
-        prepCounts.forEach(prep => {
-          const name = prep.counted_by || 'Unknown';
-          if (!leaderboard[name]) {
-            leaderboard[name] = { name, count: 0, lastCompleted: null };
-          }
-          leaderboard[name].count++;
-          const countedAt = new Date(prep.counted_at);
-          if (!leaderboard[name].lastCompleted || countedAt > leaderboard[name].lastCompleted) {
-            leaderboard[name].lastCompleted = countedAt;
-          }
-        });
-      }
-
-      const sortedLeaderboard = Object.values(leaderboard)
-        .sort((a, b) => {
-          if (b.count !== a.count) return b.count - a.count;
-          return b.lastCompleted - a.lastCompleted;
-        });
-
-      console.log('🏆 Leaderboard results:', sortedLeaderboard);
-
-      updateTopLeaderDisplay(sortedLeaderboard[0]);
-
-    } catch (error) {
-      console.error('Error fetching top leader:', error);
-      updateTopLeaderDisplay(null);
-    }
-  }
-
-  function updateTopLeaderDisplay(leader) {
-    const displayDiv = document.getElementById('topLeaderText');
-    if (!displayDiv) return;
-
-    if (!leader) {
-      displayDiv.textContent = 'No tasks completed yet today! 🎯';
-      return;
-    }
-
-    displayDiv.textContent = `${leader.name} is crushing it with ${leader.count} task${leader.count !== 1 ? 's' : ''}! 🔥`;
-  }
-
-  // Fetch on page load and refresh every 2 minutes
-  fetchTopLeader();
-  setInterval(fetchTopLeader, 2 * 60 * 1000);
-
-  // ==================== END TOP LEADER DISPLAY ====================
-
-  // ==================== END TIPS PER HOUR DISPLAY ====================
+  // ==================== LIVE STATS (TIPS/HR, TOP LEADER) ====================
+  // NOTE: These functions are now provided by app-header.js.
+  // Removed duplicate fetchTipsPerHour() and fetchTopLeader() functions.
+  // ==================== END LIVE STATS ====================
 </script>
 
 <script src="./app-header.js"></script>
