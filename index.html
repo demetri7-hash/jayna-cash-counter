@@ -2236,12 +2236,340 @@
   function isBottledOrToGoItem(itemName) {
     const name = (itemName || '').trim().toLowerCase();
     // Check if it's in the bottled sauce list
-    const isBottled = BOTTLED_SAUCE_ITEMS.some(config => 
+    const isBottled = BOTTLED_SAUCE_ITEMS.some(config =>
       config.aliases.some(alias => name.includes(alias))
     );
     // Check if it has "to go" or "to-go" in the name
     const isToGo = name.includes('to go') || name.includes('to-go');
     return isBottled || isToGo;
+  }
+
+  // ========================================
+  // UNIVERSAL MODAL HELPER FUNCTIONS
+  // ========================================
+
+  /**
+   * Show message dialog (replaces alert())
+   * @param {string} message - Message to display
+   * @param {string} type - 'success', 'error', 'warning', or 'info'
+   */
+  function showMessage(message, type = 'info') {
+    // Remove existing message if any
+    const existing = document.getElementById('inlineMessageOverlay');
+    if (existing) existing.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'inlineMessageOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      padding: 20px;
+    `;
+
+    // Create message box
+    const box = document.createElement('div');
+    const colors = {
+      success: { bg: 'var(--success-bg)', text: 'var(--success-text)', border: 'var(--success-border)' },
+      error: { bg: 'var(--error-bg)', text: 'var(--error-text)', border: 'var(--error-border)' },
+      warning: { bg: 'var(--warning-bg)', text: 'var(--warning-text)', border: 'var(--warning-border)' },
+      info: { bg: 'var(--blue-bg)', text: 'var(--blue-text)', border: 'var(--blue-text)' }
+    };
+    const color = colors[type] || colors.info;
+
+    box.style.cssText = `
+      background: white;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid ${color.border};
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 14px;
+      line-height: 1.6;
+      color: ${color.text};
+      margin-bottom: 20px;
+      white-space: pre-line;
+    `;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'OK';
+    closeBtn.style.cssText = `
+      width: 100%;
+      padding: 12px 24px;
+      background: var(--gray-900);
+      color: white;
+      border: 2px solid var(--gray-900);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    closeBtn.onclick = () => overlay.remove();
+
+    box.appendChild(messageEl);
+    box.appendChild(closeBtn);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+  }
+
+  /**
+   * Show confirmation dialog (replaces confirm())
+   * @param {string} message - Confirmation message
+   * @param {function} onConfirm - Callback if user confirms
+   * @param {function} onCancel - Callback if user cancels (optional)
+   */
+  function showConfirm(message, onConfirm, onCancel = null) {
+    // Remove existing confirm if any
+    const existing = document.getElementById('inlineConfirmOverlay');
+    if (existing) existing.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'inlineConfirmOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      padding: 20px;
+    `;
+
+    // Create message box
+    const box = document.createElement('div');
+    box.style.cssText = `
+      background: white;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid var(--warning-border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--gray-900);
+      margin-bottom: 20px;
+      white-space: pre-line;
+    `;
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    `;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = `
+      padding: 12px 24px;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border: 2px solid var(--gray-300);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    cancelBtn.onclick = () => {
+      overlay.remove();
+      if (onCancel) onCancel();
+    };
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = 'CONFIRM';
+    confirmBtn.style.cssText = `
+      padding: 12px 24px;
+      background: #dc2626;
+      color: white;
+      border: 2px solid #dc2626;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    confirmBtn.onclick = () => {
+      overlay.remove();
+      if (onConfirm) onConfirm();
+    };
+
+    buttonContainer.appendChild(cancelBtn);
+    buttonContainer.appendChild(confirmBtn);
+    box.appendChild(messageEl);
+    box.appendChild(buttonContainer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click = cancel
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+        if (onCancel) onCancel();
+      }
+    });
+  }
+
+  /**
+   * Show input prompt (replaces prompt())
+   * @param {string} message - Prompt message
+   * @param {string} defaultValue - Default input value
+   * @param {function} onSubmit - Callback with input value
+   * @param {function} onCancel - Callback if canceled (optional)
+   */
+  function showPrompt(message, defaultValue = '', onSubmit, onCancel = null) {
+    // Remove existing prompt if any
+    const existing = document.getElementById('inlinePromptOverlay');
+    if (existing) existing.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'inlinePromptOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      padding: 20px;
+    `;
+
+    // Create message box
+    const box = document.createElement('div');
+    box.style.cssText = `
+      background: white;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid var(--gray-700);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--gray-900);
+      margin-bottom: 12px;
+      font-weight: 600;
+    `;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = defaultValue;
+    input.style.cssText = `
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--gray-300);
+      font-size: 14px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+    `;
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    `;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = `
+      padding: 12px 24px;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border: 2px solid var(--gray-300);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    cancelBtn.onclick = () => {
+      overlay.remove();
+      if (onCancel) onCancel();
+    };
+
+    const submitBtn = document.createElement('button');
+    submitBtn.textContent = 'OK';
+    submitBtn.style.cssText = `
+      padding: 12px 24px;
+      background: var(--gray-900);
+      color: white;
+      border: 2px solid var(--gray-900);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    submitBtn.onclick = () => {
+      const value = input.value.trim();
+      overlay.remove();
+      if (onSubmit) onSubmit(value);
+    };
+
+    // Allow Enter key to submit
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        submitBtn.click();
+      }
+    });
+
+    buttonContainer.appendChild(cancelBtn);
+    buttonContainer.appendChild(submitBtn);
+    box.appendChild(messageEl);
+    box.appendChild(input);
+    box.appendChild(buttonContainer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Focus input
+    setTimeout(() => input.focus(), 100);
+
+    // Close on overlay click = cancel
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+        if (onCancel) onCancel();
+      }
+    });
   }
 
   // Elegant Loading and Success Functions
@@ -5091,7 +5419,7 @@
     const reportTypeElement = document.querySelector('input[name="reportType"]:checked');
     
     if (!reportTypeElement) {
-      alert('Please select a report type (Daily or Weekly)');
+      showMessage('Please select a report type (Daily or Weekly)', 'warning');
       return;
     }
     
@@ -5669,7 +5997,7 @@
           if (window.currentHistoricalReport) {
             downloadHistoricalReportPDF(window.currentHistoricalReport.week_start_date, window.currentHistoricalReport.week_end_date);
           } else {
-            alert('Report data not available for PDF download');
+            showMessage('Report data not available for PDF download', 'error');
           }
         };
         
@@ -18459,25 +18787,26 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       addNewBtn.style.borderColor = 'var(--gray-700)';
     };
     addNewBtn.onclick = () => {
-      const newAreaName = prompt('Enter new location name:');
-      if (newAreaName && newAreaName.trim()) {
-        const capitalized = newAreaName.trim().charAt(0).toUpperCase() + newAreaName.trim().slice(1);
+      showPrompt('Enter new location name:', '', (newAreaName) => {
+        if (newAreaName && newAreaName.trim()) {
+          const capitalized = newAreaName.trim().charAt(0).toUpperCase() + newAreaName.trim().slice(1);
 
-        // Add to the list if not already there
-        if (!uniqueAreas.includes(capitalized)) {
-          uniqueAreas.push(capitalized);
-          uniqueAreas.sort();
+          // Add to the list if not already there
+          if (!uniqueAreas.includes(capitalized)) {
+            uniqueAreas.push(capitalized);
+            uniqueAreas.sort();
+          }
+
+          // Auto-select the new location
+          if (selectedAreas.size < 3) {
+            selectedAreas.add(capitalized);
+          }
+
+          // Close and reopen modal to refresh with new location
+          document.body.removeChild(modal);
+          showAreaSelector(itemId, currentArea, event);
         }
-
-        // Auto-select the new location
-        if (selectedAreas.size < 3) {
-          selectedAreas.add(capitalized);
-        }
-
-        // Close and reopen modal to refresh with new location
-        document.body.removeChild(modal);
-        showAreaSelector(itemId, currentArea, event);
-      }
+      });
     };
 
     addNewContainer.appendChild(addNewBtn);
@@ -18699,7 +19028,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    */
   async function saveNewArea(itemId, areaName, statusDiv) {
     if (!areaName) {
-      alert('Please enter an area name');
+      showMessage('Please enter an area name', 'warning');
       return;
     }
 
@@ -18769,7 +19098,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     } catch (error) {
       console.error('Error saving area:', error);
-      alert('Failed to save area. Please try again.');
+      showMessage('Failed to save area. Please try again.', 'error');
     }
   }
 
@@ -18930,60 +19259,67 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     // Handle new vendor creation
     if (vendor === 'OTHER') {
-      const newVendor = prompt('Enter new vendor name:');
-      if (!newVendor || newVendor.trim() === '') {
-        showMessage('Vendor name is required', 'error');
-        return;
-      }
-      vendor = newVendor.trim();
+      showPrompt('Enter new vendor name:', '', (newVendor) => {
+        if (!newVendor || newVendor.trim() === '') {
+          showMessage('Vendor name is required', 'error');
+          return;
+        }
+        vendor = newVendor.trim();
+        proceedWithAddingItem();
+      });
+      return;
     }
 
-    showLoading('Adding Item', 'Saving to database...');
+    proceedWithAddingItem();
 
-    try {
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .insert([{
-          item_name: itemName,
-          vendor: vendor,
-          unit: unit,
-          par_level: parLevel,
-          current_stock: 0,
-          created_date: new Date().toISOString()
-        }])
-        .select();
+    async function proceedWithAddingItem() {
+      showLoading('Adding Item', 'Saving to database...');
 
-      if (error) throw error;
+      try {
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .insert([{
+            item_name: itemName,
+            vendor: vendor,
+            unit: unit,
+            par_level: parLevel,
+            current_stock: 0,
+            created_date: new Date().toISOString()
+          }])
+          .select();
 
-      // Add to local state
-      orderingSystemState.items.push({
-        id: data[0].id,
-        itemName: data[0].item_name,
-        vendor: data[0].vendor,
-        parLevel: data[0].par_level,
-        currentStock: data[0].current_stock,
-        unit: data[0].unit,
-        lastCountedDate: null
-      });
+        if (error) throw error;
 
-      refreshPriceHistoryControls();
+        // Add to local state
+        orderingSystemState.items.push({
+          id: data[0].id,
+          itemName: data[0].item_name,
+          vendor: data[0].vendor,
+          parLevel: data[0].par_level,
+          currentStock: data[0].current_stock,
+          unit: data[0].unit,
+          lastCountedDate: null
+        });
 
-      // Reset form
-      document.getElementById('addItemForm').reset();
+        refreshPriceHistoryControls();
 
-      // Refresh displays
-      renderInventoryList();
-      renderStockCountList();
-      renderPrepCountList();
-      refreshPriceHistoryControls();
-      calculateUpcomingOrders();
-      await refreshUpcomingOrdersUI();
+        // Reset form
+        document.getElementById('addItemForm').reset();
 
-      hideLoading();
-      showMessage('✅ Item added successfully!', 'success');
-    } catch (error) {
-      hideLoading();
-      showMessage(`Error adding item: ${error.message}`, 'error');
+        // Refresh displays
+        renderInventoryList();
+        renderStockCountList();
+        renderPrepCountList();
+        refreshPriceHistoryControls();
+        calculateUpcomingOrders();
+        await refreshUpcomingOrdersUI();
+
+        hideLoading();
+        showMessage('✅ Item added successfully!', 'success');
+      } catch (error) {
+        hideLoading();
+        showMessage(`Error adding item: ${error.message}`, 'error');
+      }
     }
   }
 
@@ -19006,62 +19342,69 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     // Handle new vendor creation
     if (vendor === 'OTHER') {
-      const newVendor = prompt('Enter new vendor name:');
-      if (!newVendor || newVendor.trim() === '') {
-        showMessage('Vendor name is required', 'error');
-        return;
-      }
-      vendor = newVendor.trim();
+      showPrompt('Enter new vendor name:', '', (newVendor) => {
+        if (!newVendor || newVendor.trim() === '') {
+          showMessage('Vendor name is required', 'error');
+          return;
+        }
+        vendor = newVendor.trim();
+        proceedWithAddingPrepItem();
+      });
+      return;
     }
 
-    showLoading('Adding Prep Item', 'Saving to database...');
+    proceedWithAddingPrepItem();
 
-    try {
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .insert([{
-          item_name: itemName,
-          vendor: vendor,
-          unit: unit,
-          par_level: parLevel,
-          current_stock: 0,
-          item_type: 'prep',
-          batch_lifespan_hours: batchLifespan,
-          created_date: new Date().toISOString()
-        }])
-        .select();
+    async function proceedWithAddingPrepItem() {
+      showLoading('Adding Prep Item', 'Saving to database...');
 
-      if (error) throw error;
+      try {
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .insert([{
+            item_name: itemName,
+            vendor: vendor,
+            unit: unit,
+            par_level: parLevel,
+            current_stock: 0,
+            item_type: 'prep',
+            batch_lifespan_hours: batchLifespan,
+            created_date: new Date().toISOString()
+          }])
+          .select();
 
-      // Add to local state
-      orderingSystemState.items.push({
-        id: data[0].id,
-        itemName: data[0].item_name,
-        vendor: data[0].vendor,
-        parLevel: data[0].par_level,
-        currentStock: data[0].current_stock,
-        unit: data[0].unit,
-        itemType: data[0].item_type,
-        batchLifespan: data[0].batch_lifespan_hours,
-        lastCountedDate: null
-      });
+        if (error) throw error;
 
-      refreshPriceHistoryControls();
+        // Add to local state
+        orderingSystemState.items.push({
+          id: data[0].id,
+          itemName: data[0].item_name,
+          vendor: data[0].vendor,
+          parLevel: data[0].par_level,
+          currentStock: data[0].current_stock,
+          unit: data[0].unit,
+          itemType: data[0].item_type,
+          batchLifespan: data[0].batch_lifespan_hours,
+          lastCountedDate: null
+        });
 
-      // Reset form
-      document.getElementById('addPrepItemForm').reset();
+        refreshPriceHistoryControls();
 
-      // Refresh displays
-      renderInventoryList();
-      renderStockCountList();
-      renderPrepCountList();
-      refreshPrepSheet(); // Refresh prep recommendations
+        // Reset form
+        document.getElementById('addPrepItemForm').reset();
 
-      hideLoading();
-      showMessage('Prep item added successfully!', 'success');
-    } catch (error) {
-      hideLoading();
-      showMessage(`Error adding prep item: ${error.message}`, 'error');
+        // Refresh displays
+        renderInventoryList();
+        renderStockCountList();
+        renderPrepCountList();
+        refreshPrepSheet(); // Refresh prep recommendations
+
+        hideLoading();
+        showMessage('Prep item added successfully!', 'success');
+      } catch (error) {
+        hideLoading();
+        showMessage(`Error adding prep item: ${error.message}`, 'error');
+      }
     }
   }
 
@@ -19069,35 +19412,30 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    * Delete an inventory item
    */
   async function deleteInventoryItem(itemId) {
-    if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
-      return;
-    }
+    showConfirm('Are you sure you want to delete this item? This action cannot be undone.', async () => {
+      showLoading('Deleting Item', 'Removing from database...');
 
-    showLoading('Deleting Item', 'Removing from database...');
+      try {
+        const { error } = await supabase
+          .from('inventory_items')
+          .delete()
+          .eq('id', itemId);
 
-    try {
-      const { error } = await supabase
-        .from('inventory_items')
-        .delete()
-        .eq('id', itemId);
+        if (error) throw error;
 
-      if (error) throw error;
+        // Remove from local state
+        inventoryItems = inventoryItems.filter(item => item.id !== itemId);
 
-      // Remove from local state
-      orderingSystemState.items = orderingSystemState.items.filter(i => i.id !== itemId);
+        // Re-render
+        renderInventoryList();
 
-      // Refresh displays
-      renderInventoryList();
-      renderStockCountList();
-      renderPrepCountList();
-      calculateUpcomingOrders();
-
-      hideLoading();
-      showMessage('✅ Item deleted successfully!', 'success');
-    } catch (error) {
-      hideLoading();
-      showMessage(`Error deleting item: ${error.message}`, 'error');
-    }
+        hideLoading();
+      } catch (error) {
+        console.error('Error deleting item:', error);
+        hideLoading();
+        showMessage(`Error deleting item: ${error.message}`, 'error');
+      }
+    });
   }
 
   /**
@@ -19628,37 +19966,35 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       return;
     }
 
-    if (!confirm(`Rename "${oldVendorName}" to "${newVendorName}"? This will update ${itemsWithVendor.length} items.`)) {
-      return;
-    }
+    showConfirm(`Rename "${oldVendorName}" to "${newVendorName}"? This will update ${itemsWithVendor.length} items.`, async () => {
+      showLoading('Renaming Vendor', `Updating ${itemsWithVendor.length} items...`);
 
-    showLoading('Renaming Vendor', `Updating ${itemsWithVendor.length} items...`);
+      try {
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({ vendor: newVendorName })
+          .eq('vendor', oldVendorName);
 
-    try {
-      const { error } = await supabase
-        .from('inventory_items')
-        .update({ vendor: newVendorName })
-        .eq('vendor', oldVendorName);
+        if (error) throw error;
 
-      if (error) throw error;
+        // Update local state
+        itemsWithVendor.forEach(item => {
+          item.vendor = newVendorName;
+        });
 
-      // Update local state
-      itemsWithVendor.forEach(item => {
-        item.vendor = newVendorName;
-      });
+        // Refresh displays
+        renderInventoryList();
+        renderStockCountList();
+        renderPrepCountList();
+        calculateUpcomingOrders();
 
-      // Refresh displays
-      renderInventoryList();
-      renderStockCountList();
-      renderPrepCountList();
-      calculateUpcomingOrders();
-
-      hideLoading();
-      showMessage(`✅ Renamed "${oldVendorName}" to "${newVendorName}" (${itemsWithVendor.length} items updated)`, 'success');
-    } catch (error) {
-      hideLoading();
-      showMessage(`Error renaming vendor: ${error.message}`, 'error');
-    }
+        hideLoading();
+        showMessage(`✅ Renamed "${oldVendorName}" to "${newVendorName}" (${itemsWithVendor.length} items updated)`, 'success');
+      } catch (error) {
+        hideLoading();
+        showMessage(`Error renaming vendor: ${error.message}`, 'error');
+      }
+    });
   }
 
   /**
@@ -19753,11 +20089,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    * Prompt to rename vendor
    */
   function promptRenameVendor(vendorName) {
-    const newName = prompt(`Rename vendor "${vendorName}" to:`, vendorName);
-    if (newName && newName !== vendorName) {
-      renameVendor(vendorName, newName);
+    showPrompt(`Rename vendor "${vendorName}" to:`, vendorName, (newName) => {
+      if (newName && newName !== vendorName) {
+        renameVendor(vendorName, newName);
+      }
       closeVendorManagement();
-    }
+    });
   }
 
   // ============================================
@@ -25247,84 +25584,121 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     createNewBtn.textContent = 'CREATE NEW';
     createNewBtn.style.cssText = 'flex: 1; padding: 12px; background: var(--gray-700); color: var(--white); border: 2px solid var(--gray-700); border-radius: 0; font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
     createNewBtn.onclick = async function() {
-      // Prompt for new item details
-      const newItemName = prompt('Enter item name:', item.detectedName || '');
-      if (!newItemName || newItemName.trim() === '') {
-        showMessage('Item name is required', 'error');
-        return;
-      }
-
-      const vendorOptions = ['Greenleaf', 'Performance', 'Mani Imports', 'Eatopia', 'Restaurant Depot', 'Alsco', 'SRC Pumping', 'Southern Glazer\'s', 'Breakthru Beverage', 'PREP'];
-      const vendorChoice = prompt('Enter vendor name (or choose from: ' + vendorOptions.join(', ') + '):', '');
-      if (!vendorChoice || vendorChoice.trim() === '') {
-        showMessage('Vendor is required', 'error');
-        return;
-      }
-
-      const unit = prompt('Enter unit (e.g., CS, EA, LB):', '');
-      if (!unit || unit.trim() === '') {
-        showMessage('Unit is required', 'error');
-        return;
-      }
-
-      const parLevel = prompt('Enter par level (default 0):', '0');
-      const isPrep = confirm('Is this a PREP item? (OK = Yes, Cancel = No)');
-      const itemType = isPrep ? 'prep' : 'ingredient';
-
-      // Create the item
-      document.body.removeChild(overlay);
-      showLoading('Creating New Item', 'Saving to database...');
-
-      try {
-        const insertData = {
-          item_name: newItemName.trim(),
-          vendor: vendorChoice.trim(),
-          unit: unit.trim().toUpperCase(),
-          par_level: parseFloat(parLevel) || 0,
-          current_stock: 0,
-          item_type: itemType,
-          created_date: new Date().toISOString()
-        };
-
-        // Add prep-specific fields if PREP item
-        if (isPrep) {
-          const batchLifespan = prompt('Enter batch lifespan in hours (default 48):', '48');
-          insertData.batch_lifespan_hours = parseInt(batchLifespan) || 48;
+      // Step 1: Prompt for item name
+      showPrompt('Enter item name:', item.detectedName || '', (newItemName) => {
+        if (!newItemName || newItemName.trim() === '') {
+          showMessage('Item name is required', 'error');
+          return;
         }
 
-        const { data, error } = await supabase
-          .from('inventory_items')
-          .insert([insertData])
-          .select();
+        // Step 2: Prompt for vendor
+        const vendorOptions = ['Greenleaf', 'Performance', 'Mani Imports', 'Eatopia', 'Restaurant Depot', 'Alsco', 'SRC Pumping', 'Southern Glazer\'s', 'Breakthru Beverage', 'PREP'];
+        showPrompt('Enter vendor name (or choose from: ' + vendorOptions.join(', ') + '):', '', (vendorChoice) => {
+          if (!vendorChoice || vendorChoice.trim() === '') {
+            showMessage('Vendor is required', 'error');
+            return;
+          }
 
-        if (error) throw error;
+          // Step 3: Prompt for unit
+          showPrompt('Enter unit (e.g., CS, EA, LB):', '', (unit) => {
+            if (!unit || unit.trim() === '') {
+              showMessage('Unit is required', 'error');
+              return;
+            }
 
-        // Add to local state
-        orderingSystemState.items.push({
-          id: data[0].id,
-          itemName: data[0].item_name,
-          vendor: data[0].vendor,
-          parLevel: data[0].par_level,
-          currentStock: data[0].current_stock,
-          unit: data[0].unit,
-          itemType: data[0].item_type,
-          batchLifespan: data[0].batch_lifespan_hours,
-          lastCountedDate: null
+            // Step 4: Prompt for par level
+            showPrompt('Enter par level (default 0):', '0', (parLevel) => {
+              // Step 5: Confirm if PREP item
+              showConfirm('Is this a PREP item?', async () => {
+                // YES - it's a PREP item
+                const itemType = 'prep';
+
+                // Step 6: Prompt for batch lifespan (PREP items only)
+                showPrompt('Enter batch lifespan in hours (default 48):', '48', async (batchLifespan) => {
+                  // Create the item
+                  document.body.removeChild(overlay);
+                  showLoading('Creating New Item', 'Saving to database...');
+
+                  try {
+                    const insertData = {
+                      item_name: newItemName.trim(),
+                      vendor: vendorChoice.trim(),
+                      unit: unit.trim().toUpperCase(),
+                      par_level: parseFloat(parLevel) || 0,
+                      current_stock: 0,
+                      item_type: itemType,
+                      batch_lifespan_hours: parseInt(batchLifespan) || 48,
+                      created_date: new Date().toISOString()
+                    };
+
+                    await createInventoryItem(insertData, overlay);
+                  } catch (error) {
+                    hideLoading();
+                    showMessage(`Error creating item: ${error.message}`, 'error');
+                  }
+                });
+              }, async () => {
+                // NO - it's NOT a PREP item
+                const itemType = 'ingredient';
+
+                // Create the item
+                document.body.removeChild(overlay);
+                showLoading('Creating New Item', 'Saving to database...');
+
+                try {
+                  const insertData = {
+                    item_name: newItemName.trim(),
+                    vendor: vendorChoice.trim(),
+                    unit: unit.trim().toUpperCase(),
+                    par_level: parseFloat(parLevel) || 0,
+                    current_stock: 0,
+                    item_type: itemType,
+                    created_date: new Date().toISOString()
+                  };
+
+                  await createInventoryItem(insertData, overlay);
+                } catch (error) {
+                  hideLoading();
+                  showMessage(`Error creating item: ${error.message}`, 'error');
+                }
+              });
+            });
+          });
         });
-
-        // Auto-match the newly created item
-        orderingSystemState.extractedInvoiceItems[itemIndex].matchedInventoryId = data[0].id;
-        orderingSystemState.extractedInvoiceItems[itemIndex].matchedItemName = data[0].item_name;
-        orderingSystemState.extractedInvoiceItems[itemIndex].matchConfidence = 1.0;
-
-        hideLoading();
-        renderExtractedItems();
-        showMessage('New item created and matched!', 'success');
-      } catch (error) {
-        hideLoading();
-        showMessage('Error creating item: ' + error.message, 'error');
-      }
+      });
     };
+
+    // Helper function to create inventory item
+    async function createInventoryItem(insertData, overlayToRemove) {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .insert([insertData])
+        .select();
+
+      if (error) throw error;
+
+      // Add to local state
+      orderingSystemState.items.push({
+        id: data[0].id,
+        itemName: data[0].item_name,
+        vendor: data[0].vendor,
+        parLevel: data[0].par_level,
+        currentStock: data[0].current_stock,
+        unit: data[0].unit,
+        itemType: data[0].item_type,
+        batchLifespan: data[0].batch_lifespan_hours,
+        lastCountedDate: null
+      });
+
+      // Auto-match the newly created item
+      orderingSystemState.extractedInvoiceItems[itemIndex].matchedInventoryId = data[0].id;
+      orderingSystemState.extractedInvoiceItems[itemIndex].matchedItemName = data[0].item_name;
+      orderingSystemState.extractedInvoiceItems[itemIndex].matchConfidence = 1.0;
+
+      hideLoading();
+      renderExtractedItems();
+      showMessage('New item created and matched!', 'success');
+    }
     buttonRow.appendChild(createNewBtn);
 
     const skipBtn = document.createElement('button');
@@ -27207,50 +27581,57 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     }
 
     if (vendor === 'OTHER') {
-      const newVendor = prompt('Enter new vendor name:');
-      if (!newVendor || newVendor.trim() === '') {
-        showMessage('Vendor name is required', 'error');
-        return;
-      }
-      vendor = newVendor.trim();
+      showPrompt('Enter new vendor name:', '', (newVendor) => {
+        if (!newVendor || newVendor.trim() === '') {
+          showMessage('Vendor name is required', 'error');
+          return;
+        }
+        vendor = newVendor.trim();
+        proceedWithModalAdd();
+      });
+      return;
     }
 
-    closeAddInventoryModal();
-    showLoading('Adding Item', 'Saving to database...');
+    proceedWithModalAdd();
 
-    try {
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .insert([{
-          item_name: itemName,
-          vendor: vendor,
-          unit: unit,
-          par_level: parLevel,
-          current_stock: 0,
-          item_type: 'ingredient',
-          created_date: new Date().toISOString()
-        }])
-        .select();
+    async function proceedWithModalAdd() {
+      closeAddInventoryModal();
+      showLoading('Adding Item', 'Saving to database...');
 
-      if (error) throw error;
+      try {
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .insert([{
+            item_name: itemName,
+            vendor: vendor,
+            unit: unit,
+            par_level: parLevel,
+            current_stock: 0,
+            item_type: 'ingredient',
+            created_date: new Date().toISOString()
+          }])
+          .select();
 
-      orderingSystemState.items.push({
-        id: data[0].id,
-        itemName: data[0].item_name,
-        vendor: data[0].vendor,
-        parLevel: data[0].par_level,
-        currentStock: data[0].current_stock,
-        unit: data[0].unit,
-        itemType: data[0].item_type,
-        lastCountedDate: null
-      });
+        if (error) throw error;
 
-      renderInventoryList();
-      hideLoading();
-      showMessage(`✅ ${itemName} added successfully!`, 'success');
-    } catch (error) {
-      hideLoading();
-      showMessage(`Error adding item: ${error.message}`, 'error');
+        orderingSystemState.items.push({
+          id: data[0].id,
+          itemName: data[0].item_name,
+          vendor: data[0].vendor,
+          parLevel: data[0].par_level,
+          currentStock: data[0].current_stock,
+          unit: data[0].unit,
+          itemType: data[0].item_type,
+          lastCountedDate: null
+        });
+
+        renderInventoryList();
+        hideLoading();
+        showMessage(`✅ ${itemName} added successfully!`, 'success');
+      } catch (error) {
+        hideLoading();
+        showMessage(`Error adding item: ${error.message}`, 'error');
+      }
     }
   }
 

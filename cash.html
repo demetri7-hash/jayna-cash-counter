@@ -950,9 +950,335 @@
     </div>
   </div>
 <script>
+  // ==================== UNIVERSAL MODAL HELPERS ====================
+  /**
+   * Show inline message (replaces alert())
+   * @param {string} message - Message to display
+   * @param {string} type - 'success', 'error', 'warning', or 'info'
+   */
+  function showMessage(message, type = 'info') {
+    // Remove existing message if any
+    const existing = document.getElementById('inlineMessageOverlay');
+    if (existing) existing.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'inlineMessageOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      padding: 20px;
+    `;
+
+    // Create message box
+    const box = document.createElement('div');
+    const colors = {
+      success: { bg: 'var(--success-bg)', text: 'var(--success-text)', border: 'var(--success-border)' },
+      error: { bg: 'var(--error-bg)', text: 'var(--error-text)', border: 'var(--error-border)' },
+      warning: { bg: 'var(--warning-bg)', text: 'var(--warning-text)', border: 'var(--warning-border)' },
+      info: { bg: 'var(--blue-bg)', text: 'var(--blue-text)', border: 'var(--blue-text)' }
+    };
+    const color = colors[type] || colors.info;
+
+    box.style.cssText = `
+      background: white;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid ${color.border};
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 14px;
+      line-height: 1.6;
+      color: ${color.text};
+      margin-bottom: 20px;
+      white-space: pre-line;
+    `;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'OK';
+    closeBtn.style.cssText = `
+      width: 100%;
+      padding: 12px 24px;
+      background: var(--gray-900);
+      color: white;
+      border: 2px solid var(--gray-900);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    closeBtn.onclick = () => overlay.remove();
+
+    box.appendChild(messageEl);
+    box.appendChild(closeBtn);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+  }
+
+  /**
+   * Show confirmation dialog (replaces confirm())
+   * @param {string} message - Confirmation message
+   * @param {function} onConfirm - Callback if user confirms
+   * @param {function} onCancel - Callback if user cancels (optional)
+   */
+  function showConfirm(message, onConfirm, onCancel = null) {
+    // Remove existing confirm if any
+    const existing = document.getElementById('inlineConfirmOverlay');
+    if (existing) existing.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'inlineConfirmOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      padding: 20px;
+    `;
+
+    // Create message box
+    const box = document.createElement('div');
+    box.style.cssText = `
+      background: white;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid var(--warning-border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--gray-900);
+      margin-bottom: 20px;
+      white-space: pre-line;
+    `;
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    `;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = `
+      padding: 12px 24px;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border: 2px solid var(--gray-300);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    cancelBtn.onclick = () => {
+      overlay.remove();
+      if (onCancel) onCancel();
+    };
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = 'CONFIRM';
+    confirmBtn.style.cssText = `
+      padding: 12px 24px;
+      background: #dc2626;
+      color: white;
+      border: 2px solid #dc2626;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    confirmBtn.onclick = () => {
+      overlay.remove();
+      if (onConfirm) onConfirm();
+    };
+
+    buttonContainer.appendChild(cancelBtn);
+    buttonContainer.appendChild(confirmBtn);
+    box.appendChild(messageEl);
+    box.appendChild(buttonContainer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click = cancel
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+        if (onCancel) onCancel();
+      }
+    });
+  }
+
+  /**
+   * Show input prompt (replaces prompt())
+   * @param {string} message - Prompt message
+   * @param {string} defaultValue - Default input value
+   * @param {function} onSubmit - Callback with input value
+   * @param {function} onCancel - Callback if canceled (optional)
+   */
+  function showPrompt(message, defaultValue = '', onSubmit, onCancel = null) {
+    // Remove existing prompt if any
+    const existing = document.getElementById('inlinePromptOverlay');
+    if (existing) existing.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'inlinePromptOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      padding: 20px;
+    `;
+
+    // Create message box
+    const box = document.createElement('div');
+    box.style.cssText = `
+      background: white;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid var(--gray-700);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--gray-900);
+      margin-bottom: 12px;
+      font-weight: 600;
+    `;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = defaultValue;
+    input.style.cssText = `
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--gray-300);
+      font-size: 14px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+    `;
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    `;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = `
+      padding: 12px 24px;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border: 2px solid var(--gray-300);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    cancelBtn.onclick = () => {
+      overlay.remove();
+      if (onCancel) onCancel();
+    };
+
+    const submitBtn = document.createElement('button');
+    submitBtn.textContent = 'OK';
+    submitBtn.style.cssText = `
+      padding: 12px 24px;
+      background: var(--gray-900);
+      color: white;
+      border: 2px solid var(--gray-900);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    submitBtn.onclick = () => {
+      const value = input.value.trim();
+      overlay.remove();
+      if (onSubmit) onSubmit(value);
+    };
+
+    // Allow Enter key to submit
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        submitBtn.click();
+      }
+    });
+
+    buttonContainer.appendChild(cancelBtn);
+    buttonContainer.appendChild(submitBtn);
+    box.appendChild(messageEl);
+    box.appendChild(input);
+    box.appendChild(buttonContainer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Focus input
+    setTimeout(() => input.focus(), 100);
+
+    // Close on overlay click = cancel
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+        if (onCancel) onCancel();
+      }
+    });
+  }
+  // ==================== END UNIVERSAL MODAL HELPERS ====================
+
   // Configuration
    const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';  
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
   const EMAILJS_CONFIG = {
     PUBLIC_KEY: 'LHbq8j4mlt49O75eo',
     SERVICE_ID: 'service_xm62z73',
@@ -3940,9 +4266,9 @@
   // Generate Historical Report from Database
   async function generateHistoricalReport() {
     const reportTypeElement = document.querySelector('input[name="reportType"]:checked');
-    
+
     if (!reportTypeElement) {
-      alert('Please select a report type (Daily or Weekly)');
+      showMessage('Please select a report type (Daily or Weekly)', 'warning');
       return;
     }
     
@@ -4520,7 +4846,7 @@
           if (window.currentHistoricalReport) {
             downloadHistoricalReportPDF(window.currentHistoricalReport.week_start_date, window.currentHistoricalReport.week_end_date);
           } else {
-            alert('Report data not available for PDF download');
+            showMessage('Report data not available for PDF download', 'error');
           }
         };
         

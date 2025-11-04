@@ -364,7 +364,31 @@ function clearManagerSession() {
 function logoutManager() {
   clearManagerSession();
   updateSessionStatus();
-  alert('Manager session ended');
+  showInlineNotification('Manager session ended');
+}
+
+function showInlineNotification(message) {
+  // Create modal overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+  // Create modal content
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background: white; padding: 24px; max-width: 400px; width: 90%; border: 3px solid var(--gray-700); border-radius: 0;';
+
+  const messageText = document.createElement('p');
+  messageText.textContent = message;
+  messageText.style.cssText = 'margin: 0 0 20px 0; font-size: 14px; color: var(--gray-900); text-align: center;';
+
+  const okBtn = document.createElement('button');
+  okBtn.textContent = 'OK';
+  okBtn.style.cssText = 'width: 100%; padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 0;';
+  okBtn.onclick = () => document.body.removeChild(overlay);
+
+  modal.appendChild(messageText);
+  modal.appendChild(okBtn);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 }
 
 function updateSessionStatus() {

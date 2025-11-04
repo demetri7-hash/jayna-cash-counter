@@ -989,6 +989,338 @@
   </div>
 
 <script>
+// ========================================
+// UNIVERSAL MODAL HELPERS (NO POPUPS - Google Sites Compatible)
+// ========================================
+
+/**
+ * Show inline message (replaces alert())
+ * @param {string} message - Message to display
+ * @param {string} type - 'success', 'error', 'warning', or 'info'
+ */
+function showMessage(message, type = 'info') {
+  // Remove existing message if any
+  const existing = document.getElementById('inlineMessageOverlay');
+  if (existing) existing.remove();
+
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'inlineMessageOverlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000;
+    padding: 20px;
+  `;
+
+  // Create message box
+  const box = document.createElement('div');
+  const colors = {
+    success: { bg: 'var(--success-bg)', text: 'var(--success-text)', border: 'var(--success-border)' },
+    error: { bg: 'var(--error-bg)', text: 'var(--error-text)', border: 'var(--error-border)' },
+    warning: { bg: 'var(--warning-bg)', text: 'var(--warning-text)', border: 'var(--warning-border)' },
+    info: { bg: 'var(--blue-bg)', text: 'var(--blue-text)', border: 'var(--blue-text)' }
+  };
+  const color = colors[type] || colors.info;
+
+  box.style.cssText = `
+    background: white;
+    padding: 24px;
+    max-width: 500px;
+    width: 100%;
+    border: 3px solid ${color.border};
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  `;
+
+  const messageEl = document.createElement('div');
+  messageEl.textContent = message;
+  messageEl.style.cssText = `
+    font-size: 14px;
+    line-height: 1.6;
+    color: ${color.text};
+    margin-bottom: 20px;
+    white-space: pre-line;
+  `;
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'OK';
+  closeBtn.style.cssText = `
+    width: 100%;
+    padding: 12px 24px;
+    background: var(--gray-900);
+    color: white;
+    border: 2px solid var(--gray-900);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  `;
+  closeBtn.onclick = () => overlay.remove();
+
+  box.appendChild(messageEl);
+  box.appendChild(closeBtn);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // Close on overlay click
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+
+/**
+ * Show confirmation dialog (replaces confirm())
+ * @param {string} message - Confirmation message
+ * @param {function} onConfirm - Callback if user confirms
+ * @param {function} onCancel - Callback if user cancels (optional)
+ */
+function showConfirm(message, onConfirm, onCancel = null) {
+  // Remove existing confirm if any
+  const existing = document.getElementById('inlineConfirmOverlay');
+  if (existing) existing.remove();
+
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'inlineConfirmOverlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000;
+    padding: 20px;
+  `;
+
+  // Create message box
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background: white;
+    padding: 24px;
+    max-width: 500px;
+    width: 100%;
+    border: 3px solid var(--warning-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  `;
+
+  const messageEl = document.createElement('div');
+  messageEl.textContent = message;
+  messageEl.style.cssText = `
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--gray-900);
+    margin-bottom: 20px;
+    white-space: pre-line;
+  `;
+
+  const buttonContainer = document.createElement('div');
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  `;
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'CANCEL';
+  cancelBtn.style.cssText = `
+    padding: 12px 24px;
+    background: var(--gray-100);
+    color: var(--gray-900);
+    border: 2px solid var(--gray-300);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  `;
+  cancelBtn.onclick = () => {
+    overlay.remove();
+    if (onCancel) onCancel();
+  };
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.textContent = 'CONFIRM';
+  confirmBtn.style.cssText = `
+    padding: 12px 24px;
+    background: #dc2626;
+    color: white;
+    border: 2px solid #dc2626;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  `;
+  confirmBtn.onclick = () => {
+    overlay.remove();
+    if (onConfirm) onConfirm();
+  };
+
+  buttonContainer.appendChild(cancelBtn);
+  buttonContainer.appendChild(confirmBtn);
+  box.appendChild(messageEl);
+  box.appendChild(buttonContainer);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // Close on overlay click = cancel
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+      if (onCancel) onCancel();
+    }
+  });
+}
+
+/**
+ * Show input prompt (replaces prompt())
+ * @param {string} message - Prompt message
+ * @param {string} defaultValue - Default input value
+ * @param {function} onSubmit - Callback with input value
+ * @param {function} onCancel - Callback if canceled (optional)
+ */
+function showPrompt(message, defaultValue = '', onSubmit, onCancel = null) {
+  // Remove existing prompt if any
+  const existing = document.getElementById('inlinePromptOverlay');
+  if (existing) existing.remove();
+
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'inlinePromptOverlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000;
+    padding: 20px;
+  `;
+
+  // Create message box
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background: white;
+    padding: 24px;
+    max-width: 500px;
+    width: 100%;
+    border: 3px solid var(--gray-700);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  `;
+
+  const messageEl = document.createElement('div');
+  messageEl.textContent = message;
+  messageEl.style.cssText = `
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--gray-900);
+    margin-bottom: 12px;
+    font-weight: 600;
+  `;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = defaultValue;
+  input.style.cssText = `
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--gray-300);
+    font-size: 14px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+  `;
+
+  const buttonContainer = document.createElement('div');
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  `;
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'CANCEL';
+  cancelBtn.style.cssText = `
+    padding: 12px 24px;
+    background: var(--gray-100);
+    color: var(--gray-900);
+    border: 2px solid var(--gray-300);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  `;
+  cancelBtn.onclick = () => {
+    overlay.remove();
+    if (onCancel) onCancel();
+  };
+
+  const submitBtn = document.createElement('button');
+  submitBtn.textContent = 'OK';
+  submitBtn.style.cssText = `
+    padding: 12px 24px;
+    background: var(--gray-900);
+    color: white;
+    border: 2px solid var(--gray-900);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  `;
+  submitBtn.onclick = () => {
+    const value = input.value.trim();
+    overlay.remove();
+    if (onSubmit) onSubmit(value);
+  };
+
+  // Allow Enter key to submit
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      submitBtn.click();
+    }
+  });
+
+  buttonContainer.appendChild(cancelBtn);
+  buttonContainer.appendChild(submitBtn);
+  box.appendChild(messageEl);
+  box.appendChild(input);
+  box.appendChild(buttonContainer);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // Focus input
+  setTimeout(() => input.focus(), 100);
+
+  // Close on overlay click = cancel
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+      if (onCancel) onCancel();
+    }
+  });
+}
+
+// ========================================
+// END MODAL HELPERS
+// ========================================
+
 // Main Tab Switching
 function switchMainTab(tabName) {
   console.log('Switching to tab:', tabName);
@@ -1129,13 +1461,13 @@ async function handlePhotoUpload(event) {
   const files = Array.from(event.target.files);
 
   if (uploadedPhotos.length + files.length > 5) {
-    alert('Maximum 5 photos allowed');
+    showMessage('Maximum 5 photos allowed', 'warning');
     return;
   }
 
   for (const file of files) {
     if (file.size > 2 * 1024 * 1024) {
-      alert(`${file.name} is too large. Maximum 2MB per photo.`);
+      showMessage(`${file.name} is too large. Maximum 2MB per photo.`, 'warning');
       continue;
     }
 
@@ -1231,7 +1563,7 @@ async function submitIncident(event) {
   const incidentReport = document.getElementById('incidentReport').value.trim();
 
   if (staffInvolved.length === 0) {
-    alert('Please add at least one staff member');
+    showMessage('Please add at least one staff member', 'warning');
     return;
   }
 
@@ -1267,12 +1599,12 @@ async function submitIncident(event) {
     .single();
 
   if (error) {
-    alert('Error saving incident: ' + error.message);
+    showMessage('Error saving incident: ' + error.message, 'error');
     return;
   }
 
   // Success!
-  alert('✅ Incident report saved successfully!');
+  showMessage('✅ Incident report saved successfully!', 'success');
 
   // Reset form
   document.getElementById('reportForm').reset();
@@ -1435,7 +1767,7 @@ async function printIncident() {
   if (result.success) {
     showSuccessMessage('✅ REPORT SENT TO PRINTER!', 'The incident report has been emailed to the Epson printer successfully.');
   } else {
-    alert('Error printing report: ' + result.error);
+    showMessage('Error printing report: ' + result.error, 'error');
   }
 }
 
@@ -1673,7 +2005,7 @@ async function updateIncident() {
   const incidentReport = document.getElementById('incidentReport').value.trim();
 
   if (staffInvolved.length === 0) {
-    alert('Please add at least one staff member');
+    showMessage('Please add at least one staff member', 'warning');
     return;
   }
 
@@ -1691,12 +2023,12 @@ async function updateIncident() {
     .eq('id', currentIncident.id);
 
   if (error) {
-    alert('Error updating incident: ' + error.message);
+    showMessage('Error updating incident: ' + error.message, 'error');
     return;
   }
 
   // Success!
-  alert('✅ Incident report updated successfully!');
+  showMessage('✅ Incident report updated successfully!', 'success');
 
   // Reset form
   document.getElementById('reportForm').reset();
@@ -1835,7 +2167,7 @@ async function saveAMEXReceipt() {
   const details = document.getElementById('amexDetails').value.trim();
 
   if (!vendor || !date || !amount || !category) {
-    alert('Please fill in all required fields (Vendor, Date, Amount, Category)');
+    showMessage('Please fill in all required fields (Vendor, Date, Amount, Category)', 'warning');
     return;
   }
 
@@ -1854,12 +2186,12 @@ async function saveAMEXReceipt() {
 
     if (error) {
       console.error('Error saving AMEX receipt:', error);
-      alert('Error saving receipt: ' + error.message);
+      showMessage('Error saving receipt: ' + error.message, 'error');
       return;
     }
 
     console.log('✅ AMEX receipt saved:', data);
-    alert('✅ Receipt saved successfully!');
+    showMessage('✅ Receipt saved successfully!', 'success');
 
     // Reset form and hide
     cancelAMEXForm();
@@ -1868,7 +2200,7 @@ async function saveAMEXReceipt() {
     loadAMEXReceipts();
   } catch (error) {
     console.error('Error:', error);
-    alert('Error saving receipt: ' + error.message);
+    showMessage('Error saving receipt: ' + error.message, 'error');
   }
 }
 
@@ -1927,9 +2259,9 @@ async function loadAMEXReceipts() {
   }
 }
 
-// View AMEX Receipt (Simple alert for now - can enhance with modal later)
+// View AMEX Receipt (inline modal instead of alert - Google Sites compatible)
 function viewAMEXReceipt(id) {
-  alert(`Receipt details for ID ${id} - Full modal view coming soon!`);
+  showMessage(`Receipt details for ID ${id} - Full modal view coming soon!`, 'info');
 }
 
 // Load AMEX Archive

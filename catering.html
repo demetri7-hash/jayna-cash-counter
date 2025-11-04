@@ -2001,7 +2001,27 @@
     function viewOrderDetails(orderId) {
       // TODO: Open modal with full order details for editing
       console.log('View order:', orderId);
-      alert(`Order editing modal coming soon!\nOrder ID: ${orderId}\n\nThis will allow you to edit all fields.`);
+
+      // Create info modal
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100000;padding:20px;`;
+      const box = document.createElement('div');
+      box.style.cssText = `background:white;padding:24px;max-width:500px;width:100%;border:3px solid #2563eb;`;
+      const title = document.createElement('div');
+      title.textContent = 'Coming Soon';
+      title.style.cssText = `font-size:18px;font-weight:700;color:#1e40af;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;`;
+      const msg = document.createElement('div');
+      msg.innerHTML = `Order editing modal coming soon!<br><br><strong>Order ID:</strong> ${orderId}<br><br>This will allow you to edit all fields.`;
+      msg.style.cssText = `font-size:14px;color:#4a4a4a;margin-bottom:20px;line-height:1.5;`;
+      const btn = document.createElement('button');
+      btn.textContent = 'OK';
+      btn.style.cssText = `width:100%;padding:12px;background:#1a1a1a;color:white;border:none;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;`;
+      btn.onclick = () => overlay.remove();
+      box.appendChild(title);
+      box.appendChild(msg);
+      box.appendChild(btn);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
     }
 
     // ============================================
@@ -2206,11 +2226,11 @@
             statusDiv.style.display = 'none';
           }, 5000);
         } else {
-          alert(`Error applying updates: ${data.error}`);
+          showError(`Error applying updates: ${data.error}`);
         }
       } catch (error) {
         console.error('❌ Error applying updates:', error);
-        alert(`Error applying updates: ${error.message}`);
+        showError(`Error applying updates: ${error.message}`);
       }
     }
 
@@ -4815,24 +4835,24 @@
 
         // Validate required fields
         if (!orderTypePickup?.checked && !orderTypeDelivery?.checked) {
-          alert('Please select order type (PICK UP or DELIVERY)');
+          showError('Please select order type (PICK UP or DELIVERY)');
           return;
         }
 
         if (!orderDueDate) {
-          alert('Please select ORDER DUE date');
+          showError('Please select ORDER DUE date');
           return;
         }
 
         if (!timeDue) {
-          alert('Please enter TIME DUE');
+          showError('Please enter TIME DUE');
           return;
         }
 
         const orderType = orderTypePickup?.checked ? 'PICKUP' : 'DELIVERY';
 
         if (orderType === 'DELIVERY' && !leaveJaynaAt) {
-          alert('Please enter LEAVE JAYNA AT time for delivery orders');
+          showError('Please enter LEAVE JAYNA AT time for delivery orders');
           return;
         }
 
@@ -5062,7 +5082,7 @@
 
       // Check password
       if (password !== 'reorder') {
-        alert('❌ Incorrect password');
+        showError('❌ Incorrect password');
         return;
       }
 
@@ -5167,7 +5187,7 @@
         await loadPhotos();
       } catch (error) {
         console.error('Error deleting photo:', error);
-        alert(`Error deleting photo: ${error.message}`);
+        showError(`Error deleting photo: ${error.message}`);
       }
     }
 
@@ -5248,7 +5268,7 @@
           btn.disabled = false;
         }
 
-        alert(`Error archiving photo: ${error.message}`);
+        showError(`Error archiving photo: ${error.message}`);
       }
     }
 
@@ -5309,7 +5329,22 @@
 
       if (!overlay || !messageEl) {
         console.error('Error overlay elements not found in DOM');
-        alert(message); // Fallback to alert
+        // Create dynamic inline modal instead of alert (Google Sites compatible)
+        const dynamicOverlay = document.createElement('div');
+        dynamicOverlay.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100000;padding:20px;`;
+        const box = document.createElement('div');
+        box.style.cssText = `background:white;padding:24px;max-width:500px;width:100%;border:3px solid #dc2626;`;
+        const msg = document.createElement('div');
+        msg.textContent = message;
+        msg.style.cssText = `font-size:14px;color:#991b1b;margin-bottom:20px;`;
+        const btn = document.createElement('button');
+        btn.textContent = 'OK';
+        btn.style.cssText = `width:100%;padding:12px;background:#1a1a1a;color:white;border:none;font-weight:700;cursor:pointer;`;
+        btn.onclick = () => dynamicOverlay.remove();
+        box.appendChild(msg);
+        box.appendChild(btn);
+        dynamicOverlay.appendChild(box);
+        document.body.appendChild(dynamicOverlay);
         return;
       }
 
@@ -6142,7 +6177,7 @@
           statusBar.style.borderColor = originalBorder;
         }, 2000);
 
-        alert('❌ PRINTER NOT CONNECTED!\n\nClick "CONNECT PRINTER" at the top first.');
+        showError('❌ PRINTER NOT CONNECTED!\n\nClick "CONNECT PRINTER" at the top first.');
         return;
       }
 
@@ -6181,12 +6216,32 @@
         }
 
         hideLoading();
-        alert(`✅ SUCCESS!\n\nPrinted ${labels.length} labels in grouped order:\n- BYO Gyros\n- Salads + Dressings\n- Dips + Sides\n- Greek Fries\n- Dolmas\n- Spanakopita\n- Sides\n- Desserts\n- Pinwheels`);
+
+        // Create success modal for printing
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100000;padding:20px;`;
+        const box = document.createElement('div');
+        box.style.cssText = `background:white;padding:24px;max-width:500px;width:100%;border:3px solid #059669;`;
+        const title = document.createElement('div');
+        title.textContent = '✅ SUCCESS!';
+        title.style.cssText = `font-size:18px;font-weight:700;color:#065f46;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;`;
+        const msg = document.createElement('div');
+        msg.innerHTML = `Printed ${labels.length} labels in grouped order:<br><br>- BYO Gyros<br>- Salads + Dressings<br>- Dips + Sides<br>- Greek Fries<br>- Dolmas<br>- Spanakopita<br>- Sides<br>- Desserts<br>- Pinwheels`;
+        msg.style.cssText = `font-size:14px;color:#4a4a4a;margin-bottom:20px;line-height:1.6;`;
+        const btn = document.createElement('button');
+        btn.textContent = 'OK';
+        btn.style.cssText = `width:100%;padding:12px;background:#059669;color:white;border:none;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;`;
+        btn.onclick = () => overlay.remove();
+        box.appendChild(title);
+        box.appendChild(msg);
+        box.appendChild(btn);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
 
       } catch (error) {
         console.error('❌ Label printing error:', error);
         hideLoading();
-        alert(`❌ PRINTING FAILED!\n\nError: ${error.message}\n\nCheck:\n1. Printer is still connected\n2. Printer has labels loaded\n3. Printer is turned on`);
+        showError(`❌ PRINTING FAILED!\n\nError: ${error.message}\n\nCheck:\n1. Printer is still connected\n2. Printer has labels loaded\n3. Printer is turned on`);
       }
     }
 
