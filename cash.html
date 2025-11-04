@@ -1886,7 +1886,250 @@
     }
   }
 
-  function loadCashFlowByTime() {
+  // ===== AM DATA EXISTS - SHOW PM FLOW WITH EDIT LINK =====
+
+  async function startPMCountWithEditLink() {
+    // Start PM flow normally
+    await startPMCount();
+
+    // Add "Edit AM Count" link after PM form loads
+    showEditAMLink();
+  }
+
+  function showEditAMLink() {
+    // Find PM form and add edit link at the top
+    const pmForm = document.getElementById('pmForm');
+    if (!pmForm) return;
+
+    // Check if link already exists
+    if (document.getElementById('editAMLinkContainer')) return;
+
+    // Create edit link container
+    const editLinkContainer = document.createElement('div');
+    editLinkContainer.id = 'editAMLinkContainer';
+    editLinkContainer.style.cssText = 'text-align: center; margin: 0 0 20px 0; padding: 10px; background: var(--warning-bg); border: 2px solid var(--warning-border);';
+
+    editLinkContainer.innerHTML = `
+      <p style="margin: 0 0 8px 0; font-size: 11px; color: var(--warning-text); font-weight: 600;">AM Count already submitted for today</p>
+      <a href="javascript:void(0)" onclick="editAMCount()" style="font-size: 12px; font-weight: 700; color: var(--gray-900); text-decoration: underline; cursor: pointer; letter-spacing: 0.5px;">
+        ✏️ EDIT AM COUNT
+      </a>
+    `;
+
+    // Insert at the top of PM form (after the h2)
+    const h2 = pmForm.querySelector('h2');
+    if (h2 && h2.nextSibling) {
+      pmForm.insertBefore(editLinkContainer, h2.nextSibling);
+    } else {
+      pmForm.insertBefore(editLinkContainer, pmForm.firstChild);
+    }
+  }
+
+  // ===== EDIT AM COUNT WITH PASSWORD PROTECTION =====
+
+  let isEditingExistingAM = false; // Track if we're editing existing data
+
+  function editAMCount() {
+    console.log('🔐 Edit AM Count requested - showing password modal');
+    showEditAMPasswordModal();
+  }
+
+  function showEditAMPasswordModal() {
+    const modal = document.createElement('div');
+    modal.id = 'editAMPasswordModal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+    modal.innerHTML = `
+      <div style="background: white; padding: 40px; max-width: 450px; width: 90%; border: 3px solid var(--warning-border);">
+        <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 700; color: var(--warning-text); text-transform: uppercase; letter-spacing: 1px;">⚠️ WARNING: Edit AM Count</h3>
+        <p style="margin-bottom: 20px; color: var(--gray-700); font-size: 14px; line-height: 1.5;">
+          You are about to edit today's AM cash count. This will allow you to modify the morning baseline that has already been submitted.
+        </p>
+        <p style="margin-bottom: 20px; color: var(--error-text); font-size: 13px; font-weight: 600;">
+          Enter master password or custom password to proceed:
+        </p>
+        <input type="password" id="editAMPasswordInput" placeholder="Enter password" style="width: 100%; padding: 14px; border: 2px solid var(--gray-300); font-size: 14px; margin-bottom: 20px; box-sizing: border-box;" />
+        <div style="display: flex; gap: 12px;">
+          <button onclick="closeEditAMPasswordModal()" style="flex: 1; padding: 14px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">Cancel</button>
+          <button onclick="verifyEditAMPassword()" style="flex: 1; padding: 14px; background: var(--warning-border); border: 2px solid var(--warning-border); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">Proceed</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    setTimeout(() => {
+      const input = document.getElementById('editAMPasswordInput');
+      if (input) input.focus();
+    }, 100);
+
+    // Enter key support
+    document.getElementById('editAMPasswordInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') verifyEditAMPassword();
+    });
+  }
+
+  function closeEditAMPasswordModal() {
+    const modal = document.getElementById('editAMPasswordModal');
+    if (modal) modal.remove();
+  }
+
+  async function verifyEditAMPassword() {
+    const input = document.getElementById('editAMPasswordInput');
+    if (!input) return;
+
+    const password = input.value.trim();
+
+    // Master password
+    const masterPassword = 'JaynaGyro2025!';
+
+    // Custom passwords from localStorage
+    const customPasswords = JSON.parse(localStorage.getItem('customPasswords') || '[]');
+    const validPasswords = [masterPassword, ...customPasswords];
+
+    if (validPasswords.includes(password)) {
+      closeEditAMPasswordModal();
+      console.log('✅ Password verified - loading AM count for editing');
+
+      // Set editing flag
+      isEditingExistingAM = true;
+
+      // Load AM form with existing data
+      await loadAndShowAMFormForEditing();
+    } else {
+      showMessage('Incorrect password. Access denied.', 'error');
+      closeEditAMPasswordModal();
+    }
+  }
+
+  async function loadAndShowAMFormForEditing() {
+    const today = getPacificDate();
+    const amData = await getAMData(today);
+
+    if (!amData) {
+      showMessage('No AM data found to edit', 'error');
+      return;
+    }
+
+    console.log('📝 Loading AM form with existing data:', amData);
+
+    // Show AM form
+    hideAllSections();
+    document.getElementById('amForm').classList.add('active');
+    setupDenominations('am');
+
+    // Pre-populate ALL fields
+    document.getElementById('amDate').value = amData.date;
+    document.getElementById('amCounter').value = amData.counter;
+    document.getElementById('amNotes').value = amData.notes || '';
+
+    // Drawer 1
+    if (amData.drawer1.skipped) {
+      document.getElementById('amDrawer1Skip').checked = true;
+      toggleSkip('am', 1);
+      document.getElementById('amDrawer1Reason').value = amData.drawer1.skipReason || '';
+    } else {
+      // Pre-populate drawer 1 denominations
+      DENOMINATIONS.forEach((denom, index) => {
+        const key = getDenominationKey(denom.value);
+        const value = amData.drawer1.counts[key] || 0;
+        document.getElementById(`amD1Q${index}`).value = value;
+      });
+      updateCalculations('am', 1);
+    }
+
+    // Drawer 2
+    if (amData.drawer2.skipped) {
+      document.getElementById('amDrawer2Skip').checked = true;
+      toggleSkip('am', 2);
+      document.getElementById('amDrawer2Reason').value = amData.drawer2.skipReason || '';
+    } else {
+      // Pre-populate drawer 2 denominations
+      DENOMINATIONS.forEach((denom, index) => {
+        const key = getDenominationKey(denom.value);
+        const value = amData.drawer2.counts[key] || 0;
+        document.getElementById(`amD2Q${index}`).value = value;
+      });
+      updateCalculations('am', 2);
+    }
+
+    showMessage('✏️ Editing existing AM count. Make your changes and resubmit.', 'info');
+  }
+
+  function getDenominationKey(value) {
+    const map = {
+      100: 'hundreds',
+      50: 'fifties',
+      20: 'twenties',
+      10: 'tens',
+      5: 'fives',
+      1: 'ones',
+      0.25: 'quarters',
+      0.10: 'dimes',
+      0.05: 'nickels',
+      0.01: 'pennies'
+    };
+    return map[value];
+  }
+
+  // ===== CONFIRMATION MODAL BEFORE OVERWRITING =====
+
+  function showConfirmOverwriteAMModal(callback) {
+    const modal = document.createElement('div');
+    modal.id = 'confirmOverwriteModal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+    modal.innerHTML = `
+      <div style="background: white; padding: 40px; max-width: 500px; width: 90%; border: 3px solid var(--error-border);">
+        <h3 style="margin: 0 0 15px 0; font-size: 20px; font-weight: 700; color: var(--error-text); text-transform: uppercase; letter-spacing: 1px;">⚠️ CONFIRM OVERWRITE</h3>
+        <p style="margin-bottom: 20px; color: var(--gray-700); font-size: 15px; line-height: 1.6;">
+          You are about to <strong>overwrite</strong> the existing AM cash count that was already submitted today.
+        </p>
+        <p style="margin-bottom: 25px; color: var(--error-text); font-size: 14px; font-weight: 600;">
+          This will replace the morning baseline in the database. Are you sure you want to proceed?
+        </p>
+        <div style="display: flex; gap: 12px;">
+          <button onclick="closeConfirmOverwriteModal()" style="flex: 1; padding: 16px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 14px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">Cancel</button>
+          <button onclick="confirmOverwrite()" style="flex: 1; padding: 16px; background: var(--error-border); border: 2px solid var(--error-border); color: white; font-size: 14px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">Yes, Overwrite</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Store callback globally
+    window.overwriteCallback = callback;
+  }
+
+  function closeConfirmOverwriteModal() {
+    const modal = document.getElementById('confirmOverwriteModal');
+    if (modal) modal.remove();
+    window.overwriteCallback = null;
+  }
+
+  function confirmOverwrite() {
+    closeConfirmOverwriteModal();
+    if (window.overwriteCallback) {
+      window.overwriteCallback();
+    }
+  }
+
+  async function loadCashFlowByTime() {
+    // CRITICAL: Check if AM data already exists for today
+    const today = getPacificDate();
+    console.log(`🔍 Checking for existing AM data for: ${today}`);
+
+    const existingAMData = await getAMData(today);
+
+    if (existingAMData) {
+      console.log('✅ AM data found for today - automatically loading PM flow');
+      console.log('📊 AM Data:', existingAMData);
+      await startPMCountWithEditLink();
+      return;
+    }
+
+    console.log('📝 No AM data found - using time-based flow');
+
     // Get Pacific time
     const now = new Date();
     const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
@@ -2795,20 +3038,39 @@
   
   async function submitAM() {
     try {
-      showLoading('Submitting AM Count', 'Recording your morning cash count...');
-      
-      const data = collectFormData('am');
-      await storeAMData(data);
-      
-      // Show elegant success screen
-      showAMSuccess(data.total);
-      resetForm('am');
-      
+      // CRITICAL: Check if we're editing existing data
+      if (isEditingExistingAM) {
+        console.log('⚠️ Editing existing AM data - showing confirmation modal');
+
+        // Show confirmation modal before proceeding
+        showConfirmOverwriteAMModal(async () => {
+          // User confirmed - proceed with overwrite
+          await performAMSubmit();
+        });
+      } else {
+        // Fresh AM count - no confirmation needed
+        await performAMSubmit();
+      }
+
     } catch (error) {
       hideLoading();
       console.error('AM submission error:', error);
       showMessage(`Error: ${error.message}`, 'error');
     }
+  }
+
+  async function performAMSubmit() {
+    showLoading('Submitting AM Count', 'Recording your morning cash count...');
+
+    const data = collectFormData('am');
+    await storeAMData(data);
+
+    // Reset editing flag
+    isEditingExistingAM = false;
+
+    // Show elegant success screen
+    showAMSuccess(data.total);
+    resetForm('am');
   }
   
   async function submitPM() {
