@@ -1147,41 +1147,50 @@
     document.getElementById('pmDate').value = today;
     // Note: reportDate element doesn't exist in cash.html (reports section removed)
     
-    // Add password protection to date inputs
-    document.getElementById('amDate').addEventListener('change', function() {
-      const result = validateDateChange(this);
-      if (result instanceof Promise) {
-        // Handle async validation - input value already reset if needed
-        return;
-      }
-    });
-    
-    document.getElementById('pmDate').addEventListener('change', function() {
-      const result = validateDateChange(this);
-      if (result instanceof Promise) {
-        result.then((success) => {
-          if (success) {
-            // Only load AM data if date change was authorized
-            loadAMData();
-            // Also reload Toast cash sales for the new date
-            fetchToastCashSalesForDate(this.value);
-          }
-        });
-      } else if (result) {
-        // Synchronous case (current date selected)
-        loadAMData();
-        // Also reload Toast cash sales for the new date
-        fetchToastCashSalesForDate(this.value);
-      }
-    });
-    
-    document.getElementById('reportDate').addEventListener('change', function() {
-      const result = validateDateChange(this);
-      if (result instanceof Promise) {
-        // Handle async validation - input value already reset if needed
-        return;
-      }
-    });
+    // Add password protection to date inputs (only if elements exist)
+    const amDateEl = document.getElementById('amDate');
+    if (amDateEl) {
+      amDateEl.addEventListener('change', function() {
+        const result = validateDateChange(this);
+        if (result instanceof Promise) {
+          // Handle async validation - input value already reset if needed
+          return;
+        }
+      });
+    }
+
+    const pmDateEl = document.getElementById('pmDate');
+    if (pmDateEl) {
+      pmDateEl.addEventListener('change', function() {
+        const result = validateDateChange(this);
+        if (result instanceof Promise) {
+          result.then((success) => {
+            if (success) {
+              // Only load AM data if date change was authorized
+              loadAMData();
+              // Also reload Toast cash sales for the new date
+              fetchToastCashSalesForDate(this.value);
+            }
+          });
+        } else if (result) {
+          // Synchronous case (current date selected)
+          loadAMData();
+          // Also reload Toast cash sales for the new date
+          fetchToastCashSalesForDate(this.value);
+        }
+      });
+    }
+
+    const reportDateEl = document.getElementById('reportDate');
+    if (reportDateEl) {
+      reportDateEl.addEventListener('change', function() {
+        const result = validateDateChange(this);
+        if (result instanceof Promise) {
+          // Handle async validation - input value already reset if needed
+          return;
+        }
+      });
+    }
   }
   
   const PACIFIC_TIMEZONE = 'America/Los_Angeles';
@@ -6536,12 +6545,12 @@
 <!-- App Header Navigation -->
 <script src="./app-header.js"></script>
 <script>
-  // Initialize app header on page load
+  // Auto-start cash flow when page loads
   document.addEventListener('DOMContentLoaded', () => {
-    renderAppHeader({ currentPage: 'cash', showLiveStats: true });
-    
-    // Auto-start cash flow
-    startSmartCashFlow();
+    // Wait a moment for header to render first
+    setTimeout(() => {
+      startSmartCashFlow();
+    }, 100);
   });
 </script>
 
