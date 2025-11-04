@@ -668,6 +668,9 @@
 
   <!-- ExcelJS library for native Excel file generation -->
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+
+  <!-- Supabase client library for database access -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <!-- Loading Overlay -->
@@ -721,11 +724,6 @@
     <div id="appHeader"></div>
 
     <div class="content">
-      <!-- Manager Logs Link -->
-      <div style="text-align: center; margin: 16px 0 20px 0;">
-        <a href="javascript:void(0)" onclick="requirePasswordFor('Manager Logs', accessManagerLogs)" style="font-size: 11px; font-weight: 600; color: var(--gray-700); text-decoration: none; letter-spacing: 0.8px; padding: 6px 12px; border: 2px solid var(--gray-300); background: white; display: inline-block; transition: all 0.15s ease; cursor: pointer;">MANAGER LOGS</a>
-      </div>
-
       <!-- Tab Navigation -->
       <div class="tab-navigation">
         <button class="tab-btn active" onclick="showTab('photos')">ORDERS</button>
@@ -1029,6 +1027,25 @@
       if (dateStr === todayPacific) return 'TODAY';
       if (dateStr === tomorrowPacific) return 'TOMORROW';
       return 'FUTURE';
+    }
+
+    // ============================================
+    // SUPABASE INITIALIZATION
+    // ============================================
+    const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
+
+    let supabase;
+    function initializeSupabase() {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log('✅ Supabase initialized');
+    }
+
+    // Initialize Supabase when script loads
+    if (window.supabase) {
+      initializeSupabase();
+    } else {
+      console.error('❌ Supabase library not loaded');
     }
 
     // ============================================
