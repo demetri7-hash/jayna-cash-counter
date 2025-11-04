@@ -7945,6 +7945,11 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         statusDiv.style.opacity = '1';
       }
 
+      // Recalculate orders in background
+      calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
+      refreshBottleCount(); // Refresh bottle count after stock update
+
       setTimeout(() => {
         inputElement.style.borderColor = '#2e7d32';
         inputElement.style.background = '#f9fdf9';
@@ -7954,13 +7959,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         if (statusDiv) {
           statusDiv.style.opacity = '0';
         }
-      }, 800);
 
-      // Recalculate orders in background
-      calculateUpcomingOrders();
-      await refreshUpcomingOrdersUI();
-      refreshBottleCount(); // Refresh bottle count after stock update
-      renderPrepCountList(); // Re-render to show counted_by name
+        // Re-render AFTER visual feedback shows
+        renderPrepCountList(); // Re-render to show counted_by name
+      }, 800);
 
     } catch (error) {
       console.error('Auto-save failed:', error);
@@ -8664,6 +8666,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         statusDiv.style.opacity = '1';
       }
 
+      calculateUpcomingOrders();
+      await refreshUpcomingOrdersUI();
+      refreshBottleCount();
+
       setTimeout(() => {
         inputElement.style.borderColor = '#2e7d32';
         inputElement.style.background = 'white';
@@ -8672,12 +8678,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         if (statusDiv) {
           statusDiv.style.opacity = '0';
         }
-      }, 800);
 
-      calculateUpcomingOrders();
-      await refreshUpcomingOrdersUI();
-      refreshBottleCount();
-      renderPrepCountList(); // Re-render to show counted_by name
+        // Re-render AFTER visual feedback shows
+        renderPrepCountList(); // Re-render to show counted_by name
+      }, 800);
 
     } catch (error) {
       console.error('Auto-save location failed:', error);
