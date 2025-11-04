@@ -833,7 +833,7 @@
         <!-- All Tips (Expandable Section) -->
         <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;" ontoggle="updateTipsSummary()">
           <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
-            All Tips <span id="tipsSummaryAmount" style="color: #007bff; font-weight: 700;">$0.00</span>
+            All Tips <span id="tipsSummaryAmount" style="color: #007bff; font-weight: 700; font-size: 11px;">Cash: $0.00 | TDS: $0.00 | EZC: $0.00</span>
           </summary>
           <div style="margin-top: 15px;">
             <div class="form-group">
@@ -888,26 +888,10 @@
           </div>
         </details>
 
-        <!-- Custom Notes (Expandable Section) -->
-        <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;">
+        <!-- Cashbox Section (Collapsible) -->
+        <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;" ontoggle="updateCashboxSummary()">
           <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
-            + ADD NOTES
-          </summary>
-          <div style="margin-top: 15px;">
-            <div class="form-group" style="margin-bottom: 0;">
-              <label for="tipPoolNotes">Custom Notes (Optional):</label>
-              <textarea id="tipPoolNotes" class="form-input" rows="3" placeholder="Enter any notes or adjustments for this tip pool calculation..."></textarea>
-            </div>
-          </div>
-        </details>
-
-        <!-- Hidden field for ezcaterSales (will be auto-calculated) -->
-        <input type="hidden" id="ezcaterSales" value="0">
-
-        <!-- Cashbox Count Section (Collapsible) -->
-        <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;">
-          <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
-            Cashbox Count (Optional - Click to expand)
+            Cashbox <span id="cashboxSummaryAmount" style="color: #007bff; font-weight: 700;">$0.00</span>
           </summary>
           <div style="margin-top: 15px;">
             <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
@@ -1000,28 +984,44 @@
           </div>
         </details>
 
-        <button class="submit-btn" onclick="calculateTipPool()">Calculate Tip Pool</button>
-        <button class="submit-btn" onclick="downloadTipPoolPDF()" id="tipPoolPdfBtn" style="margin-left: 10px; display: none;">Download Tip Pool PDF</button>
-        <button class="submit-btn" onclick="clearSavedData()" style="margin-left: 10px;" title="Clear all saved data and start fresh">Clear Saved Data</button>
-        
+        <!-- Custom Notes (Expandable Section) -->
+        <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;">
+          <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
+            + ADD NOTES
+          </summary>
+          <div style="margin-top: 15px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="tipPoolNotes">Custom Notes (Optional):</label>
+              <textarea id="tipPoolNotes" class="form-input" rows="3" placeholder="Enter any notes or adjustments for this tip pool calculation..."></textarea>
+            </div>
+          </div>
+        </details>
 
-        
+        <!-- Hidden field for ezcaterSales (will be auto-calculated) -->
+        <input type="hidden" id="ezcaterSales" value="0">
+
+        <button class="submit-btn" onclick="calculateTipPool()">Next Step</button>
+        <button class="submit-btn" onclick="downloadTipPoolPDF()" id="tipPoolPdfBtn" style="margin-left: 10px; display: none;">Download Tip Pool PDF</button>
+        <button class="submit-btn" onclick="clearSavedData()" style="margin-left: 10px; padding: 6px 12px; font-size: 11px;" title="Clear all saved data and start fresh">Start Over</button>
+
+
+
         <!-- Tip Pool Results Display -->
         <div id="tipPoolResults" style="display: none; margin-top: 20px;">
           <div id="tipPoolSummary"></div>
           <div id="tipPoolTable"></div>
-          
+
           <!-- Combined Report Section - Auto-populated -->
           <div id="combinedReportSection" style="display: none; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 0; border: 2px solid #6f42c1;">
             <h4 style="margin: 0 0 15px 0; color: #6f42c1;">Weekly Combined Report</h4>
             <p style="margin: 0 0 15px 0; font-size: 14px; color: #666;">
               Generate a comprehensive weekly summary combining your tip pool calculations with cash count reports.
             </p>
-            
+
             <!-- PDF Upload Options -->
             <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 0; border: 1px solid #ddd;">
               <h5 style="margin: 0 0 10px 0; color: #333;">Attach Additional PDFs (Optional)</h5>
-              
+
               <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                 <div style="flex: 1;">
                   <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">Add Weekly Voids Log:</label>
@@ -1032,29 +1032,27 @@
                   <input type="file" id="extrasUpload" accept=".pdf" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 0;">
                 </div>
               </div>
-              
+
               <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">
                 Upload PDFs to include in your weekly report. Order: Generated Report → Voids Log → Extras
               </p>
             </div>
-            
+
             <div style="display: flex; gap: 15px; align-items: center;">
               <button class="submit-btn" onclick="generateCombinedReport()" style="flex: 1;">Generate Combined Weekly Report</button>
             </div>
-            
+
             <!-- Hidden inputs for auto-populated data -->
             <input type="hidden" id="combinedStartDate">
             <input type="hidden" id="combinedEndDate">
             <input type="hidden" id="combinedRealEnvelope">
           </div>
         </div>
-        
+
         <!-- Hidden Tip Pool Report Display for PDF generation -->
         <div id="tipPoolReportDisplay" style="display: none; position: fixed; top: 0; left: 0; width: 800px; background: white; z-index: 9999; opacity: 0; pointer-events: none;">
           <div id="tipPoolReportContent"></div>
         </div>
-
-        <button class="submit-btn" onclick="goHome()" style="margin-top: 10px;">Back to Menu</button>
       </div>
   </div>
 
@@ -1415,6 +1413,7 @@
     }, 0);
 
     document.getElementById('tipPoolCashboxTotal').textContent = `$${total.toFixed(2)}`;
+    updateCashboxSummary();
     return total;
   }
 
@@ -2003,11 +2002,12 @@
     const cashTips = parseFloat(document.getElementById('calculatedCashTips').value) || 0;
     const tdsTips = parseFloat(document.getElementById('tdsDriverTips').value) || 0;
     const ezCaterTips = parseFloat(document.getElementById('ezcaterTips').value) || 0;
-    const total = cashTips + tdsTips + ezCaterTips;
 
     const summarySpan = document.getElementById('tipsSummaryAmount');
     if (summarySpan) {
-      summarySpan.textContent = `$${total.toFixed(2)}`;
+      // Show itemized like Sales & Labor
+      const display = `Cash: $${cashTips.toFixed(2)} | TDS: $${tdsTips.toFixed(2)} | EZC: $${ezCaterTips.toFixed(2)}`;
+      summarySpan.textContent = display;
     }
   }
 
@@ -2033,6 +2033,83 @@
     const summarySpan = document.getElementById('envelopeDepositSummaryAmount');
     if (summarySpan) {
       summarySpan.textContent = `$${deposit.toFixed(2)}`;
+    }
+  }
+
+  function updateCashboxSummary() {
+    const total = parseFloat(document.getElementById('tipPoolCashboxTotal').textContent.replace('$', '')) || 0;
+
+    const summarySpan = document.getElementById('cashboxSummaryAmount');
+    if (summarySpan) {
+      if (total === 0) {
+        summarySpan.style.color = '#dc3545'; // Soft red
+      } else {
+        summarySpan.style.color = '#007bff'; // Blue
+      }
+      summarySpan.textContent = `$${total.toFixed(2)}`;
+    }
+  }
+
+  async function autoFetchCashboxCount(startDate, endDate) {
+    console.log('Auto-fetching cashbox count for most recent Monday within 6 days of end date:', endDate);
+
+    try {
+      // Parse end date
+      const endDateObj = new Date(endDate + 'T12:00:00');
+
+      // Find most recent Monday within 6 days of end date
+      let foundMonday = null;
+
+      // Search backwards from end date up to 6 days
+      for (let i = 0; i <= 6; i++) {
+        const checkDate = new Date(endDateObj);
+        checkDate.setDate(checkDate.getDate() - i);
+
+        // Check if this date is a Monday (0 = Sunday, 1 = Monday, etc.)
+        if (checkDate.getDay() === 1) {
+          foundMonday = checkDate;
+          break;
+        }
+      }
+
+      if (!foundMonday) {
+        console.log('No Monday found within 6 days of end date');
+        document.getElementById('tipPoolCashboxTotal').textContent = '$0.00';
+        updateCashboxSummary();
+        return;
+      }
+
+      // Format as YYYY-MM-DD
+      const mondayStr = foundMonday.toISOString().split('T')[0];
+      console.log('Found Monday within 6 days:', mondayStr);
+
+      // Query cashbox_counts table for that Monday
+      const { data: cashboxData, error } = await supabase
+        .from('cashbox_counts')
+        .select('total')
+        .eq('date', mondayStr)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+        throw error;
+      }
+
+      if (cashboxData && cashboxData.total) {
+        const total = parseFloat(cashboxData.total);
+        document.getElementById('tipPoolCashboxTotal').textContent = `$${total.toFixed(2)}`;
+        console.log(`✅ Cashbox count auto-fetched for ${mondayStr}: $${total.toFixed(2)}`);
+      } else {
+        document.getElementById('tipPoolCashboxTotal').textContent = '$0.00';
+        console.log(`No cashbox count found for Monday ${mondayStr}`);
+      }
+
+      // Update summary
+      updateCashboxSummary();
+
+    } catch (error) {
+      console.error('Error fetching cashbox count:', error);
+      document.getElementById('tipPoolCashboxTotal').textContent = '$0.00';
+      updateCashboxSummary();
     }
   }
 
@@ -2093,6 +2170,9 @@
 
       // Auto-fetch real envelope deposit from database (not in manual files!)
       await autoFetchRealEnvelopeDeposit(startDate, endDate);
+
+      // Auto-fetch cashbox count from database (not in manual files!)
+      await autoFetchCashboxCount(startDate, endDate);
       return;
     }
 
@@ -2221,6 +2301,9 @@
 
       // Auto-fetch real envelope deposit from database
       await autoFetchRealEnvelopeDeposit(startDate, endDate);
+
+      // Auto-fetch cashbox count from database
+      await autoFetchCashboxCount(startDate, endDate);
 
       // Hide loading overlay on success
       loadingOverlay.style.display = 'none';
