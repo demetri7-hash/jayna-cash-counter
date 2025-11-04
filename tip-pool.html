@@ -818,30 +818,30 @@
           </div>
         </details>
 
+        <!-- Tips Calculated By (always visible) -->
+        <div class="form-group">
+          <label for="calculatedByName">Tips Calculated By:</label>
+          <select id="calculatedByName" class="form-input" onchange="enableDateSelectors()">
+            <option value="">Select Name</option>
+            <option value="Demetri Gregorakis">Demetri Gregorakis</option>
+          </select>
+        </div>
+
         <div class="form-group">
           <label for="tipPoolDateRange">Date Range for Tip Pool:</label>
           <div style="display: flex; gap: 15px; margin: 10px 0;">
             <div style="flex: 1;">
               <label for="tipPoolStartDate" style="font-size: 12px; color: #666;">Start Date:</label>
-              <input type="date" id="tipPoolStartDate" class="form-input" onchange="this.blur(); calculateCashTips();">
+              <input type="date" id="tipPoolStartDate" class="form-input" disabled style="background: #f0f0f0; cursor: not-allowed;" onchange="this.blur(); calculateCashTips();">
             </div>
             <div style="flex: 1;">
               <label for="tipPoolEndDate" style="font-size: 12px; color: #666;">End Date:</label>
-              <input type="date" id="tipPoolEndDate" class="form-input" onchange="this.blur(); calculateCashTips(); autoFetchOnDateChange();">
+              <input type="date" id="tipPoolEndDate" class="form-input" disabled style="background: #f0f0f0; cursor: not-allowed;" onchange="this.blur(); calculateCashTips(); autoFetchOnDateChange();">
             </div>
           </div>
           <div id="autoFetchStatus" style="font-size: 11px; color: #666; margin-top: 5px; min-height: 16px;">
             <!-- Auto-fetch status will appear here -->
           </div>
-        </div>
-        
-        <!-- Tips Calculated By (always visible) -->
-        <div class="form-group">
-          <label for="calculatedByName">Tips Calculated By:</label>
-          <select id="calculatedByName" class="form-input">
-            <option value="">Select Name</option>
-            <option value="Demetri Gregorakis">Demetri Gregorakis</option>
-          </select>
         </div>
 
         <!-- Real Envelope Deposit (Expandable Section) -->
@@ -930,29 +930,7 @@
             Cashbox <span id="cashboxSummaryAmount" style="color: #007bff; font-weight: 700;">$0.00</span>
           </summary>
           <div style="margin-top: 15px;">
-            <p style="color: #666; font-size: 12px; margin-bottom: 15px;">
-              Count all cash and coins in the cashbox <strong>before</strong> generating the combined report. This enables weekly reconciliation tracking.
-            </p>
-
-            <!-- Counter Name Selection -->
-            <div class="form-group">
-              <label for="tipPoolCashboxCounter">Counted by:</label>
-              <select id="tipPoolCashboxCounter" class="form-select" onchange="toggleTipPoolCashboxInputs()">
-                <option value="">Choose Name (or skip if not counting today)</option>
-                <option value="Demetri Gregorakis">Demetri Gregorakis</option>
-                <option value="Ahmet Can Guler">Ahmet Can Guler</option>
-                <option value="Kayla Mccullough">Kayla Mccullough</option>
-                <option value="Dilan Uzum">Dilan Uzum</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div class="form-group" id="tipPoolCashboxOtherNameGroup" style="display: none;">
-              <label for="tipPoolCashboxOtherName">Enter your name:</label>
-              <input type="text" id="tipPoolCashboxOtherName" class="form-input" placeholder="Full Name">
-            </div>
-
-            <!-- Denomination Inputs -->
+            <!-- Denomination Inputs (hidden by default, can be expanded if needed) -->
             <div id="tipPoolCashboxDenominationInputs" style="display: none; margin-top: 15px;">
               <h5 style="color: #666; margin-bottom: 15px;">Count by Denomination</h5>
 
@@ -1423,23 +1401,6 @@
   }
 
   // ===== TIP POOL CASHBOX FUNCTIONS =====
-
-  function toggleTipPoolCashboxInputs() {
-    const counterSelect = document.getElementById('tipPoolCashboxCounter');
-    const otherNameGroup = document.getElementById('tipPoolCashboxOtherNameGroup');
-    const denominationInputs = document.getElementById('tipPoolCashboxDenominationInputs');
-
-    if (counterSelect.value === 'Other') {
-      otherNameGroup.style.display = 'block';
-      denominationInputs.style.display = 'block';
-    } else if (counterSelect.value) {
-      otherNameGroup.style.display = 'none';
-      denominationInputs.style.display = 'block';
-    } else {
-      otherNameGroup.style.display = 'none';
-      denominationInputs.style.display = 'none';
-    }
-  }
 
   function calculateTipPoolCashboxTotal() {
     const denominations = [
@@ -2152,6 +2113,32 @@
     const summarySpan = document.getElementById('envelopeDepositSummaryAmount');
     if (summarySpan) {
       summarySpan.textContent = `$${deposit.toFixed(2)}`;
+    }
+  }
+
+  // Enable date selectors after name is chosen
+  function enableDateSelectors() {
+    const nameSelected = document.getElementById('calculatedByName').value;
+    const startDateInput = document.getElementById('tipPoolStartDate');
+    const endDateInput = document.getElementById('tipPoolEndDate');
+
+    if (nameSelected) {
+      // Enable date selectors
+      startDateInput.disabled = false;
+      endDateInput.disabled = false;
+      startDateInput.style.background = 'white';
+      endDateInput.style.background = 'white';
+      startDateInput.style.cursor = 'pointer';
+      endDateInput.style.cursor = 'pointer';
+      console.log('Date selectors enabled for:', nameSelected);
+    } else {
+      // Disable date selectors
+      startDateInput.disabled = true;
+      endDateInput.disabled = true;
+      startDateInput.style.background = '#f0f0f0';
+      endDateInput.style.background = '#f0f0f0';
+      startDateInput.style.cursor = 'not-allowed';
+      endDateInput.style.cursor = 'not-allowed';
     }
   }
 
