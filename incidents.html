@@ -63,6 +63,62 @@
       fill: var(--gray-700);
     }
 
+    /* Main Tab System */
+    .tab-btn {
+      padding: 12px 20px;
+      border: none;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border-bottom: 3px solid transparent;
+    }
+    .tab-btn.active {
+      background: var(--gray-700) !important;
+      color: white !important;
+      border-bottom-color: var(--gray-700) !important;
+    }
+    .tab-btn:not(.active) {
+      background: var(--gray-100);
+      color: var(--gray-700);
+    }
+    .main-tab-content {
+      display: none;
+    }
+    .main-tab-content.active {
+      display: block;
+    }
+
+    /* AMEX Sub-Tab System */
+    .amex-tab-btn {
+      padding: 12px 20px;
+      border: none;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border-bottom: 3px solid transparent;
+    }
+    .amex-tab-btn.active {
+      background: var(--gray-700) !important;
+      color: white !important;
+      border-bottom-color: var(--gray-700) !important;
+    }
+    .amex-tab-btn:not(.active) {
+      background: var(--gray-100);
+      color: var(--gray-700);
+    }
+    .amex-tab-content {
+      display: none;
+    }
+    .amex-tab-content.active {
+      display: block;
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       font-family: 'Aptos', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -712,6 +768,14 @@
     <div class="content">
     <div id="messageArea"></div>
 
+    <!-- Tab Navigation -->
+    <div style="display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid var(--gray-300);">
+      <button class="tab-btn active" onclick="switchMainTab('incidents')" style="padding: 12px 20px; background: var(--gray-700); color: white; border: none; border-bottom: 3px solid var(--gray-700); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; cursor: pointer; transition: all 0.15s ease;">INCIDENTS</button>
+      <button class="tab-btn" onclick="switchMainTab('amex')" style="padding: 12px 20px; background: var(--gray-100); color: var(--gray-700); border: none; border-bottom: 3px solid transparent; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; cursor: pointer; transition: all 0.15s ease;">AMEX RECEIPTS</button>
+    </div>
+
+    <!-- INCIDENTS TAB -->
+    <div id="incidentsMainTab" class="main-tab-content" style="display: block;">
     <!-- Toggle Form Button -->
     <div style="display: flex; gap: 12px; margin-bottom: 20px;">
       <button class="toggle-form-btn" style="margin-bottom: 0; padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;" onclick="toggleForm()">+ NEW INCIDENT REPORT</button>
@@ -807,6 +871,86 @@
         <div class="loading" style="text-align: center; padding: 40px; color: var(--gray-600);">Loading incidents...</div>
       </div>
     </div>
+    </div><!-- END INCIDENTS TAB -->
+
+    <!-- AMEX RECEIPTS TAB -->
+    <div id="amexMainTab" class="main-tab-content" style="display: none;">
+
+      <div style="text-align: center; margin-bottom: 20px;">
+        <p style="font-size: 13px; color: var(--gray-600); font-weight: 600; margin-bottom: 4px;">CARD ENDING 1100</p>
+        <p style="font-size: 12px; color: var(--gray-500);">DEMETRI GREGORAKIS | JAYNA ONE INC</p>
+      </div>
+
+      <!-- AMEX Internal Tab Navigation -->
+      <div style="display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 2px solid var(--gray-300);">
+        <button class="amex-tab-btn active" onclick="switchAMEXTab('receipts')" style="padding: 12px 20px; background: var(--gray-100); color: var(--gray-700); border: none; border-bottom: 3px solid transparent; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; cursor: pointer; transition: all 0.15s ease;">RECEIPTS</button>
+        <button class="amex-tab-btn" onclick="switchAMEXTab('archive')" style="padding: 12px 20px; background: var(--gray-100); color: var(--gray-700); border: none; border-bottom: 3px solid transparent; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; cursor: pointer; transition: all 0.15s ease;">ARCHIVE</button>
+      </div>
+
+      <!-- AMEX RECEIPTS SUB-TAB -->
+      <div id="amexReceiptsTab" class="amex-tab-content" style="display: block;">
+        <button style="margin-bottom: 20px; padding: 12px 24px; background: var(--gray-200); border: none; font-size: 11px; font-weight: 700; color: var(--gray-700); cursor: pointer; text-transform: uppercase; letter-spacing: 0.8px; transition: all 0.15s ease; float: right;" onclick="toggleAMEXAddForm()">ADD RECEIPT</button>
+
+        <!-- Add Receipt Form (Collapsible) -->
+        <div id="amexAddForm" style="display: none; clear: both; background: white; border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+          <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900); margin-bottom: 16px;">Add New Receipt</h3>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Vendor / Store Name</label>
+            <input type="text" id="amexVendor" list="amexVendorList" placeholder="Start typing... (e.g., Office Depot, Amazon, US Foods)" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; font-weight: 400; background: white;">
+            <datalist id="amexVendorList"></datalist>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Purchase Date</label>
+              <input type="date" id="amexPurchaseDate" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; font-weight: 400; background: white;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Amount ($)</label>
+              <input type="number" id="amexAmount" step="0.01" placeholder="0.00" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; font-weight: 400; background: white;">
+            </div>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Category</label>
+            <select id="amexCategory" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; font-weight: 400; background: white;">
+              <option value="">SELECT CATEGORY</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Details</label>
+            <textarea id="amexDetails" placeholder="Enter purchase details..." style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; font-weight: 400; background: white; min-height: 80px; resize: vertical; font-family: inherit;"></textarea>
+          </div>
+
+          <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+            <button onclick="cancelAMEXForm()" style="padding: 12px 24px; background: var(--gray-100); color: var(--gray-900); border: 2px solid var(--gray-300); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">CANCEL</button>
+            <button onclick="saveAMEXReceipt()" style="padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">SAVE RECEIPT</button>
+          </div>
+        </div>
+
+        <!-- Receipt List -->
+        <div style="background: var(--white); border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px; clear: both;">
+          <h2 style="font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900); margin-bottom: 16px;">Receipt List</h2>
+          <div id="amexReceiptsList" style="min-height: 200px;">
+            <div style="text-align: center; padding: 40px; color: var(--gray-600);">Loading receipts...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AMEX ARCHIVE SUB-TAB -->
+      <div id="amexArchiveTab" class="amex-tab-content" style="display: none;">
+        <div style="background: var(--white); border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+          <h2 style="font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900); margin-bottom: 16px;">Archived Receipts</h2>
+          <div id="amexArchiveList" style="min-height: 200px;">
+            <div style="text-align: center; padding: 40px; color: var(--gray-600);">Loading archive...</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- END AMEX TAB -->
 
   </div>
   </div>
@@ -845,6 +989,30 @@
   </div>
 
 <script>
+// Main Tab Switching
+function switchMainTab(tabName) {
+  console.log('Switching to tab:', tabName);
+
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // Update tab content
+  document.querySelectorAll('.main-tab-content').forEach(content => {
+    content.style.display = 'none';
+  });
+
+  if (tabName === 'incidents') {
+    document.getElementById('incidentsMainTab').style.display = 'block';
+  } else if (tabName === 'amex') {
+    document.getElementById('amexMainTab').style.display = 'block';
+    // Load AMEX data when tab is opened
+    if (typeof loadAMEXReceipts === 'function') {
+      loadAMEXReceipts();
+    }
+  }
+}
+
 // Supabase client
 const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
@@ -1578,6 +1746,239 @@ async function deleteIncident() {
   await loadIncidents();
 }
 
+// ========================================
+// AMEX RECEIPTS SYSTEM
+// ========================================
+
+// AMEX Internal Tab Switching
+function switchAMEXTab(tabName) {
+  console.log('Switching AMEX sub-tab to:', tabName);
+
+  // Update tab buttons
+  document.querySelectorAll('.amex-tab-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // Update tab content
+  document.querySelectorAll('.amex-tab-content').forEach(content => {
+    content.style.display = 'none';
+  });
+
+  if (tabName === 'receipts') {
+    document.getElementById('amexReceiptsTab').style.display = 'block';
+    loadAMEXReceipts();
+  } else if (tabName === 'archive') {
+    document.getElementById('amexArchiveTab').style.display = 'block';
+    loadAMEXArchive();
+  }
+}
+
+// Toggle Add Receipt Form
+function toggleAMEXAddForm() {
+  const form = document.getElementById('amexAddForm');
+  if (form.style.display === 'none') {
+    form.style.display = 'block';
+    // Set today's date
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('amexPurchaseDate').value = today;
+  } else {
+    form.style.display = 'none';
+  }
+}
+
+// Cancel AMEX Form
+function cancelAMEXForm() {
+  document.getElementById('amexAddForm').style.display = 'none';
+  // Reset form
+  document.getElementById('amexVendor').value = '';
+  document.getElementById('amexAmount').value = '';
+  document.getElementById('amexCategory').value = '';
+  document.getElementById('amexDetails').value = '';
+}
+
+// Load AMEX Categories
+async function loadAMEXCategories() {
+  try {
+    const { data, error } = await supabase
+      .from('amex_categories')
+      .select('*')
+      .order('name');
+
+    if (error) {
+      console.error('Error loading AMEX categories:', error);
+      return;
+    }
+
+    const select = document.getElementById('amexCategory');
+    select.innerHTML = '<option value="">SELECT CATEGORY</option>';
+
+    if (data) {
+      data.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.name;
+        option.textContent = cat.name;
+        select.appendChild(option);
+      });
+    }
+
+    console.log(`✅ Loaded ${data ? data.length : 0} AMEX categories`);
+  } catch (error) {
+    console.error('Error loading categories:', error);
+  }
+}
+
+// Save AMEX Receipt
+async function saveAMEXReceipt() {
+  const vendor = document.getElementById('amexVendor').value.trim();
+  const date = document.getElementById('amexPurchaseDate').value;
+  const amount = parseFloat(document.getElementById('amexAmount').value);
+  const category = document.getElementById('amexCategory').value;
+  const details = document.getElementById('amexDetails').value.trim();
+
+  if (!vendor || !date || !amount || !category) {
+    alert('Please fill in all required fields (Vendor, Date, Amount, Category)');
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('amex_receipts')
+      .insert({
+        vendor: vendor,
+        purchase_date: date,
+        amount: amount,
+        category: category,
+        details: details,
+        image_urls: [] // Future: Add file upload support
+      })
+      .select();
+
+    if (error) {
+      console.error('Error saving AMEX receipt:', error);
+      alert('Error saving receipt: ' + error.message);
+      return;
+    }
+
+    console.log('✅ AMEX receipt saved:', data);
+    alert('✅ Receipt saved successfully!');
+
+    // Reset form and hide
+    cancelAMEXForm();
+
+    // Reload receipts list
+    loadAMEXReceipts();
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error saving receipt: ' + error.message);
+  }
+}
+
+// Load AMEX Receipts
+async function loadAMEXReceipts() {
+  const container = document.getElementById('amexReceiptsList');
+  container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-600);">Loading receipts...</div>';
+
+  try {
+    const { data, error } = await supabase
+      .from('amex_receipts')
+      .select('*')
+      .order('purchase_date', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Error loading AMEX receipts:', error);
+      container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-600);">Error loading receipts</div>';
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-600);">No receipts yet. Click "ADD RECEIPT" to add your first receipt.</div>';
+      return;
+    }
+
+    // Render receipts as cards
+    let html = '';
+    data.forEach(receipt => {
+      const date = new Date(receipt.purchase_date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+
+      html += `
+        <div style="background: var(--white); border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 12px; transition: all 0.15s ease; cursor: pointer;" onclick="viewAMEXReceipt(${receipt.id})" onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="font-size: 14px; font-weight: 700; color: var(--gray-900);">${receipt.vendor || 'N/A'}</div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--gray-900);">$${parseFloat(receipt.amount).toFixed(2)}</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 11px; color: var(--gray-600);">${date}</div>
+            <div style="display: inline-block; padding: 4px 10px; background: var(--gray-200); color: var(--gray-700); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">${receipt.category}</div>
+          </div>
+          ${receipt.details ? `<div style="font-size: 12px; color: var(--gray-600); margin-top: 8px;">${receipt.details.substring(0, 100)}${receipt.details.length > 100 ? '...' : ''}</div>` : ''}
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+    console.log(`✅ Loaded ${data.length} AMEX receipts`);
+  } catch (error) {
+    console.error('Error:', error);
+    container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-600);">Error loading receipts</div>';
+  }
+}
+
+// View AMEX Receipt (Simple alert for now - can enhance with modal later)
+function viewAMEXReceipt(id) {
+  alert(`Receipt details for ID ${id} - Full modal view coming soon!`);
+}
+
+// Load AMEX Archive
+async function loadAMEXArchive() {
+  const container = document.getElementById('amexArchiveList');
+  container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-600);">Loading archive...</div>';
+
+  try {
+    const { data, error } = await supabase
+      .from('amex_archived_pdfs')
+      .select('*')
+      .order('archive_date', { ascending: false });
+
+    if (error) {
+      console.error('Error loading AMEX archive:', error);
+      container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-600);">Error loading archive</div>';
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-600);">No archived receipts yet</div>';
+      return;
+    }
+
+    // Render archive entries
+    let html = '';
+    data.forEach(archive => {
+      html += `
+        <div style="background: var(--white); border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 12px; display: grid; grid-template-columns: 120px 100px 120px 1fr 100px; gap: 16px; align-items: center;">
+          <span style="font-weight: 600; color: var(--gray-900);">${archive.archive_date}</span>
+          <span>${archive.entry_count} entries</span>
+          <span style="font-weight: 700; color: var(--gray-900);">$${parseFloat(archive.total_amount).toFixed(2)}</span>
+          <span style="font-size: 11px; color: var(--gray-500);">
+            ${archive.date_range_start} to ${archive.date_range_end}<br>
+            Approved by: ${archive.approved_by}
+          </span>
+          <a href="${archive.pdf_url}" target="_blank" style="text-decoration: none; padding: 8px 16px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; text-align: center;">VIEW PDF</a>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+    console.log(`✅ Loaded ${data.length} archived PDFs`);
+  } catch (error) {
+    console.error('Error:', error);
+    container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--gray-600);">Error loading archive</div>';
+  }
+}
+
 </script>
 
 <script src="./app-header.js"></script>
@@ -1608,6 +2009,9 @@ async function deleteIncident() {
 
       // Keep form hidden by default (toggle button shows it)
       document.getElementById('incidentForm').style.display = 'none';
+
+      // Load AMEX categories (for when user switches to AMEX tab)
+      loadAMEXCategories();
     }, 100);
   });
 </script>
