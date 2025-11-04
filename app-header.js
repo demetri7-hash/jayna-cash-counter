@@ -175,7 +175,7 @@ window.submitPassword = async function() {
 
   const enteredPassword = inputEl.value;
 
-  // Check hardcoded password first
+  // Check hardcoded password
   if (enteredPassword === currentPasswordRequired) {
     // Correct password! Close modal and execute callback
     if (modal) modal.style.display = 'none';
@@ -185,32 +185,7 @@ window.submitPassword = async function() {
     return;
   }
 
-  // Also check against watchdog passwords from database
-  if (typeof supabase !== 'undefined') {
-    try {
-      const { data, error } = await supabase
-        .from('foh_watchdog_passwords')
-        .select('password')
-        .eq('is_active', true);
-
-      if (!error && data) {
-        const watchdogPasswords = data.map(row => row.password);
-
-        if (watchdogPasswords.includes(enteredPassword)) {
-          // Valid watchdog password! Close modal and execute callback
-          if (modal) modal.style.display = 'none';
-          if (window.managerPasswordCallback) {
-            window.managerPasswordCallback();
-          }
-          return;
-        }
-      }
-    } catch (err) {
-      console.error('Error checking watchdog passwords:', err);
-    }
-  }
-
-  // Wrong password (not hardcoded and not in database)
+  // Wrong password
   errorEl.textContent = '❌ Incorrect password. Please try again.';
   errorEl.style.display = 'block';
   inputEl.value = '';
