@@ -1358,12 +1358,16 @@ function requestPasswordForEdit() {
 }
 
 function requestPasswordForDelete() {
+  console.log('🔴 requestPasswordForDelete() called');
   pendingPasswordAction = 'delete';
+  console.log('🔴 pendingPasswordAction set to:', pendingPasswordAction);
   document.getElementById('incidentPasswordLabel').textContent = 'Enter password to delete this incident:';
   document.getElementById('incidentPasswordInput').value = '';
   document.getElementById('incidentPasswordError').style.display = 'none';
   const modal = document.getElementById('incidentPasswordModal');
+  console.log('🔴 Password modal element:', modal);
   modal.style.display = 'flex';
+  console.log('🔴 Password modal displayed');
 
   // Focus password input
   setTimeout(() => {
@@ -1372,20 +1376,30 @@ function requestPasswordForDelete() {
 }
 
 function submitIncidentPassword() {
+  console.log('🔵 submitIncidentPassword() called');
   const password = document.getElementById('incidentPasswordInput').value;
+  console.log('🔵 Password entered (length):', password.length);
+  console.log('🔵 Expected password:', INCIDENTS_PASSWORD);
+  console.log('🔵 pendingPasswordAction:', pendingPasswordAction);
   const errorEl = document.getElementById('incidentPasswordError');
 
   if (password === INCIDENTS_PASSWORD) {
+    console.log('✅ Password CORRECT! Executing action...');
     // Correct password! Close modal and execute action
     closeIncidentPasswordModal();
 
     if (pendingPasswordAction === 'edit') {
+      console.log('📝 Calling editIncident()');
       editIncident();
     } else if (pendingPasswordAction === 'delete') {
+      console.log('🗑️ Calling deleteIncident()');
       // Password IS the confirmation - proceed with delete
       deleteIncident();
+    } else {
+      console.log('⚠️ No matching action for:', pendingPasswordAction);
     }
   } else {
+    console.log('❌ Password INCORRECT');
     // Wrong password
     errorEl.textContent = '❌ Incorrect password. Please try again.';
     errorEl.style.display = 'block';
