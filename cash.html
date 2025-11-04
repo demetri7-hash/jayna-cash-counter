@@ -2295,13 +2295,14 @@
       return;
     }
 
+    // CRITICAL FIX: Set the PM date BEFORE calling startPMCount()
+    // because startPMCount() -> loadAMData() reads from pmDate.value
+    document.getElementById('pmDate').value = selectedDate;
+
     const pmData = await getPMData(selectedDate);
 
     // Show PM form (works for both new entry and editing)
     await startPMCount();
-
-    // Set the date to the selected date
-    document.getElementById('pmDate').value = selectedDate;
 
     if (pmData) {
       // PM data EXISTS - pre-populate for editing
