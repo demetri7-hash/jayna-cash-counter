@@ -2004,6 +2004,46 @@
     }
   }
 
+  function addEditingByDropdown(shift, originalCounter) {
+    // Check if already exists
+    if (document.getElementById(`${shift}EditingByGroup`)) return;
+
+    // Find the original counter form group
+    const counterSelect = document.getElementById(`${shift}Counter`);
+    const counterGroup = counterSelect.closest('.form-group');
+
+    // Create new form group for "Editing By"
+    const editingByGroup = document.createElement('div');
+    editingByGroup.className = 'form-group';
+    editingByGroup.id = `${shift}EditingByGroup`;
+    editingByGroup.style.cssText = 'margin-top: 20px; padding-top: 20px; border-top: 2px solid var(--warning-border); background: var(--warning-bg); padding: 15px; margin-bottom: 20px;';
+
+    editingByGroup.innerHTML = `
+      <label for="${shift}EditingBy" style="color: var(--warning-text);">AM COUNT EDITING BY:</label>
+      <select id="${shift}EditingBy" class="form-select" required>
+        <option value="">Choose Name to Enable Editing</option>
+        <option value="Demetri Gregorakis">Demetri Gregorakis</option>
+        <option value="Dilan Uzum">Dilan Uzum</option>
+        <option value="Katerina Perakis">Katerina Perakis</option>
+        <option value="Kayla Mccullough">Kayla Mccullough</option>
+      </select>
+      <p style="margin-top: 8px; font-size: 11px; color: var(--warning-text); font-style: italic;">
+        Original count by: <strong>${originalCounter}</strong>
+      </p>
+    `;
+
+    // Insert after the original counter group
+    counterGroup.parentNode.insertBefore(editingByGroup, counterGroup.nextSibling);
+
+    // Add change event listener to enable denomination inputs
+    document.getElementById(`${shift}EditingBy`).addEventListener('change', function() {
+      if (this.value) {
+        console.log(`✅ Editing by ${this.value} - enabling denomination fields`);
+        toggleDenominationInputs(shift);
+      }
+    });
+  }
+
   async function loadAndShowAMFormForEditing() {
     const today = getPacificDate();
     const amData = await getAMData(today);
@@ -2024,6 +2064,14 @@
     document.getElementById('amDate').value = amData.date;
     document.getElementById('amCounter').value = amData.counter;
     document.getElementById('amNotes').value = amData.notes || '';
+
+    // Disable original counter dropdown when editing
+    document.getElementById('amCounter').disabled = true;
+    document.getElementById('amCounter').style.opacity = '0.6';
+    document.getElementById('amCounter').style.cursor = 'not-allowed';
+
+    // Add "Editing By" dropdown right after original counter dropdown
+    addEditingByDropdown('am', amData.counter);
 
     // Drawer 1
     if (amData.drawer1.skipped) {
@@ -2952,10 +3000,15 @@
   }
   
   function collectFormData(shift) {
-    const counter = document.getElementById(`${shift}Counter`).value;
+    // Check if we're editing (Editing By dropdown exists)
+    const editingBySelect = document.getElementById(`${shift}EditingBy`);
+    const counter = editingBySelect && editingBySelect.value
+      ? editingBySelect.value
+      : document.getElementById(`${shift}Counter`).value;
+
     const date = document.getElementById(`${shift}Date`).value;
     const notes = document.getElementById(`${shift}Notes`).value.trim();
-    
+
     if (!counter) throw new Error('Please select a name');
     if (!date) throw new Error('Please select a date');
     
