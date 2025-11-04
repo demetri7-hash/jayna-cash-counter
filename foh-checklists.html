@@ -3385,17 +3385,29 @@
 
     console.log(`✅ Using ${teamMembers.length} clocked-in employees:`, teamMembers);
 
-    // Set up team names with colors
-    fohSystemState.teamNames = teamMembers.map((name, index) => ({
-      name: name,
-      color: getUserColor(index)
-    }));
+    // Set up team names with colors - ALWAYS add Demetri Gregorakis as first option
+    const teamNamesWithDemetri = [{
+      name: 'Demetri Gregorakis',
+      color: '#FF6B6B' // Distinct red color for Demetri
+    }];
 
-    // Set first employee as active user
+    // Add all clocked-in employees (skip duplicates if Demetri is clocked in)
+    teamMembers.forEach((name, index) => {
+      if (name !== 'Demetri Gregorakis' && name !== 'Demetri') {
+        teamNamesWithDemetri.push({
+          name: name,
+          color: getUserColor(index + 1) // Offset by 1 since Demetri uses index 0
+        });
+      }
+    });
+
+    fohSystemState.teamNames = teamNamesWithDemetri;
+
+    // Set first employee (Demetri) as active user
     fohSystemState.activeUserIndex = 0;
 
-    // Save first name to localStorage for consistency
-    localStorage.setItem('foh_username', teamMembers[0]);
+    // Save Demetri's name to localStorage for consistency
+    localStorage.setItem('foh_username', 'Demetri Gregorakis');
 
     // Start the checklist session
     await startChecklistSession(teamMembers);
@@ -3420,14 +3432,34 @@
         }
       }
 
-      // Set up team names with colors
+      // Set up team names with colors - ALWAYS add Demetri Gregorakis as first option
       if (teamMembers.length > 0) {
-        fohSystemState.teamNames = teamMembers.map((name, index) => ({
-          name: name,
-          color: getUserColor(index)
-        }));
+        const teamNamesWithDemetri = [{
+          name: 'Demetri Gregorakis',
+          color: '#FF6B6B' // Distinct red color for Demetri
+        }];
+
+        // Add all clocked-in employees (skip duplicates if Demetri is clocked in)
+        teamMembers.forEach((name, index) => {
+          if (name !== 'Demetri Gregorakis' && name !== 'Demetri') {
+            teamNamesWithDemetri.push({
+              name: name,
+              color: getUserColor(index + 1) // Offset by 1 since Demetri uses index 0
+            });
+          }
+        });
+
+        fohSystemState.teamNames = teamNamesWithDemetri;
         fohSystemState.activeUserIndex = 0;
-        fohSystemState.staffName = teamMembers[0];
+        fohSystemState.staffName = 'Demetri Gregorakis';
+      } else {
+        // If no team members at all, just add Demetri
+        fohSystemState.teamNames = [{
+          name: 'Demetri Gregorakis',
+          color: '#FF6B6B'
+        }];
+        fohSystemState.activeUserIndex = 0;
+        fohSystemState.staffName = 'Demetri Gregorakis';
       }
 
       fohSystemState.currentSession = session;
