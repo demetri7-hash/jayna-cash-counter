@@ -1385,18 +1385,23 @@ function submitIncidentPassword() {
 
   if (password === INCIDENTS_PASSWORD) {
     console.log('✅ Password CORRECT! Executing action...');
-    // Correct password! Close modal and execute action
+
+    // CRITICAL: Save the action BEFORE closing modal (which resets pendingPasswordAction to null)
+    const actionToExecute = pendingPasswordAction;
+    console.log('💾 Saved action:', actionToExecute);
+
+    // Close modal (this sets pendingPasswordAction = null)
     closeIncidentPasswordModal();
 
-    if (pendingPasswordAction === 'edit') {
+    // Execute the saved action
+    if (actionToExecute === 'edit') {
       console.log('📝 Calling editIncident()');
       editIncident();
-    } else if (pendingPasswordAction === 'delete') {
+    } else if (actionToExecute === 'delete') {
       console.log('🗑️ Calling deleteIncident()');
-      // Password IS the confirmation - proceed with delete
       deleteIncident();
     } else {
-      console.log('⚠️ No matching action for:', pendingPasswordAction);
+      console.log('⚠️ No matching action for:', actionToExecute);
     }
   } else {
     console.log('❌ Password INCORRECT');
