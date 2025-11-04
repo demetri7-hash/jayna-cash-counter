@@ -13,7 +13,7 @@ function renderSharedHeader() {
   }
 
   const headerHTML = `
-    <div class="header">
+    <div class="header" style="padding-top: 20px;">
       <img src="jayna-logo.png" alt="Jayna Gyro Logo" class="logo">
       <h1>JAYNA GYRO</h1>
       <p style="opacity: 0.7;">FOR AUTHORIZED USE ONLY</p>
@@ -74,6 +74,19 @@ function renderSharedHeader() {
       <!-- VOID & DISCOUNT TRACKING DISPLAY -->
       <div id="voidDiscountDisplay" style="margin-top: 12px; padding: 8px 12px; background: var(--gray-100); border: 2px solid var(--gray-300); text-align: center; font-size: 10px; font-weight: 600; color: var(--gray-700); letter-spacing: 0.5px;">
         Loading today's data...
+      </div>
+
+      <!-- MAIN MENU NAVIGATION -->
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; margin-bottom: 20px;">
+        <a href="index.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CASH</a>
+        <a href="orders-prep.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">ORDERS & PREP</a>
+        <a href="foh-checklists.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">FOH</a>
+        <a href="boh.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">BOH</a>
+        <a href="catering.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CATERING</a>
+        <a href="drivers.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">DRIVERS</a>
+        <a href="tip-pool.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">MANAGER</a>
+        <a href="teamupdates.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">TEAM UPDATES</a>
+        <a href="incidents.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">INCIDENTS</a>
       </div>
 
       <p style="opacity: 0.7; margin-top: 12px;">APP CREATED BY DEMETRI GREGORAKIS</p>
