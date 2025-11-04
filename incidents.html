@@ -707,8 +707,9 @@
   </script>
 </head>
 <body>
-  <div id="appHeader"></div>
-  <div class="content">
+  <div class="container">
+    <div id="appHeader"></div>
+    <div class="content">
     <div id="messageArea"></div>
 
     <!-- Toggle Form Button -->
@@ -807,6 +808,7 @@
       </div>
     </div>
 
+  </div>
   </div>
 
   <!-- View Incident Modal -->
@@ -1329,29 +1331,29 @@ function goHome() {
     // Initialize Supabase
     initializeSupabase();
 
-    // Render app header
-    renderAppHeader({ currentPage: 'incidents', showLiveStats: true });
+    // app-header.js auto-renders header
+    setTimeout(() => {
+      // Set today's date and time
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('incidentDate').value = today;
 
-    // Set today's date and time
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('incidentDate').value = today;
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('incidentTime').value = `${hours}:${minutes}`;
 
-    const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    document.getElementById('incidentTime').value = `${hours}:${minutes}`;
+      // Load Toast employees for autocomplete
+      loadEmployees();
 
-    // Load Toast employees for autocomplete
-    loadEmployees();
+      // Load departments
+      loadDepartments();
 
-    // Load departments
-    loadDepartments();
+      // Load incidents
+      loadIncidents();
 
-    // Load incidents
-    loadIncidents();
-
-    // Keep form hidden by default (toggle button shows it)
-    document.getElementById('incidentForm').style.display = 'none';
+      // Keep form hidden by default (toggle button shows it)
+      document.getElementById('incidentForm').style.display = 'none';
+    }, 100);
   });
 </script>
 
