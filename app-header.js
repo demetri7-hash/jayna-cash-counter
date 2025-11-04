@@ -124,9 +124,7 @@ function renderSharedHeader() {
   headerDiv.innerHTML = headerHTML;
 
   // Initialize live stats after header is rendered
-  if (typeof initializeLiveStats === 'function') {
-    initializeLiveStats();
-  }
+  initializeLiveStats();
 }
 
 // Auto-run when script loads
@@ -223,3 +221,361 @@ window.accessManager = function() {
 window.accessIncidents = function() {
   window.location.href = 'incidents.html';
 };
+
+// ============================================
+// LIVE STATS SYSTEM (Clocked In, Tips/HR, Leader, Void Tracking)
+// ============================================
+
+let lastTipsUpdate = null;
+
+// Initialize all live stats
+function initializeLiveStats() {
+  console.log('🔄 Initializing live stats for header...');
+
+  // Initial fetch for all stats
+  fetchClockedInEmployees();
+  fetchTipsPerHour();
+  fetchTopLeader();
+  fetchVoidDiscountTracking();
+
+  // Set up refresh intervals
+  setInterval(fetchClockedInEmployees, 5 * 60 * 1000); // Every 5 minutes
+  setInterval(fetchTipsPerHour, 30 * 1000); // Every 30 seconds
+  setInterval(fetchTopLeader, 2 * 60 * 1000); // Every 2 minutes
+  setInterval(fetchVoidDiscountTracking, 5 * 60 * 1000); // Every 5 minutes
+}
+
+// ==================== CLOCKED IN EMPLOYEES ====================
+
+async function fetchClockedInEmployees() {
+  try {
+    // Get TODAY in YYYY-MM-DD format (Pacific time)
+    const todayPacific = new Date().toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+
+    const [month, day, year] = todayPacific.split(', ')[0].split('/');
+    const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+    console.log('🍞 Fetching clocked-in employees from Toast for:', today);
+
+    // STEP 1: Authenticate with Toast API
+    const authResponse = await fetch('/api/toast-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!authResponse.ok) {
+      console.error('❌ Failed to authenticate with Toast API');
+      updateClockedInDisplay([]);
+      return;
+    }
+
+    const authData = await authResponse.json();
+    if (!authData.success || !authData.data?.accessToken) {
+      console.error('❌ Toast authentication failed');
+      updateClockedInDisplay([]);
+      return;
+    }
+
+    const token = authData.data.accessToken;
+    console.log('✅ Toast authenticated');
+
+    // STEP 2: Fetch clocked-in employees via serverless function
+    const clockedInUrl = `/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`;
+
+    console.log('🔍 Fetching clocked-in employees from serverless function');
+
+    const response = await fetch(clockedInUrl);
+
+    if (!response.ok) {
+      console.error('❌ Failed to fetch clocked-in employees:', response.status);
+      updateClockedInDisplay([]);
+      return;
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      console.error('❌ Clocked-in API error:', result.error);
+      updateClockedInDisplay([]);
+      return;
+    }
+
+    console.log(`📊 Total time entries today: ${result.totalTimeEntries}`);
+    console.log(`🟢 Currently clocked in: ${result.count} employees`);
+
+    if (result.clockedIn.length > 0) {
+      console.log('✅ Clocked in employees:', result.clockedIn);
+    }
+
+    // Extract employee names
+    const employees = result.clockedIn.map(emp => emp.fullName);
+
+    updateClockedInDisplay(employees);
+
+  } catch (error) {
+    console.error('❌ Error fetching clocked in employees:', error);
+    updateClockedInDisplay([]);
+  }
+}
+
+function updateClockedInDisplay(employees) {
+  const listDiv = document.getElementById('clockedInList');
+
+  if (!listDiv) return;
+
+  if (employees.length === 0) {
+    listDiv.innerHTML = '<span style="color: #999; font-size: 11px; font-style: italic;">No one clocked in</span>';
+    return;
+  }
+
+  // Display names in green separated by pipes
+  const namesText = employees.join(' | ');
+  listDiv.innerHTML = `
+    <div style="color: #2e7d32; font-size: 12px; font-weight: 500;">
+      ${namesText}
+    </div>
+    <div style="color: #666; font-size: 9px; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px;">
+      Clocked In
+    </div>
+  `;
+}
+
+// ==================== TIPS PER HOUR ====================
+
+async function fetchTipsPerHour() {
+  try {
+    const response = await fetch('/api/toast-tips-per-hour-today', {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      updateTipsPerHourDisplay(null);
+      return;
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.data) {
+      lastTipsUpdate = new Date();
+      updateTipsPerHourDisplay(result.data);
+    } else {
+      updateTipsPerHourDisplay(null);
+    }
+  } catch (error) {
+    console.error('Error fetching tips per hour:', error);
+    updateTipsPerHourDisplay(null);
+  }
+}
+
+function updateTipsPerHourDisplay(data) {
+  const displayDiv = document.getElementById('tipsPerHourText');
+
+  if (!displayDiv) return;
+
+  if (!data) {
+    displayDiv.innerHTML = '<div style="font-size: 14px;">-</div>';
+    return;
+  }
+
+  const arrow = data.trendingUp ? '↑' : '↓';
+
+  // Main number (large and bold)
+  displayDiv.innerHTML = `<div style="font-size: 17px; font-weight: 900; color: #fff; line-height: 1;">
+    ${arrow} $${data.tipsPerHour.toFixed(2)}/hr
+  </div>`;
+}
+
+// ==================== TOP LEADER ====================
+
+async function fetchTopLeader() {
+  try {
+    // Check if Supabase is available
+    if (typeof window.supabase === 'undefined') {
+      console.error('❌ Supabase not available for leaderboard');
+      updateTopLeaderDisplay(null);
+      return;
+    }
+
+    // Get Pacific time start/end of today (STARTING AT 5AM)
+    const nowPacific = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    const currentHour = nowPacific.getHours();
+
+    // If it's before 5 AM, we're still in "yesterday's" shift
+    const todayStart = new Date(nowPacific);
+    if (currentHour < 5) {
+      todayStart.setDate(todayStart.getDate() - 1);
+      todayStart.setHours(5, 0, 0, 0);
+    } else {
+      todayStart.setHours(5, 0, 0, 0);
+    }
+
+    // End time is tomorrow at 4:59:59 AM
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+    todayEnd.setHours(4, 59, 59, 999);
+
+    const startISO = todayStart.toISOString();
+    const endISO = todayEnd.toISOString();
+
+    console.log('🏆 Fetching leaderboard data for range:', startISO, 'to', endISO);
+
+    // Fetch FOH tasks
+    const { data: tasks, error: tasksError } = await window.supabase
+      .from('foh_checklist_tasks')
+      .select('completed_by, completed_at, is_completed')
+      .eq('is_completed', true)
+      .gte('completed_at', startISO)
+      .lte('completed_at', endISO);
+
+    console.log(`📋 Found ${tasks?.length || 0} completed FOH tasks`);
+
+    // Fetch prep count actions
+    const { data: prepCounts, error: prepError } = await window.supabase
+      .from('prep_count_log')
+      .select('counted_by, counted_at')
+      .gte('counted_at', startISO)
+      .lte('counted_at', endISO);
+
+    console.log(`📦 Found ${prepCounts?.length || 0} prep count actions`);
+
+    // Combine counts
+    const leaderboard = {};
+
+    // Count FOH tasks
+    if (tasks && tasks.length > 0) {
+      tasks.forEach(task => {
+        const name = task.completed_by || 'Unknown';
+        if (!leaderboard[name]) {
+          leaderboard[name] = { name, count: 0, lastActivity: null };
+        }
+        leaderboard[name].count++;
+        const activityTime = new Date(task.completed_at);
+        if (!leaderboard[name].lastActivity || activityTime > leaderboard[name].lastActivity) {
+          leaderboard[name].lastActivity = activityTime;
+        }
+      });
+    }
+
+    // Count prep actions
+    if (prepCounts && prepCounts.length > 0) {
+      prepCounts.forEach(prep => {
+        const name = prep.counted_by || 'Unknown';
+        if (!leaderboard[name]) {
+          leaderboard[name] = { name, count: 0, lastActivity: null };
+        }
+        leaderboard[name].count++;
+        const activityTime = new Date(prep.counted_at);
+        if (!leaderboard[name].lastActivity || activityTime > leaderboard[name].lastActivity) {
+          leaderboard[name].lastActivity = activityTime;
+        }
+      });
+    }
+
+    // Check if we have any data
+    if (Object.keys(leaderboard).length === 0) {
+      updateTopLeaderDisplay(null);
+      return;
+    }
+
+    // Sort and get top leader
+    const sortedLeaderboard = Object.values(leaderboard)
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return b.lastActivity - a.lastActivity;
+      });
+
+    console.log('🥇 Top leader:', sortedLeaderboard[0].name, 'with', sortedLeaderboard[0].count, 'points');
+
+    updateTopLeaderDisplay(sortedLeaderboard[0]);
+
+  } catch (error) {
+    console.error('Error fetching top leader:', error);
+    updateTopLeaderDisplay(null);
+  }
+}
+
+function updateTopLeaderDisplay(leader) {
+  const displayDiv = document.getElementById('topLeaderText');
+  if (!displayDiv) return;
+
+  if (!leader) {
+    displayDiv.textContent = 'No activity yet! 🎯';
+    return;
+  }
+
+  displayDiv.textContent = `${leader.name} (${leader.count} action${leader.count !== 1 ? 's' : ''}) 🔥`;
+}
+
+// ==================== VOID & DISCOUNT TRACKING ====================
+
+async function fetchVoidDiscountTracking() {
+  try {
+    // Get TODAY in YYYY-MM-DD format (Pacific time)
+    const todayPacific = new Date().toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+
+    const [month, day, year] = todayPacific.split(', ')[0].split('/');
+    const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+    // Authenticate with Toast API
+    const authResponse = await fetch('/api/toast-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!authResponse.ok) {
+      updateVoidDiscountDisplay(null);
+      return;
+    }
+
+    const authData = await authResponse.json();
+    if (!authData.success || !authData.data?.accessToken) {
+      updateVoidDiscountDisplay(null);
+      return;
+    }
+
+    const token = authData.data.accessToken;
+
+    // Fetch void/discount tracking data
+    const trackingUrl = `/api/toast-void-discount-tracking?startDate=${today}&endDate=${today}&token=${encodeURIComponent(token)}`;
+
+    const response = await fetch(trackingUrl);
+
+    if (!response.ok) {
+      updateVoidDiscountDisplay(null);
+      return;
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.data) {
+      updateVoidDiscountDisplay(result.data);
+    } else {
+      updateVoidDiscountDisplay(null);
+    }
+  } catch (error) {
+    console.error('Error fetching void/discount tracking:', error);
+    updateVoidDiscountDisplay(null);
+  }
+}
+
+function updateVoidDiscountDisplay(data) {
+  const displayDiv = document.getElementById('voidDiscountDisplay');
+  if (!displayDiv) return;
+
+  if (!data) {
+    displayDiv.textContent = 'Loading today\'s data...';
+    return;
+  }
+
+  displayDiv.textContent = `VOIDED ORDERS: ${data.voidedOrders || 0} | DISCOUNTS: ${data.discounts || 0} | REFUNDS: ${data.refunds || 0} | VOIDED PAYMENTS: ${data.voidedPayments || 0}`;
+}
