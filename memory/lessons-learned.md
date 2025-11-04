@@ -115,13 +115,28 @@ document.getElementById('tipPoolForm').classList.add('active');
 
 ✅ **cash.html** (6,231 lines) - CONFIRMED WORKING
 ✅ **orders-prep.html** (18,067 lines) - CONFIRMED WORKING
-🔧 **tip-pool.html** (4,556 lines) - LOADS BUT FORM NOT VISIBLE
+✅ **tip-pool.html** (4,556 lines) - CONFIRMED WORKING
+✅ **incidents.html** (1,358 lines) - DEPLOYED (testing needed)
 
-## Next Steps for tip-pool.html
+## incidents.html Details
 
-1. Check if tipPoolForm needs `.active` class
-2. Add to DOMContentLoaded: `document.getElementById('tipPoolForm').classList.add('active');`
-3. Redeploy and test
+**Extracted from:** managerlogs.html
+**Features:**
+- Complete incident report form with manager name, date/time, department, staff involved, detailed report
+- Photo upload (up to 5 photos, 2MB each, compressed to 1200px max, JPEG 85%)
+- Toast employee autocomplete integration via /api/toast-employees
+- Department management with custom department option
+- Supabase storage for incident photos (incident-photos bucket)
+- View incident details in modal
+- PDF download via /api/print-incident
+- Epson printer email functionality
+- Form toggle button (hidden by default, shows on "+ NEW INCIDENT REPORT" click)
+- Recent incidents list with click to view details
+
+**Key implementation:**
+- Form kept hidden by default: `document.getElementById('incidentForm').style.display = 'none';`
+- Toggle button shows/hides form dynamically
+- Different approach from other pages (no .classList.add('active') needed initially)
 
 ## Pattern for goHome()
 
@@ -147,9 +162,44 @@ function goHome() {
 - TDS_DRIVER_GUID constant
 - All tip pool calculation functions
 
-## Remember
+**For incidents:**
+- loadEmployees() - Toast employee autocomplete
+- toggleForm() - Show/hide incident form
+- loadDepartments() - Load from Supabase departments table
+- handleDepartmentChange() - Show custom department input
+- addStaffField() - Dynamically add staff involved fields
+- compressImage() - Photo compression (1200px max, JPEG 85%)
+- handlePhotoUpload(), renderPhotoPreview(), removePhoto()
+- submitIncident() - Save to manager_incidents table + upload photos
+- loadIncidents() - Display recent incidents
+- viewIncident() - Show modal with full details
+- downloadPDF(), printIncident() - PDF generation and printer email
 
-- User feedback: "This is literally the most crucial and complicated flow in the entire app" (tip pool)
+## 🚨 CRITICAL RULE: NEVER MOVE FORWARD WITHOUT USER CONFIRMATION 🚨
+
+**STOP AND WAIT FOR USER TO TEST EACH EXTRACTION!!!**
+
+### Workflow:
+1. Extract file and deploy
+2. **STOP AND WAIT**
+3. User tests in browser
+4. User says "confirmed working" or "page is working"
+5. **ONLY THEN** move to next extraction
+
+### DO NOT:
+- Assume page is working
+- Move to next extraction without explicit confirmation
+- Interpret "ok now auto compact" as permission to continue
+- Mark extraction as "completed" until user confirms
+
+### User Feedback:
+- "This is literally the most crucial and complicated flow in the entire app" (tip pool)
+- "wait dude i never told you the tip pool was ready!!!"
+- "update memory files NOT to move on to the next extraction until you have confirmation from me that the current one is 100% operational"
+- "this is so so so important"
+
+### Remember:
 - Production system - staff use daily - BE CAREFUL
 - Test thoroughly before confirming
 - Do NOT remove from index.html until ALL files confirmed working
+- **WAIT FOR USER CONFIRMATION BEFORE PROCEEDING**

@@ -536,6 +536,7 @@
         min-height: 100% !important;
         position: relative !important;
         overflow-y: auto !important;
+        padding-top: 10px !important; /* Space for Google Sites white bar */
         padding-bottom: 50px !important; /* Extra space at bottom */
       }
       
@@ -714,7 +715,7 @@
   </style>
 </head>
 <body>
-  <!-- Loading Overlay with Water-Filling Logo -->
+  <!-- Loading Overlay with Animated Logo -->
   <div id="loadingOverlay" style="
     display: none;
     position: fixed;
@@ -735,70 +736,87 @@
         Demetri is a Genius 😉
       </p>
 
-      <!-- Logo Container with Water Fill Effect -->
-      <div style="position: relative; width: 120px; height: 120px; margin: 0 auto;">
-        <!-- Background logo (grayed out) -->
-        <img src="jayna-logo-new.png" alt="Jayna Logo" style="
-          width: 120px;
-          height: 120px;
-          opacity: 0.2;
-          filter: grayscale(100%);
-          border-radius: 50%;
-        ">
-
-        <!-- Filling logo (clip-path reveals from bottom) -->
-        <img id="fillingLogo" src="jayna-logo-new.png" alt="Jayna Logo" style="
+      <!-- Logo Container with Pulse + Glow Effect -->
+      <div style="position: relative; width: 150px; height: 150px; margin: 0 auto;">
+        <!-- Animated glowing rings -->
+        <div style="
           position: absolute;
-          top: 0;
-          left: 0;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 150px;
+          height: 150px;
+          border-radius: 50%;
+          border: 3px solid rgba(0, 123, 255, 0.6);
+          animation: pulseRing 2s ease-out infinite;
+        "></div>
+
+        <div style="
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 150px;
+          height: 150px;
+          border-radius: 50%;
+          border: 3px solid rgba(0, 123, 255, 0.4);
+          animation: pulseRing 2s ease-out infinite 0.5s;
+        "></div>
+
+        <!-- Main logo with pulse + rotation -->
+        <img src="jayna-logo-loading.png" alt="Jayna Logo" style="
           width: 120px;
           height: 120px;
-          clip-path: inset(100% 0 0 0);
-          transition: clip-path 0.5s ease-out;
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          animation: logoFloat 3s ease-in-out infinite, logoGlow 2s ease-in-out infinite;
           filter: drop-shadow(0 0 20px rgba(0, 123, 255, 0.8));
           border-radius: 50%;
         ">
-
-        <!-- Wave effect overlay -->
-        <div id="waveOverlay" style="
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          width: 120px;
-          height: 8px;
-          background: linear-gradient(90deg,
-            rgba(0, 123, 255, 0) 0%,
-            rgba(0, 123, 255, 0.5) 25%,
-            rgba(0, 123, 255, 0.8) 50%,
-            rgba(0, 123, 255, 0.5) 75%,
-            rgba(0, 123, 255, 0) 100%
-          );
-          animation: wave 2s ease-in-out infinite;
-          transform: translateY(100%);
-          transition: transform 0.5s ease-out;
-          border-radius: 0 0 60px 60px;
-          filter: blur(2px);
-        ">
-        </div>
       </div>
 
-      <!-- Progress percentage (optional) -->
-      <div id="loadingPercentage" style="
-        margin-top: 20px;
-        font-size: 14px;
-        color: rgba(255, 255, 255, 0.7);
+      <!-- Loading text with animated dots -->
+      <div style="
+        margin-top: 30px;
+        font-size: 16px;
+        color: rgba(255, 255, 255, 0.9);
         letter-spacing: 2px;
-      ">0%</div>
+        font-weight: 600;
+      ">
+        Loading<span id="loadingDots">.</span>
+      </div>
     </div>
   </div>
 
   <style>
-    @keyframes wave {
+    @keyframes pulseRing {
+      0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 1;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(1.4);
+        opacity: 0;
+      }
+    }
+
+    @keyframes logoFloat {
       0%, 100% {
-        background-position: 0 0;
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
       }
       50% {
-        background-position: 100px 0;
+        transform: translate(-50%, -50%) scale(1.1) rotate(5deg);
+      }
+    }
+
+    @keyframes logoGlow {
+      0%, 100% {
+        filter: drop-shadow(0 0 20px rgba(0, 123, 255, 0.8)) brightness(1);
+      }
+      50% {
+        filter: drop-shadow(0 0 40px rgba(0, 200, 255, 1)) brightness(1.2);
       }
     }
   </style>
@@ -1253,38 +1271,46 @@
   function getPacificDate(date = new Date()) {
     return formatPacificDate(date);
   }
+  // Animated dots interval
+  let dotAnimationInterval = null;
+
   function showLoading() {
     const overlay = document.getElementById('loadingOverlay');
     overlay.style.display = 'flex';
-    updateLoadingProgress(0); // Start at 0%
+    startDotAnimation();
   }
 
   function hideLoading() {
     document.getElementById('loadingOverlay').style.display = 'none';
-    updateLoadingProgress(0); // Reset for next time
+    stopDotAnimation();
+  }
+
+  function startDotAnimation() {
+    const dotsElement = document.getElementById('loadingDots');
+    let dotCount = 1;
+
+    // Clear any existing interval
+    if (dotAnimationInterval) {
+      clearInterval(dotAnimationInterval);
+    }
+
+    // Animate dots: . .. ... (repeat)
+    dotAnimationInterval = setInterval(() => {
+      dotCount = (dotCount % 3) + 1;
+      dotsElement.textContent = '.'.repeat(dotCount);
+    }, 500); // Change every 500ms
+  }
+
+  function stopDotAnimation() {
+    if (dotAnimationInterval) {
+      clearInterval(dotAnimationInterval);
+      dotAnimationInterval = null;
+    }
   }
 
   function updateLoadingProgress(percent) {
-    // Update logo water fill effect from bottom to top
-    const fillingLogo = document.getElementById('fillingLogo');
-    const waveOverlay = document.getElementById('waveOverlay');
-    const percentageDisplay = document.getElementById('loadingPercentage');
-
-    if (fillingLogo) {
-      // Calculate how much to reveal (0% = fully hidden, 100% = fully visible)
-      const revealAmount = 100 - percent; // Invert: start at 100%, end at 0%
-      fillingLogo.style.clipPath = `inset(${revealAmount}% 0 0 0)`;
-    }
-
-    if (waveOverlay) {
-      // Move wave overlay up as fill increases
-      const wavePosition = 100 - percent; // Start at bottom (100%), move to top (0%)
-      waveOverlay.style.transform = `translateY(${wavePosition}%)`;
-    }
-
-    if (percentageDisplay) {
-      percentageDisplay.textContent = `${Math.round(percent)}%`;
-    }
+    // Progress tracking removed - just keep animation running
+    // The dots animation continues regardless of progress
   }
   function showMessage(text, type) {
     // Only show popups for important messages (errors), ignore info/success
