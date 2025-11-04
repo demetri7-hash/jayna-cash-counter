@@ -573,9 +573,15 @@ function updateVoidDiscountDisplay(data) {
   if (!displayDiv) return;
 
   if (!data) {
-    displayDiv.textContent = 'Loading today\'s data...';
+    displayDiv.innerHTML = '<span style="color: var(--gray-500); font-style: italic;">Unable to load data</span>';
     return;
   }
 
-  displayDiv.textContent = `VOIDED ORDERS: ${data.voidedOrders || 0} | DISCOUNTS: ${data.discounts || 0} | REFUNDS: ${data.refunds || 0} | VOIDED PAYMENTS: ${data.voidedPayments || 0}`;
+  // Extract counts from API response structure
+  const voidCount = data.voidedOrders?.count || 0;
+  const discountCount = data.discounts?.count || 0;
+  const refundCount = data.refunds?.count || 0;
+  const voidedPaymentCount = data.voidedPayments?.count || 0;
+
+  displayDiv.textContent = `VOIDED ORDERS: ${voidCount} | DISCOUNTS: ${discountCount} | REFUNDS: ${refundCount} | VOIDED PAYMENTS: ${voidedPaymentCount}`;
 }
