@@ -1754,67 +1754,314 @@
     }
   }
 
-  function showMessage(text, type) {
-    // Only show popups for important messages (errors), ignore info/success
-    if (type === 'error') {
-      showPopupMessage(text, type);
-    }
-    // Silently ignore info and success messages to prevent bouncing
-  }
+  // ====================================
+  // UNIVERSAL MODAL HELPER FUNCTIONS
+  // ====================================
 
-  function showPopupMessage(text, type) {
-    const messageType = type === 'error' ? 'Error' : type === 'success' ? 'Success' : 'Notice';
-    const backgroundColor = type === 'error' ? '#f44336' : '#4CAF50';
+  function showMessage(message, type = 'info') {
+    // Remove existing message if any
+    const existing = document.getElementById('inlineMessageOverlay');
+    if (existing) existing.remove();
 
-    const modalHTML = `
-      <div id="messageModal" style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.7);
-        z-index: 10000;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      ">
-        <div style="
-          background: white;
-          padding: 30px;
-          border-radius: 0;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-          max-width: 400px;
-          width: 90%;
-          text-align: center;
-        ">
-          <h3 style="margin: 0 0 20px 0; color: ${backgroundColor};">${messageType}</h3>
-          <p style="margin: 0 0 25px 0; line-height: 1.4; font-size: 16px;">
-            ${text}
-          </p>
-          <button onclick="closeMessageModal()" style="
-            background: ${backgroundColor};
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 0;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-          ">OK</button>
-        </div>
-      </div>
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'inlineMessageOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      padding: 20px;
     `;
 
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    // Create message box
+    const box = document.createElement('div');
+    const colors = {
+      success: { bg: 'var(--success-bg)', text: 'var(--success-text)', border: 'var(--success-border)' },
+      error: { bg: 'var(--error-bg)', text: 'var(--error-text)', border: 'var(--error-border)' },
+      warning: { bg: 'var(--warning-bg)', text: 'var(--warning-text)', border: 'var(--warning-border)' },
+      info: { bg: 'var(--blue-bg)', text: 'var(--blue-text)', border: 'var(--blue-text)' }
+    };
+    const color = colors[type] || colors.info;
+
+    box.style.cssText = `
+      background: white;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid ${color.border};
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 14px;
+      line-height: 1.6;
+      color: ${color.text};
+      margin-bottom: 20px;
+      white-space: pre-line;
+    `;
+
+    const okBtn = document.createElement('button');
+    okBtn.textContent = 'OK';
+    okBtn.style.cssText = `
+      width: 100%;
+      padding: 12px 24px;
+      background: var(--gray-900);
+      color: white;
+      border: 2px solid var(--gray-900);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    okBtn.onclick = () => overlay.remove();
+
+    box.appendChild(messageEl);
+    box.appendChild(okBtn);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
   }
 
-  function closeMessageModal() {
-    const modal = document.getElementById('messageModal');
-    if (modal) {
-      modal.remove();
-    }
+  function showConfirm(message, onConfirm, onCancel = null) {
+    // Remove existing confirm if any
+    const existing = document.getElementById('inlineConfirmOverlay');
+    if (existing) existing.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'inlineConfirmOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      padding: 20px;
+    `;
+
+    // Create message box
+    const box = document.createElement('div');
+    box.style.cssText = `
+      background: white;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid var(--warning-border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--gray-900);
+      margin-bottom: 20px;
+      white-space: pre-line;
+    `;
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    `;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = `
+      padding: 12px 24px;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border: 2px solid var(--gray-300);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    cancelBtn.onclick = () => {
+      overlay.remove();
+      if (onCancel) onCancel();
+    };
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = 'OK';
+    confirmBtn.style.cssText = `
+      padding: 12px 24px;
+      background: #dc2626;
+      color: white;
+      border: 2px solid #dc2626;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    confirmBtn.onclick = () => {
+      overlay.remove();
+      if (onConfirm) onConfirm();
+    };
+
+    buttonContainer.appendChild(cancelBtn);
+    buttonContainer.appendChild(confirmBtn);
+    box.appendChild(messageEl);
+    box.appendChild(buttonContainer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click = cancel
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+        if (onCancel) onCancel();
+      }
+    });
+  }
+
+  function showPrompt(message, defaultValue = '', onSubmit, onCancel = null) {
+    // Remove existing prompt if any
+    const existing = document.getElementById('inlinePromptOverlay');
+    if (existing) existing.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'inlinePromptOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      padding: 20px;
+    `;
+
+    // Create message box
+    const box = document.createElement('div');
+    box.style.cssText = `
+      background: white;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid var(--gray-700);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--gray-900);
+      margin-bottom: 12px;
+      font-weight: 600;
+    `;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = defaultValue;
+    input.style.cssText = `
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--gray-300);
+      font-size: 14px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+    `;
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    `;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = `
+      padding: 12px 24px;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border: 2px solid var(--gray-300);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    cancelBtn.onclick = () => {
+      overlay.remove();
+      if (onCancel) onCancel();
+    };
+
+    const submitBtn = document.createElement('button');
+    submitBtn.textContent = 'OK';
+    submitBtn.style.cssText = `
+      padding: 12px 24px;
+      background: var(--gray-900);
+      color: white;
+      border: 2px solid var(--gray-900);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    `;
+    submitBtn.onclick = () => {
+      const value = input.value.trim();
+      overlay.remove();
+      if (onSubmit) onSubmit(value);
+    };
+
+    // Allow Enter key to submit
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        submitBtn.click();
+      }
+    });
+
+    buttonContainer.appendChild(cancelBtn);
+    buttonContainer.appendChild(submitBtn);
+    box.appendChild(messageEl);
+    box.appendChild(input);
+    box.appendChild(buttonContainer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Focus input
+    setTimeout(() => input.focus(), 100);
+
+    // Close on overlay click = cancel
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+        if (onCancel) onCancel();
+      }
+    });
   }
 
   function hideAllSections() {
@@ -9008,25 +9255,26 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       addNewBtn.style.borderColor = 'var(--gray-700)';
     };
     addNewBtn.onclick = () => {
-      const newAreaName = prompt('Enter new location name:');
-      if (newAreaName && newAreaName.trim()) {
-        const capitalized = newAreaName.trim().charAt(0).toUpperCase() + newAreaName.trim().slice(1);
+      showPrompt('Enter new location name:', '', (newAreaName) => {
+        if (newAreaName && newAreaName.trim()) {
+          const capitalized = newAreaName.trim().charAt(0).toUpperCase() + newAreaName.trim().slice(1);
 
-        // Add to the list if not already there
-        if (!uniqueAreas.includes(capitalized)) {
-          uniqueAreas.push(capitalized);
-          uniqueAreas.sort();
+          // Add to the list if not already there
+          if (!uniqueAreas.includes(capitalized)) {
+            uniqueAreas.push(capitalized);
+            uniqueAreas.sort();
+          }
+
+          // Auto-select the new location
+          if (selectedAreas.size < 3) {
+            selectedAreas.add(capitalized);
+          }
+
+          // Close and reopen modal to refresh with new location
+          document.body.removeChild(modal);
+          showAreaSelector(itemId, currentArea, event);
         }
-
-        // Auto-select the new location
-        if (selectedAreas.size < 3) {
-          selectedAreas.add(capitalized);
-        }
-
-        // Close and reopen modal to refresh with new location
-        document.body.removeChild(modal);
-        showAreaSelector(itemId, currentArea, event);
-      }
+      });
     };
 
     addNewContainer.appendChild(addNewBtn);
@@ -9248,7 +9496,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    */
   async function saveNewArea(itemId, areaName, statusDiv) {
     if (!areaName) {
-      alert('Please enter an area name');
+      showMessage('Please enter an area name', 'error');
       return;
     }
 
@@ -9318,7 +9566,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     } catch (error) {
       console.error('Error saving area:', error);
-      alert('Failed to save area. Please try again.');
+      showMessage('Failed to save area. Please try again.', 'error');
     }
   }
 
@@ -9479,15 +9727,21 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     // Handle new vendor creation
     if (vendor === 'OTHER') {
-      const newVendor = prompt('Enter new vendor name:');
-      if (!newVendor || newVendor.trim() === '') {
-        showMessage('Vendor name is required', 'error');
-        return;
-      }
-      vendor = newVendor.trim();
+      showPrompt('Enter new vendor name:', '', (newVendor) => {
+        if (!newVendor || newVendor.trim() === '') {
+          showMessage('Vendor name is required', 'error');
+          return;
+        }
+        vendor = newVendor.trim();
+        continueAddItem();
+      });
+      return;
     }
 
-    showLoading('Adding Item', 'Saving to database...');
+    continueAddItem();
+
+    async function continueAddItem() {
+      showLoading('Adding Item', 'Saving to database...');
 
     try {
       const { data, error } = await supabase
@@ -9534,6 +9788,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       hideLoading();
       showMessage(`Error adding item: ${error.message}`, 'error');
     }
+    }
   }
 
   /**
@@ -9555,17 +9810,23 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     // Handle new vendor creation
     if (vendor === 'OTHER') {
-      const newVendor = prompt('Enter new vendor name:');
-      if (!newVendor || newVendor.trim() === '') {
-        showMessage('Vendor name is required', 'error');
-        return;
-      }
-      vendor = newVendor.trim();
+      showPrompt('Enter new vendor name:', '', (newVendor) => {
+        if (!newVendor || newVendor.trim() === '') {
+          showMessage('Vendor name is required', 'error');
+          return;
+        }
+        vendor = newVendor.trim();
+        continueAddPrepItem();
+      });
+      return;
     }
 
-    showLoading('Adding Prep Item', 'Saving to database...');
+    continueAddPrepItem();
 
-    try {
+    async function continueAddPrepItem() {
+      showLoading('Adding Prep Item', 'Saving to database...');
+
+      try {
       const { data, error } = await supabase
         .from('inventory_items')
         .insert([{
@@ -9612,17 +9873,15 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       hideLoading();
       showMessage(`Error adding prep item: ${error.message}`, 'error');
     }
+    }
   }
 
   /**
    * Delete an inventory item
    */
   async function deleteInventoryItem(itemId) {
-    if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
-      return;
-    }
-
-    showLoading('Deleting Item', 'Removing from database...');
+    showConfirm('Are you sure you want to delete this item? This action cannot be undone.', async () => {
+      showLoading('Deleting Item', 'Removing from database...');
 
     try {
       const { error } = await supabase
@@ -9647,6 +9906,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       hideLoading();
       showMessage(`Error deleting item: ${error.message}`, 'error');
     }
+    });
   }
 
   /**
@@ -10177,11 +10437,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       return;
     }
 
-    if (!confirm(`Rename "${oldVendorName}" to "${newVendorName}"? This will update ${itemsWithVendor.length} items.`)) {
-      return;
-    }
-
-    showLoading('Renaming Vendor', `Updating ${itemsWithVendor.length} items...`);
+    showConfirm(`Rename "${oldVendorName}" to "${newVendorName}"? This will update ${itemsWithVendor.length} items.`, async () => {
+      showLoading('Renaming Vendor', `Updating ${itemsWithVendor.length} items...`);
 
     try {
       const { error } = await supabase
@@ -10208,6 +10465,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       hideLoading();
       showMessage(`Error renaming vendor: ${error.message}`, 'error');
     }
+    });
   }
 
   /**
@@ -10302,11 +10560,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    * Prompt to rename vendor
    */
   function promptRenameVendor(vendorName) {
-    const newName = prompt(`Rename vendor "${vendorName}" to:`, vendorName);
-    if (newName && newName !== vendorName) {
-      renameVendor(vendorName, newName);
-      closeVendorManagement();
-    }
+    showPrompt(`Rename vendor "${vendorName}" to:`, vendorName, (newName) => {
+      if (newName && newName !== vendorName) {
+        renameVendor(vendorName, newName);
+        closeVendorManagement();
+      }
+    });
   }
 
   // ============================================
@@ -15795,31 +16054,47 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     const createNewBtn = document.createElement('button');
     createNewBtn.textContent = 'CREATE NEW';
     createNewBtn.style.cssText = 'flex: 1; padding: 12px; background: var(--gray-700); color: var(--white); border: 2px solid var(--gray-700); border-radius: 0; font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer;';
-    createNewBtn.onclick = async function() {
-      // Prompt for new item details
-      const newItemName = prompt('Enter item name:', item.detectedName || '');
-      if (!newItemName || newItemName.trim() === '') {
-        showMessage('Item name is required', 'error');
-        return;
-      }
+    createNewBtn.onclick = function() {
+      // Prompt for new item details (chained prompts)
+      showPrompt('Enter item name:', item.detectedName || '', (newItemName) => {
+        if (!newItemName || newItemName.trim() === '') {
+          showMessage('Item name is required', 'error');
+          return;
+        }
 
-      const vendorOptions = ['Greenleaf', 'Performance', 'Mani Imports', 'Eatopia', 'Restaurant Depot', 'Alsco', 'SRC Pumping', 'Southern Glazer\'s', 'Breakthru Beverage', 'PREP'];
-      const vendorChoice = prompt('Enter vendor name (or choose from: ' + vendorOptions.join(', ') + '):', '');
-      if (!vendorChoice || vendorChoice.trim() === '') {
-        showMessage('Vendor is required', 'error');
-        return;
-      }
+        const vendorOptions = ['Greenleaf', 'Performance', 'Mani Imports', 'Eatopia', 'Restaurant Depot', 'Alsco', 'SRC Pumping', 'Southern Glazer\'s', 'Breakthru Beverage', 'PREP'];
+        showPrompt('Enter vendor name (or choose from: ' + vendorOptions.join(', ') + '):', '', (vendorChoice) => {
+          if (!vendorChoice || vendorChoice.trim() === '') {
+            showMessage('Vendor is required', 'error');
+            return;
+          }
 
-      const unit = prompt('Enter unit (e.g., CS, EA, LB):', '');
-      if (!unit || unit.trim() === '') {
-        showMessage('Unit is required', 'error');
-        return;
-      }
+          showPrompt('Enter unit (e.g., CS, EA, LB):', '', (unit) => {
+            if (!unit || unit.trim() === '') {
+              showMessage('Unit is required', 'error');
+              return;
+            }
 
-      const parLevel = prompt('Enter par level (default 0):', '0');
-      const isPrep = confirm('Is this a PREP item? (OK = Yes, Cancel = No)');
-      const itemType = isPrep ? 'prep' : 'ingredient';
+            showPrompt('Enter par level (default 0):', '0', (parLevel) => {
+              showConfirm('Is this a PREP item?', async () => {
+                // YES - it's a prep item
+                const itemType = 'prep';
 
+                showPrompt('Enter batch lifespan in hours (default 48):', '48', async (batchLifespan) => {
+                  await createNewItem(newItemName, vendorChoice, unit, parLevel, itemType, batchLifespan);
+                });
+              }, async () => {
+                // NO - it's not a prep item
+                const itemType = 'ingredient';
+                await createNewItem(newItemName, vendorChoice, unit, parLevel, itemType, null);
+              });
+            });
+          });
+        });
+      });
+    };
+
+    async function createNewItem(newItemName, vendorChoice, unit, parLevel, itemType, batchLifespan) {
       // Create the item
       document.body.removeChild(overlay);
       showLoading('Creating New Item', 'Saving to database...');
@@ -15836,8 +16111,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         };
 
         // Add prep-specific fields if PREP item
-        if (isPrep) {
-          const batchLifespan = prompt('Enter batch lifespan in hours (default 48):', '48');
+        if (itemType === 'prep' && batchLifespan) {
           insertData.batch_lifespan_hours = parseInt(batchLifespan) || 48;
         }
 
@@ -15873,7 +16147,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         hideLoading();
         showMessage('Error creating item: ' + error.message, 'error');
       }
-    };
+    }
+
+
     buttonRow.appendChild(createNewBtn);
 
     const skipBtn = document.createElement('button');
@@ -17756,18 +18032,24 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     }
 
     if (vendor === 'OTHER') {
-      const newVendor = prompt('Enter new vendor name:');
-      if (!newVendor || newVendor.trim() === '') {
-        showMessage('Vendor name is required', 'error');
-        return;
-      }
-      vendor = newVendor.trim();
+      showPrompt('Enter new vendor name:', '', (newVendor) => {
+        if (!newVendor || newVendor.trim() === '') {
+          showMessage('Vendor name is required', 'error');
+          return;
+        }
+        vendor = newVendor.trim();
+        continueAddItemModal();
+      });
+      return;
     }
 
-    closeAddInventoryModal();
-    showLoading('Adding Item', 'Saving to database...');
+    continueAddItemModal();
 
-    try {
+    async function continueAddItemModal() {
+      closeAddInventoryModal();
+      showLoading('Adding Item', 'Saving to database...');
+
+      try {
       const { data, error } = await supabase
         .from('inventory_items')
         .insert([{
@@ -17800,6 +18082,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     } catch (error) {
       hideLoading();
       showMessage(`Error adding item: ${error.message}`, 'error');
+    }
     }
   }
 
