@@ -1,0 +1,1358 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>Jayna Gyro Cash Counter</title>
+  
+  <link rel="apple-touch-icon" href="https://static.spotapps.co/website_images/ab_websites/229800_website_v1/logo.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#00A8E1">
+  
+  <style>
+    /* Jayna Brand Design - Sky Blue & Grayscale */
+    :root {
+      --primary-blue: #00A8E1;
+      --secondary-blue: #0094D6;
+      --light-blue: #E3F4FC;
+      --accent-blue: #0081C6;
+      --gray-900: #212121;
+      --gray-700: #424242;
+      --gray-600: #616161;
+      --gray-500: #757575;
+      --gray-400: #BDBDBD;
+      --gray-300: #E0E0E0;
+      --gray-100: #F5F5F5;
+      --success: #00C853;
+      --warning: #FFB300;
+      --error: #D32F2F;
+      --white: #FFFFFF;
+      --blue-bg: #dbeafe;
+      --blue-text: #1e40af;
+      --success-bg: #d1fae5;
+      --success-text: #065f46;
+      --success-border: #059669;
+      --warning-bg: #fef3c7;
+      --warning-text: #92400e;
+      --warning-border: #f59e0b;
+      --error-bg: #fee2e2;
+      --error-text: #991b1b;
+      --error-border: #dc2626;
+    }
+
+    /* Pen Icon Edit Button */
+    .modal-edit-icon {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .modal-edit-icon:hover {
+      background: var(--gray-200);
+    }
+    .modal-edit-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--gray-700);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      font-family: 'Aptos', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--white); /* White background to blend with Google Sites header */
+      min-height: 100vh;
+      padding: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: var(--white);
+      border-radius: 0;
+      overflow: visible;
+      box-shadow: none; /* Remove shadow for seamless Google Sites embed */
+      min-height: auto;
+      max-height: none;
+    }
+    .header {
+      background: var(--white);
+      color: var(--gray-900);
+      text-align: center;
+      padding: 12px;
+      border-radius: 0;
+      border-bottom: 1px solid var(--gray-300);
+    }
+    .header h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; letter-spacing: 1.5px; text-transform: uppercase; }
+    .header p { opacity: 0.7; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    /* Mobile-First Responsive Design */
+    .content {
+      padding: 12px;
+      /* Google Sites full page embed optimization */
+      max-height: none;
+      overflow: visible;
+    }
+    .main-menu { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .secondary-links { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 20px; font-size: 11px; }
+    .secondary-links a { color: var(--gray-700); text-decoration: underline; cursor: pointer; transition: color 0.15s ease; }
+    .secondary-links a:hover { color: var(--gray-900); }
+    .menu-btn {
+      padding: 16px 12px !important;
+      border: 2px solid var(--gray-700) !important;
+      border-radius: 0 !important;
+      background: var(--gray-700) !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      color: white !important;
+      cursor: pointer !important;
+      transition: all 0.15s ease !important;
+      text-align: center !important;
+      min-height: 50px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-transform: uppercase !important;
+      letter-spacing: 1.2px !important;
+      text-decoration: none !important;
+    }
+    .menu-btn:hover {
+      background: var(--gray-600) !important;
+      border-color: var(--gray-600) !important;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+    .menu-btn.active {
+      border-color: var(--gray-600) !important;
+      background: var(--gray-600) !important;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+    .menu-btn.primary {
+      background: var(--gray-100) !important;
+      color: var(--gray-900) !important;
+      border: 2px solid var(--gray-300) !important;
+    }
+    .menu-btn.primary:hover {
+      background: var(--gray-200) !important;
+      border-color: var(--gray-400) !important;
+    }
+    .form-section { 
+      display: none; 
+      /* Ensure sections don't get cut off */
+      min-height: auto;
+      overflow: visible;
+    }
+    .form-section.active {
+      display: block;
+      /* Force visibility in Google Sites */
+      position: relative;
+      z-index: 1;
+    }
+    .form-group { margin-bottom: 12px; }
+    .form-group label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 700;
+      font-size: 10px;
+      color: var(--gray-700);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Enhanced Mobile-Friendly Inputs */
+    .form-input, .form-select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      min-height: 44px;
+      box-sizing: border-box;
+      -webkit-appearance: none;
+      appearance: none;
+      transition: all 0.15s ease;
+      background: var(--white);
+      color: var(--gray-900);
+    }
+    .form-input:focus, .form-select:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 2px rgba(0, 217, 217, 0.15);
+      background: var(--white);
+    }
+    
+    /* Number inputs with mobile optimization */
+    input[type="number"] {
+      -webkit-appearance: none;
+      -moz-appearance: textfield;
+      appearance: none;
+      /* Remove number input arrows */
+    }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    input, select, textarea, button {
+      font-size: 16px !important;
+    }
+
+    .drawer-section {
+      margin: 20px 0;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      overflow: hidden;
+    }
+    .drawer-header {
+      background: var(--light-blue);
+      padding: 15px 20px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 15px;
+      color: var(--primary-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .skip-toggle {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 16px;
+      color: var(--gray-500);
+    }
+    .skip-toggle input[type="checkbox"] { width: 20px; height: 20px; }
+    .drawer-content { padding: 20px; }
+    .denom-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--gray-300);
+    }
+    .denom-row:last-child { border-bottom: none; }
+    .denom-label { font-weight: 500; font-size: 18px; color: var(--gray-700); }
+    .denom-value { font-size: 16px; color: var(--gray-500); margin-top: 4px; }
+
+    /* Mobile-Optimized Quantity Inputs */
+    .qty-input {
+      width: 100px;
+      height: 56px;
+      text-align: center;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--gray-700);
+      -webkit-appearance: none;
+      -moz-appearance: textfield;
+      appearance: none;
+      transition: all 0.2s ease;
+      background: var(--white);
+    }
+    .qty-input:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 3px rgba(44, 95, 141, 0.1);
+    }
+    /* Remove number arrows */
+    .qty-input::-webkit-outer-spin-button,
+    .qty-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    
+    /* Disabled denomination inputs */
+    .qty-input:disabled {
+      background-color: var(--gray-300);
+      color: var(--gray-500);
+      border-color: var(--gray-300);
+      cursor: not-allowed;
+    }
+
+    .denom-row.disabled {
+      opacity: 0.5;
+    }
+
+    .drawer-total {
+      margin-top: 15px;
+      padding: 15px;
+      background: var(--light-blue);
+      border-radius: 0;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--primary-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .grand-total {
+      background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+      color: var(--white);
+      padding: 20px;
+      border-radius: 0;
+      text-align: center;
+      margin: 20px 0;
+      box-shadow: 0 4px 12px rgba(44, 95, 141, 0.2);
+    }
+    .grand-total h3 { font-size: 18px; margin-bottom: 8px; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px; }
+    .grand-total .amount { font-size: 36px; font-weight: 600; }
+    .notes-area {
+      width: 100%;
+      min-height: 100px;
+      padding: 18px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 16px;
+      resize: vertical;
+      box-sizing: border-box;
+      transition: all 0.2s ease;
+    }
+    .notes-area:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 3px rgba(44, 95, 141, 0.1);
+    }
+    .submit-btn {
+      padding: 14px 20px;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      border: none;
+      border-radius: 0;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      min-height: 48px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      border: 2px solid var(--gray-300);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+    .submit-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+      background: var(--gray-300);
+    }
+    .submit-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+      background: var(--gray-300);
+      color: var(--gray-500);
+    }
+    .am-total-display {
+      background: var(--light-blue);
+      padding: 20px;
+      border-radius: 0;
+      margin: 20px 0;
+      border: 2px solid rgba(44, 95, 141, 0.1);
+    }
+    .am-total-display h4 { margin-bottom: 8px; color: var(--primary-blue); font-size: 16px; font-weight: 500; }
+    .am-total-display .amount { font-size: 28px; font-weight: 600; color: var(--primary-blue); }
+
+    /* Enhanced Currency Inputs */
+    .currency-input {
+      width: 100%;
+      padding: 20px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 22px;
+      text-align: center;
+      min-height: 60px;
+      box-sizing: border-box;
+      -webkit-appearance: none;
+      -moz-appearance: textfield;
+      appearance: none;
+      transition: all 0.2s ease;
+      background: var(--white);
+      color: var(--gray-700);
+    }
+    .currency-input:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 3px rgba(44, 95, 141, 0.1);
+    }
+    .currency-input::-webkit-outer-spin-button,
+    .currency-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .confirmation-screen { text-align: center; padding: 40px 20px; }
+    .confirmation-screen h2 { color: var(--success); margin-bottom: 30px; font-size: 32px; font-weight: 600; }
+    .deposit-instruction {
+      background: linear-gradient(135deg, var(--success) 0%, #4A8C63 100%);
+      color: var(--white);
+      padding: 30px;
+      border-radius: 0;
+      margin: 25px 0;
+      font-size: 24px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(95, 167, 119, 0.2);
+    }
+    .return-instruction {
+      background: linear-gradient(135deg, var(--warning) 0%, #C69563 100%);
+      color: var(--white);
+      padding: 30px;
+      border-radius: 0;
+      margin: 25px 0;
+      font-size: 24px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(212, 165, 116, 0.2);
+    }
+    .thank-you { font-size: 22px; color: var(--success); margin: 30px 0; font-weight: 500; }
+    .confirm-btn {
+      background: linear-gradient(135deg, var(--success) 0%, #4A8C63 100%);
+      margin-top: 30px;
+    }
+    .loading { text-align: center; padding: 40px; }
+    .loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 6px solid var(--gray-300);
+      border-top: 6px solid var(--primary-blue);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .message {
+      padding: 18px;
+      border-radius: 0;
+      margin: 20px 0;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+    .message.success {
+      background: #E8F5EC;
+      color: #2D5F3F;
+      border: 2px solid var(--success);
+    }
+    .message.error {
+      background: #F8E6E7;
+      color: #6B3638;
+      border: 2px solid var(--error);
+    }
+    .message.info {
+      background: var(--light-blue);
+      color: var(--primary-blue);
+      border: 2px solid var(--secondary-blue);
+    }
+
+    /* Typography - Headers */
+    h2, h3, h4, h5, h6 {
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    h2 { font-size: 22px; }
+    h3 { font-size: 19px; }
+    h4 { font-size: 16px; }
+    h5 { font-size: 14px; }
+    h6 { font-size: 12px; }
+
+    /* Tip Pool Calculator Styles */
+    .cash-needed { color: var(--error); font-weight: 600; }
+    .cash-surplus { color: var(--success); font-weight: 600; }
+    .hidden { display: none; }
+    .skip-content { padding: 25px; }
+    .skip-reason {
+      width: 100%;
+      padding: 18px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 16px;
+      min-height: 56px;
+      box-sizing: border-box;
+      transition: all 0.2s ease;
+    }
+    .skip-reason:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 3px rgba(44, 95, 141, 0.1);
+    }
+    
+    /* Mobile responsive adjustments */
+    @media (max-width: 768px) {
+      .container { margin: 0; border-radius: 0; }
+      .header { padding: 20px; }
+      .header h1 { font-size: 24px; }
+      .content { padding: 15px; }
+      .main-menu { gap: 12px; }
+      .menu-btn { padding: 25px 15px; font-size: 16px; min-height: 70px; }
+      .denom-row { flex-direction: column; align-items: flex-start; gap: 12px; padding: 20px 0; }
+      .qty-input { width: 120px; margin-top: 8px; }
+      .grand-total .amount { font-size: 32px; }
+      .confirmation-screen h2 { font-size: 28px; }
+      .deposit-instruction, .return-instruction { font-size: 20px; padding: 25px; }
+    }
+    
+    @media (max-width: 768px) {
+      .main-menu { grid-template-columns: 1fr 1fr; gap: 12px; }
+    }
+
+    @media (max-width: 480px) {
+      .header h1 { font-size: 20px; }
+      .main-menu { grid-template-columns: 1fr; gap: 10px; }
+      .main-menu.show-report { grid-template-columns: 1fr; }
+      .menu-btn { padding: 20px 15px; min-height: 60px; }
+      .secondary-links { font-size: 10px; gap: 10px; }
+      .denom-label { font-size: 16px; }
+      .qty-input { width: 100px; height: 50px; font-size: 18px; }
+      .grand-total .amount { font-size: 28px; }
+      .deposit-instruction, .return-instruction { font-size: 18px; padding: 20px; }
+    }
+    
+    /* Google Sites Full Page Embed Optimizations */
+    @media screen {
+      html {
+        /* Force proper viewport handling in Google Sites */
+        height: auto !important;
+        min-height: 100% !important;
+        overflow-y: auto !important;
+      }
+      
+      body {
+        /* Ensure body can scroll properly in Google Sites iframe */
+        height: auto !important;
+        min-height: 100% !important;
+        position: relative !important;
+        overflow-y: auto !important;
+        padding-bottom: 50px !important; /* Extra space at bottom */
+      }
+      
+      .container {
+        /* Ensure container doesn't get viewport-locked */
+        position: relative !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        margin-bottom: 50px !important; /* Extra bottom margin */
+      }
+      
+      .submit-btn {
+        /* Ensure submit buttons are always accessible */
+        position: relative !important;
+        z-index: 10 !important;
+        margin-bottom: 30px !important;
+      }
+      
+      /* Force visibility of bottom elements in Google Sites */
+      .form-section:last-child,
+      .form-section .submit-btn:last-child {
+        margin-bottom: 100px !important;
+      }
+    }
+    
+    /* Elegant Loading Overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.3s ease;
+    }
+    .loading-overlay.hidden {
+      display: none;
+    }
+    .loading-content {
+      text-align: center;
+      padding: 40px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 0;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .loading-spinner-elegant {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(102, 126, 234, 0.1);
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin-elegant 1.2s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin-elegant {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-content h3 {
+      margin: 0 0 10px 0;
+      font-size: 24px;
+      color: #333;
+      font-weight: 600;
+    }
+    .loading-content p {
+      margin: 0;
+      font-size: 16px;
+      color: #666;
+      opacity: 0.8;
+    }
+    
+    /* Success Screens */
+    .success-screen {
+      text-align: center;
+      padding: 40px 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .success-icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: success-bounce 0.6s ease;
+    }
+    @keyframes success-bounce {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .success-screen h2 {
+      color: #28a745;
+      margin-bottom: 15px;
+      font-size: 32px;
+      font-weight: 700;
+    }
+    .success-message {
+      font-size: 18px;
+      color: #666;
+      margin-bottom: 30px;
+      line-height: 1.5;
+    }
+    .success-details {
+      background: #f8f9fa;
+      border-radius: 0;
+      padding: 25px;
+      margin: 25px 0;
+      border-left: 4px solid #28a745;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 16px;
+    }
+    .detail-row:not(:last-child) {
+      border-bottom: 1px solid #e9ecef;
+    }
+    .detail-row span:first-child {
+      color: #666;
+      font-weight: 500;
+    }
+    .detail-row span:last-child {
+      color: #333;
+      font-weight: 600;
+    }
+    .success-btn {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+      margin-top: 30px;
+      font-size: 18px;
+      padding: 20px 40px;
+      border-radius: 0;
+      transition: all 0.3s ease;
+    }
+    .success-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(40, 167, 69, 0.3);
+    }
+  </style>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <!-- Tip Pool Calculator Dependencies -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+  <!-- OCR Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    // Configure PDF.js worker
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
+</head>
+<body>
+  <div id="appHeader"></div>
+  <div class="content">
+    <div id="messageArea"></div>
+
+    <!-- Toggle Form Button -->
+    <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+      <button class="toggle-form-btn" style="margin-bottom: 0; padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;" onclick="toggleForm()">+ NEW INCIDENT REPORT</button>
+    </div>
+
+    <!-- Incident Report Form -->
+    <div id="incidentForm" class="section" style="background: var(--white); border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+      <h2 style="font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900); margin-bottom: 16px;">Incident Report</h2>
+
+      <form id="reportForm" onsubmit="submitIncident(event)">
+        <!-- Manager Name -->
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label for="managerName" style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Manager Name *</label>
+          <input type="text" id="managerName" required style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; font-weight: 400; background: white;">
+        </div>
+
+        <!-- Date & Time -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label for="incidentDate" style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Incident Date *</label>
+            <input type="date" id="incidentDate" required style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; font-weight: 400; background: white;">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label for="incidentTime" style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Incident Time *</label>
+            <input type="time" id="incidentTime" required style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; font-weight: 400; background: white;">
+          </div>
+        </div>
+
+        <!-- Department -->
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label for="department" style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Department *</label>
+          <select id="department" onchange="handleDepartmentChange()" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; font-weight: 400; background: white;">
+            <option value="">Select Department...</option>
+            <option value="FOH">FOH</option>
+            <option value="BOH">BOH</option>
+            <option value="PREP">PREP</option>
+            <option value="MANAGEMENT">MANAGEMENT</option>
+            <option value="DELIVERY">DELIVERY</option>
+            <option value="__custom__">+ Add New Department</option>
+          </select>
+          <input type="text" id="customDepartment" style="display: none; margin-top: 8px; width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px;" placeholder="Enter new department name">
+        </div>
+
+        <!-- Staff Involved -->
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Staff Involved *</label>
+          <div id="staffList">
+            <div class="staff-entry" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+              <input type="text" class="staff-name" list="employeeNames" placeholder="Enter or select staff name" required style="flex: 1; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px;">
+            </div>
+          </div>
+          <datalist id="employeeNames"></datalist>
+          <a class="add-link" onclick="addStaffField()" style="display: inline-block; font-size: 12px; font-weight: 600; color: var(--gray-700); text-decoration: none; margin-top: 8px; cursor: pointer;">+ Add Another Name</a>
+        </div>
+
+        <!-- Incident Report -->
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label for="incidentReport" style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Incident Report *</label>
+          <div style="background: var(--warning-bg); border: 2px solid var(--warning-border); padding: 12px 16px; margin-bottom: 8px; font-size: 12px; color: var(--warning-text);">
+            Please be as detailed as possible. Include: what happened, when, where, who was involved, any damage/injury, actions taken, and any witnesses.
+          </div>
+          <textarea id="incidentReport" required placeholder="Describe the incident in detail..." style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; font-weight: 400; background: white; min-height: 120px; resize: vertical; font-family: inherit;"></textarea>
+        </div>
+
+        <!-- Photo Upload -->
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">Photos (Optional - Up to 5)</label>
+          <div class="photo-upload-area" onclick="document.getElementById('photoInput').click()" style="border: 2px dashed var(--gray-300); padding: 20px; text-align: center; background: var(--gray-100); cursor: pointer;">
+            <div style="font-size: 13px; color: var(--gray-600); font-weight: 600;">
+              📷 Click to Upload Photos
+            </div>
+            <div style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">
+              Max 5 photos, 2MB each
+            </div>
+          </div>
+          <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" onchange="handlePhotoUpload(event)">
+          <div id="photoPreview" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-top: 12px;"></div>
+        </div>
+
+        <!-- Submit Button -->
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+          <button type="button" onclick="cancelForm()" style="padding: 12px 24px; background: var(--gray-100); color: var(--gray-900); border: 2px solid var(--gray-300); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">CANCEL</button>
+          <button type="submit" style="padding: 12px 24px; background: #059669; border: 2px solid #059669; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">SAVE INCIDENT REPORT</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Incidents List -->
+    <div class="section" style="background: var(--white); border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+      <h2 style="font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900); margin-bottom: 16px;">Recent Incidents</h2>
+      <div id="incidentsList" class="incidents-list">
+        <div class="loading" style="text-align: center; padding: 40px; color: var(--gray-600);">Loading incidents...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- View Incident Modal -->
+  <div id="viewModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 10000; overflow-y: auto; padding: 20px;">
+    <div style="background: white; padding: 24px; max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; border: 3px solid var(--gray-700);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid var(--gray-300);">
+        <h2 style="font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900); margin: 0;">Incident Report</h2>
+        <button onclick="closeModal()" style="background: var(--gray-200); color: var(--gray-900); border: 2px solid var(--gray-300); padding: 8px 16px; font-size: 12px; cursor: pointer; text-transform: uppercase;">CLOSE</button>
+      </div>
+
+      <div id="modalBody"></div>
+
+      <div style="display: flex; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 2px solid var(--gray-300);">
+        <button onclick="downloadPDF()" style="padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">📥 DOWNLOAD PDF</button>
+        <button onclick="printIncident()" style="padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">🖨️ SEND TO PRINTER</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// Supabase client
+const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
+
+let supabase;
+function initializeSupabase() {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('Supabase initialized');
+}
+
+let currentIncident = null;
+let uploadedPhotos = [];
+let employeeList = [];
+
+// Load Toast employees for autocomplete
+async function loadEmployees() {
+  try {
+    const response = await fetch('/api/toast-employees');
+    const data = await response.json();
+
+    if (data.success && data.employees) {
+      employeeList = data.employees;
+
+      // Populate datalist
+      const datalist = document.getElementById('employeeNames');
+      datalist.innerHTML = data.employees
+        .map(emp => `<option value="${emp.name}">${emp.jobTitle ? ` (${emp.jobTitle})` : ''}</option>`)
+        .join('');
+
+      console.log(`✅ Loaded ${data.employees.length} employees from Toast`);
+    }
+  } catch (error) {
+    console.error('Error loading employees:', error);
+    // Silently fail - form still works without autocomplete
+  }
+}
+
+// Toggle form visibility
+function toggleForm() {
+  const form = document.getElementById('incidentForm');
+  const btn = document.querySelector('.toggle-form-btn');
+
+  if (form.classList.contains('active')) {
+    form.classList.remove('active');
+    btn.textContent = '+ NEW INCIDENT REPORT';
+    form.style.display = 'none';
+  } else {
+    form.classList.add('active');
+    btn.textContent = '− HIDE FORM';
+    form.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+// Cancel form
+function cancelForm() {
+  document.getElementById('reportForm').reset();
+  uploadedPhotos = [];
+  document.getElementById('photoPreview').innerHTML = '';
+  toggleForm();
+}
+
+// Load departments from database
+async function loadDepartments() {
+  const { data, error } = await supabase
+    .from('departments')
+    .select('name')
+    .order('name');
+
+  if (!error && data) {
+    const select = document.getElementById('department');
+    const existingOptions = Array.from(select.options).map(o => o.value);
+
+    data.forEach(dept => {
+      if (!existingOptions.includes(dept.name)) {
+        const option = document.createElement('option');
+        option.value = dept.name;
+        option.textContent = dept.name;
+        select.insertBefore(option, select.options[select.options.length - 1]);
+      }
+    });
+  }
+}
+
+// Handle custom department input
+function handleDepartmentChange() {
+  const select = document.getElementById('department');
+  const customInput = document.getElementById('customDepartment');
+
+  if (select.value === '__custom__') {
+    customInput.style.display = 'block';
+    customInput.required = true;
+  } else {
+    customInput.style.display = 'none';
+    customInput.required = false;
+  }
+}
+
+// Add additional staff field
+function addStaffField() {
+  const staffList = document.getElementById('staffList');
+  const entry = document.createElement('div');
+  entry.className = 'staff-entry';
+  entry.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
+  entry.innerHTML = `
+    <input type="text" class="staff-name" list="employeeNames" placeholder="Enter or select staff name" style="flex: 1; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px;">
+    <button type="button" onclick="this.parentElement.remove()" style="padding: 8px 12px; font-size: 11px; background: var(--error-bg); color: var(--error-text); border: 2px solid var(--error-border); cursor: pointer; text-transform: uppercase;">REMOVE</button>
+  `;
+  staffList.appendChild(entry);
+}
+
+// Handle photo upload
+async function handlePhotoUpload(event) {
+  const files = Array.from(event.target.files);
+
+  if (uploadedPhotos.length + files.length > 5) {
+    alert('Maximum 5 photos allowed');
+    return;
+  }
+
+  for (const file of files) {
+    if (file.size > 2 * 1024 * 1024) {
+      alert(`${file.name} is too large. Maximum 2MB per photo.`);
+      continue;
+    }
+
+    // Compress image
+    const compressed = await compressImage(file);
+    uploadedPhotos.push(compressed);
+  }
+
+  renderPhotoPreview();
+}
+
+// Compress image
+function compressImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Resize to max 1200px width/height
+        let width = img.width;
+        let height = img.height;
+        const maxSize = 1200;
+
+        if (width > maxSize || height > maxSize) {
+          if (width > height) {
+            height = (height / width) * maxSize;
+            width = maxSize;
+          } else {
+            width = (width / height) * maxSize;
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          resolve({
+            blob: blob,
+            preview: canvas.toDataURL('image/jpeg', 0.85),
+            name: file.name
+          });
+        }, 'image/jpeg', 0.85);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Render photo preview
+function renderPhotoPreview() {
+  const preview = document.getElementById('photoPreview');
+  preview.innerHTML = uploadedPhotos.map((photo, idx) => `
+    <div style="position: relative; aspect-ratio: 1; background: var(--gray-200); border: 2px solid var(--gray-300);">
+      <img src="${photo.preview}" alt="Photo ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover;">
+      <button type="button" onclick="removePhoto(${idx})" style="position: absolute; top: 4px; right: 4px; background: var(--error-bg); color: var(--error-text); border: 1px solid var(--error-border); padding: 4px 8px; font-size: 10px; cursor: pointer; font-weight: 700;">✕</button>
+    </div>
+  `).join('');
+}
+
+// Remove photo
+function removePhoto(index) {
+  uploadedPhotos.splice(index, 1);
+  renderPhotoPreview();
+}
+
+// Submit incident report
+async function submitIncident(event) {
+  event.preventDefault();
+
+  const managerName = document.getElementById('managerName').value.trim();
+  const incidentDate = document.getElementById('incidentDate').value;
+  const incidentTime = document.getElementById('incidentTime').value;
+
+  let department = document.getElementById('department').value;
+  if (department === '__custom__') {
+    department = document.getElementById('customDepartment').value.trim().toUpperCase();
+
+    // Save new department
+    await supabase.from('departments').upsert({ name: department });
+  }
+
+  const staffInputs = document.querySelectorAll('.staff-name');
+  const staffInvolved = Array.from(staffInputs)
+    .map(input => input.value.trim())
+    .filter(name => name.length > 0);
+
+  const incidentReport = document.getElementById('incidentReport').value.trim();
+
+  if (staffInvolved.length === 0) {
+    alert('Please add at least one staff member');
+    return;
+  }
+
+  // Upload photos to Supabase Storage
+  const photoUrls = [];
+  for (const photo of uploadedPhotos) {
+    const fileName = `${Date.now()}_${photo.name}`;
+    const { data, error } = await supabase.storage
+      .from('incident-photos')
+      .upload(fileName, photo.blob);
+
+    if (!error) {
+      const { data: { publicUrl } } = supabase.storage
+        .from('incident-photos')
+        .getPublicUrl(fileName);
+      photoUrls.push(publicUrl);
+    }
+  }
+
+  // Save incident to database
+  const { data, error } = await supabase
+    .from('manager_incidents')
+    .insert({
+      manager_name: managerName,
+      incident_date: incidentDate,
+      incident_time: incidentTime,
+      department: department,
+      staff_involved: staffInvolved,
+      incident_report: incidentReport,
+      photo_urls: photoUrls
+    })
+    .select()
+    .single();
+
+  if (error) {
+    alert('Error saving incident: ' + error.message);
+    return;
+  }
+
+  // Success!
+  alert('✅ Incident report saved successfully!');
+
+  // Reset form
+  document.getElementById('reportForm').reset();
+  uploadedPhotos = [];
+  document.getElementById('photoPreview').innerHTML = '';
+
+  // Reload incidents
+  await loadIncidents();
+
+  // Hide form
+  toggleForm();
+}
+
+// Load incidents from database
+async function loadIncidents() {
+  const list = document.getElementById('incidentsList');
+
+  const { data, error } = await supabase
+    .from('manager_incidents')
+    .select('*')
+    .order('incident_date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    list.innerHTML = '<div style="text-align: center; padding: 60px 20px; color: var(--gray-600);">Error loading incidents</div>';
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div style="text-align: center; padding: 60px 20px; color: var(--gray-600);">No incidents reported yet</div>';
+    return;
+  }
+
+  // Store incidents globally for access by onclick handlers
+  window.allIncidents = data;
+
+  list.innerHTML = data.map((incident, idx) => {
+    const preview = incident.incident_report.substring(0, 120) + (incident.incident_report.length > 120 ? '...' : '');
+    const date = new Date(incident.incident_date).toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+
+    return `
+      <div onclick="viewIncidentByIndex(${idx})" style="background: var(--white); border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.15s ease;" onmouseover="this.style.borderColor='var(--gray-700)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='var(--gray-300)'; this.style.boxShadow='none';">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 0.5px;">${date} at ${incident.incident_time}</div>
+          <div style="font-size: 11px; font-weight: 600; color: var(--gray-600);">${incident.manager_name}</div>
+        </div>
+        <div style="font-size: 11px; font-weight: 600; color: var(--gray-600); margin-bottom: 4px;">
+          ${incident.department} • ${incident.staff_involved.length} staff involved
+        </div>
+        <div style="font-size: 13px; color: var(--gray-700); line-height: 1.5; margin-top: 8px;">${preview}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// View incident by index
+function viewIncidentByIndex(index) {
+  if (window.allIncidents && window.allIncidents[index]) {
+    viewIncident(window.allIncidents[index]);
+  }
+}
+
+// View incident details in modal
+function viewIncident(incident) {
+  currentIncident = incident;
+
+  const date = new Date(incident.incident_date).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const staffList = incident.staff_involved.join(', ');
+
+  const photos = incident.photo_urls && incident.photo_urls.length > 0
+    ? `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px;">
+        ${incident.photo_urls.map(url => `<img src="${url}" style="width: 100%; border: 2px solid var(--gray-300);" />`).join('')}
+       </div>`
+    : '';
+
+  document.getElementById('modalBody').innerHTML = `
+    <div style="margin-bottom: 16px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); margin-bottom: 4px;">Date & Time</div>
+      <div style="font-size: 14px; color: var(--gray-900);">${date} at ${incident.incident_time}</div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); margin-bottom: 4px;">Reported By</div>
+      <div style="font-size: 14px; color: var(--gray-900);">${incident.manager_name}</div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); margin-bottom: 4px;">Department</div>
+      <div style="font-size: 14px; color: var(--gray-900);">${incident.department}</div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); margin-bottom: 4px;">Staff Involved</div>
+      <div style="font-size: 14px; color: var(--gray-900);">${staffList}</div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); margin-bottom: 4px;">Incident Report</div>
+      <div style="font-size: 14px; color: var(--gray-900); white-space: pre-wrap; line-height: 1.6;">${incident.incident_report}</div>
+    </div>
+
+    ${photos ? `<div style="margin-bottom: 16px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); margin-bottom: 4px;">Photos</div>
+      ${photos}
+    </div>` : ''}
+  `;
+
+  const modal = document.getElementById('viewModal');
+  modal.style.display = 'flex';
+}
+
+// Close modal
+function closeModal() {
+  const modal = document.getElementById('viewModal');
+  modal.style.display = 'none';
+  currentIncident = null;
+}
+
+// Download PDF
+async function downloadPDF() {
+  if (!currentIncident) return;
+
+  const response = await fetch('/api/print-incident', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ incident_id: currentIncident.id })
+  });
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Incident_Report_${currentIncident.incident_date}_${currentIncident.id}.pdf`;
+  a.click();
+}
+
+// Print incident (send to Epson printer via email)
+async function printIncident() {
+  if (!currentIncident) return;
+
+  const response = await fetch('/api/print-incident?print=true', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ incident_id: currentIncident.id })
+  });
+
+  const result = await response.json();
+
+  if (result.success) {
+    showSuccessMessage('✅ REPORT SENT TO PRINTER!', 'The incident report has been emailed to the Epson printer successfully.');
+  } else {
+    alert('Error printing report: ' + result.error);
+  }
+}
+
+// Show success message
+function showSuccessMessage(title, message) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    padding: 20px;
+  `;
+
+  const messageBox = document.createElement('div');
+  messageBox.style.cssText = `
+    background: white;
+    padding: 32px;
+    max-width: 500px;
+    width: 100%;
+    border: 3px solid #059669;
+    text-align: center;
+  `;
+
+  messageBox.innerHTML = `
+    <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+    <h2 style="font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #059669; margin: 0 0 16px 0;">
+      ${title}
+    </h2>
+    <p style="font-size: 14px; color: var(--gray-700); margin: 0 0 24px 0; line-height: 1.6;">
+      ${message}
+    </p>
+    <button onclick="this.closest('div[style*=fixed]').remove()" style="padding: 12px 32px; background: #059669; border: 2px solid #059669; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+      OK
+    </button>
+  `;
+
+  overlay.appendChild(messageBox);
+  document.body.appendChild(overlay);
+
+  setTimeout(() => {
+    if (overlay.parentElement) {
+      overlay.remove();
+    }
+  }, 4000);
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+    }
+  });
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeModal();
+  }
+});
+
+// goHome function (reload current page)
+function goHome() {
+  window.location.href = 'incidents.html';
+}
+
+</script>
+
+<script src="./app-header.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Initialize Supabase
+    initializeSupabase();
+
+    // Render app header
+    renderAppHeader({ currentPage: 'incidents', showLiveStats: true });
+
+    // Set today's date and time
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('incidentDate').value = today;
+
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('incidentTime').value = `${hours}:${minutes}`;
+
+    // Load Toast employees for autocomplete
+    loadEmployees();
+
+    // Load departments
+    loadDepartments();
+
+    // Load incidents
+    loadIncidents();
+
+    // Keep form hidden by default (toggle button shows it)
+    document.getElementById('incidentForm').style.display = 'none';
+  });
+</script>
+
+</body>
+</html>
