@@ -4760,6 +4760,13 @@
     const taskRecord = fohSystemState.tasks.find(t => t.id === taskId);
     if (!taskRecord || !taskRecord.is_completed) return;
 
+    // FETCH fresh clocked-in employees if state is empty
+    if (fohSystemState.clockedInEmployees.length === 0) {
+      console.log('🔄 Clocked-in employees state is empty, fetching fresh data...');
+      await fetchClockedInEmployees();
+      console.log(`✅ After fetch: ${fohSystemState.clockedInEmployees.length} employees`, fohSystemState.clockedInEmployees);
+    }
+
     // Build available team names list with Demetri Gregorakis ALWAYS available
     let availableNames = [];
 
