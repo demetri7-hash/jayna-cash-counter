@@ -1810,54 +1810,63 @@
         });
       }
 
-      if (!orders || orders.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">📅</div>
-            <div class="empty-title">No Upcoming Catering Orders</div>
-            <div class="empty-message">No catering orders scheduled for the next 14 days.</div>
-            <br>
-            <p style="font-size: 12px; color: var(--gray-500);">
-              Showing orders with source: Invoice, Catering, or Catering Online Ordering
-            </p>
-          </div>
-        `;
-        if (showLoadingSpinner) {
-          hideLoading();
-        }
-        return;
-      }
-
       // Group orders by date
       const ordersByDate = {};
-      orders.forEach(order => {
-        const date = order.delivery_date;
-        if (!ordersByDate[date]) {
-          ordersByDate[date] = [];
-        }
-        ordersByDate[date].push(order);
-      });
+      if (orders && orders.length > 0) {
+        orders.forEach(order => {
+          const date = order.delivery_date;
+          if (!ordersByDate[date]) {
+            ordersByDate[date] = [];
+          }
+          ordersByDate[date].push(order);
+        });
+      }
 
-      // Sort dates
-      const sortedDates = Object.keys(ordersByDate).sort();
+      // Generate next 7 days (including today)
+      const next7Days = [];
+      const today = new Date();
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        const dateStr = formatDate(date);
+        next7Days.push(dateStr);
+      }
+
+      // Find orders beyond day 7 (sorted by date)
+      const allOrderDates = Object.keys(ordersByDate).sort();
+      const day7Date = next7Days[6]; // Last of the 7 days
+      const ordersBeyond7Days = allOrderDates.filter(date => date > day7Date);
+
+      // Combine: first 7 days + any additional dates beyond day 7
+      const datesToDisplay = [...next7Days, ...ordersBeyond7Days];
 
       // Build HTML
       let html = '';
-      sortedDates.forEach(date => {
-        const dateOrders = ordersByDate[date];
+      datesToDisplay.forEach(date => {
+        const dateOrders = ordersByDate[date] || [];
         const dateLabel = formatDateLabel(date);
         const dateClass = getDateClass(date);
 
         html += `
           <div class="date-group">
             <div class="date-group-header ${dateClass}">
-              ${dateLabel} (${dateOrders.length} order${dateOrders.length > 1 ? 's' : ''})
+              ${dateLabel}${dateOrders.length > 0 ? ` (${dateOrders.length} order${dateOrders.length > 1 ? 's' : ''})` : ''}
             </div>
         `;
 
-        dateOrders.forEach(order => {
-          html += renderOrderCard(order);
-        });
+        if (dateOrders.length === 0) {
+          // No orders for this day - show "NO ORDERS DUE"
+          html += `
+            <div style="padding: 20px; text-align: center; color: var(--gray-500); font-size: 13px; font-weight: 600; background: var(--gray-100); border: 2px dashed var(--gray-300);">
+              NO ORDERS DUE
+            </div>
+          `;
+        } else {
+          // Show orders for this day
+          dateOrders.forEach(order => {
+            html += renderOrderCard(order);
+          });
+        }
 
         html += `</div>`;
       });
