@@ -179,7 +179,7 @@ window.submitPassword = async function() {
   if (enteredPassword === currentPasswordRequired) {
     // Correct password!
     window.closePasswordModal();
-    window.location.href = currentPasswordTarget;
+    window.top.location.href = currentPasswordTarget;
     return;
   }
 
@@ -197,7 +197,7 @@ window.submitPassword = async function() {
         if (watchdogPasswords.includes(enteredPassword)) {
           // Valid watchdog password!
           window.closePasswordModal();
-          window.location.href = currentPasswordTarget;
+          window.top.location.href = currentPasswordTarget;
           return;
         }
       }
