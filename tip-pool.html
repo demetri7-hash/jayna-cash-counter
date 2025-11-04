@@ -722,33 +722,55 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.85);
     z-index: 9999;
     justify-content: center;
     align-items: center;
   ">
-    <div style="
-      text-align: center;
-      color: white;
-    ">
-      <div class="spinner" style="
-        border: 8px solid #f3f3f3;
-        border-top: 8px solid #4CAF50;
-        border-radius: 50%;
-        width: 60px;
-        height: 60px;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 20px;
-      "></div>
-      <h3 id="loadingTitle" style="
-        font-size: 18px;
-        font-weight: bold;
-        margin-bottom: 10px;
-      ">Fetching Toast data...</h3>
-      <p id="loadingMessage" style="
-        font-size: 14px;
-        opacity: 0.9;
-      ">Please wait...</p>
+    <div style="text-align: center; color: white;">
+      <h3 style="font-size: 24px; font-weight: bold; margin-bottom: 8px; letter-spacing: 1px;">
+        MAKING MAGIC
+      </h3>
+      <p style="font-size: 16px; margin-bottom: 30px; opacity: 0.9;">
+        Demetri is a Genius 😉
+      </p>
+
+      <!-- Animated Pie Chart Progress -->
+      <svg width="80" height="80" viewBox="0 0 80 80" style="margin: 0 auto; display: block;">
+        <!-- Background circle -->
+        <circle cx="40" cy="40" r="35" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="8"/>
+
+        <!-- Animated gradient progress circle -->
+        <defs>
+          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#007bff;stop-opacity:1">
+              <animate attributeName="stop-color" values="#007bff;#0056b3;#007bff" dur="2s" repeatCount="indefinite"/>
+            </stop>
+            <stop offset="100%" style="stop-color:#0056b3;stop-opacity:1">
+              <animate attributeName="stop-color" values="#0056b3;#007bff;#0056b3" dur="2s" repeatCount="indefinite"/>
+            </stop>
+          </linearGradient>
+        </defs>
+
+        <!-- Progress circle (starts at top, fills clockwise) -->
+        <circle
+          id="progressCircle"
+          cx="40"
+          cy="40"
+          r="35"
+          fill="none"
+          stroke="url(#progressGradient)"
+          stroke-width="8"
+          stroke-linecap="round"
+          transform="rotate(-90 40 40)"
+          style="
+            stroke-dasharray: 220;
+            stroke-dashoffset: 220;
+            transition: stroke-dashoffset 0.5s ease;
+            filter: drop-shadow(0 0 8px rgba(0,123,255,0.6));
+          "
+        />
+      </svg>
     </div>
   </div>
 
@@ -987,7 +1009,7 @@
         <!-- Custom Notes (Expandable Section) -->
         <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;">
           <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
-            + ADD NOTES
+            Add Notes
           </summary>
           <div style="margin-top: 15px;">
             <div class="form-group" style="margin-bottom: 0;">
@@ -1000,9 +1022,13 @@
         <!-- Hidden field for ezcaterSales (will be auto-calculated) -->
         <input type="hidden" id="ezcaterSales" value="0">
 
-        <button class="submit-btn" onclick="calculateTipPool()">Next Step</button>
-        <button class="submit-btn" onclick="downloadTipPoolPDF()" id="tipPoolPdfBtn" style="margin-left: 10px; display: none;">Download Tip Pool PDF</button>
-        <button class="submit-btn" onclick="clearSavedData()" style="margin-left: 10px; padding: 6px 12px; font-size: 11px;" title="Clear all saved data and start fresh">Start Over</button>
+        <!-- Stacked Buttons -->
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 20px;">
+          <button class="submit-btn" onclick="calculateTipPool()">Next Step</button>
+          <button class="submit-btn" onclick="confirmStartOver()" style="padding: 6px 12px; font-size: 11px;" title="Clear all saved data and start fresh">Start Over</button>
+        </div>
+
+        <button class="submit-btn" onclick="downloadTipPoolPDF()" id="tipPoolPdfBtn" style="margin-top: 10px; display: none;">Download Tip Pool PDF</button>
 
 
 
@@ -1206,16 +1232,24 @@
   function getPacificDate(date = new Date()) {
     return formatPacificDate(date);
   }
-  function showLoading(title, message) {
+  function showLoading() {
     const overlay = document.getElementById('loadingOverlay');
-    document.getElementById('loadingTitle').textContent = title;
-    document.getElementById('loadingMessage').textContent = message;
-    overlay.style.display = 'flex'; // Override inline style
-    // Don't hide sections - loading overlay should appear on top, not replace content
+    overlay.style.display = 'flex';
+    updateLoadingProgress(0); // Start at 0%
   }
 
   function hideLoading() {
     document.getElementById('loadingOverlay').style.display = 'none';
+    updateLoadingProgress(0); // Reset for next time
+  }
+
+  function updateLoadingProgress(percent) {
+    // Update pie chart fill (220 is the full circle circumference)
+    const progressCircle = document.getElementById('progressCircle');
+    if (progressCircle) {
+      const offset = 220 - (220 * percent / 100);
+      progressCircle.style.strokeDashoffset = offset;
+    }
   }
   function showMessage(text, type) {
     // Only show popups for important messages (errors), ignore info/success
@@ -1555,11 +1589,78 @@
   }
   
   // Clear all saved data
+  function confirmStartOver() {
+    // Create confirmation modal
+    const modalHTML = `
+      <div id="confirmStartOverModal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.75);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      ">
+        <div style="
+          background: white;
+          padding: 30px;
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+          border: 3px solid #dc2626;
+        ">
+          <h3 style="margin: 0 0 15px 0; color: #dc2626; font-size: 20px;">Start Over?</h3>
+          <p style="margin: 0 0 25px 0; line-height: 1.5; font-size: 15px; color: #666;">
+            This will clear all your current data and reset the form. This action cannot be undone.
+          </p>
+          <div style="display: flex; gap: 10px; justify-content: center;">
+            <button onclick="closeStartOverModal()" style="
+              background: #f3f4f6;
+              color: #374151;
+              border: 2px solid #d1d5db;
+              padding: 10px 20px;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: 600;
+            ">Cancel</button>
+            <button onclick="proceedStartOver()" style="
+              background: #dc2626;
+              color: white;
+              border: 2px solid #dc2626;
+              padding: 10px 20px;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: 600;
+            ">Yes, Start Over</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+  }
+
+  function closeStartOverModal() {
+    const modal = document.getElementById('confirmStartOverModal');
+    if (modal) {
+      modal.remove();
+    }
+  }
+
+  function proceedStartOver() {
+    closeStartOverModal();
+    clearSavedData();
+  }
+
   function clearSavedData() {
     try {
       localStorage.removeItem('jaynaGyroCashCounter_tipPoolData');
       localStorage.removeItem('jaynaGyroCashCounter_combinedReportData');
-      
+
       // Reset tip pool state
       tipPoolRecords = [];
       tipPoolSummary = {};
@@ -1574,13 +1675,13 @@
           input.value = '';
         }
       });
-      
+
       // Hide results
       document.getElementById('tipPoolResults').style.display = 'none';
       document.getElementById('tipPoolPdfBtn').style.display = 'none';
       document.getElementById('combinedReportSection').style.display = 'none';
       document.getElementById('tipPoolForm').classList.remove('active');
-      
+
       showSuccessMessage('All saved data cleared. You can start fresh.');
       console.log('All saved data cleared');
     } catch (error) {
@@ -2177,18 +2278,16 @@
     }
 
     // Show loading overlay
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    loadingOverlay.style.display = 'flex';
+    showLoading(); // Starts at 0%
 
     // Update status indicator
     const statusDiv = document.getElementById('autoFetchStatus');
     statusDiv.innerHTML = '<span style="color: #666;">Fetching data from Toast API...</span>';
 
     try {
-      // Authenticate with Toast API
+      // Step 1: Authenticate with Toast API
       console.log('Fetching from Toast API...');
-      document.getElementById('loadingTitle').textContent = 'Authenticating with Toast API...';
-      document.getElementById('loadingMessage').textContent = 'Please wait...';
+      updateLoadingProgress(10);
 
       const authResponse = await fetch('/api/toast-auth', {
         method: 'POST',
@@ -2200,9 +2299,8 @@
       if (!authData.success || !authData.data?.accessToken) throw new Error('Failed to get access token');
       const token = authData.data.accessToken;
 
-      // Fetch labor and sales data from API
-      document.getElementById('loadingTitle').textContent = 'Fetching labor and payment data...';
-      document.getElementById('loadingMessage').textContent = 'Processing hundreds of payments - this may take 2-3 minutes. Please be patient!';
+      // Step 2: Fetch labor and sales data from API
+      updateLoadingProgress(20);
 
       const [laborResponse, salesResponse] = await Promise.all([
         fetch(`/api/toast-labor-summary?startDate=${startDate}&endDate=${endDate}&token=${token}`),
@@ -2228,6 +2326,9 @@
         laborResponse.json(),
         salesResponse.json()
       ]);
+
+      // Step 3: Data retrieved successfully
+      updateLoadingProgress(40);
 
       // Store the fetched data globally
       apiFetchedData.laborData = laborResult.employees;
@@ -2290,23 +2391,31 @@
       }
       console.log(`===================\n`);
 
-      // Auto-fetch TDS Driver tips
+      // Step 4: Auto-fetch TDS Driver tips
+      updateLoadingProgress(50);
       await autoFetchTdsDriverTips(startDate, endDate);
 
-      // Auto-fetch ezCater tips from database
+      // Step 5: Auto-fetch ezCater tips from database
+      updateLoadingProgress(62);
       await autoFetchEzCaterTips(startDate, endDate);
 
-      // Auto-fetch ezCater net sales from database
+      // Step 6: Auto-fetch ezCater net sales from database
+      updateLoadingProgress(75);
       await autoFetchEzCaterNetSales(startDate, endDate);
 
-      // Auto-fetch real envelope deposit from database
+      // Step 7: Auto-fetch real envelope deposit from database
+      updateLoadingProgress(87);
       await autoFetchRealEnvelopeDeposit(startDate, endDate);
 
-      // Auto-fetch cashbox count from database
+      // Step 8: Auto-fetch cashbox count from database
+      updateLoadingProgress(95);
       await autoFetchCashboxCount(startDate, endDate);
 
+      // Complete!
+      updateLoadingProgress(100);
+
       // Hide loading overlay on success
-      loadingOverlay.style.display = 'none';
+      hideLoading();
 
     } catch (error) {
       console.error('Auto-fetch error:', error);
@@ -2314,7 +2423,7 @@
       statusDiv.innerHTML = '<span style="color: #dc3545;">Failed to fetch data. You can upload files manually instead.</span>';
 
       // Hide loading overlay on error
-      loadingOverlay.style.display = 'none';
+      hideLoading();
     }
   }
 
