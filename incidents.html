@@ -1534,18 +1534,23 @@ async function updateIncident() {
 async function deleteIncident() {
   if (!currentIncident) return;
 
+  console.log('Deleting incident:', currentIncident.id);
+
   const { error } = await supabase
     .from('manager_incidents')
     .delete()
     .eq('id', currentIncident.id);
 
   if (error) {
-    alert('Error deleting incident: ' + error.message);
+    console.error('Delete error:', error);
+    showSuccessMessage('❌ DELETE FAILED', 'Error deleting incident: ' + error.message);
     return;
   }
 
-  // Success!
-  alert('✅ Incident report deleted successfully');
+  console.log('✅ Incident deleted successfully');
+
+  // Success! Use showSuccessMessage instead of alert
+  showSuccessMessage('✅ INCIDENT DELETED', 'The incident report has been permanently deleted from the database.');
 
   // Close modal
   closeModal();
