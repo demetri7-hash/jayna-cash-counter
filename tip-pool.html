@@ -763,11 +763,11 @@
         
         <div style="background: #f8f9fa; padding: 15px; border-radius: 0; margin-bottom: 20px; border-left: 4px solid #007bff;">
           <h4 style="margin: 0 0 10px 0; color: #007bff;">Quick Start:</h4>
-          <p style="margin: 5px 0; font-size: 14px;">1. Select date range → data auto-fetches from Toast</p>
-          <p style="margin: 5px 0; font-size: 14px;">2. Enter Real Envelope Deposit</p>
-          <p style="margin: 5px 0; font-size: 14px;">3. Enter EZ Cater tips + your name</p>
-          <p style="margin: 5px 0; font-size: 14px;">4. Click Calculate</p>
-          <p style="margin: 5px 0; font-size: 12px; color: #666;"><em>TDS Driver tips auto-calculate from your saved PM data</em></p>
+          <p style="margin: 5px 0; font-size: 14px;">1. Select date range → all data auto-fetches from database and Toast API</p>
+          <p style="margin: 5px 0; font-size: 14px;">2. Select your name from "Tips Calculated By" dropdown</p>
+          <p style="margin: 5px 0; font-size: 14px;">3. Review auto-fetched values in expandable sections</p>
+          <p style="margin: 5px 0; font-size: 14px;">4. Click Calculate Tip Pool</p>
+          <p style="margin: 5px 0; font-size: 12px; color: #666;"><em>All fields auto-populate but can be edited if needed</em></p>
         </div>
         
         <!-- Optional manual file uploads (data auto-fetches from Toast API) -->
@@ -805,77 +805,104 @@
           </div>
         </div>
         
-        <div class="form-group">
-          <label for="realEnvelopeDeposit">Real Envelope Deposit ($):</label>
-          <input type="number" id="realEnvelopeDeposit" class="form-input" step="1" placeholder="e.g., 550" inputmode="numeric" pattern="[0-9]*" onchange="calculateCashTips()">
-          <div style="font-size: 12px; color: #666; margin-top: 5px;">
-            Actual cash amount counted from envelopes
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label for="calculatedCashTips">Cash Tips (Auto-Calculated):</label>
-          <input type="number" id="calculatedCashTips" class="form-input" step="0.01" inputmode="decimal" readonly style="background: #f8f9fa; color: #666;">
-          <div style="font-size: 12px; color: #007bff; margin-top: 5px;">
-            <strong>Formula:</strong> Real Envelope Deposit - Toast Cash Sales (from saved PM data)
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label for="ezcaterTips">EZ Cater Tips for the Week ($):</label>
-          <input type="number" id="ezcaterTips" class="form-input" step="0.01" inputmode="decimal">
-          <div id="ezcaterAutoFetchStatus" style="font-size: 14px; color: #666; margin-top: 5px;">Auto-fetched from ezCater orders (editable)</div>
-        </div>
-
-        <div class="form-group">
-          <label for="tdsDriverTips">TDS Driver Tips for the Week ($):</label>
-          <input type="number" id="tdsDriverTips" class="form-input" step="0.01" inputmode="decimal" readonly style="background: #f8f9fa; color: #666;">
-          <div id="tdsAutoFetchStatus" style="font-size: 14px; color: #666; margin-top: 5px;">Auto-calculated from Toast API when you calculate tip pool</div>
-        </div>
-
-        <div class="form-group">
-          <label for="manualLaborCost">Total Labor Cost from Toast Web (Optional):</label>
-          <input type="number" id="manualLaborCost" class="form-input" step="0.01" placeholder="e.g., 9637.82" inputmode="decimal">
-          <div style="font-size: 12px; color: #666; margin-top: 5px;">
-            <strong>Why?</strong> CA double-time rules make API labor cost inaccurate. Enter the "Total Cost" from Toast web labor report for exact calculations.
-          </div>
-          <div style="font-size: 11px; color: #999; margin-top: 3px;">
-            If left blank, will use API data (may be $100-150 low due to double-time hours)
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="manualNetSales">Manual Net Sales (Optional):</label>
-          <input type="number" id="manualNetSales" class="form-input" step="0.01" placeholder="e.g., 31250.45" inputmode="decimal">
-          <div style="font-size: 12px; color: #666; margin-top: 5px;">
-            <strong>Why?</strong> Manually enter net sales if API data doesn't match Toast web reports. This will be used for labor percentage calculations.
-          </div>
-          <div style="font-size: 11px; color: #999; margin-top: 3px;">
-            If left blank, will use API-fetched net sales data from Toast
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="ezcaterSales">EZCater Sales (Optional):</label>
-          <input type="number" id="ezcaterSales" class="form-input" step="0.01" placeholder="e.g., 1500.00" inputmode="decimal">
-          <div style="font-size: 12px; color: #666; margin-top: 5px;">
-            <strong>Add EZCater catering sales</strong> to the total net sales for labor percentage calculations.
-          </div>
-          <div style="font-size: 11px; color: #999; margin-top: 3px;">
-            This amount will be added to the net sales (manual or API) when calculating labor summary
-          </div>
-        </div>
-
+        <!-- Tips Calculated By (always visible) -->
         <div class="form-group">
           <label for="calculatedByName">Tips Calculated By:</label>
-          <input type="text" id="calculatedByName" class="form-input" placeholder="Your Full Name">
+          <select id="calculatedByName" class="form-input">
+            <option value="">Select Name</option>
+            <option value="Demetri Gregorakis">Demetri Gregorakis</option>
+          </select>
         </div>
 
-        <div class="form-group">
-          <label for="tipPoolNotes">Custom Notes (Optional):</label>
-          <textarea id="tipPoolNotes" class="form-input" rows="3" placeholder="Enter any notes or adjustments for this tip pool calculation..."></textarea>
-          <div style="font-size: 12px; color: #666; margin-top: 5px;">These notes will be displayed in the tip pool summary below.</div>
-        </div>
+        <!-- Real Envelope Deposit (Expandable Section) -->
+        <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;" ontoggle="updateEnvelopeDepositSummary()">
+          <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
+            Real Envelope Deposit <span id="envelopeDepositSummaryAmount" style="color: #007bff; font-weight: 700;">$0.00</span>
+          </summary>
+          <div style="margin-top: 15px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="realEnvelopeDeposit">Real Envelope Deposit ($):</label>
+              <input type="number" id="realEnvelopeDeposit" class="form-input" step="1" placeholder="e.g., 550" inputmode="numeric" pattern="[0-9]*" onchange="calculateCashTips(); updateEnvelopeDepositSummary();">
+              <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                Auto-fetched from database (editable)
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- All Tips (Expandable Section) -->
+        <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;" ontoggle="updateTipsSummary()">
+          <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
+            All Tips <span id="tipsSummaryAmount" style="color: #007bff; font-weight: 700;">$0.00</span>
+          </summary>
+          <div style="margin-top: 15px;">
+            <div class="form-group">
+              <label for="calculatedCashTips">Cash Tips (Auto-Calculated):</label>
+              <input type="number" id="calculatedCashTips" class="form-input" step="0.01" inputmode="decimal" readonly style="background: #f8f9fa; color: #666;" onchange="updateTipsSummary()">
+              <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                Formula: Real Envelope Deposit - Toast Cash Sales
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="tdsDriverTips">TDS Driver Tips ($):</label>
+              <input type="number" id="tdsDriverTips" class="form-input" step="0.01" inputmode="decimal" readonly style="background: #f8f9fa; color: #666;" onchange="updateTipsSummary()">
+              <div id="tdsAutoFetchStatus" style="font-size: 12px; color: #666; margin-top: 5px;">Auto-calculated from Toast API</div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="ezcaterTips">EZCater Tips ($):</label>
+              <input type="number" id="ezcaterTips" class="form-input" step="0.01" inputmode="decimal" onchange="updateTipsSummary()">
+              <div id="ezcaterAutoFetchStatus" style="font-size: 12px; color: #666; margin-top: 5px;">Auto-fetched from database (editable)</div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Sales & Labor (Expandable Section) -->
+        <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;" ontoggle="updateSalesLaborSummary()">
+          <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
+            Sales & Labor <span id="salesLaborSummaryAmount" style="color: #007bff; font-weight: 700; font-size: 11px;">Sales: $0.00 | Labor: $0.00</span>
+          </summary>
+          <div style="margin-top: 15px;">
+            <div class="form-group">
+              <label for="ezcaterNetSales">EZCater Net Sales ($):</label>
+              <input type="number" id="ezcaterNetSales" class="form-input" step="0.01" inputmode="decimal" onchange="updateSalesLaborSummary()">
+              <div id="ezcaterNetSalesAutoFetchStatus" style="font-size: 12px; color: #666; margin-top: 5px;">Auto-fetched from database (editable)</div>
+            </div>
+
+            <div class="form-group">
+              <label for="manualNetSales">Manual Net Sales (Optional):</label>
+              <input type="number" id="manualNetSales" class="form-input" step="0.01" placeholder="e.g., 31250.45" inputmode="decimal" onchange="updateSalesLaborSummary()">
+              <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                Enter if API data doesn't match Toast web reports
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="manualLaborCost">Total Labor Cost (Optional):</label>
+              <input type="number" id="manualLaborCost" class="form-input" step="0.01" placeholder="e.g., 9637.82" inputmode="decimal" onchange="updateSalesLaborSummary()">
+              <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                Enter "Total Cost" from Toast web for exact calculations
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Custom Notes (Expandable Section) -->
+        <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;">
+          <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
+            + ADD NOTES
+          </summary>
+          <div style="margin-top: 15px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="tipPoolNotes">Custom Notes (Optional):</label>
+              <textarea id="tipPoolNotes" class="form-input" rows="3" placeholder="Enter any notes or adjustments for this tip pool calculation..."></textarea>
+            </div>
+          </div>
+        </details>
+
+        <!-- Hidden field for ezcaterSales (will be auto-calculated) -->
+        <input type="hidden" id="ezcaterSales" value="0">
 
         <!-- Cashbox Count Section (Collapsible) -->
         <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;">
@@ -1625,6 +1652,10 @@
 
       // TDS Driver tips are now auto-fetched with other data when dates change (no delay!)
 
+      // Update summary displays
+      updateTipsSummary();
+      updateEnvelopeDepositSummary();
+
     } catch (error) {
       console.error('Error calculating cash tips:', error);
       document.getElementById('calculatedCashTips').value = '';
@@ -1771,7 +1802,10 @@
       // Update the field and UI
       document.getElementById('tdsDriverTips').value = totalNetTips.toFixed(2);
       document.getElementById('tdsAutoFetchStatus').innerHTML = `<span style="color: #28a745;">Loaded: $${totalNetTips.toFixed(2)} from ${totalOrderCount} TDS orders</span>`;
-      
+
+      // Update tips summary
+      updateTipsSummary();
+
       console.log('TDS Driver tips auto-fetched successfully:', totalNetTips);
       
     } catch (tdsError) {
@@ -1853,6 +1887,155 @@
     }
   }
 
+  async function autoFetchEzCaterNetSales(startDate, endDate) {
+    console.log('Auto-fetching ezCater net sales from database for date range:', startDate, 'to', endDate);
+
+    // Update status to show loading
+    const statusDiv = document.getElementById('ezcaterNetSalesAutoFetchStatus');
+    statusDiv.innerHTML = '<span style="color: #666;">Fetching ezCater net sales from database...</span>';
+
+    try {
+      // Query catering_orders table for ezCater orders in date range
+      const { data: ezCaterOrders, error } = await supabase
+        .from('catering_orders')
+        .select('subtotal, order_number, delivery_date, customer_name')
+        .eq('source_system', 'EZCATER')
+        .gte('delivery_date', startDate)
+        .lte('delivery_date', endDate)
+        .order('delivery_date', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      // Calculate total net sales (sum of subtotals, excluding tax and tips)
+      const totalNetSales = ezCaterOrders.reduce((sum, order) => {
+        const subtotal = parseFloat(order.subtotal) || 0;
+        return sum + subtotal;
+      }, 0);
+
+      const orderCount = ezCaterOrders.length;
+
+      // Auto-populate the ezCater net sales field
+      document.getElementById('ezcaterNetSales').value = totalNetSales.toFixed(2);
+
+      // Update status div with success message
+      if (orderCount > 0) {
+        statusDiv.innerHTML = `<span style="color: #28a745;">✓ Loaded: $${totalNetSales.toFixed(2)} from ${orderCount} ezCater order${orderCount === 1 ? '' : 's'}</span>`;
+      } else {
+        statusDiv.innerHTML = '<span style="color: #666;">No ezCater orders found in this date range</span>';
+      }
+
+      // Update the summary text in expandable section if it exists
+      updateSalesLaborSummary();
+
+      // Show success message in console
+      console.log(`✅ ezCater net sales auto-fetched: $${totalNetSales.toFixed(2)} from ${orderCount} orders`);
+
+      if (orderCount > 0) {
+        console.log('ezCater orders found:');
+        ezCaterOrders.forEach(order => {
+          console.log(`  - Order #${order.order_number} (${order.delivery_date}): $${parseFloat(order.subtotal).toFixed(2)} subtotal`);
+        });
+      } else {
+        console.log('No ezCater orders found in this date range');
+      }
+
+    } catch (error) {
+      console.error('Error fetching ezCater net sales:', error);
+      // Don't block the flow - just set to 0 if fetch fails
+      document.getElementById('ezcaterNetSales').value = '0.00';
+      statusDiv.innerHTML = '<span style="color: #dc3545;">Failed to fetch ezCater net sales from database</span>';
+    }
+  }
+
+  async function autoFetchRealEnvelopeDeposit(startDate, endDate) {
+    console.log('Auto-fetching real envelope deposit from database for date range:', startDate, 'to', endDate);
+
+    try {
+      // Query cash_counts table for envelope deposit amounts in date range
+      const { data: cashCounts, error } = await supabase
+        .from('cash_counts')
+        .select('date, pm_deposit_amount')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .not('pm_deposit_amount', 'is', null)
+        .order('date', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      // Calculate total envelope deposit
+      const totalDeposit = cashCounts.reduce((sum, record) => {
+        const deposit = parseFloat(record.pm_deposit_amount) || 0;
+        return sum + deposit;
+      }, 0);
+
+      const recordCount = cashCounts.length;
+
+      // Auto-populate the real envelope deposit field
+      document.getElementById('realEnvelopeDeposit').value = totalDeposit.toFixed(2);
+
+      // Update the summary text in expandable section if it exists
+      updateEnvelopeDepositSummary();
+
+      // Show success message in console
+      console.log(`✅ Real envelope deposit auto-fetched: $${totalDeposit.toFixed(2)} from ${recordCount} days`);
+
+      if (recordCount > 0) {
+        console.log('Cash counts found:');
+        cashCounts.forEach(record => {
+          console.log(`  - ${record.date}: $${parseFloat(record.pm_deposit_amount).toFixed(2)} deposit`);
+        });
+      } else {
+        console.log('No cash counts with envelope deposits found in this date range');
+      }
+
+    } catch (error) {
+      console.error('Error fetching real envelope deposit:', error);
+      // Don't block the flow - leave field empty if fetch fails
+    }
+  }
+
+  // Helper functions to update summary text in expandable sections
+  function updateTipsSummary() {
+    const cashTips = parseFloat(document.getElementById('calculatedCashTips').value) || 0;
+    const tdsTips = parseFloat(document.getElementById('tdsDriverTips').value) || 0;
+    const ezCaterTips = parseFloat(document.getElementById('ezcaterTips').value) || 0;
+    const total = cashTips + tdsTips + ezCaterTips;
+
+    const summarySpan = document.getElementById('tipsSummaryAmount');
+    if (summarySpan) {
+      summarySpan.textContent = `$${total.toFixed(2)}`;
+    }
+  }
+
+  function updateSalesLaborSummary() {
+    const ezCaterNetSales = parseFloat(document.getElementById('ezcaterNetSales').value) || 0;
+    const manualNetSales = parseFloat(document.getElementById('manualNetSales').value) || 0;
+    const manualLaborCost = parseFloat(document.getElementById('manualLaborCost').value) || 0;
+
+    // Auto-sync ezcaterSales with ezcaterNetSales (same value)
+    document.getElementById('ezcaterSales').value = ezCaterNetSales.toFixed(2);
+
+    const summarySpan = document.getElementById('salesLaborSummaryAmount');
+    if (summarySpan) {
+      // Show the sum of all values
+      const display = `Sales: $${(ezCaterNetSales + manualNetSales).toFixed(2)} | Labor: $${manualLaborCost.toFixed(2)}`;
+      summarySpan.textContent = display;
+    }
+  }
+
+  function updateEnvelopeDepositSummary() {
+    const deposit = parseFloat(document.getElementById('realEnvelopeDeposit').value) || 0;
+
+    const summarySpan = document.getElementById('envelopeDepositSummaryAmount');
+    if (summarySpan) {
+      summarySpan.textContent = `$${deposit.toFixed(2)}`;
+    }
+  }
+
   // Handle file upload - show status and clear API data
   function handleFileUpload() {
     const laborFile = document.getElementById('laborFile').files[0];
@@ -1904,6 +2087,12 @@
 
       // Auto-fetch ezCater tips from database (not in manual files!)
       await autoFetchEzCaterTips(startDate, endDate);
+
+      // Auto-fetch ezCater net sales from database (not in manual files!)
+      await autoFetchEzCaterNetSales(startDate, endDate);
+
+      // Auto-fetch real envelope deposit from database (not in manual files!)
+      await autoFetchRealEnvelopeDeposit(startDate, endDate);
       return;
     }
 
@@ -2026,6 +2215,12 @@
 
       // Auto-fetch ezCater tips from database
       await autoFetchEzCaterTips(startDate, endDate);
+
+      // Auto-fetch ezCater net sales from database
+      await autoFetchEzCaterNetSales(startDate, endDate);
+
+      // Auto-fetch real envelope deposit from database
+      await autoFetchRealEnvelopeDeposit(startDate, endDate);
 
       // Hide loading overlay on success
       loadingOverlay.style.display = 'none';
