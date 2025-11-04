@@ -1477,6 +1477,7 @@
 
   const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
+  const PACIFIC_TIMEZONE = 'America/Los_Angeles';
   let supabase;
 
   function initializeSupabase() {
@@ -1491,6 +1492,133 @@
       console.error('Supabase init failed:', error);
       showMessage('Database connection failed', 'error');
     }
+  }
+
+  // ====================================
+  // PACIFIC TIME HELPER FUNCTIONS
+  // ====================================
+
+  /**
+   * Determine the offset (in minutes) for Pacific time at a specific moment.
+   */
+  function getPacificOffsetMinutes(date) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      timeZoneName: 'short'
+    }).formatToParts(date);
+
+    const tzName = parts.find(part => part.type === 'timeZoneName')?.value || 'PST';
+
+    if (tzName.includes('PDT')) return 420; // UTC-7
+    if (tzName.includes('PST')) return 480; // UTC-8
+
+    const gmtMatch = tzName.match(/GMT([+-]\d{2})(\d{2})?/i);
+    if (gmtMatch) {
+      const hours = parseInt(gmtMatch[1], 10);
+      const minutes = gmtMatch[2] ? parseInt(gmtMatch[2], 10) : 0;
+      return Math.abs(hours) * 60 + minutes;
+    }
+
+    return 480; // Default to PST
+  }
+
+  /**
+   * Create a Date that represents a Pacific-local wall clock time.
+   */
+  function createPacificDate(year, month, day, hour = 12, minute = 0, second = 0) {
+    const utcMillis = Date.UTC(year, month - 1, day, hour, minute, second);
+    const tempUtcDate = new Date(utcMillis);
+    const offsetMinutes = getPacificOffsetMinutes(tempUtcDate);
+    return new Date(utcMillis + offsetMinutes * 60000);
+  }
+
+  /**
+   * Convert any JS Date into a Pacific-local date (defaulting to midday).
+   */
+  function getPacificMidday(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+
+    const year = Number(parts.find(part => part.type === 'year')?.value);
+    const month = Number(parts.find(part => part.type === 'month')?.value);
+    const day = Number(parts.find(part => part.type === 'day')?.value);
+
+    return createPacificDate(year, month, day, 12, 0, 0);
+  }
+
+  /**
+   * Parse a YYYY-MM-DD string into a Pacific-local Date (midday).
+   */
+  function parsePacificDate(dateString) {
+    if (!dateString) return null;
+    const [year, month, day] = dateString.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return createPacificDate(year, month, day, 12, 0, 0);
+  }
+
+  /**
+   * Format a Date as YYYY-MM-DD in Pacific time.
+   */
+  function formatPacificDate(date) {
+    if (!date) return '';
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+
+    const year = parts.find(part => part.type === 'year')?.value;
+    const month = parts.find(part => part.type === 'month')?.value;
+    const day = parts.find(part => part.type === 'day')?.value;
+
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Format helper for display strings while forcing Pacific timezone.
+   */
+  function formatPacificDateDisplay(date, options = {}) {
+    if (!date) return '';
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      ...options
+    }).format(date);
+  }
+
+  function formatPacificWeekday(date) {
+    return formatPacificDateDisplay(date, { weekday: 'long' });
+  }
+
+  function getPacificHour(date) {
+    if (!date) return null;
+    const hourString = new Intl.DateTimeFormat('en-US', {
+      timeZone: PACIFIC_TIMEZONE,
+      hour: '2-digit',
+      hour12: false
+    }).format(date);
+    return Number(hourString);
+  }
+
+  /**
+   * Add days to a Pacific Date and return the normalized Pacific midday Date.
+   */
+  function addPacificDays(date, days) {
+    if (!date) return null;
+    const pacificMidday = getPacificMidday(date);
+    const nextUtc = new Date(pacificMidday.getTime() + days * 86400000);
+    return getPacificMidday(nextUtc);
+  }
+
+  /**
+   * Return the current Pacific date as YYYY-MM-DD.
+   */
+  function getPacificDate(date = new Date()) {
+    return formatPacificDate(date);
   }
 
   // ====================================
@@ -1613,8 +1741,8 @@
   }
 
   function goHome() {
-    // Navigate back to index.html main menu
-    window.location.href = 'index.html';
+    // Reload current page to refresh data
+    window.location.href = 'orders-prep.html';
   }
 
   // ====================================
