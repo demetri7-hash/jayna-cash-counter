@@ -2518,11 +2518,9 @@
         console.log('✅ Clocked in employees:', result.clockedIn);
       }
 
-      // Extract first names only
+      // Extract FULL names (matching header display)
       const employees = result.clockedIn.map(emp => {
-        const fullName = emp.fullName || emp.name || 'Unknown';
-        const firstName = fullName.split(' ')[0]; // Get first name only
-        return firstName;
+        return emp.fullName || emp.name || 'Unknown';
       });
 
       // Store in state
@@ -4773,19 +4771,26 @@
 
     // Add all clocked-in employees (only skip if EXACTLY "Demetri Gregorakis")
     // NOTE: Another employee named "Demetri" (different last name) should still be added
+    console.log(`👥 Clocked-in employees in state: ${fohSystemState.clockedInEmployees.length}`, fohSystemState.clockedInEmployees);
+
     if (fohSystemState.clockedInEmployees.length > 0) {
       fohSystemState.clockedInEmployees.forEach((name, index) => {
         if (name !== 'Demetri Gregorakis') {
+          console.log(`  ➕ Adding clocked-in employee: ${name}`);
           availableNames.push({
             name: name,
             color: getUserColor(index + 1) // Offset by 1 since Demetri uses index 0
           });
+        } else {
+          console.log(`  ⏭️ Skipping duplicate: ${name}`);
         }
       });
     }
 
     // Update teamNames with the complete list
     fohSystemState.teamNames = availableNames;
+
+    console.log(`🔄 Available team members for cycling: ${availableNames.length}`, availableNames.map(u => u.name));
 
     if (fohSystemState.teamNames.length === 0) {
       showMessage('No team members available to cycle through', 'error');
