@@ -13,6 +13,20 @@ function renderSharedHeader() {
   }
 
   const headerHTML = `
+    <!-- Password Modal -->
+    <div id="passwordModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 99999; align-items: center; justify-content: center;">
+      <div style="background: white; padding: 24px; max-width: 400px; width: 90%; border: 3px solid var(--gray-700);">
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">PASSWORD REQUIRED</h3>
+        <p id="passwordModalLabel" style="margin-bottom: 12px; font-size: 13px; color: var(--gray-700);"></p>
+        <input type="password" id="passwordInput" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; margin-bottom: 16px; box-sizing: border-box;">
+        <div style="display: flex; gap: 12px;">
+          <button onclick="window.closePasswordModal()" style="flex: 1; padding: 12px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; text-transform: uppercase; cursor: pointer;">CANCEL</button>
+          <button onclick="window.submitPassword()" style="flex: 1; padding: 12px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; text-transform: uppercase; cursor: pointer;">SUBMIT</button>
+        </div>
+        <div id="passwordError" style="margin-top: 12px; color: #dc2626; font-size: 12px; font-weight: 600; display: none;"></div>
+      </div>
+    </div>
+
     <div class="header" style="padding-top: 20px;">
       <img src="jayna-logo.png" alt="Jayna Gyro Logo" class="logo">
       <h1>JAYNA GYRO</h1>
@@ -78,13 +92,13 @@ function renderSharedHeader() {
 
       <!-- MAIN MENU NAVIGATION -->
       <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; margin-bottom: 20px;">
-        <a href="cash.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CASH</a>
+        <a onclick="window.requirePassword('cash.html', 'jaynacash', 'CASH')" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CASH</a>
         <a href="orders-prep.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">ORDERS & PREP</a>
         <a href="foh-checklists.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">FOH</a>
         <a href="boh.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">BOH</a>
         <a href="catering.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CATERING</a>
         <a href="drivers.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">DRIVERS</a>
-        <a href="tip-pool.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">MANAGER</a>
+        <a onclick="window.requirePassword('tip-pool.html', 'JaynaGyro2025!', 'MANAGER')" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">MANAGER</a>
         <a href="teamupdates.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">TEAM UPDATES</a>
         <a href="incidents.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">INCIDENTS</a>
       </div>
@@ -121,3 +135,101 @@ if (document.readyState === 'loading') {
 } else {
   renderSharedHeader();
 }
+
+// Password protection system
+let currentPasswordTarget = null;
+let currentPasswordRequired = null;
+let currentPasswordLabel = null;
+
+window.requirePassword = function(targetUrl, password, label) {
+  currentPasswordTarget = targetUrl;
+  currentPasswordRequired = password;
+  currentPasswordLabel = label;
+
+  const modal = document.getElementById('passwordModal');
+  const labelEl = document.getElementById('passwordModalLabel');
+  const inputEl = document.getElementById('passwordInput');
+  const errorEl = document.getElementById('passwordError');
+
+  if (modal && labelEl && inputEl) {
+    labelEl.textContent = `Enter password to access ${label}:`;
+    inputEl.value = '';
+    errorEl.style.display = 'none';
+    modal.style.display = 'flex';
+    inputEl.focus();
+
+    // Allow Enter key to submit
+    inputEl.onkeypress = function(e) {
+      if (e.key === 'Enter') {
+        window.submitPassword();
+      }
+    };
+  }
+};
+
+window.submitPassword = async function() {
+  const inputEl = document.getElementById('passwordInput');
+  const errorEl = document.getElementById('passwordError');
+
+  if (!inputEl || !errorEl) return;
+
+  const enteredPassword = inputEl.value;
+
+  // Check hardcoded password first
+  if (enteredPassword === currentPasswordRequired) {
+    // Correct password!
+    window.closePasswordModal();
+    window.location.href = currentPasswordTarget;
+    return;
+  }
+
+  // Also check against watchdog passwords from database
+  if (typeof supabase !== 'undefined') {
+    try {
+      const { data, error } = await supabase
+        .from('foh_watchdog_passwords')
+        .select('password')
+        .eq('is_active', true);
+
+      if (!error && data) {
+        const watchdogPasswords = data.map(row => row.password);
+
+        if (watchdogPasswords.includes(enteredPassword)) {
+          // Valid watchdog password!
+          window.closePasswordModal();
+          window.location.href = currentPasswordTarget;
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Error checking watchdog passwords:', err);
+    }
+  }
+
+  // Wrong password (not hardcoded and not in database)
+  errorEl.textContent = '❌ Incorrect password. Please try again.';
+  errorEl.style.display = 'block';
+  inputEl.value = '';
+  inputEl.focus();
+};
+
+window.closePasswordModal = function() {
+  const modal = document.getElementById('passwordModal');
+  const inputEl = document.getElementById('passwordInput');
+  const errorEl = document.getElementById('passwordError');
+
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  if (inputEl) {
+    inputEl.value = '';
+    inputEl.onkeypress = null;
+  }
+  if (errorEl) {
+    errorEl.style.display = 'none';
+  }
+
+  currentPasswordTarget = null;
+  currentPasswordRequired = null;
+  currentPasswordLabel = null;
+};
