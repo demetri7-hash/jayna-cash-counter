@@ -92,13 +92,13 @@ function renderSharedHeader() {
 
       <!-- MAIN MENU NAVIGATION -->
       <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; margin-bottom: 20px;">
-        <a onclick="window.requirePassword('cash.html', 'jaynacash', 'CASH')" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CASH</a>
+        <a onclick="window.requirePasswordFor('CASH', accessCash, 'jaynacash')" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CASH</a>
         <a href="orders-prep.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">ORDERS & PREP</a>
         <a href="foh-checklists.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">FOH</a>
         <a href="boh.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">BOH</a>
         <a href="catering.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CATERING</a>
         <a href="drivers.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">DRIVERS</a>
-        <a onclick="window.requirePassword('tip-pool.html', 'JaynaGyro2025!', 'MANAGER')" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">MANAGER</a>
+        <a onclick="window.requirePasswordFor('MANAGER', accessManager, 'JaynaGyro2025!')" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">MANAGER</a>
         <a href="teamupdates.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">TEAM UPDATES</a>
         <a href="incidents.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">INCIDENTS</a>
       </div>
@@ -136,13 +136,13 @@ if (document.readyState === 'loading') {
   renderSharedHeader();
 }
 
-// Password protection system
-let currentPasswordTarget = null;
+// Password protection system (USES OLD WORKING METHOD)
+window.managerPasswordCallback = null;
 let currentPasswordRequired = null;
 let currentPasswordLabel = null;
 
-window.requirePassword = function(targetUrl, password, label) {
-  currentPasswordTarget = targetUrl;
+window.requirePasswordFor = function(label, callback, password) {
+  window.managerPasswordCallback = callback;
   currentPasswordRequired = password;
   currentPasswordLabel = label;
 
@@ -157,21 +157,19 @@ window.requirePassword = function(targetUrl, password, label) {
     errorEl.style.display = 'none';
     modal.style.display = 'flex';
 
-    // Don't call focus() - causes cross-origin errors in iframe
-    // inputEl.focus();
-
     // Allow Enter key to submit
-    inputEl.onkeypress = function(e) {
+    inputEl.addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
         window.submitPassword();
       }
-    };
+    });
   }
 };
 
 window.submitPassword = async function() {
   const inputEl = document.getElementById('passwordInput');
   const errorEl = document.getElementById('passwordError');
+  const modal = document.getElementById('passwordModal');
 
   if (!inputEl || !errorEl) return;
 
@@ -179,9 +177,11 @@ window.submitPassword = async function() {
 
   // Check hardcoded password first
   if (enteredPassword === currentPasswordRequired) {
-    // Correct password!
-    window.closePasswordModal();
-    window.top.location.href = currentPasswordTarget;
+    // Correct password! Close modal and execute callback
+    if (modal) modal.style.display = 'none';
+    if (window.managerPasswordCallback) {
+      window.managerPasswordCallback();
+    }
     return;
   }
 
@@ -197,9 +197,11 @@ window.submitPassword = async function() {
         const watchdogPasswords = data.map(row => row.password);
 
         if (watchdogPasswords.includes(enteredPassword)) {
-          // Valid watchdog password!
-          window.closePasswordModal();
-          window.top.location.href = currentPasswordTarget;
+          // Valid watchdog password! Close modal and execute callback
+          if (modal) modal.style.display = 'none';
+          if (window.managerPasswordCallback) {
+            window.managerPasswordCallback();
+          }
           return;
         }
       }
@@ -212,7 +214,6 @@ window.submitPassword = async function() {
   errorEl.textContent = '❌ Incorrect password. Please try again.';
   errorEl.style.display = 'block';
   inputEl.value = '';
-  // Don't call focus() - causes cross-origin errors in iframe
 };
 
 window.closePasswordModal = function() {
@@ -225,13 +226,21 @@ window.closePasswordModal = function() {
   }
   if (inputEl) {
     inputEl.value = '';
-    inputEl.onkeypress = null;
   }
   if (errorEl) {
     errorEl.style.display = 'none';
   }
 
-  currentPasswordTarget = null;
+  window.managerPasswordCallback = null;
   currentPasswordRequired = null;
   currentPasswordLabel = null;
+};
+
+// Navigation callback functions (called AFTER password validation)
+window.accessCash = function() {
+  window.location.href = 'cash.html';
+};
+
+window.accessManager = function() {
+  window.location.href = 'tip-pool.html';
 };
