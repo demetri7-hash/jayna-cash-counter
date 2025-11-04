@@ -863,7 +863,7 @@
         <!-- All Tips (Expandable Section) -->
         <details style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;" ontoggle="updateTipsSummary()">
           <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
-            All Tips <span id="tipsSummaryAmount" style="color: #007bff; font-weight: 700; font-size: 11px;">Cash: $0.00 | TDS: $0.00 | EZC: $0.00</span>
+            All Tips <span id="tipsSummaryAmount" style="color: #007bff; font-weight: 700; font-size: 11px;">Cash: $0.00 | TDS: $0.00 | CC: $0.00 | EZC: $0.00</span>
           </summary>
           <div style="margin-top: 15px;">
             <div class="form-group">
@@ -878,6 +878,12 @@
               <label for="tdsDriverTips">TDS Driver Tips ($):</label>
               <input type="number" id="tdsDriverTips" class="form-input" step="0.01" inputmode="decimal" readonly style="background: #f8f9fa; color: #666;" onchange="updateTipsSummary()">
               <div id="tdsAutoFetchStatus" style="font-size: 12px; color: #666; margin-top: 5px;">Auto-calculated from Toast API</div>
+            </div>
+
+            <div class="form-group">
+              <label for="creditCardTips">Credit Card Tips ($):</label>
+              <input type="number" id="creditCardTips" class="form-input" step="0.01" inputmode="decimal" onchange="updateTipsSummary()">
+              <div style="font-size: 12px; color: #666; margin-top: 5px;">Auto-fetched from Toast API (editable)</div>
             </div>
 
             <div class="form-group" style="margin-bottom: 0;">
@@ -2113,12 +2119,13 @@
   function updateTipsSummary() {
     const cashTips = parseFloat(document.getElementById('calculatedCashTips').value) || 0;
     const tdsTips = parseFloat(document.getElementById('tdsDriverTips').value) || 0;
+    const ccTips = parseFloat(document.getElementById('creditCardTips').value) || 0;
     const ezCaterTips = parseFloat(document.getElementById('ezcaterTips').value) || 0;
 
     const summarySpan = document.getElementById('tipsSummaryAmount');
     if (summarySpan) {
       // Show itemized like Sales & Labor
-      const display = `Cash: $${cashTips.toFixed(2)} | TDS: $${tdsTips.toFixed(2)} | EZC: $${ezCaterTips.toFixed(2)}`;
+      const display = `Cash: $${cashTips.toFixed(2)} | TDS: $${tdsTips.toFixed(2)} | CC: $${ccTips.toFixed(2)} | EZC: $${ezCaterTips.toFixed(2)}`;
       summarySpan.textContent = display;
     }
   }
@@ -2163,56 +2170,56 @@
   }
 
   async function autoFetchCashboxCount(startDate, endDate) {
-    console.log('Auto-fetching cashbox count for most recent Monday within 6 days of end date:', endDate);
+    console.log('Auto-fetching cashbox count for today (most recent count)');
 
     try {
-      // Parse end date
-      const endDateObj = new Date(endDate + 'T12:00:00');
+      // Get today's date in Pacific timezone
+      const today = new Date();
+      const pacificDate = new Date(today.toLocaleString('en-US', { timeZone: PACIFIC_TIMEZONE }));
+      const todayStr = pacificDate.toISOString().split('T')[0];
 
-      // Find most recent Monday within 6 days of end date
-      let foundMonday = null;
+      console.log(`Looking for cashbox count for today: ${todayStr}`);
 
-      // Search backwards from end date up to 6 days
-      for (let i = 0; i <= 6; i++) {
-        const checkDate = new Date(endDateObj);
-        checkDate.setDate(checkDate.getDate() - i);
-
-        // Check if this date is a Monday (0 = Sunday, 1 = Monday, etc.)
-        if (checkDate.getDay() === 1) {
-          foundMonday = checkDate;
-          break;
-        }
-      }
-
-      if (!foundMonday) {
-        console.log('No Monday found within 6 days of end date');
-        document.getElementById('tipPoolCashboxTotal').textContent = '$0.00';
-        updateCashboxSummary();
-        return;
-      }
-
-      // Format as YYYY-MM-DD
-      const mondayStr = foundMonday.toISOString().split('T')[0];
-      console.log('Found Monday within 6 days:', mondayStr);
-
-      // Query cashbox_counts table for that Monday
+      // Query cashbox_counts table for today's count
       const { data: cashboxData, error } = await supabase
         .from('cashbox_counts')
-        .select('total')
-        .eq('date', mondayStr)
+        .select('total, date')
+        .eq('date', todayStr)
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+        console.error('Supabase error fetching cashbox:', error);
         throw error;
       }
 
       if (cashboxData && cashboxData.total) {
         const total = parseFloat(cashboxData.total);
         document.getElementById('tipPoolCashboxTotal').textContent = `$${total.toFixed(2)}`;
-        console.log(`✅ Cashbox count auto-fetched for ${mondayStr}: $${total.toFixed(2)}`);
+        console.log(`✅ Cashbox count auto-fetched for ${cashboxData.date}: $${total.toFixed(2)}`);
       } else {
-        document.getElementById('tipPoolCashboxTotal').textContent = '$0.00';
-        console.log(`No cashbox count found for Monday ${mondayStr}`);
+        // No count for today, try to find the most recent count
+        console.log(`No cashbox count found for today (${todayStr}), searching for most recent count...`);
+
+        const { data: recentCashbox, error: recentError } = await supabase
+          .from('cashbox_counts')
+          .select('total, date')
+          .lte('date', todayStr)
+          .order('date', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (recentError && recentError.code !== 'PGRST116') {
+          console.error('Error fetching most recent cashbox:', recentError);
+        }
+
+        if (recentCashbox && recentCashbox.total) {
+          const total = parseFloat(recentCashbox.total);
+          document.getElementById('tipPoolCashboxTotal').textContent = `$${total.toFixed(2)}`;
+          console.log(`✅ Most recent cashbox count found from ${recentCashbox.date}: $${total.toFixed(2)}`);
+        } else {
+          document.getElementById('tipPoolCashboxTotal').textContent = '$0.00';
+          console.log('No cashbox count found in database');
+        }
       }
 
       // Update summary
@@ -2354,8 +2361,21 @@
         netSales: salesResult.netSales
       };
 
-      // Show subtle success indicator
-      statusDiv.innerHTML = `<span style="color: #28a745;">✓ Data loaded from Toast API: ${laborResult.employeesCount} employees, $${salesResult.creditTips.toFixed(2)} credit tips</span>`;
+      // Auto-populate Credit Card Tips field
+      if (salesResult.creditTips) {
+        document.getElementById('creditCardTips').value = salesResult.creditTips.toFixed(2);
+        updateTipsSummary();
+      }
+
+      // Auto-populate Labor Cost field
+      if (laborResult.totalLaborCost) {
+        document.getElementById('manualLaborCost').value = laborResult.totalLaborCost.toFixed(2);
+        updateSalesLaborSummary();
+        console.log(`✅ Labor cost auto-populated: $${laborResult.totalLaborCost.toFixed(2)}`);
+      }
+
+      // Hide status indicator (data auto-populates in fields)
+      statusDiv.innerHTML = '';
 
       console.log('Auto-fetch complete:', { laborResult, salesResult });
 
