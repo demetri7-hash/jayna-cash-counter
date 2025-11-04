@@ -843,14 +843,9 @@
 </head>
 <body>
   <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <div class="header-info">
-        <div style="text-align: center; margin-bottom: 12px;">
-          <img src="jayna-logo.png" alt="Jayna Gyro Logo" style="max-width: 100%; width: 576px; height: auto; margin-bottom: 4px;">
-          <h1 style="margin-bottom: 8px; font-size: 18px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">JAYNA GYRO</h1>
-          <p style="font-size: 11px; font-weight: 500; letter-spacing: 1px; margin-bottom: 4px;">MANAGER PORTAL</p>
-        </div>
+    <!-- App Header (Injected by app-header.js) -->
+    <div id="appHeader"></div>
+
 
         <!-- CURRENTLY CLOCKED IN -->
         <div id="clockedInContainer" style="margin: 8px 0; text-align: center;">
@@ -3871,111 +3866,11 @@
 
     // Fetch on page load
     document.addEventListener('DOMContentLoaded', function() {
-      fetchClockedInEmployees();
-      fetchTipsPerHour();
-      fetchTopLeader();
-      setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
-      setInterval(fetchTipsPerHour, 30 * 1000);
-      setInterval(fetchTopLeader, 2 * 60 * 1000);
-    });
+      fetchClockedInEmployees();      setInterval(fetchClockedInEmployees, 5 * 60 * 1000);    });
 
     // ==================== END CLOCKED IN DISPLAY ====================
 
-    // ==================== TOP LEADER DISPLAY ====================
-
-    async function fetchTopLeader() {
-      try {
-        const todayPacific = new Date().toLocaleString('en-US', {
-          timeZone: 'America/Los_Angeles',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
-
-        const [month, day, year] = todayPacific.split(', ')[0].split('/');
-        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-
-        // Fetch FOH tasks
-        const { data: tasks, error: tasksError } = await supabase
-          .from('foh_checklist_tasks')
-          .select('completed_by, completed_at, is_completed')
-          .eq('is_completed', true)
-          .gte('completed_at', `${today}T00:00:00`)
-          .lt('completed_at', `${today}T23:59:59`);
-
-        // Fetch prep count actions
-        const { data: prepCounts, error: prepError } = await supabase
-          .from('prep_count_log')
-          .select('counted_by, counted_at')
-          .gte('counted_at', `${today}T00:00:00`)
-          .lte('counted_at', `${today}T23:59:59`);
-
-        if ((!tasks || tasks.length === 0) && (!prepCounts || prepCounts.length === 0)) {
-          updateTopLeaderDisplay(null);
-          return;
-        }
-
-        const leaderboard = {};
-
-        // Count FOH tasks
-        if (tasks && tasks.length > 0) {
-          tasks.forEach(task => {
-            const name = task.completed_by || 'Unknown';
-            if (!leaderboard[name]) {
-              leaderboard[name] = { name, count: 0, lastCompleted: null };
-            }
-            leaderboard[name].count++;
-            const completedAt = new Date(task.completed_at);
-            if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
-              leaderboard[name].lastCompleted = completedAt;
-            }
-          });
-        }
-
-        // Count prep items
-        if (prepCounts && prepCounts.length > 0) {
-          prepCounts.forEach(prep => {
-            const name = prep.counted_by || 'Unknown';
-            if (!leaderboard[name]) {
-              leaderboard[name] = { name, count: 0, lastCompleted: null };
-            }
-            leaderboard[name].count++;
-            const countedAt = new Date(prep.counted_at);
-            if (!leaderboard[name].lastCompleted || countedAt > leaderboard[name].lastCompleted) {
-              leaderboard[name].lastCompleted = countedAt;
-            }
-          });
-        }
-
-        const sortedLeaderboard = Object.values(leaderboard)
-          .sort((a, b) => {
-            if (b.count !== a.count) return b.count - a.count;
-            return b.lastCompleted - a.lastCompleted;
-          });
-
-        updateTopLeaderDisplay(sortedLeaderboard[0]);
-
-      } catch (error) {
-        console.error('Error fetching top leader:', error);
-        updateTopLeaderDisplay(null);
-      }
-    }
-
-    function updateTopLeaderDisplay(leader) {
-      const displayDiv = document.getElementById('topLeaderText');
-      if (!displayDiv) return;
-
-      if (!leader) {
-        displayDiv.textContent = 'No tasks completed yet today! 🎯';
-        return;
-      }
-
-      displayDiv.textContent = `${leader.name} is crushing it with ${leader.count} task${leader.count !== 1 ? 's' : ''}! 🔥`;
-    }
-
-    // ==================== END TOP LEADER DISPLAY ====================
-
-    // ==================== PASSWORD PROTECTION FOR MANAGER LOGS ====================
+        // ==================== PASSWORD PROTECTION FOR MANAGER LOGS ====================
     const ADMIN_PASSWORD = 'JaynaGyro2025!';
 
     function isManagerSessionValid() {

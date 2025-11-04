@@ -276,16 +276,10 @@
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <img src="jayna-logo.png" alt="Jayna Gyro Logo" style="max-width: 100%; width: 576px; height: auto; margin-bottom: 4px;">
-      <h1 style="margin-bottom: 8px; font-size: 18px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">JAYNA GYRO</h1>
-      <p style="font-size: 11px; font-weight: 500; letter-spacing: 1px; margin-bottom: 8px;">FOR AUTHORIZED USE ONLY</p>
+    
+    <!-- App Header (Injected by app-header.js) -->
+    <div id="appHeader"></div>
 
-      <!-- CURRENTLY CLOCKED IN -->
-      <div id="clockedInContainer" style="margin: 8px 0; text-align: center;">
-        <div id="clockedInList" style="color: #2e7d32; font-size: 12px; font-weight: 500;">
-          Loading...
-        </div>
       <!-- COMBINED TIPS/HR & LEADER DISPLAY (JAYNA BLUE GRADIENT) -->
         <div id="tipsPerHourCard" style="margin-top: 12px; padding: 8px 12px; background: linear-gradient(135deg, #00A8E1 0%, #0094D6 100%); border: 2px solid #00A8E1; border-radius: 0; position: relative; box-shadow: 0 3px 5px rgba(0,0,0,0.1); transition: all 0.3s ease; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center;">
 
@@ -3848,9 +3842,7 @@
 
     // Fetch on page load
     document.addEventListener('DOMContentLoaded', function() {
-      fetchClockedInEmployees();
-      fetchTipsPerHour();
-      // Auto-refresh every 5 minutes
+      fetchClockedInEmployees();      // Auto-refresh every 5 minutes
       setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
     });
 
@@ -3955,222 +3947,10 @@
     }
     // ==================== END PASSWORD PROTECTION ====================
 
-    // ==================== TIPS PER HOUR DISPLAY ====================
+        // ==================== LIVE STATS ====================
+    // NOTE: Live stats (Tips/HR, Top Leader) now provided by app-header.js
+    // ==================== END LIVE STATS ====================
 
-    let lastTipsUpdate = null;
-
-
-    async function fetchTipsPerHour() {
-      try {
-        const response = await fetch('/api/toast-tips-per-hour-today', {
-          method: 'POST'
-        });
-
-        if (!response.ok) {
-          updateTipsPerHourDisplay(null);
-          return;
-        }
-
-        const result = await response.json();
-
-        if (result.success && result.data) {
-          lastTipsUpdate = new Date();
-
-          updateTipsPerHourDisplay(result.data);
-          updateLastUpdatedTime();
-
-        } else {
-          updateTipsPerHourDisplay(null);
-        }
-      } catch (error) {
-        console.error('Error fetching tips per hour:', error);
-        updateTipsPerHourDisplay(null);
-      }
-    }
-
-    function updateTipsPerHourDisplay(data) {
-      const displayDiv = document.getElementById('tipsPerHourText');
-      const cardDiv = document.getElementById('tipsPerHourCard');
-
-      if (!displayDiv) return;
-
-      if (!data) {
-        displayDiv.innerHTML = '<div style="font-size: 14px;">-</div>';
-        return;
-      }
-
-      // Dynamic card color based on trend
-      const bgGradient = data.trendingUp
-        ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
-        : 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)';
-      const borderColor = data.trendingUp ? '#059669' : '#dc2626';
-
-      if (cardDiv) {
-        cardDiv.style.background = bgGradient;
-        cardDiv.style.borderColor = borderColor;
-      }
-
-      const arrow = data.trendingUp ? '↑' : '↓';
-
-      // Main number (large and bold)
-      let html = `<div style="font-size: 28px; font-weight: 900; color: #fff; line-height: 1;">
-        ${arrow} $${data.tipsPerHour.toFixed(2)}/hr
-      </div>`;
-
-      // Comparison stats (smaller, below main number)
-      html += `<div style="margin-top: 6px; font-size: 10px; color: rgba(255,255,255,0.85); line-height: 1.4;">`;
-
-      if (data.percentChangeFromLastHour !== null && data.percentChangeFromLastHour !== undefined) {
-        const hourArrow = data.percentChangeFromLastHour >= 0 ? '↑' : '↓';
-        html += `<div>${hourArrow} ${data.percentChangeFromLastHour > 0 ? '+' : ''}${data.percentChangeFromLastHour}% vs last hour</div>`;
-      }
-
-      if (data.percentChangeFromYesterday !== null) {
-        const dayArrow = data.percentChangeFromYesterday >= 0 ? '↑' : '↓';
-        html += `<div>${dayArrow} ${data.percentChangeFromYesterday > 0 ? '+' : ''}${data.percentChangeFromYesterday.toFixed(1)}% vs yesterday</div>`;
-      }
-
-      if (data.percentChangeFromLastWeek !== null) {
-        const weekArrow = data.percentChangeFromLastWeek >= 0 ? '↑' : '↓';
-        html += `<div>${weekArrow} ${data.percentChangeFromLastWeek > 0 ? '+' : ''}${data.percentChangeFromLastWeek.toFixed(1)}% vs last week</div>`;
-      }
-
-      html += `</div>`;
-
-      displayDiv.innerHTML = html;
-    }
-
-    // Auto-refresh tips/hr every 30 seconds for LIVE updates
-    setInterval(fetchTipsPerHour, 30 * 1000);
-
-
-    function updateLastUpdatedTime() {
-      const lastUpdatedDiv = document.getElementById('tipsLastUpdated');
-      if (!lastUpdatedDiv || !lastTipsUpdate) return;
-
-      const now = new Date();
-      const diffMs = now - lastTipsUpdate;
-      const diffSec = Math.floor(diffMs / 1000);
-      const diffMin = Math.floor(diffSec / 60);
-
-      let timeAgo = '';
-      if (diffMin < 1) {
-        timeAgo = 'Just now';
-      } else if (diffMin === 1) {
-        timeAgo = '1 minute ago';
-      } else if (diffMin < 60) {
-        timeAgo = `${diffMin} minutes ago`;
-      } else {
-        const diffHour = Math.floor(diffMin / 60);
-        timeAgo = diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
-      }
-
-      lastUpdatedDiv.textContent = `LAST UPDATED: ${timeAgo}`;
-    }
-
-    // Update "time ago" display every 30 seconds
-    setInterval(updateLastUpdatedTime, 30 * 1000);
-
-
-    // ==================== TOP LEADER DISPLAY ====================
-
-    async function fetchTopLeader() {
-      try {
-        const todayPacific = new Date().toLocaleString('en-US', {
-          timeZone: 'America/Los_Angeles',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
-
-        const [month, day, year] = todayPacific.split(', ')[0].split('/');
-        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-
-        // Fetch FOH tasks
-        const { data: tasks, error: tasksError } = await supabase
-          .from('foh_checklist_tasks')
-          .select('completed_by, completed_at, is_completed')
-          .eq('is_completed', true)
-          .gte('completed_at', `${today}T00:00:00`)
-          .lt('completed_at', `${today}T23:59:59`);
-
-        // Fetch prep count actions
-        const { data: prepCounts, error: prepError } = await supabase
-          .from('prep_count_log')
-          .select('counted_by, counted_at')
-          .gte('counted_at', `${today}T00:00:00`)
-          .lte('counted_at', `${today}T23:59:59`);
-
-        if ((!tasks || tasks.length === 0) && (!prepCounts || prepCounts.length === 0)) {
-          updateTopLeaderDisplay(null);
-          return;
-        }
-
-        const leaderboard = {};
-
-        // Count FOH tasks
-        if (tasks && tasks.length > 0) {
-          tasks.forEach(task => {
-            const name = task.completed_by || 'Unknown';
-            if (!leaderboard[name]) {
-              leaderboard[name] = { name, count: 0, lastCompleted: null };
-            }
-            leaderboard[name].count++;
-            const completedAt = new Date(task.completed_at);
-            if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
-              leaderboard[name].lastCompleted = completedAt;
-            }
-          });
-        }
-
-        // Count prep items
-        if (prepCounts && prepCounts.length > 0) {
-          prepCounts.forEach(prep => {
-            const name = prep.counted_by || 'Unknown';
-            if (!leaderboard[name]) {
-              leaderboard[name] = { name, count: 0, lastCompleted: null };
-            }
-            leaderboard[name].count++;
-            const countedAt = new Date(prep.counted_at);
-            if (!leaderboard[name].lastCompleted || countedAt > leaderboard[name].lastCompleted) {
-              leaderboard[name].lastCompleted = countedAt;
-            }
-          });
-        }
-
-        const sortedLeaderboard = Object.values(leaderboard)
-          .sort((a, b) => {
-            if (b.count !== a.count) return b.count - a.count;
-            return b.lastCompleted - a.lastCompleted;
-          });
-
-        updateTopLeaderDisplay(sortedLeaderboard[0]);
-
-      } catch (error) {
-        console.error('Error fetching top leader:', error);
-        updateTopLeaderDisplay(null);
-      }
-    }
-
-    function updateTopLeaderDisplay(leader) {
-      const displayDiv = document.getElementById('topLeaderText');
-      if (!displayDiv) return;
-
-      if (!leader) {
-        displayDiv.textContent = 'No tasks completed yet today! 🎯';
-        return;
-      }
-
-      displayDiv.textContent = `${leader.name} is crushing it with ${leader.count} task${leader.count !== 1 ? 's' : ''}! 🔥`;
-    }
-
-    // Fetch on page load and refresh every 2 minutes
-    fetchTopLeader();
-    setInterval(fetchTopLeader, 2 * 60 * 1000);
-
-    // ==================== END TOP LEADER DISPLAY ====================
-
-    // ==================== END TIPS PER HOUR DISPLAY ====================
   </script>
 </body>
 </html>
