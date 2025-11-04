@@ -830,6 +830,20 @@
     </div>
   </div>
 
+  <!-- Password Modal (for Edit/Delete) -->
+  <div id="incidentPasswordModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 10001; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 24px; max-width: 400px; width: 90%; border: 3px solid var(--gray-700);">
+      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">PASSWORD REQUIRED</h3>
+      <p id="incidentPasswordLabel" style="margin-bottom: 12px; font-size: 13px; color: var(--gray-700);"></p>
+      <input type="password" id="incidentPasswordInput" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; margin-bottom: 16px; box-sizing: border-box;">
+      <div style="display: flex; gap: 12px;">
+        <button onclick="closeIncidentPasswordModal()" style="flex: 1; padding: 12px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; text-transform: uppercase; cursor: pointer;">CANCEL</button>
+        <button onclick="submitIncidentPassword()" style="flex: 1; padding: 12px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; text-transform: uppercase; cursor: pointer;">SUBMIT</button>
+      </div>
+      <div id="incidentPasswordError" style="margin-top: 12px; color: #dc2626; font-size: 12px; font-weight: 600; display: none;"></div>
+    </div>
+  </div>
+
 <script>
 // Supabase client
 const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
@@ -1327,24 +1341,78 @@ function goHome() {
 
 // Password protection for edit and delete
 const INCIDENTS_PASSWORD = 'Alonissos325*';
+let pendingPasswordAction = null;
 
 function requestPasswordForEdit() {
-  const password = prompt('Enter password to edit this incident:');
-  if (password === INCIDENTS_PASSWORD) {
-    editIncident();
-  } else if (password !== null) {
-    alert('❌ Incorrect password');
-  }
+  pendingPasswordAction = 'edit';
+  document.getElementById('incidentPasswordLabel').textContent = 'Enter password to edit this incident:';
+  document.getElementById('incidentPasswordInput').value = '';
+  document.getElementById('incidentPasswordError').style.display = 'none';
+  const modal = document.getElementById('incidentPasswordModal');
+  modal.style.display = 'flex';
+
+  // Focus password input
+  setTimeout(() => {
+    document.getElementById('incidentPasswordInput').focus();
+  }, 100);
 }
 
 function requestPasswordForDelete() {
-  const password = prompt('Enter password to delete this incident:');
+  pendingPasswordAction = 'delete';
+  document.getElementById('incidentPasswordLabel').textContent = 'Enter password to delete this incident:';
+  document.getElementById('incidentPasswordInput').value = '';
+  document.getElementById('incidentPasswordError').style.display = 'none';
+  const modal = document.getElementById('incidentPasswordModal');
+  modal.style.display = 'flex';
+
+  // Focus password input
+  setTimeout(() => {
+    document.getElementById('incidentPasswordInput').focus();
+  }, 100);
+}
+
+function submitIncidentPassword() {
+  const password = document.getElementById('incidentPasswordInput').value;
+  const errorEl = document.getElementById('incidentPasswordError');
+
   if (password === INCIDENTS_PASSWORD) {
-    confirmDelete();
-  } else if (password !== null) {
-    alert('❌ Incorrect password');
+    // Correct password! Close modal and execute action
+    closeIncidentPasswordModal();
+
+    if (pendingPasswordAction === 'edit') {
+      editIncident();
+    } else if (pendingPasswordAction === 'delete') {
+      // Password IS the confirmation - proceed with delete
+      deleteIncident();
+    }
+  } else {
+    // Wrong password
+    errorEl.textContent = '❌ Incorrect password. Please try again.';
+    errorEl.style.display = 'block';
+    document.getElementById('incidentPasswordInput').value = '';
+    document.getElementById('incidentPasswordInput').focus();
   }
 }
+
+function closeIncidentPasswordModal() {
+  const modal = document.getElementById('incidentPasswordModal');
+  modal.style.display = 'none';
+  document.getElementById('incidentPasswordInput').value = '';
+  document.getElementById('incidentPasswordError').style.display = 'none';
+  pendingPasswordAction = null;
+}
+
+// Keyboard support for password modal
+document.addEventListener('keydown', (e) => {
+  const passwordModal = document.getElementById('incidentPasswordModal');
+  if (passwordModal && passwordModal.style.display === 'flex') {
+    if (e.key === 'Enter') {
+      submitIncidentPassword();
+    } else if (e.key === 'Escape') {
+      closeIncidentPasswordModal();
+    }
+  }
+});
 
 // Edit incident
 function editIncident() {
@@ -1460,17 +1528,6 @@ async function updateIncident() {
   // Hide form
   toggleForm();
   currentIncident = null;
-}
-
-// Confirm delete
-function confirmDelete() {
-  if (!currentIncident) return;
-
-  const confirmation = confirm(`⚠️ Are you sure you want to delete this incident report?\n\nDate: ${currentIncident.incident_date}\nManager: ${currentIncident.manager_name}\n\nThis action cannot be undone!`);
-
-  if (confirmation) {
-    deleteIncident();
-  }
 }
 
 // Delete incident
