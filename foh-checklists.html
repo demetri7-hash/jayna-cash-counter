@@ -2450,10 +2450,10 @@
   initializeFOHSystem();
 
   /**
-   * Fetch Currently Clocked-In Employees from Toast API
-   * (Same method used in index.html header)
+   * Fetch Currently Clocked-In Employees from Toast API for FOH
+   * EXACT COPY from orders-prep.html fetchClockedInEmployeesForPrep()
    */
-  async function fetchClockedInEmployees() {
+  async function fetchClockedInEmployeesForFOH() {
     try {
       // Get TODAY in YYYY-MM-DD format (Pacific time)
       const todayPacific = new Date().toLocaleString('en-US', {
@@ -2466,7 +2466,7 @@
       const [month, day, year] = todayPacific.split(', ')[0].split('/');
       const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
-      console.log('👥 Fetching clocked-in employees from Toast for:', today);
+      console.log('👥 [FOH] Fetching clocked-in employees from Toast:', today);
 
       // STEP 1: Authenticate with Toast API
       const authResponse = await fetch('/api/toast-auth', {
@@ -2488,9 +2488,8 @@
       }
 
       const token = authData.data.accessToken;
-      console.log('✅ Toast authenticated');
 
-      // STEP 2: Fetch clocked-in employees via serverless function
+      // STEP 2: Fetch clocked-in employees via serverless function (same as prep)
       const clockedInUrl = `/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`;
 
       console.log('🔍 Fetching clocked-in employees from serverless function');
@@ -2518,17 +2517,17 @@
         console.log('✅ Clocked in employees:', result.clockedIn);
       }
 
-      // Extract FULL names (matching header display)
-      const employees = result.clockedIn.map(emp => {
-        return emp.fullName || emp.name || 'Unknown';
-      });
+      // Extract FULL names (EXACT pattern as prep)
+      const clockedInList = result.clockedIn
+        .map(emp => emp.fullName || emp.name || 'Unknown')
+        .filter(name => name) // Remove any nulls/undefined
+        .sort();
 
-      // Store in state
-      fohSystemState.clockedInEmployees = employees;
+      fohSystemState.clockedInEmployees = clockedInList;
 
-      console.log(`✅ Stored ${employees.length} clocked-in employees:`, employees);
+      console.log(`✅ [FOH] Found ${clockedInList.length} clocked-in employees:`, clockedInList);
 
-      return employees;
+      return clockedInList;
 
     } catch (error) {
       console.error('❌ Error fetching clocked in employees:', error);
@@ -2539,10 +2538,9 @@
 
   // Fetch clocked-in employees on page load
   document.addEventListener('DOMContentLoaded', function() {
-    fetchClockedInEmployees();
-    fetchTipsPerHour();
+    fetchClockedInEmployeesForFOH();
     // Refresh every 5 minutes
-    setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
+    setInterval(fetchClockedInEmployeesForFOH, 5 * 60 * 1000);
   });
 
   /**
@@ -4763,7 +4761,7 @@
     // FETCH fresh clocked-in employees if state is empty
     if (fohSystemState.clockedInEmployees.length === 0) {
       console.log('🔄 Clocked-in employees state is empty, fetching fresh data...');
-      await fetchClockedInEmployees();
+      await fetchClockedInEmployeesForFOH();
       console.log(`✅ After fetch: ${fohSystemState.clockedInEmployees.length} employees`, fohSystemState.clockedInEmployees);
     }
 
