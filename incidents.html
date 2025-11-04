@@ -821,9 +821,11 @@
 
       <div id="modalBody"></div>
 
-      <div style="display: flex; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 2px solid var(--gray-300);">
+      <div style="display: flex; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 2px solid var(--gray-300); flex-wrap: wrap;">
         <button onclick="downloadPDF()" style="padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">📥 DOWNLOAD PDF</button>
         <button onclick="printIncident()" style="padding: 12px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">🖨️ SEND TO PRINTER</button>
+        <button onclick="requestPasswordForEdit()" style="padding: 12px 24px; background: #f59e0b; border: 2px solid #f59e0b; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">✏️ EDIT</button>
+        <button onclick="requestPasswordForDelete()" style="padding: 12px 24px; background: #dc2626; border: 2px solid #dc2626; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">🗑️ DELETE</button>
       </div>
     </div>
   </div>
@@ -1321,6 +1323,178 @@ document.addEventListener('keydown', (e) => {
 // goHome function (reload current page)
 function goHome() {
   window.location.href = 'incidents.html';
+}
+
+// Password protection for edit and delete
+const INCIDENTS_PASSWORD = 'Alonissos325*';
+
+function requestPasswordForEdit() {
+  const password = prompt('Enter password to edit this incident:');
+  if (password === INCIDENTS_PASSWORD) {
+    editIncident();
+  } else if (password !== null) {
+    alert('❌ Incorrect password');
+  }
+}
+
+function requestPasswordForDelete() {
+  const password = prompt('Enter password to delete this incident:');
+  if (password === INCIDENTS_PASSWORD) {
+    confirmDelete();
+  } else if (password !== null) {
+    alert('❌ Incorrect password');
+  }
+}
+
+// Edit incident
+function editIncident() {
+  if (!currentIncident) return;
+
+  // Close modal
+  closeModal();
+
+  // Populate form with current incident data
+  document.getElementById('managerName').value = currentIncident.manager_name;
+  document.getElementById('incidentDate').value = currentIncident.incident_date;
+  document.getElementById('incidentTime').value = currentIncident.incident_time;
+  document.getElementById('department').value = currentIncident.department;
+  document.getElementById('incidentReport').value = currentIncident.incident_report;
+
+  // Populate staff names
+  const staffList = document.getElementById('staffList');
+  staffList.innerHTML = '';
+  currentIncident.staff_involved.forEach((staffName, index) => {
+    const entry = document.createElement('div');
+    entry.className = 'staff-entry';
+    entry.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
+    entry.innerHTML = `
+      <input type="text" class="staff-name" list="employeeNames" placeholder="Enter or select staff name" ${index === 0 ? 'required' : ''} value="${staffName}" style="flex: 1; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px;">
+      ${index > 0 ? '<button type="button" onclick="this.parentElement.remove()" style="padding: 8px 12px; font-size: 11px; background: var(--error-bg); color: var(--error-text); border: 2px solid var(--error-border); cursor: pointer; text-transform: uppercase;">REMOVE</button>' : ''}
+    `;
+    staffList.appendChild(entry);
+  });
+
+  // Show form in edit mode
+  const form = document.getElementById('incidentForm');
+  const btn = document.querySelector('.toggle-form-btn');
+  form.classList.add('active');
+  btn.textContent = '− EDITING INCIDENT';
+  form.style.display = 'block';
+
+  // Change submit button to update
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.textContent = 'UPDATE INCIDENT REPORT';
+  submitBtn.style.background = '#f59e0b';
+  submitBtn.style.borderColor = '#f59e0b';
+
+  // Modify form submission to update instead of insert
+  const reportForm = document.getElementById('reportForm');
+  reportForm.onsubmit = async (event) => {
+    event.preventDefault();
+    await updateIncident();
+  };
+
+  // Scroll to form
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Update incident
+async function updateIncident() {
+  const managerName = document.getElementById('managerName').value.trim();
+  const incidentDate = document.getElementById('incidentDate').value;
+  const incidentTime = document.getElementById('incidentTime').value;
+
+  let department = document.getElementById('department').value;
+  if (department === '__custom__') {
+    department = document.getElementById('customDepartment').value.trim().toUpperCase();
+    await supabase.from('departments').upsert({ name: department });
+  }
+
+  const staffInputs = document.querySelectorAll('.staff-name');
+  const staffInvolved = Array.from(staffInputs)
+    .map(input => input.value.trim())
+    .filter(name => name.length > 0);
+
+  const incidentReport = document.getElementById('incidentReport').value.trim();
+
+  if (staffInvolved.length === 0) {
+    alert('Please add at least one staff member');
+    return;
+  }
+
+  // Update incident in database
+  const { error } = await supabase
+    .from('manager_incidents')
+    .update({
+      manager_name: managerName,
+      incident_date: incidentDate,
+      incident_time: incidentTime,
+      department: department,
+      staff_involved: staffInvolved,
+      incident_report: incidentReport
+    })
+    .eq('id', currentIncident.id);
+
+  if (error) {
+    alert('Error updating incident: ' + error.message);
+    return;
+  }
+
+  // Success!
+  alert('✅ Incident report updated successfully!');
+
+  // Reset form
+  document.getElementById('reportForm').reset();
+  const reportForm = document.getElementById('reportForm');
+  reportForm.onsubmit = submitIncident; // Restore original submit handler
+
+  // Reset submit button
+  const submitBtn = reportForm.querySelector('button[type="submit"]');
+  submitBtn.textContent = 'SAVE INCIDENT REPORT';
+  submitBtn.style.background = '#059669';
+  submitBtn.style.borderColor = '#059669';
+
+  // Reload incidents
+  await loadIncidents();
+
+  // Hide form
+  toggleForm();
+  currentIncident = null;
+}
+
+// Confirm delete
+function confirmDelete() {
+  if (!currentIncident) return;
+
+  const confirmation = confirm(`⚠️ Are you sure you want to delete this incident report?\n\nDate: ${currentIncident.incident_date}\nManager: ${currentIncident.manager_name}\n\nThis action cannot be undone!`);
+
+  if (confirmation) {
+    deleteIncident();
+  }
+}
+
+// Delete incident
+async function deleteIncident() {
+  if (!currentIncident) return;
+
+  const { error } = await supabase
+    .from('manager_incidents')
+    .delete()
+    .eq('id', currentIncident.id);
+
+  if (error) {
+    alert('Error deleting incident: ' + error.message);
+    return;
+  }
+
+  // Success!
+  alert('✅ Incident report deleted successfully');
+
+  // Close modal
+  closeModal();
+
+  // Reload incidents
+  await loadIncidents();
 }
 
 </script>
