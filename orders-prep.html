@@ -704,6 +704,13 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
   </script>
+
+  <style>
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
   <!-- App Header (Injected by app-header.js) -->
@@ -1464,6 +1471,152 @@
   </div>
 
 <script>
+  // ====================================
+  // CONFIGURATION & INITIALIZATION
+  // ====================================
+
+  const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
+  let supabase;
+
+  function initializeSupabase() {
+    if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
+      showMessage('Please configure Supabase credentials', 'error');
+      return;
+    }
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log('✅ Supabase initialized for orders-prep.html');
+    } catch (error) {
+      console.error('Supabase init failed:', error);
+      showMessage('Database connection failed', 'error');
+    }
+  }
+
+  // ====================================
+  // HELPER FUNCTIONS
+  // ====================================
+
+  function showLoading(title, message) {
+    const existingOverlay = document.getElementById('loadingOverlay');
+    if (existingOverlay) {
+      document.getElementById('loadingTitle').textContent = title;
+      document.getElementById('loadingMessage').textContent = message;
+      existingOverlay.style.display = 'flex';
+      return;
+    }
+
+    const overlayHTML = `
+      <div id="loadingOverlay" style="
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+      ">
+        <div style="text-align: center; color: white;">
+          <div class="spinner" style="
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #4CAF50;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+          "></div>
+          <h3 id="loadingTitle" style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">${title}</h3>
+          <p id="loadingMessage" style="font-size: 14px; color: #ccc;">${message}</p>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', overlayHTML);
+  }
+
+  function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+  }
+
+  function showMessage(text, type) {
+    // Only show popups for important messages (errors), ignore info/success
+    if (type === 'error') {
+      showPopupMessage(text, type);
+    }
+    // Silently ignore info and success messages to prevent bouncing
+  }
+
+  function showPopupMessage(text, type) {
+    const messageType = type === 'error' ? 'Error' : type === 'success' ? 'Success' : 'Notice';
+    const backgroundColor = type === 'error' ? '#f44336' : '#4CAF50';
+
+    const modalHTML = `
+      <div id="messageModal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      ">
+        <div style="
+          background: white;
+          padding: 30px;
+          border-radius: 0;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+        ">
+          <h3 style="margin: 0 0 20px 0; color: ${backgroundColor};">${messageType}</h3>
+          <p style="margin: 0 0 25px 0; line-height: 1.4; font-size: 16px;">
+            ${text}
+          </p>
+          <button onclick="closeMessageModal()" style="
+            background: ${backgroundColor};
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 0;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+          ">OK</button>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+  }
+
+  function closeMessageModal() {
+    const modal = document.getElementById('messageModal');
+    if (modal) {
+      modal.remove();
+    }
+  }
+
+  function hideAllSections() {
+    // For orders-prep.html, we only have one section, so this is a no-op
+    // But we need it defined because ordering system code calls it
+  }
+
+  function goHome() {
+    // Navigate back to index.html main menu
+    window.location.href = 'index.html';
+  }
+
   // ====================================
   // ORDERING SYSTEM - START
   // ====================================
@@ -17789,7 +17942,13 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 <script src="./app-header.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
+    // Initialize Supabase first
+    initializeSupabase();
+
+    // Render header with live stats
     renderAppHeader({ currentPage: 'orders', showLiveStats: true });
+
+    // Start ordering system
     startOrderingSystem();
   });
 </script>
