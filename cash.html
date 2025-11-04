@@ -1094,9 +1094,6 @@
     initializeEmailJS();
     setTodayDate();
 
-    // Load custom vendor formats from database
-    loadCustomVendorFormats();
-
     // Load saved data (removed loadTipPoolData to reset tip pool fields every time)
     loadCombinedReportData();
 
@@ -3334,13 +3331,13 @@
   
   async function getAMData(date) {
     if (!supabase) return null;
-    
+
     const { data, error } = await supabase
       .from('cash_counts')
       .select('*')
       .eq('date', date)
-      .single();
-    
+      .maybeSingle(); // Use maybeSingle() instead of single() to avoid 406 errors
+
     if (error || !data || !data.am_total) return null;
     
     return {
