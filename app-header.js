@@ -394,11 +394,19 @@ function updateTipsPerHourDisplay(data) {
 
 async function fetchTopLeader() {
   try {
-    // Check if Supabase is available
-    if (typeof window.supabase === 'undefined') {
-      console.error('❌ Supabase not available for leaderboard');
-      updateTopLeaderDisplay(null);
-      return;
+    // Check if Supabase client is available (look for global supabase variable with .from method)
+    if (typeof window.supabase === 'undefined' || !window.supabase.from) {
+      // Check if page has initialized a global supabase client
+      if (typeof supabase === 'undefined' || !supabase || typeof supabase.from !== 'function') {
+        console.error('❌ Supabase client not available for leaderboard (may still be initializing)');
+        updateTopLeaderDisplay(null);
+        return;
+      }
+      // Use page-level supabase client
+      var supabaseClient = supabase;
+    } else {
+      // Use window.supabase if it has .from method
+      var supabaseClient = window.supabase;
     }
 
     // Get Pacific time start/end of today (STARTING AT 5AM)
@@ -425,7 +433,7 @@ async function fetchTopLeader() {
     console.log('🏆 Fetching leaderboard data for range:', startISO, 'to', endISO);
 
     // Fetch FOH tasks
-    const { data: tasks, error: tasksError } = await window.supabase
+    const { data: tasks, error: tasksError } = await supabaseClient
       .from('foh_checklist_tasks')
       .select('completed_by, completed_at, is_completed')
       .eq('is_completed', true)
@@ -435,7 +443,7 @@ async function fetchTopLeader() {
     console.log(`📋 Found ${tasks?.length || 0} completed FOH tasks`);
 
     // Fetch prep count actions
-    const { data: prepCounts, error: prepError } = await window.supabase
+    const { data: prepCounts, error: prepError } = await supabaseClient
       .from('prep_count_log')
       .select('counted_by, counted_at')
       .gte('counted_at', startISO)
@@ -557,8 +565,9 @@ async function fetchVoidDiscountTracking() {
 
     const result = await response.json();
 
-    if (result.success && result.data) {
-      updateVoidDiscountDisplay(result.data);
+    if (result.success) {
+      // API returns data at root level (voidedOrders, discounts, refunds, voidedPayments)
+      updateVoidDiscountDisplay(result);
     } else {
       updateVoidDiscountDisplay(null);
     }
