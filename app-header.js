@@ -156,7 +156,9 @@ window.requirePassword = function(targetUrl, password, label) {
     inputEl.value = '';
     errorEl.style.display = 'none';
     modal.style.display = 'flex';
-    inputEl.focus();
+
+    // Don't call focus() - causes cross-origin errors in iframe
+    // inputEl.focus();
 
     // Allow Enter key to submit
     inputEl.onkeypress = function(e) {
@@ -210,7 +212,7 @@ window.submitPassword = async function() {
   errorEl.textContent = '❌ Incorrect password. Please try again.';
   errorEl.style.display = 'block';
   inputEl.value = '';
-  inputEl.focus();
+  // Don't call focus() - causes cross-origin errors in iframe
 };
 
 window.closePasswordModal = function() {
