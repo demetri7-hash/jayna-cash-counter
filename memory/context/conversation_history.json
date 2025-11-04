@@ -1,6 +1,61 @@
 {
   "conversations": [
     {
+      "date": "2025-11-04T08:00:00Z",
+      "summary": "Fixed critical PM submission workflow bugs and integrated AMEX receipts into incidents page. User was trying to submit PM count for yesterday's date but encountered multiple null reference errors preventing completion. Fixed all blocking issues in sequence.",
+      "key_decisions": [
+        "Fix PM date loading: Set pmDate BEFORE calling startPMCount() to prevent wrong AM data load",
+        "Add null safety checks to showLoading/hideLoading functions (missing loadingOverlay element)",
+        "Add null safety check to goHome() function (missing mainMenu element)",
+        "Integrate AMEX receipts as tabbed section within incidents.html (not standalone page)",
+        "Use page reload as safe fallback when DOM elements missing"
+      ],
+      "action_items": [
+        "Monitor PM submissions for past dates to verify complete workflow",
+        "Test AMEX receipts tab functionality in production",
+        "Verify no remaining null reference errors in console",
+        "Check that printer status reports arrive correctly for PM submissions"
+      ],
+      "topics": ["Bug Fixing", "PM Count Submission", "Null Safety", "AMEX Integration", "Past Date Editing", "Production Debugging"],
+      "important_details": [
+        "PROBLEM 1: User trying to submit PM count for yesterday, but loading wrong date",
+        "ERROR 1: 'NO AM DATA FOUND FOR (today's date)' when user selected yesterday",
+        "ROOT CAUSE 1: loadAndShowPMFormForEditing() was setting pmDate AFTER calling startPMCount()",
+        "FIX 1: Moved pmDate assignment BEFORE startPMCount() call (cash.html line 2300)",
+        "EXPLANATION 1: startPMCount() → loadAMData() reads pmDate.value, so date must be set first",
+        "COMMIT 1: 6434a89 - fix(cash): Set pmDate before startPMCount() to prevent wrong AM data load",
+        "PROBLEM 2: PM submission crashing with 'null is not an object (loadingOverlay.style)'",
+        "ERROR 2: hideLoading() at line 990 trying to access missing loadingOverlay element",
+        "ROOT CAUSE 2: showLoading/hideLoading functions had no null checks for DOM elements",
+        "FIX 2: Added null checks to both functions - check if overlay exists before accessing",
+        "Added console.warn for missing overlay (non-breaking, graceful degradation)",
+        "COMMIT 2: 47f3ade - fix(cash): Add null checks to showLoading/hideLoading functions",
+        "PROBLEM 3: After successful PM submission, clicking CONFIRM AND CLOSE crashed with blank page",
+        "ERROR 3: 'null is not an object (mainMenu.style)' at goHome() line 1727",
+        "ROOT CAUSE 3: goHome() trying to access mainMenu element that doesn't exist on cash page",
+        "FIX 3: Added null check to goHome() - if mainMenu missing, reload page as safe fallback",
+        "COMMIT 3: 9416f74 - fix(cash): Add null check to goHome() function",
+        "RESULT: Complete PM submission workflow now works end-to-end for past dates",
+        "BONUS FEATURE: Integrated AMEX receipts into incidents page",
+        "USER REQUEST: 'what happened to my amex flow? can we get it back? if so, add it as a tab within the incideneta page please'",
+        "AMEX INTEGRATION: Added main tab navigation (INCIDENTS | AMEX RECEIPTS)",
+        "AMEX STRUCTURE: Main AMEX tab has internal sub-tabs (Receipts | Archive)",
+        "AMEX FEATURES: Add receipt form (vendor, date, amount, category, details), receipt list, archive view",
+        "AMEX UI: Card-based receipt display, collapsible add form, category dropdown auto-loads",
+        "AMEX DB: Uses existing amex_receipts and amex_categories tables, shared Supabase client",
+        "AMEX FUNCTIONS: switchMainTab(), switchAMEXTab(), toggleAMEXAddForm(), saveAMEXReceipt(), loadAMEXReceipts(), loadAMEXArchive()",
+        "AMEX FUTURE: File upload, full detail modal, pagination, Accept and Clear workflow",
+        "COMMIT 4: 1363c5c - feat(incidents): Integrate AMEX receipts as tabbed section",
+        "FILES MODIFIED: cash.html (3 separate fixes), incidents.html (AMEX integration)",
+        "DEPLOYMENT: All changes pushed to main branch, deployed via Vercel",
+        "USER EXPERIENCE: User successfully submitted PM count for yesterday after fixes deployed",
+        "CRITICAL LEARNING: Hard refresh (Cmd+Shift+R) required after deployment to bypass browser cache",
+        "BROWSER CACHING: User's browser was serving old cached version, showing fixed errors after hard refresh",
+        "PM WORKFLOW NOW: Change date → Click 'Go to PM Count' → Enter password → Fill PM data → Submit → Success screen → Close button → Page reload/navigation",
+        "User satisfaction: High (all blocking bugs resolved, AMEX bonus feature added)"
+      ]
+    },
+    {
       "date": "2025-11-03T14:00:00Z",
       "summary": "Added void/discount tracking filter and display to index.html. Excluded REWARD DOLLARS and ONLINE ORDER from discount counts. Confirmed clocked-in API uses Pacific→UTC conversion.",
       "key_decisions": [
@@ -111,310 +166,6 @@
         "NO REFERENCES: grep found zero references to 'collateral' in any HTML files",
         "NO DEPLOYMENT IMPACT: All active pages verified working, no broken links",
         "User satisfaction: High (repo cleanup complete, nothing broken)"
-      ]
-    },
-    {
-      "date": "2025-11-01T19:15:00Z",
-      "summary": "Deployed NEW landscape PDF format to production 4AM cron job. Replaced old portrait executive summary with compact 2-column layout, enhanced review format, and added session insights.",
-      "key_decisions": [
-        "Remove executive summary page entirely (start directly with checklist pages)",
-        "Use landscape orientation (792x612pt) with 0.2\" margins for compact layout",
-        "Group tasks by person compactly: 'AKATERINA COMPLETED: task1, task2, task3'",
-        "Detect review-only checklists (0-2 tasks, mostly ratings) and use bigger fonts",
-        "Show staff names from tasksByPerson (actual task completers, not session fields)",
-        "Add First/Last task timestamps to Session Insights box"
-      ],
-      "action_items": [
-        "Monitor 4AM email reports for new landscape format starting next day",
-        "Verify all checklist types render correctly (tasks vs reviews)",
-        "Confirm staff names match actual task completers",
-        "Check that review-only checklists use bigger fonts and readable notes"
-      ],
-      "topics": ["PDF Generation", "jsPDF", "Production Deployment", "Landscape Layout", "Review Format", "Session Insights", "4AM Cron Job"],
-      "important_details": [
-        "FILE MODIFIED: api/foh-daily-report.js (generateChecklistsPDF function, lines 284-733)",
-        "REPLACED: 448 lines of old portrait format with 373 lines of new landscape format",
-        "OLD FORMAT: Portrait orientation, executive summary page 1, staff performance tables, problem tasks",
-        "NEW FORMAT: Landscape orientation, NO executive summary, each session gets clean page",
-        "LAYOUT: 2-column design - left: tasks grouped by person, right: ratings + insights box",
-        "STAFF LINE: Changed from session fields (staff_name, staff_name_2) to Object.keys(tasksByPerson)",
-        "STAFF COUNT: Fixed to count actual task completers from tasksByPerson (not session fields)",
-        "INSIGHTS BOX: Tasks, Rate, First/Last timestamps, Staff count, Top performer, Avg rating",
-        "REVIEW FORMAT: Detected via isReviewOnly (completedTasks < 3 && ratings > 0)",
-        "REVIEW FONTS: Category 6pt→8pt, Stars 8pt→10pt, Notes 5pt→7pt, 3 lines max (vs 1)",
-        "REVIEW METADATA: Added 'By: [name] at [time]' under each rating for review-only checklists",
-        "FOOTER: Page numbers (left), Generated time (center), APP CREATED BY DEMETRI GREGORAKIS (right)",
-        "COMMIT: 4483395 - feat(foh-daily-report): Deploy landscape PDF format to production 4AM cron job",
-        "PUSHED: To main branch, will deploy automatically via Vercel",
-        "SCREENSHOTS REVIEWED: '/Users/demetrigregorakis/Downloads/last test page 4 reviews format.jpg' (review format)",
-        "SCREENSHOTS REVIEWED: '/Users/demetrigregorakis/Downloads/screenshot test 5 landascape.jpg' (landscape test)",
-        "USER FEEDBACK: 'everything is perffect lets deploy it to the MAIN cron job'",
-        "DATA SOURCE: Uses previous day's data via getPacificYesterday() (NOT yesterday-only test data)",
-        "EMAIL: Sends via nodemailer with Buffer.from(doc.output('arraybuffer'))",
-        "COMPATIBILITY: Works with existing analytics.js calculations and email HTML template",
-        "User satisfaction: Extremely high (PDF perfected, ready for production)"
-      ]
-    },
-    {
-      "date": "2025-11-01T17:40:00Z",
-      "summary": "Added 'APP CREATED BY DEMETRI GREGORAKIS' credit line to all 12 HTML pages. User reinforced ALWAYS commit/push after changes and maintain memory system automatically.",
-      "key_decisions": [
-        "Use ALL CAPS format: 'APP CREATED BY DEMETRI GREGORAKIS' (not mixed case)",
-        "Place after topLeaderDisplay section with consistent styling: opacity: 0.7; margin-top: 12px",
-        "Apply to all 12 main application HTML pages for brand consistency",
-        "User caught two critical oversights: failing to commit/push, failing to update memory files"
-      ],
-      "action_items": [
-        "ALWAYS commit and push changes immediately after making them (explicit in CLAUDE.md)",
-        "ALWAYS update memory files automatically without being asked",
-        "Read memory files at session start (index.json → user_profile → conversation_history → active_tasks)",
-        "Update memory files after major milestones or at session end"
-      ],
-      "topics": ["Branding", "Credit Lines", "HTML Consistency", "Git Workflow", "Memory System", "User Instructions"],
-      "important_details": [
-        "FILES MODIFIED: index.html, boh.html, catering.html, cogs.html, catering-test.html, managerlogs.html, foh-checklists.html, drivers.html, scheduling.html, teamupdates.html, manager.html, amex-receipts.html",
-        "INITIAL MISTAKE 1: Used mixed case 'App created by Demetri Gregorakis' instead of ALL CAPS",
-        "USER CORRECTION 1: 'its supposed to be in ALL CAOS' [sic] - changed all to 'APP CREATED BY DEMETRI GREGORAKIS'",
-        "INITIAL MISTAKE 2: Placed credit after 'FOR AUTHORIZED USE ONLY' in boh.html (WRONG location)",
-        "USER CORRECTION 2: Showed screenshot and index.html copy-paste showing correct placement after topLeaderDisplay",
-        "Screenshot reference: '/Users/demetrigregorakis/Desktop/Screenshot 2025-11-01 at 9.23.30 AM.png'",
-        "PLACEMENT PATTERN: After topLeaderDisplay closing div, before header section closing div",
-        "manager.html: Different HTML structure, added after topLeaderDisplay at line 880",
-        "amex-receipts.html: Added in header section after account info at line 560",
-        "CRITICAL OVERSIGHT 1: Failed to commit and push changes after completion",
-        "USER REMINDER: 'you need yo ALWAYS commit and PUSH after the changesPLEASE that is in your instructions..'",
-        "CRITICAL OVERSIGHT 2: Failed to update memory files automatically",
-        "USER QUESTION: 'what did you do about auto-updateding memory files by auto detecting context??'",
-        "FIX: Immediately committed with feat(credits) message, pushed to remote (commit 6541f15)",
-        "FIX: Read and updated all memory files (conversation_history, active_tasks, index.json)",
-        "LEARNING: User expects autonomous memory management - should happen automatically without being asked",
-        "CLAUDE.md Memory System Instructions: Read at session start, update during conversation, write at major milestones",
-        "Memory files live at: /memory/index.json, /memory/context/, /memory/tasks/, /memory/knowledge/",
-        "Deployment: Changes pushed to production, will deploy automatically via Vercel",
-        "User satisfaction: High (work completed correctly after corrections)"
-      ]
-    },
-    {
-      "date": "2025-10-30T17:30:00Z",
-      "summary": "Major improvements to catering prep PDFs and checklist system. Fixed visual quality, date clarity, department filtering, data freshness, and added status indicators.",
-      "key_decisions": [
-        "Replace broken Unicode characters with drawn rectangles (checkboxes)",
-        "Separate 'Generated on:' timestamp from 'DUE DATE:' in catering orders",
-        "Reduce sauce quantities: 20 portions per sauce set (was 10, gives LESS sauce)",
-        "Add department column to checklist_definitions table for proper FOH/BOH separation",
-        "Always reload checklist data from database (not cache) to show latest edits",
-        "Display status badges: 'NOT YET STARTED' (red) or 'IN PROGRESS' (yellow)",
-        "Sort checklists by start time (earliest first), maintain order when expired"
-      ],
-      "action_items": [
-        "Monitor catering prep PDFs for emoji/checkbox rendering issues",
-        "Verify sauce quantities with kitchen staff (now 20 portions per set)",
-        "Test checklist editing workflow (edit → save → start checklist)",
-        "Verify status indicators update correctly when sessions are created",
-        "Confirm both FOH and BOH pages show correct department-specific checklists"
-      ],
-      "topics": ["Catering PDF", "jsPDF", "Checklist System", "Department Filtering", "Status Indicators", "Database Schema", "Data Freshness"],
-      "important_details": [
-        "PROBLEM 1: Catering PDF showed corrupted emoji 'Ø<B}þ' and broken checkbox character '☐'",
-        "FIX 1: Removed emojis entirely, drew actual rectangles using doc.rect() for checkboxes",
-        "VISUAL DESIGN: Blue title bars (#2196F3), gray section headers (#F0F0F0), proper spacing",
-        "PROBLEM 2: Unclear if date on catering page was generation date or delivery date",
-        "FIX 2: Added 'Generated on: [timestamp]' at top (9px italic), bold 'DUE DATE:' with each order (10px bold)",
-        "PROBLEM 3: BYO Gyro sauce quantities too high (user wanted LESS sauce)",
-        "FIX 3: Changed from Math.ceil(total/10) to Math.ceil(total/20) - halved sauce quantities",
-        "Sauce sets now: 1 set per 20 portions (16oz Tzatziki, Spicy Aioli, Lemon Vinaigrette)",
-        "PROBLEM 4: EDIT tab only showing few checklists (filter was 'like foh_%')",
-        "FIX 4: Added department TEXT column with CHECK constraint ('FOH' or 'BOH')",
-        "SQL 1: add_department_column.sql - adds column, index, marks 8 FOH checklists",
-        "SQL 2: mark_boh_checklists.sql - marks all type LIKE 'boh_%' as BOH department",
-        "Updated filter from .like('foh_%') to .eq('department', 'FOH')",
-        "PROBLEM 5: Duplicate ADMIN_PASSWORD declaration on BOH page line 8345",
-        "FIX 5: Removed duplicate, kept original at line 617",
-        "PROBLEM 6: Edited checklists not showing new tasks when started from landing page",
-        "ROOT CAUSE: selectChecklist() used cached data from page load (fohSystemState.allChecklists)",
-        "FIX 6: Changed to loadChecklistFromDatabase() FIRST, then update cached state",
-        "PROBLEM 7: User wants status visibility on checklist cards (not started vs in progress)",
-        "FIX 7: Query today's sessions, create checklistStatuses map, add badge to card HTML",
-        "Status badge: 'NOT YET STARTED' (#dc2626 red) if no session exists",
-        "Status badge: 'IN PROGRESS' (#f59e0b yellow) if session exists for today",
-        "SORTING: Changed from custom sort order to start time order (earliest first)",
-        "Sort maintained even when checklist time window expires",
-        "FILES MODIFIED: index.html (catering PDF), foh-checklists.html, boh.html",
-        "FILES CREATED: sql/add_department_column.sql, sql/mark_boh_checklists.sql",
-        "BOH BUG: Was querying foh_checklist_sessions instead of boh_checklist_sessions",
-        "COMMITS: Multiple, final commit aaefd66 - feat(boh): Add status indicators and sort checklists",
-        "All changes tested and deployed to production",
-        "User confirmed catering PDF looks good, sauce quantities correct"
-      ]
-    },
-    {
-      "date": "2025-10-28T21:45:00Z",
-      "summary": "COMPLETE EZCATER WEBHOOK FIX: Fixed failing webhook subscriptions, customer name parsing, and created manual import tools. All 4 webhooks now active and verified.",
-      "key_decisions": [
-        "Use GraphQL introspection to discover REAL API schema (stop guessing)",
-        "Fix deprecated createSubscriber mutation → use createEventNotificationSubscription",
-        "Customer names stored in event.contact.name (NOT orderCustomer.fullName)",
-        "Create import-by-number tool (order number → UUID auto-discovery)",
-        "Replace window.prompt with modal input (Google Sites sandbox compatibility)",
-        "Created 5 new API endpoints for EZCater management"
-      ],
-      "action_items": [
-        "Monitor Vercel logs when next EZCater order arrives",
-        "Verify webhook POST requests hit /api/ezcater-webhook",
-        "Confirm customer names populate automatically for new orders",
-        "Watch for all 4 event types: submitted, accepted, rejected, cancelled"
-      ],
-      "topics": ["EZCater API", "GraphQL Introspection", "Webhook Subscriptions", "Order Synchronization", "Customer Data Parsing", "Google Sites Sandbox"],
-      "important_details": [
-        "PROBLEM: Webhook subscription failing with 500 error 'Subscriber could not be created'",
-        "ROOT CAUSE 1: Using deprecated mutations (createSubscriber/createSubscription)",
-        "FIX 1: Changed to createEventNotificationSubscription (single-step process)",
-        "ROOT CAUSE 2: Guessing API schema fields (caterer vs caterers, webhookSecret)",
-        "FIX 2: Created ezcater-introspect.js to discover REAL schema via GraphQL introspection",
-        "ROOT CAUSE 3: Customer name parsing checked orderCustomer.fullName (wrong field)",
-        "FIX 3: Changed to event.contact.name with fallbacks in parseOrderData()",
-        "ROOT CAUSE 4: Manual import required UUID (user only has order number)",
-        "FIX 4: Created import-by-number that tries 3 ID formats to auto-find UUID",
-        "ROOT CAUSE 5: window.prompt blocked in Google Sites sandbox",
-        "FIX 5: Created modal input with DOM manipulation",
-        "NEW FILES: ezcater-introspect.js, ezcater-list-subscriptions.js, ezcater-import-by-number.js, fix-customer-names.js, check-order-data.js",
-        "UPDATED FILES: ezcater-subscribe.js (complete rewrite), ezcater-webhook.js, ezcater-manual-import.js, catering.html",
-        "VERIFIED: 1 subscriber with 4 active webhook subscriptions (submitted, accepted, rejected, cancelled)",
-        "SUCCESS: Imported order #284577019 (RQJUCC) with customer name 'Rom Apolinar'",
-        "CONFIDENCE: 95% that webhooks will work for new orders (infrastructure solid, awaiting live test)",
-        "API Token: amF5bmFzY2Fuc0BnbWFpbC5jb206OGRjNDM1MDY2ZTlhM2NhZWYwNjAxZWNhYmQ0MzNlY2ViNTU1ZWJiOTdkOTBjMGY1NGFmNmY2YTg3MjQwYzRlZQ==",
-        "Commits: Multiple including final 2d0d70a - 'fix(ezcater): Extract customer names from event.contact.name field'",
-        "User extremely happy with results"
-      ]
-    },
-    {
-      "date": "2025-10-28T04:00:00Z",
-      "summary": "CSS Architecture Deep Dive: Fixed navigation button inconsistencies across all pages. Learned critical CSS patterns and user design intentions.",
-      "key_decisions": [
-        "index.html has CSS class (.menu-btn) vs inline style conflicts - fixed with !important",
-        "Manager Logs button is INTENTIONALLY smaller - user designed it that way",
-        "drivers.html needed complete CSS rewrite to match other pages",
-        "All pages must use same base CSS structure (copied from foh-checklists.html)",
-        "Use scoped button classes (.driver-button) NOT global selectors (button {})"
-      ],
-      "action_items": [
-        "When creating new pages, ALWAYS copy base CSS from foh-checklists.html",
-        "NEVER standardize Manager Logs button - it's intentionally different",
-        "Use scoped class names to avoid global CSS conflicts",
-        "Test with hard refresh (Cmd+Shift+R) after CSS changes"
-      ],
-      "topics": ["CSS Architecture", "Navigation Styling", "Design Consistency", "User Intent", "CSS Specificity Wars"],
-      "important_details": [
-        "ROOT CAUSE 1: index.html had .menu-btn CSS class fighting with inline styles on buttons",
-        "FIX 1: Added !important to all .menu-btn CSS properties, removed redundant inline styles",
-        "ROOT CAUSE 2: drivers.html had completely different CSS (wrong font, global button selector, different padding)",
-        "FIX 2: Copied exact CSS structure from foh-checklists.html to drivers.html, renamed button to .driver-button",
-        "MISTAKE: Changed Manager Logs button to match navigation (user designed it smaller on purpose)",
-        "REVERT: Restored Manager Logs to 6px padding, font-weight 600 across all pages",
-        "LEARNED: User has intentional design choices - don't assume inconsistency means mistake",
-        "Base CSS pattern: font-family 'Aptos', CSS variables --gray-*, body/container styling must match",
-        "Navigation pattern: 16px padding, 11px font, 50px min-height, 1.2px letter-spacing, alternating light/dark",
-        "Commits: 33091a3 (index fix), eacdd68 (Manager Logs change), 34f5bdd (revert + !important fix), f8d0241 (drivers CSS)",
-        "Documented all learnings in memory/knowledge/domain_expertise.json under css_styling_architecture domain"
-      ]
-    },
-    {
-      "date": "2025-10-27T23:00:00Z",
-      "summary": "Successfully implemented driver flag system with proper formatting and documentation. Fixed drivers.html layout, deployed to production.",
-      "key_decisions": [
-        "Created standalone drivers.html (NOT touching index.html)",
-        "Matched exact formatting of other pages (white background, content wrapper, 600px)",
-        "Used existing shared-header.js pattern for consistency",
-        "Created api/send-driver-flag-email.js for email notifications",
-        "Applied learnings from CRITICAL RULE #3 - asked permission, copied patterns"
-      ],
-      "action_items": [
-        "Monitor driver flag submissions in production",
-        "Ensure Supabase driver_flags table exists with proper schema",
-        "Test email notifications when first flag is submitted"
-      ],
-      "topics": ["Driver Flags", "Production Success", "Following Best Practices", "Layout Fixes"],
-      "important_details": [
-        "File: drivers.html - 600px mobile-friendly layout with FLAG/FLAGGED tabs",
-        "File: api/send-driver-flag-email.js - Gmail integration for PDF reports",
-        "Styling: White background, proper .content wrapper, matches boh.html exactly",
-        "Database: Uses driver_flags table with columns: date, time, staff_name, guest_name, driver_name, order_number, reason_flags, details, archived",
-        "Features: Staff name cycling from clocked-in employees, reason flag buttons, PDF generation, password-protected FLAGGED tab",
-        "Commit: 26d20c2 - feat(drivers): Add driver flag system with mobile-friendly layout",
-        "Deployment: Successfully deployed to Vercel, verified live at /drivers.html",
-        "Local testing: Verified server runs on port 8000, returns HTTP 200"
-      ]
-    },
-    {
-      "date": "2025-10-27T20:00:00Z",
-      "summary": "CRITICAL FAILURE: Broke index.html by removing 196 lines without permission. User extremely upset. Reverted 9 commits to restore working state.",
-      "key_decisions": [
-        "NEVER touch index.html without explicit permission",
-        "Index.html has intentional 'duplicate' code for dynamic show/hide patterns",
-        "Always copy existing patterns, never reinvent or 'improve' working code",
-        "User warnings (I'm afraid...) are SACRED - stop and ask permission",
-        "Production code is NOT for experimenting - only copy working patterns"
-      ],
-      "action_items": [
-        "Read CRITICAL RULE #3 in CLAUDE.md before EVERY session",
-        "Always ask user before modifying index.html",
-        "Use memory system to preserve learnings across sessions",
-        "Re-implement driver flag system step-by-step when user is ready"
-      ],
-      "topics": ["Critical Failure", "Production Incident", "Index.html", "Trust Breaking", "Learning"],
-      "important_details": [
-        "Mistake 1: Removed 196 lines thinking they were duplicate (they weren't)",
-        "Mistake 2: Added shared-header.js causing duplicate variable errors",
-        "Mistake 3: Broke Supabase initialization (DATABASE NOT CONNECTED)",
-        "Mistake 4: Ignored user's explicit warning about being afraid of index.html changes",
-        "Mistake 5: Experimented instead of following patterns",
-        "Recovery: Reverted to commit 070a362, saved driver files for future",
-        "Key learning: 'Duplicate' code often serves a purpose - NEVER remove without understanding",
-        "Trust damaged - must rebuild by asking permission before touching core files",
-        "Documented full post-mortem in CLAUDE.md as CRITICAL RULE #3"
-      ]
-    },
-    {
-      "date": "2025-10-27T00:00:00Z",
-      "summary": "Created staff notification for new paid break policy requiring Toast POS clock-out. Documented Homebase messaging format preferences.",
-      "key_decisions": [
-        "Break policy effective immediately with 7-day grace period",
-        "Staff must clock 'PAID BREAK' (not unpaid) in Toast POS for 10-minute breaks",
-        "Require emoji confirmation from all staff",
-        "Established Homebase format: no # headers, use **bold**, 3 languages (EN/TR/ES)",
-        "Language separator: --- (no language labels)"
-      ],
-      "action_items": [
-        "Monitor Toast POS logs daily for break compliance",
-        "Collect emoji confirmations from all staff within 7 days",
-        "Help staff remember and remind each other"
-      ],
-      "topics": ["Staff Policy", "Toast POS", "Compliance", "Homebase Communication", "Multilingual Messaging"],
-      "important_details": [
-        "Policy reason: Legal compliance, liability protection, ensure all staff get breaks",
-        "Homebase messaging format rules stored in memory/preferences/communication_style.json",
-        "Format: Concise, step-by-step, explains 'why', clear timeline, emoji confirmation",
-        "Languages: English first, Turkish second, Mexican Spanish last",
-        "Homebase renders **bold** automatically but not markdown headers"
-      ]
-    },
-    {
-      "date": "2025-10-19T08:00:00Z",
-      "summary": "Added AM Cash Count Viewer to FOH WATCHDOG tab with password protection. User can now view AM count data at any time of day.",
-      "key_decisions": [
-        "Placed AM CASH tab between HISTORY and PASSWORDS in WATCHDOG",
-        "Reused existing WATCHDOG password protection",
-        "Displayed full drawer breakdown with denomination details",
-        "Used same format as PM flow AM summary"
-      ],
-      "action_items": [],
-      "topics": ["FOH Checklists", "Cash Counting", "Manager Tools", "Supabase Integration"],
-      "important_details": [
-        "Function: loadAMCashData(date) - fetches and displays AM count",
-        "Queries cash_counts table from Supabase",
-        "Shows counter name, timestamp, total, drawer details, notes",
-        "Handles skipped drawers gracefully",
-        "Committed: 2d9ecb4 - feat(foh): Add AM cash count viewer to WATCHDOG tab"
       ]
     }
   ],
