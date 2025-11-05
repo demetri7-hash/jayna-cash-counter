@@ -62,6 +62,54 @@ async function fetchWithRateLimit(url, options, retryCount = 0) {
   }
 }
 
+/**
+ * Convert Pacific date (YYYY-MM-DD) to proper Pacific time Date object
+ * This ensures we're working in Pacific timezone, not UTC
+ */
+function getPacificDate(dateStr) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+
+  // Create date string in Pacific timezone at noon (avoids DST edge cases)
+  const pacificDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00`;
+
+  // Detect DST (PST = -08:00, PDT = -07:00)
+  const testDate = new Date(pacificDateStr);
+  const isDST = testDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', timeZoneName: 'short' }).includes('PDT');
+  const offset = isDST ? '-07:00' : '-08:00';
+
+  // Create date with explicit Pacific offset
+  const dateWithOffset = new Date(pacificDateStr + offset);
+
+  return dateWithOffset;
+}
+
+/**
+ * Get next day in Pacific timezone
+ */
+function getNextPacificDay(dateObj) {
+  // Convert to Pacific time string
+  const pacificStr = dateObj.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+
+  // Parse Pacific date
+  const [month, day, year] = pacificStr.split(', ')[0].split('/');
+  const pacificDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+
+  // Add one day
+  pacificDate.setDate(pacificDate.getDate() + 1);
+
+  // Format as YYYY-MM-DD
+  const nextYear = pacificDate.getFullYear();
+  const nextMonth = String(pacificDate.getMonth() + 1).padStart(2, '0');
+  const nextDay = String(pacificDate.getDate()).padStart(2, '0');
+
+  return `${nextYear}-${nextMonth}-${nextDay}`;
+}
+
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -87,7 +135,7 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`📋 Fetching Toast catering orders: ${startDate} to ${endDate}`);
+    console.log(`📋 Fetching Toast catering orders (Pacific time): ${startDate} to ${endDate}`);
 
     // Toast API configuration
     const TOAST_CONFIG = {
@@ -95,22 +143,19 @@ export default async function handler(req, res) {
       restaurantGuid: process.env.TOAST_RESTAURANT_GUID
     };
 
-    // Convert dates to business date format (yyyymmdd)
-    const startBusinessDate = parseInt(startDate.replace(/-/g, ''));
-    const endBusinessDate = parseInt(endDate.replace(/-/g, ''));
-
-    console.log(`📅 Date range: ${startBusinessDate} to ${endBusinessDate}`);
-
-    // Fetch orders for each day in the range
+    // Fetch orders for each day in the range (using Pacific timezone dates)
     const allCateringOrders = [];
     const sourceStats = {}; // Track sources for debugging
-    let currentDate = new Date(startDate);
-    const finalDate = new Date(endDate);
+    let currentDateStr = startDate;
+    const finalDateObj = getPacificDate(endDate);
 
-    while (currentDate <= finalDate) {
-      const businessDate = currentDate.toISOString().split('T')[0].replace(/-/g, '');
+    console.log(`📅 Pacific date range: ${currentDateStr} to ${endDate}`);
 
-      console.log(`🔍 Fetching orders for ${businessDate}...`);
+    while (getPacificDate(currentDateStr) <= finalDateObj) {
+      // Convert Pacific date to businessDate format (yyyymmdd)
+      const businessDate = currentDateStr.replace(/-/g, '');
+
+      console.log(`🔍 Fetching orders for Pacific date ${currentDateStr} (businessDate ${businessDate})...`);
 
       // PAGINATION LOOP - Fetch ALL pages, not just first 100
       let page = 1;
@@ -189,8 +234,8 @@ export default async function handler(req, res) {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      // Move to next day
-      currentDate.setDate(currentDate.getDate() + 1);
+      // Move to next day in Pacific timezone
+      currentDateStr = getNextPacificDay(getPacificDate(currentDateStr));
     }
 
     console.log(`📦 Total catering orders found: ${allCateringOrders.length}`);
