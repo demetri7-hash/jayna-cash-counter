@@ -922,6 +922,23 @@
     }
 
     /**
+     * Get Pacific date + N days as YYYY-MM-DD string
+     * @param {number} daysToAdd - Number of days to add (can be negative)
+     */
+    function getPacificDatePlusDays(daysToAdd) {
+      const now = new Date();
+      // Add days in milliseconds
+      const futureDate = new Date(now.getTime() + (daysToAdd * 24 * 60 * 60 * 1000));
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      return formatter.format(futureDate); // Returns "YYYY-MM-DD"
+    }
+
+    /**
      * Format date string (YYYY-MM-DD) as Pacific time display string
      * Does NOT rely on device timezone settings
      */
@@ -1106,15 +1123,11 @@
           showLoading('LOADING ORDERS', 'Loading catering orders from database...');
         }
 
-        // Calculate date range (today + 14 days)
-        const today = new Date();
-        const endDate = new Date();
-        endDate.setDate(today.getDate() + 14);
+        // Calculate date range (today + 14 days) in Pacific timezone
+        const startDateStr = getPacificToday();
+        const endDateStr = getPacificDatePlusDays(14);
 
-        const startDateStr = formatDate(today);
-        const endDateStr = formatDate(endDate);
-
-        console.log(`📋 Fetching orders from database: ${startDateStr} to ${endDateStr}`);
+        console.log(`📋 Fetching orders from database (Pacific time): ${startDateStr} to ${endDateStr}`);
 
         // Call database API (no authentication needed, very fast!)
         const response = await fetch(`/api/get-catering-orders?startDate=${startDateStr}&endDate=${endDateStr}`, {
@@ -1170,15 +1183,11 @@
           await authenticateToast();
         }
 
-        // Calculate date range (today + 14 days)
-        const today = new Date();
-        const endDate = new Date();
-        endDate.setDate(today.getDate() + 14);
+        // Calculate date range (today + 14 days) in Pacific timezone
+        const startDateStr = getPacificToday();
+        const endDateStr = getPacificDatePlusDays(14);
 
-        const startDateStr = formatDate(today);
-        const endDateStr = formatDate(endDate);
-
-        console.log(`🔄 Syncing from Toast: ${startDateStr} to ${endDateStr}`);
+        console.log(`🔄 Syncing from Toast (Pacific time): ${startDateStr} to ${endDateStr}`);
 
         // Call Toast catering orders API (will save to database)
         const response = await fetch('/api/toast-catering-orders', {
@@ -1268,17 +1277,11 @@
         statusDiv.style.color = 'var(--warning-text)';
         statusDiv.textContent = '🔄 Syncing from EZCater...';
 
-        // Calculate date range (last 30 days to cover recent orders)
-        const today = new Date();
-        const startDate = new Date();
-        startDate.setDate(today.getDate() - 30);
-        const endDate = new Date();
-        endDate.setDate(today.getDate() + 14);
+        // Calculate date range (last 30 days to cover recent orders) in Pacific timezone
+        const startDateStr = getPacificDatePlusDays(-30);
+        const endDateStr = getPacificDatePlusDays(14);
 
-        const startDateStr = formatDate(startDate);
-        const endDateStr = formatDate(endDate);
-
-        console.log(`🔄 Syncing from EZCater: ${startDateStr} to ${endDateStr}`);
+        console.log(`🔄 Syncing from EZCater (Pacific time): ${startDateStr} to ${endDateStr}`);
 
         // Call EZCater sync API (will fetch recent orders and save to database)
         const response = await fetch('/api/ezcater-sync-orders', {
@@ -1839,13 +1842,10 @@
         });
       }
 
-      // Generate next 7 days (including today)
+      // Generate next 7 days (including today) in Pacific timezone
       const next7Days = [];
-      const today = new Date();
       for (let i = 0; i < 7; i++) {
-        const date = new Date(today);
-        date.setDate(today.getDate() + i);
-        const dateStr = formatDate(date);
+        const dateStr = getPacificDatePlusDays(i);
         next7Days.push(dateStr);
       }
 
@@ -2065,13 +2065,9 @@
           await authenticateToast();
         }
 
-        // Calculate date range (today + 14 days)
-        const today = new Date();
-        const endDate = new Date();
-        endDate.setDate(today.getDate() + 14);
-
-        const startDateStr = formatDate(today);
-        const endDateStr = formatDate(endDate);
+        // Calculate date range (today + 14 days) in Pacific timezone
+        const startDateStr = getPacificToday();
+        const endDateStr = getPacificDatePlusDays(14);
 
         // Fetch fresh orders from Toast API
         const toastResponse = await fetch('/api/toast-catering-orders', {
