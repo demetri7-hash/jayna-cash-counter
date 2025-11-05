@@ -27,33 +27,66 @@ export default async function handler(req, res) {
         const toastApiUrl = process.env.TOAST_BASE_URL || 'https://ws-api.toasttab.com';
         
         console.log(`Starting cash calculation for business date: ${businessDate}`);
-        
-        // Step 1: Get payment GUIDs for the business date
-        const paymentsUrl = `${toastApiUrl}/orders/v2/payments?paidBusinessDate=${businessDate}`;
-        
-        console.log(`Fetching payment GUIDs from: ${paymentsUrl}`);
-        
-        const paymentsResponse = await fetch(paymentsUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Toast-Restaurant-External-ID': restaurantId,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!paymentsResponse.ok) {
-            console.error(`Payment GUIDs fetch failed: ${paymentsResponse.status} ${paymentsResponse.statusText}`);
-            const errorText = await paymentsResponse.text();
-            console.error('Error response:', errorText);
-            return res.status(paymentsResponse.status).json({ 
-                error: 'Failed to fetch payment GUIDs',
-                details: errorText 
+
+        // Step 1: Get ALL payment GUIDs for the business date (with pagination)
+        let allPaymentGuids = [];
+        let page = 1;
+        let hasMorePages = true;
+        const pageSize = 100; // Toast default
+
+        console.log(`Fetching payment GUIDs with pagination...`);
+
+        while (hasMorePages) {
+            const paymentsUrl = `${toastApiUrl}/orders/v2/payments?paidBusinessDate=${businessDate}&pageSize=${pageSize}&page=${page}`;
+
+            console.log(`Fetching page ${page}...`);
+
+            const paymentsResponse = await fetch(paymentsUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Toast-Restaurant-External-ID': restaurantId,
+                    'Content-Type': 'application/json'
+                }
             });
+
+            if (!paymentsResponse.ok) {
+                console.error(`Payment GUIDs fetch failed: ${paymentsResponse.status} ${paymentsResponse.statusText}`);
+                const errorText = await paymentsResponse.text();
+                console.error('Error response:', errorText);
+                return res.status(paymentsResponse.status).json({
+                    error: 'Failed to fetch payment GUIDs',
+                    details: errorText
+                });
+            }
+
+            const pageGuids = await paymentsResponse.json();
+            console.log(`Page ${page}: Found ${pageGuids.length} payment GUIDs`);
+
+            if (Array.isArray(pageGuids) && pageGuids.length > 0) {
+                allPaymentGuids = allPaymentGuids.concat(pageGuids);
+
+                // Check if there are more pages
+                if (pageGuids.length === pageSize) {
+                    page++;
+                    // Rate limit protection
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                } else {
+                    hasMorePages = false;
+                }
+            } else {
+                hasMorePages = false;
+            }
+
+            // Safety limit
+            if (page > 50) {
+                console.warn(`Reached maximum page limit (50 pages = 5000 payments)`);
+                hasMorePages = false;
+            }
         }
-        
-        const paymentGuids = await paymentsResponse.json();
-        console.log(`Found ${paymentGuids.length} payment GUIDs`);
+
+        const paymentGuids = allPaymentGuids;
+        console.log(`✅ Total payment GUIDs found across all pages: ${paymentGuids.length}`);
         
         if (paymentGuids.length === 0) {
             return res.json({
