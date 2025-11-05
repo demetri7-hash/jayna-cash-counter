@@ -387,6 +387,7 @@ export default async function handler(req, res) {
 
         // Order details
         source: order.source,
+        source_system: 'TOAST', // CRITICAL: Frontend needs this to filter Toast vs EZCater orders
         business_date: order.businessDate,
         headcount: order.numberOfGuests || null,
         total: total, // Already in dollars!
