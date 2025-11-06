@@ -71,7 +71,7 @@ export default async function handler(req, res) {
         customer_email: orderData.customer_email,
         customer_phone: orderData.customer_phone,
         delivery_date: orderData.delivery_date,
-        delivery_time: orderData.delivery_time ? new Date(orderData.delivery_date + 'T' + orderData.delivery_time).toISOString() : null,
+        delivery_time: orderData.delivery_time ? `${orderData.delivery_date}T${orderData.delivery_time}-08:00` : null, // Keep Pacific timezone!
         delivery_address: [
           orderData.delivery_address_street,
           orderData.delivery_address_city,
