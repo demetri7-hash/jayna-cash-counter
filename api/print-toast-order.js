@@ -482,13 +482,13 @@ async function generateOrderReceiptPDF(order, lineItems) {
         });
       }
 
-      // Add special requests (NO EMOJI - jsPDF doesn't support them)
+      // Add special requests (use * symbol instead of emoji)
       if (item.special_requests) {
         const cleanedRequest = decodeHTMLEntities(item.special_requests);
         console.log('🧹 BEFORE decode:', item.special_requests);
         console.log('🧹 AFTER decode:', cleanedRequest);
         tableData.push([
-          `   >> ${cleanedRequest}`,
+          `   * ${cleanedRequest}`,
           '',
           ''
         ]);
