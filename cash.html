@@ -2087,8 +2087,8 @@
   async function fetchToastCashSalesForDate(dateInput) {
     // Show loading state
     document.getElementById('autoToastAmount').textContent = 'Loading...';
-    document.getElementById('autoToastDetails').textContent = 'Fetching live data from Toast API...';
-    
+    document.getElementById('autoToastDetails').textContent = 'Fetching with 3-attempt retry logic for accuracy...';
+
     try {
       // Handle both date string (YYYY-MM-DD) and formatted date (YYYYMMDD)
       let businessDate;
@@ -2100,65 +2100,133 @@
         // Already in YYYYMMDD format
         businessDate = dateInput;
       }
-      
-      console.log('Auto-fetching Toast cash sales for:', businessDate);
-      
+
+      console.log('🔄 Starting 3-attempt fetch for Toast cash sales:', businessDate);
+
       // First authenticate with Toast
       const authResponse = await fetch('/api/toast-auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      
+
       if (!authResponse.ok) {
         throw new Error('Failed to authenticate with Toast API');
       }
-      
+
       const authData = await authResponse.json();
       if (!authData.success || !authData.data?.accessToken) {
         throw new Error('Toast authentication failed');
       }
-      
-      // Fetch cash sales using payments API
-      const paymentsUrl = `/api/toast-payments?businessDate=${businessDate}&token=${encodeURIComponent(authData.data.accessToken)}`;
-      const paymentsResponse = await fetch(paymentsUrl);
-      
-      if (!paymentsResponse.ok) {
-        throw new Error('Failed to fetch Toast payments data');
+
+      // RETRY LOGIC: Fetch 3 times and use the highest amount (most complete data)
+      const attempts = [];
+      const token = authData.data.accessToken;
+
+      for (let i = 1; i <= 3; i++) {
+        console.log(`🔄 Attempt ${i}/3: Fetching cash sales...`);
+        document.getElementById('autoToastDetails').textContent = `Attempt ${i}/3: Fetching payments...`;
+
+        try {
+          const paymentsUrl = `/api/toast-payments?businessDate=${businessDate}&token=${encodeURIComponent(token)}`;
+          const paymentsResponse = await fetch(paymentsUrl);
+
+          if (!paymentsResponse.ok) {
+            console.warn(`Attempt ${i} failed: HTTP ${paymentsResponse.status}`);
+            attempts.push({ success: false, attempt: i, error: `HTTP ${paymentsResponse.status}` });
+            continue;
+          }
+
+          const paymentsData = await paymentsResponse.json();
+          if (!paymentsData.success) {
+            console.warn(`Attempt ${i} failed:`, paymentsData.error);
+            attempts.push({ success: false, attempt: i, error: paymentsData.error });
+            continue;
+          }
+
+          // Success! Store this attempt's result
+          attempts.push({
+            success: true,
+            attempt: i,
+            totalCashAmount: paymentsData.totalCashAmount,
+            totalCashPayments: paymentsData.totalCashPayments,
+            totalPaymentGuids: paymentsData.totalPaymentGuids
+          });
+
+          console.log(`✅ Attempt ${i} success: $${paymentsData.totalCashAmount.toFixed(2)} (${paymentsData.totalCashPayments} payments)`);
+
+          // Small delay between attempts to avoid rate limiting
+          if (i < 3) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+
+        } catch (error) {
+          console.warn(`Attempt ${i} error:`, error.message);
+          attempts.push({ success: false, attempt: i, error: error.message });
+        }
       }
-      
-      const paymentsData = await paymentsResponse.json();
-      if (!paymentsData.success) {
-        throw new Error(paymentsData.error || 'Toast payments API returned an error');
+
+      // Find successful attempts
+      const successfulAttempts = attempts.filter(a => a.success);
+
+      if (successfulAttempts.length === 0) {
+        throw new Error('All 3 fetch attempts failed. Please try again.');
       }
-      
+
+      // Use the HIGHEST amount (most complete data)
+      const bestAttempt = successfulAttempts.reduce((max, current) =>
+        current.totalCashAmount > max.totalCashAmount ? current : max
+      );
+
+      // Check for discrepancies between attempts
+      const amounts = successfulAttempts.map(a => a.totalCashAmount);
+      const minAmount = Math.min(...amounts);
+      const maxAmount = Math.max(...amounts);
+      const hasDiscrepancy = maxAmount !== minAmount;
+
+      console.log('📊 Fetch Results:');
+      console.log(`   - Successful attempts: ${successfulAttempts.length}/3`);
+      console.log(`   - Amounts: $${amounts.map(a => a.toFixed(2)).join(', $')}`);
+      console.log(`   - Using HIGHEST: $${bestAttempt.totalCashAmount.toFixed(2)} (Attempt ${bestAttempt.attempt})`);
+
       // Store the auto-calculated amount
-      autoCalculatedToastAmount = paymentsData.totalCashAmount;
-      
+      autoCalculatedToastAmount = bestAttempt.totalCashAmount;
+
       // Update the hidden field for form processing
       document.getElementById('toastSales').value = autoCalculatedToastAmount.toFixed(2);
-      
-      // Show success result
+
+      // Show success result with warning if discrepancies detected
       document.getElementById('autoToastAmount').textContent = `$${autoCalculatedToastAmount.toFixed(2)}`;
-      document.getElementById('autoToastDetails').textContent = 
-        `${paymentsData.totalCashPayments} cash payments • ${paymentsData.totalPaymentGuids} total transactions • Auto-synced`;
-      
-      console.log('Toast cash sales auto-fetched successfully:', autoCalculatedToastAmount);
-      
+
+      let detailsText = `${bestAttempt.totalCashPayments} cash payments • ${bestAttempt.totalPaymentGuids} transactions`;
+
+      if (hasDiscrepancy) {
+        detailsText += ` • ⚠️ DISCREPANCY DETECTED (Range: $${minAmount.toFixed(2)}-$${maxAmount.toFixed(2)}) - Using highest amount`;
+        document.getElementById('autoToastDetails').style.color = '#d97706'; // Orange warning
+      } else {
+        detailsText += ` • ✅ All ${successfulAttempts.length} attempts matched`;
+        document.getElementById('autoToastDetails').style.color = '#065f46'; // Green success
+      }
+
+      document.getElementById('autoToastDetails').textContent = detailsText;
+
+      console.log('✅ Toast cash sales fetched successfully:', autoCalculatedToastAmount);
+
       // Trigger discrepancy validation if we're in PM mode
       const pmGrandTotal = document.getElementById('pmGrandTotal');
       if (pmGrandTotal && pmGrandTotal.textContent !== '$0.00') {
         const pmTotal = parseFloat(pmGrandTotal.textContent.replace('$', '').replace(',', '')) || 0;
         validatePMDiscrepancy(pmTotal);
       }
-      
+
     } catch (error) {
-      console.error('Toast API auto-fetch error:', error);
-      
-      // Show error state but don't provide fallback
+      console.error('❌ Toast API fetch error:', error);
+
+      // Show error state
       document.getElementById('autoToastAmount').textContent = 'API Error';
-      document.getElementById('autoToastDetails').textContent = 
-        `Failed to fetch: ${error.message} • Please check internet connection and try again`;
-      
+      document.getElementById('autoToastDetails').textContent =
+        `Failed: ${error.message} • Check connection and retry`;
+      document.getElementById('autoToastDetails').style.color = '#991b1b'; // Red error
+
       // Reset auto amount
       autoCalculatedToastAmount = 0;
       document.getElementById('toastSales').value = '0';
