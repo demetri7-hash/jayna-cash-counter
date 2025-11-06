@@ -2070,10 +2070,18 @@
   let autoCalculatedToastAmount = 0;
   
   async function fetchToastCashSales() {
-    // Use today's date by default
-    const today = new Date();
-    const businessDate = formatDateForToast(today);
-    await fetchToastCashSalesForDate(businessDate);
+    // Use the selected PM date from the date picker
+    const selectedDate = document.getElementById('pmDate').value;
+    if (!selectedDate) {
+      console.warn('No PM date selected, using today');
+      const today = new Date();
+      const businessDate = formatDateForToast(today);
+      await fetchToastCashSalesForDate(businessDate);
+    } else {
+      // Use the selected date
+      console.log('Fetching Toast cash sales for selected date:', selectedDate);
+      await fetchToastCashSalesForDate(selectedDate);
+    }
   }
 
   async function fetchToastCashSalesForDate(dateInput) {
