@@ -482,16 +482,11 @@ async function generateOrderReceiptPDF(order, lineItems) {
         });
       }
 
-      // Add special requests with bold header
+      // Add special requests as indented note
       if (item.special_requests) {
         const cleanedRequest = decodeHTMLEntities(item.special_requests);
         tableData.push([
-          { content: 'SPECIAL REQUEST', styles: { fontStyle: 'bold' } },
-          '',
-          ''
-        ]);
-        tableData.push([
-          cleanedRequest,
+          { content: `   NOTE: ${cleanedRequest}`, styles: { fontStyle: 'italic', fontSize: 8 } },
           '',
           ''
         ]);
