@@ -683,6 +683,29 @@
       transform: translateY(-2px);
       box-shadow: 0 10px 25px rgba(40, 167, 69, 0.3);
     }
+
+    /* Animated Loading Dots */
+    .loading-dots {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .loading-dots span {
+      font-size: 20px;
+      color: #059669;
+      animation: pulse-dot 1.4s ease-in-out infinite;
+      opacity: 0.3;
+    }
+    @keyframes pulse-dot {
+      0%, 100% {
+        opacity: 0.3;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.2);
+      }
+    }
   </style>
   
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
@@ -874,7 +897,16 @@
             </div>
 
             <div style="text-align: center; margin: 15px 0;">
-              <div style="font-size: 32px; font-weight: bold; color: var(--gray-900); margin-bottom: 8px;" id="autoToastAmount">Loading...</div>
+              <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px;">
+                <div style="font-size: 32px; font-weight: bold; color: var(--gray-900);" id="autoToastAmount">Loading...</div>
+                <div id="toastLoadingIndicator" style="display: none;">
+                  <div class="loading-dots">
+                    <span style="animation-delay: 0s;">●</span>
+                    <span style="animation-delay: 0.2s;">●</span>
+                    <span style="animation-delay: 0.4s;">●</span>
+                  </div>
+                </div>
+              </div>
               <div style="font-size: 14px; color: var(--gray-700); font-weight: 500;" id="autoToastDetails">Fetching today's cash sales automatically...</div>
             </div>
 
@@ -2085,9 +2117,13 @@
   }
 
   async function fetchToastCashSalesForDate(dateInput) {
-    // Show loading state
+    // Show loading state with animated indicator
+    const loadingIndicator = document.getElementById('toastLoadingIndicator');
+    loadingIndicator.style.display = 'block';
+
     document.getElementById('autoToastAmount').textContent = 'Loading...';
     document.getElementById('autoToastDetails').textContent = 'Fetching with 3-attempt retry logic for accuracy...';
+    document.getElementById('autoToastDetails').style.color = '#059669'; // Green during loading
 
     try {
       // Handle both date string (YYYY-MM-DD) and formatted date (YYYYMMDD)
@@ -2124,7 +2160,8 @@
 
       for (let i = 1; i <= 3; i++) {
         console.log(`🔄 Attempt ${i}/3: Fetching cash sales...`);
-        document.getElementById('autoToastDetails').textContent = `Attempt ${i}/3: Fetching payments...`;
+        document.getElementById('autoToastDetails').textContent = `🔄 Attempt ${i}/3: Fetching payments...`;
+        document.getElementById('autoToastDetails').style.color = '#059669'; // Keep green during attempts
 
         try {
           const paymentsUrl = `/api/toast-payments?businessDate=${businessDate}&token=${encodeURIComponent(token)}`;
@@ -2209,6 +2246,9 @@
 
       document.getElementById('autoToastDetails').textContent = detailsText;
 
+      // Hide loading indicator on success
+      loadingIndicator.style.display = 'none';
+
       console.log('✅ Toast cash sales fetched successfully:', autoCalculatedToastAmount);
 
       // Trigger discrepancy validation if we're in PM mode
@@ -2220,6 +2260,9 @@
 
     } catch (error) {
       console.error('❌ Toast API fetch error:', error);
+
+      // Hide loading indicator on error
+      loadingIndicator.style.display = 'none';
 
       // Show error state
       document.getElementById('autoToastAmount').textContent = 'API Error';
