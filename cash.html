@@ -903,7 +903,7 @@
               <div style="font-size: 13px; color: var(--gray-700); font-weight: 500; margin-bottom: 10px;" id="autoToastDetails">Fetching today's cash sales automatically...</div>
 
               <!-- Retry Button -->
-              <button onclick="fetchToastCashSales()" style="padding: 8px 16px; background: #3b82f6; border: 2px solid #3b82f6; color: white; font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 0; transition: all 0.15s ease;" onmouseover="this.style.background='#2563eb'; this.style.borderColor='#2563eb'" onmouseout="this.style.background='#3b82f6'; this.style.borderColor='#3b82f6'">
+              <button id="toastRetryBtn" onclick="fetchToastCashSales()" style="padding: 8px 16px; background: #3b82f6; border: 2px solid #3b82f6; color: white; font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 0; transition: all 0.15s ease;" onmouseover="this.style.background='#2563eb'; this.style.borderColor='#2563eb'" onmouseout="this.style.background='#3b82f6'; this.style.borderColor='#3b82f6'">
                 RETRY
               </button>
             </div>
@@ -2113,7 +2113,14 @@
   async function fetchToastCashSalesForDate(dateInput) {
     // Show loading state with animated indicator
     const loadingIndicator = document.getElementById('toastLoadingIndicator');
+    const retryBtn = document.getElementById('toastRetryBtn');
+
     loadingIndicator.style.display = 'block';
+
+    // Disable retry button during fetch
+    retryBtn.disabled = true;
+    retryBtn.style.opacity = '0.5';
+    retryBtn.style.cursor = 'not-allowed';
 
     document.getElementById('autoToastAmount').textContent = 'Loading...';
     document.getElementById('autoToastDetails').textContent = 'Fetching with 3-attempt retry logic for accuracy...';
@@ -2243,6 +2250,11 @@
       // Hide loading indicator on success
       loadingIndicator.style.display = 'none';
 
+      // Re-enable retry button
+      retryBtn.disabled = false;
+      retryBtn.style.opacity = '1';
+      retryBtn.style.cursor = 'pointer';
+
       console.log('✅ Toast cash sales fetched successfully:', autoCalculatedToastAmount);
 
       // Trigger discrepancy validation if we're in PM mode
@@ -2257,6 +2269,11 @@
 
       // Hide loading indicator on error
       loadingIndicator.style.display = 'none';
+
+      // Re-enable retry button (so they can retry after error)
+      retryBtn.disabled = false;
+      retryBtn.style.opacity = '1';
+      retryBtn.style.cursor = 'pointer';
 
       // Show error state
       document.getElementById('autoToastAmount').textContent = 'API Error';
