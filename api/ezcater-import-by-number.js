@@ -240,34 +240,26 @@ async function tryFetchOrder(id, apiToken) {
 }
 
 function parseOrderData(order) {
-  // CRITICAL: Use event's timezone to extract date/time (NOT UTC!)
-  // EZCater provides timeZoneIdentifier (e.g., "America/Los_Angeles")
-  const timezone = order.event?.timeZoneIdentifier || 'America/Los_Angeles';
+  // SIMPLE FIX: Extract date/time directly from ISO string (no timezone conversion!)
+  // EZCater sends timestamps already in the correct local timezone
+  // Example: "2025-11-06T17:00:00-08:00" means 5 PM Pacific on Nov 6
 
-  const deliveryTimestamp = order.event?.catererHandoffFoodTime ? new Date(order.event.catererHandoffFoodTime) :
-                           (order.event?.timestamp ? new Date(order.event.timestamp) : null);
-
-  // Extract date/time in the EVENT'S timezone, not UTC!
+  const timestampStr = order.event?.catererHandoffFoodTime || order.event?.timestamp;
   let deliveryDate = null;
   let deliveryTime = null;
 
-  if (deliveryTimestamp) {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-    deliveryDate = formatter.format(deliveryTimestamp); // Returns "YYYY-MM-DD"
+  if (timestampStr) {
+    // Extract date directly from ISO string: "2025-11-06T17:00:00..." → "2025-11-06"
+    const dateMatch = timestampStr.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (dateMatch) {
+      deliveryDate = dateMatch[1]; // "YYYY-MM-DD"
+    }
 
-    const timeFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-    deliveryTime = timeFormatter.format(deliveryTimestamp).replace(/:/g, ':'); // "HH:MM:SS"
+    // Extract time directly from ISO string: "...T17:00:00..." → "17:00:00"
+    const timeMatch = timestampStr.match(/T(\d{2}:\d{2}:\d{2})/);
+    if (timeMatch) {
+      deliveryTime = timeMatch[1]; // "HH:MM:SS"
+    }
   }
 
   // Try contact name FIRST (that's where EZCater actually puts it!)

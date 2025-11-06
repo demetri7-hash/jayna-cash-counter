@@ -23,13 +23,29 @@ export default async function handler(req, res) {
     const testOrderNumber = `TEST-${Math.floor(Math.random() * 10000)}`;
 
     // Calculate delivery time: tomorrow at 12:00 PM Pacific
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(12, 0, 0, 0);
+    const now = new Date();
 
-    // Format in ISO 8601 with Pacific timezone offset
-    const tomorrowPacific = new Date(tomorrow.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-    const deliveryTime = tomorrowPacific.toISOString().replace('Z', '-08:00'); // PST offset
+    // Get tomorrow's date in Pacific timezone
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const todayPacific = formatter.format(now); // "2025-11-05"
+
+    // Add 1 day to get tomorrow
+    const [year, month, day] = todayPacific.split('-').map(Number);
+    const tomorrowDate = new Date(year, month - 1, day + 1);
+    const tomorrowStr = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`;
+
+    // Determine if we're in PDT (-07:00) or PST (-08:00)
+    const testDate = new Date();
+    const isDST = testDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', timeZoneName: 'short' }).includes('PDT');
+    const offset = isDST ? '-07:00' : '-08:00';
+
+    // Create ISO string: tomorrow at 12:00 PM Pacific
+    const deliveryTime = `${tomorrowStr}T12:00:00${offset}`;
 
     // Create test webhook payload (simulates what EZCater sends)
     const testWebhookPayload = {
@@ -229,32 +245,23 @@ export default async function handler(req, res) {
 }
 
 function parseTestOrder(order) {
-  // Use same parsing logic as real webhook
-  const timezone = order.event?.timeZoneIdentifier || 'America/Los_Angeles';
-
-  const deliveryTimestamp = order.event?.catererHandoffFoodTime ? new Date(order.event.catererHandoffFoodTime) :
-                           (order.event?.timestamp ? new Date(order.event.timestamp) : null);
-
+  // SIMPLE: Extract date/time directly from ISO string (no conversion!)
+  const timestampStr = order.event?.catererHandoffFoodTime || order.event?.timestamp;
   let deliveryDate = null;
   let deliveryTime = null;
 
-  if (deliveryTimestamp) {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-    deliveryDate = formatter.format(deliveryTimestamp);
+  if (timestampStr) {
+    // Extract date: "2025-11-06T12:00:00-08:00" → "2025-11-06"
+    const dateMatch = timestampStr.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (dateMatch) {
+      deliveryDate = dateMatch[1];
+    }
 
-    const timeFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-    deliveryTime = timeFormatter.format(deliveryTimestamp);
+    // Extract time: "2025-11-06T12:00:00-08:00" → "12:00:00"
+    const timeMatch = timestampStr.match(/T(\d{2}:\d{2}:\d{2})/);
+    if (timeMatch) {
+      deliveryTime = timeMatch[1];
+    }
   }
 
   const customerName = order.event?.contact?.name ||
