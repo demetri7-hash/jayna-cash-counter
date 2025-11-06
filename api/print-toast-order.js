@@ -482,13 +482,16 @@ async function generateOrderReceiptPDF(order, lineItems) {
         });
       }
 
-      // Add special requests (use * symbol instead of emoji)
+      // Add special requests with bold header
       if (item.special_requests) {
         const cleanedRequest = decodeHTMLEntities(item.special_requests);
-        console.log('🧹 BEFORE decode:', item.special_requests);
-        console.log('🧹 AFTER decode:', cleanedRequest);
         tableData.push([
-          `   * ${cleanedRequest}`,
+          { content: 'SPECIAL REQUEST', styles: { fontStyle: 'bold' } },
+          '',
+          ''
+        ]);
+        tableData.push([
+          cleanedRequest,
           '',
           ''
         ]);
