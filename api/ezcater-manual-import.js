@@ -287,11 +287,10 @@ function parseOrderData(order) {
       second: '2-digit',
       hour12: false
     });
-    const timeParts = timeFormatter.formatToParts(dt);
-    const hour = timeParts.find(p => p.type === 'hour').value;
-    const minute = timeParts.find(p => p.type === 'minute').value;
-    const second = timeParts.find(p => p.type === 'second').value;
-    deliveryTime = `${hour}:${minute}:${second}`;
+
+    // Format as string and parse - more reliable than formatToParts
+    const timeString = timeFormatter.format(dt); // "17:00:00" format
+    deliveryTime = timeString.replace(/\u202f/g, '').trim(); // Remove any non-breaking spaces
   }
 
     // Try contact name FIRST (that's where EZCater actually puts it!)
