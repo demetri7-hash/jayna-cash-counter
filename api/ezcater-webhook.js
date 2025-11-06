@@ -250,12 +250,36 @@ async function fetchOrderFromEZCater(orderId) {
  * Based on official EZCater API schema (October 2025)
  */
 function parseOrderData(order) {
+  // CRITICAL: Use event's timezone to extract date/time (NOT UTC!)
+  // EZCater provides timeZoneIdentifier (e.g., "America/Los_Angeles")
+  const timezone = order.event?.timeZoneIdentifier || 'America/Los_Angeles';
+
   // Extract DELIVERY timestamp (catererHandoffFoodTime) - NOT order placement timestamp!
-  // Use catererHandoffFoodTime (actual delivery time) with fallback to timestamp (order placement)
   const deliveryTimestamp = order.event?.catererHandoffFoodTime ? new Date(order.event.catererHandoffFoodTime) :
                            (order.event?.timestamp ? new Date(order.event.timestamp) : null);
-  const deliveryDate = deliveryTimestamp ? deliveryTimestamp.toISOString().split('T')[0] : null;
-  const deliveryTime = deliveryTimestamp ? deliveryTimestamp.toISOString().split('T')[1].substring(0, 8) : null;
+
+  // Extract date/time in the EVENT'S timezone, not UTC!
+  let deliveryDate = null;
+  let deliveryTime = null;
+
+  if (deliveryTimestamp) {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    deliveryDate = formatter.format(deliveryTimestamp); // Returns "YYYY-MM-DD"
+
+    const timeFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    deliveryTime = timeFormatter.format(deliveryTimestamp).replace(/:/g, ':'); // "HH:MM:SS"
+  }
 
   // Extract customer info (orderCustomer in actual schema, not "customer")
     // Try contact name FIRST (that's where EZCater actually puts it!)
