@@ -248,17 +248,21 @@ function parseOrderData(order) {
   let deliveryDate = null;
   let deliveryTime = null;
 
+  console.log('🔍 RAW TIMESTAMP FROM EZCATER:', timestampStr);
+
   if (timestampStr) {
     // Extract date directly from ISO string: "2025-11-06T17:00:00..." → "2025-11-06"
     const dateMatch = timestampStr.match(/^(\d{4}-\d{2}-\d{2})/);
     if (dateMatch) {
       deliveryDate = dateMatch[1]; // "YYYY-MM-DD"
+      console.log('📅 EXTRACTED DATE:', deliveryDate);
     }
 
     // Extract time directly from ISO string: "...T17:00:00..." → "17:00:00"
     const timeMatch = timestampStr.match(/T(\d{2}:\d{2}:\d{2})/);
     if (timeMatch) {
       deliveryTime = timeMatch[1]; // "HH:MM:SS"
+      console.log('⏰ EXTRACTED TIME:', deliveryTime);
     }
   }
 
