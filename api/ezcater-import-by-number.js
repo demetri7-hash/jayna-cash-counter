@@ -240,10 +240,7 @@ async function tryFetchOrder(id, apiToken) {
 }
 
 function parseOrderData(order) {
-  // SIMPLE FIX: Extract date/time directly from ISO string (no timezone conversion!)
-  // EZCater sends timestamps already in the correct local timezone
-  // Example: "2025-11-06T17:00:00-08:00" means 5 PM Pacific on Nov 6
-
+  // CORRECT FIX: Parse timestamp and convert to Pacific timezone
   const timestampStr = order.event?.catererHandoffFoodTime || order.event?.timestamp;
   let deliveryDate = null;
   let deliveryTime = null;
@@ -251,19 +248,35 @@ function parseOrderData(order) {
   console.log('🔍 RAW TIMESTAMP FROM EZCATER:', timestampStr);
 
   if (timestampStr) {
-    // Extract date directly from ISO string: "2025-11-06T17:00:00..." → "2025-11-06"
-    const dateMatch = timestampStr.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (dateMatch) {
-      deliveryDate = dateMatch[1]; // "YYYY-MM-DD"
-      console.log('📅 EXTRACTED DATE:', deliveryDate);
-    }
+    // Parse the ISO timestamp into a Date object
+    const dt = new Date(timestampStr);
+    console.log('📍 PARSED AS DATE OBJECT:', dt.toISOString());
 
-    // Extract time directly from ISO string: "...T17:00:00..." → "17:00:00"
-    const timeMatch = timestampStr.match(/T(\d{2}:\d{2}:\d{2})/);
-    if (timeMatch) {
-      deliveryTime = timeMatch[1]; // "HH:MM:SS"
-      console.log('⏰ EXTRACTED TIME:', deliveryTime);
-    }
+    // Convert to Pacific timezone and extract date
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    deliveryDate = dateFormatter.format(dt); // "YYYY-MM-DD" in Pacific time
+
+    // Convert to Pacific timezone and extract time
+    const timeFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    const timeParts = timeFormatter.formatToParts(dt);
+    const hour = timeParts.find(p => p.type === 'hour').value;
+    const minute = timeParts.find(p => p.type === 'minute').value;
+    const second = timeParts.find(p => p.type === 'second').value;
+    deliveryTime = `${hour}:${minute}:${second}`;
+
+    console.log('📅 EXTRACTED DATE (Pacific):', deliveryDate);
+    console.log('⏰ EXTRACTED TIME (Pacific):', deliveryTime);
   }
 
   // Try contact name FIRST (that's where EZCater actually puts it!)

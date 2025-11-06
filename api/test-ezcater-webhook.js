@@ -245,23 +245,37 @@ export default async function handler(req, res) {
 }
 
 function parseTestOrder(order) {
-  // SIMPLE: Extract date/time directly from ISO string (no conversion!)
+  // CORRECT FIX: Parse timestamp and convert to Pacific timezone
   const timestampStr = order.event?.catererHandoffFoodTime || order.event?.timestamp;
   let deliveryDate = null;
   let deliveryTime = null;
 
   if (timestampStr) {
-    // Extract date: "2025-11-06T12:00:00-08:00" → "2025-11-06"
-    const dateMatch = timestampStr.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (dateMatch) {
-      deliveryDate = dateMatch[1];
-    }
+    // Parse the ISO timestamp into a Date object
+    const dt = new Date(timestampStr);
 
-    // Extract time: "2025-11-06T12:00:00-08:00" → "12:00:00"
-    const timeMatch = timestampStr.match(/T(\d{2}:\d{2}:\d{2})/);
-    if (timeMatch) {
-      deliveryTime = timeMatch[1];
-    }
+    // Convert to Pacific timezone and extract date
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    deliveryDate = dateFormatter.format(dt); // "YYYY-MM-DD" in Pacific time
+
+    // Convert to Pacific timezone and extract time
+    const timeFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    const timeParts = timeFormatter.formatToParts(dt);
+    const hour = timeParts.find(p => p.type === 'hour').value;
+    const minute = timeParts.find(p => p.type === 'minute').value;
+    const second = timeParts.find(p => p.type === 'second').value;
+    deliveryTime = `${hour}:${minute}:${second}`;
   }
 
   const customerName = order.event?.contact?.name ||
