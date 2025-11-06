@@ -107,14 +107,16 @@ function decodeHTMLEntities(text) {
     '&hellip;': '...',
     '&trade;': '™',
     '&copy;': '©',
-    '&reg;': '®'
+    '&reg;': '®',
+    '&thorn;': '', // Remove thorn entity
+    '&THORN;': ''  // Remove uppercase thorn entity
   };
 
   let decoded = text;
 
   // Replace known entities
   for (const [entity, char] of Object.entries(entities)) {
-    decoded = decoded.replace(new RegExp(entity, 'g'), char);
+    decoded = decoded.replace(new RegExp(entity, 'gi'), char);
   }
 
   // Handle numeric entities like &#8211; or &#x201C;
@@ -126,10 +128,16 @@ function decodeHTMLEntities(text) {
     return String.fromCharCode(parseInt(hex, 16));
   });
 
-  // Remove any remaining & followed by non-ascii characters (like & þ)
+  // CRITICAL: Remove the specific "& þ" pattern (ampersand + space + thorn)
+  decoded = decoded.replace(/&\s*þ/g, '');
+
+  // Remove any remaining & followed by non-ascii characters
   decoded = decoded.replace(/&\s*[\u0080-\uFFFF]/g, '');
 
-  return decoded.trim();
+  // Remove leading/trailing whitespace and clean up multiple spaces
+  decoded = decoded.replace(/\s+/g, ' ').trim();
+
+  return decoded;
 }
 
 export default async function handler(req, res) {
@@ -477,6 +485,8 @@ async function generateOrderReceiptPDF(order, lineItems) {
       // Add special requests (decode HTML entities to fix & þ issue)
       if (item.special_requests) {
         const cleanedRequest = decodeHTMLEntities(item.special_requests);
+        console.log('🧹 BEFORE decode:', item.special_requests);
+        console.log('🧹 AFTER decode:', cleanedRequest);
         tableData.push([
           `   ⚠️ ${cleanedRequest}`,
           '',
