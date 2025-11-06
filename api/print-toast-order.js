@@ -88,6 +88,50 @@ function formatPhoneNumber(phone) {
   return phone;
 }
 
+/**
+ * Decode HTML entities (fixes EZCater's & þ encoding issue)
+ */
+function decodeHTMLEntities(text) {
+  if (!text) return text;
+
+  // Common HTML entity replacements
+  const entities = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&nbsp;': ' ',
+    '&ndash;': '–',
+    '&mdash;': '—',
+    '&hellip;': '...',
+    '&trade;': '™',
+    '&copy;': '©',
+    '&reg;': '®'
+  };
+
+  let decoded = text;
+
+  // Replace known entities
+  for (const [entity, char] of Object.entries(entities)) {
+    decoded = decoded.replace(new RegExp(entity, 'g'), char);
+  }
+
+  // Handle numeric entities like &#8211; or &#x201C;
+  decoded = decoded.replace(/&#(\d+);/g, (match, dec) => {
+    return String.fromCharCode(dec);
+  });
+
+  decoded = decoded.replace(/&#x([0-9A-Fa-f]+);/g, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+
+  // Remove any remaining & followed by non-ascii characters (like & þ)
+  decoded = decoded.replace(/&\s*[\u0080-\uFFFF]/g, '');
+
+  return decoded.trim();
+}
+
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -252,9 +296,18 @@ async function generateOrderReceiptPDF(order, lineItems) {
   if (order.payment_status) {
     beoInfoLine += ` • ${order.payment_status.toUpperCase()}`;
   }
+
+  // Utensils - Show "Yes" or "No" with quantity if applicable
   if (order.utensils_required !== null && order.utensils_required !== undefined) {
-    beoInfoLine += ` • Utensils: ${order.utensils_required ? 'Yes' : 'No'}`;
+    if (order.utensils_required) {
+      // If utensils required, show quantity if available
+      const utensilQty = order.utensils_quantity || order.headcount || 'Yes';
+      beoInfoLine += ` • Utensils: ${typeof utensilQty === 'number' ? `${utensilQty} sets` : utensilQty}`;
+    } else {
+      beoInfoLine += ` • Utensils: No`;
+    }
   }
+
   doc.text(beoInfoLine, 40, yPos);
   yPos += 15;
 
@@ -408,22 +461,24 @@ async function generateOrderReceiptPDF(order, lineItems) {
         `$${totalPrice}`
       ]);
 
-      // Add modifiers as sub-rows
+      // Add modifiers as sub-rows (decode HTML entities)
       if (item.modifiers && Array.isArray(item.modifiers) && item.modifiers.length > 0) {
         item.modifiers.forEach(mod => {
           const modPrice = mod.price ? ` (+$${parseFloat(mod.price).toFixed(2)})` : '';
+          const modName = decodeHTMLEntities(mod.name || '');
           tableData.push([
-            `   + ${mod.name}${modPrice}`,
+            `   + ${modName}${modPrice}`,
             '',
             ''
           ]);
         });
       }
 
-      // Add special requests
+      // Add special requests (decode HTML entities to fix & þ issue)
       if (item.special_requests) {
+        const cleanedRequest = decodeHTMLEntities(item.special_requests);
         tableData.push([
-          `   ⚠️ ${item.special_requests}`,
+          `   ⚠️ ${cleanedRequest}`,
           '',
           ''
         ]);
