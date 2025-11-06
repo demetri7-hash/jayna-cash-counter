@@ -2667,6 +2667,9 @@
                   <button onclick="closeToastOrderModal()" style="background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
                     CLOSE
                   </button>
+                  <button onclick="deleteOrderWithPassword(event, ${order.id})" style="background: #dc2626; border: 2px solid #dc2626; color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                    🗑️ DELETE ORDER
+                  </button>
                 </div>
               </div>
 
@@ -2843,6 +2846,140 @@
           modal.remove();
         }
       }
+    }
+
+    // Delete order with password protection (Google Sites friendly - no alerts/confirms!)
+    async function deleteOrderWithPassword(event, orderId) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      // Create inline password prompt (Google Sites friendly)
+      const promptOverlay = document.createElement('div');
+      promptOverlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100001; padding: 20px;';
+
+      const promptBox = document.createElement('div');
+      promptBox.style.cssText = 'background: white; padding: 24px; max-width: 400px; width: 100%; border: 3px solid #dc2626;';
+
+      const title = document.createElement('div');
+      title.textContent = '🗑️ DELETE ORDER';
+      title.style.cssText = 'font-size: 18px; font-weight: 700; color: #dc2626; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px;';
+
+      const warning = document.createElement('div');
+      warning.innerHTML = '⚠️ <strong>WARNING:</strong> This will permanently delete this order from the database!';
+      warning.style.cssText = 'background: #fee2e2; border: 2px solid #dc2626; color: #991b1b; padding: 12px; margin-bottom: 16px; font-size: 13px;';
+
+      const label = document.createElement('label');
+      label.textContent = 'Enter password to confirm:';
+      label.style.cssText = 'display: block; margin-bottom: 8px; font-size: 13px; font-weight: 700; color: #1a1a1a;';
+
+      const input = document.createElement('input');
+      input.type = 'password';
+      input.placeholder = 'Enter password...';
+      input.style.cssText = 'width: 100%; padding: 12px; border: 2px solid #d1d5db; font-size: 14px; margin-bottom: 20px; box-sizing: border-box;';
+
+      const errorMsg = document.createElement('div');
+      errorMsg.style.cssText = 'color: #dc2626; font-size: 13px; margin-bottom: 12px; display: none; font-weight: 600;';
+
+      const buttonContainer = document.createElement('div');
+      buttonContainer.style.cssText = 'display: flex; gap: 12px; justify-content: flex-end;';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'CANCEL';
+      cancelBtn.style.cssText = 'padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;';
+      cancelBtn.onclick = () => promptOverlay.remove();
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'DELETE';
+      deleteBtn.style.cssText = 'padding: 12px 24px; background: #dc2626; border: 2px solid #dc2626; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;';
+      deleteBtn.onclick = async () => {
+        const password = input.value.trim();
+
+        // Check password
+        if (password !== 'Alonissos325*') {
+          errorMsg.textContent = '❌ Incorrect password!';
+          errorMsg.style.display = 'block';
+          input.value = '';
+          input.focus();
+          return;
+        }
+
+        // Password correct - proceed with deletion
+        try {
+          promptOverlay.remove();
+          showLoading('DELETING ORDER', 'Removing order from database...');
+
+          const response = await fetch('/api/delete-catering-order', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              order_id: orderId
+            })
+          });
+
+          const result = await response.json();
+          hideLoading();
+
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to delete order');
+          }
+
+          console.log(`✅ Order ${orderId} deleted successfully`);
+
+          // Close modal and reload orders
+          closeToastOrderModal();
+          await loadOrdersFromDatabase();
+
+          // Show success message
+          const statusDiv = document.getElementById('syncStatus');
+          if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#d1fae5';
+            statusDiv.style.borderColor = '#059669';
+            statusDiv.style.color = '#065f46';
+            statusDiv.textContent = '✅ Order deleted successfully!';
+            setTimeout(() => {
+              statusDiv.style.display = 'none';
+            }, 3000);
+          }
+
+        } catch (error) {
+          hideLoading();
+          console.error('❌ Delete error:', error);
+
+          const statusDiv = document.getElementById('syncStatus');
+          if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#fee2e2';
+            statusDiv.style.borderColor = '#dc2626';
+            statusDiv.style.color = '#991b1b';
+            statusDiv.textContent = `❌ Delete failed: ${error.message}`;
+          }
+        }
+      };
+
+      // Enter key submits
+      input.onkeypress = (e) => {
+        if (e.key === 'Enter') {
+          deleteBtn.click();
+        }
+      };
+
+      buttonContainer.appendChild(cancelBtn);
+      buttonContainer.appendChild(deleteBtn);
+
+      promptBox.appendChild(title);
+      promptBox.appendChild(warning);
+      promptBox.appendChild(label);
+      promptBox.appendChild(input);
+      promptBox.appendChild(errorMsg);
+      promptBox.appendChild(buttonContainer);
+      promptOverlay.appendChild(promptBox);
+      document.body.appendChild(promptOverlay);
+
+      // Auto-focus input
+      setTimeout(() => input.focus(), 100);
     }
 
     // Mark order as completed
