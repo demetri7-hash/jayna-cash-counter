@@ -890,7 +890,7 @@
           <!-- Auto-calculated display section -->
           <div style="background: var(--gray-100); border: 2px solid var(--gray-300); border-radius: 0; padding: 12px; margin-bottom: 10px;">
             <div style="text-align: center;">
-              <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 6px;">
+              <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px;">
                 <div style="font-size: 32px; font-weight: bold; color: var(--gray-900);" id="autoToastAmount">Loading...</div>
                 <div id="toastLoadingIndicator" style="display: none;">
                   <div class="loading-dots">
@@ -900,7 +900,6 @@
                   </div>
                 </div>
               </div>
-              <div style="font-size: 13px; color: var(--gray-700); font-weight: 500; margin-bottom: 10px;" id="autoToastDetails">Fetching today's cash sales automatically...</div>
 
               <!-- Retry Button -->
               <button id="toastRetryBtn" onclick="fetchToastCashSales()" style="padding: 8px 16px; background: #3b82f6; border: 2px solid #3b82f6; color: white; font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 0; transition: all 0.15s ease;" onmouseover="this.style.background='#2563eb'; this.style.borderColor='#2563eb'" onmouseout="this.style.background='#3b82f6'; this.style.borderColor='#3b82f6'">
@@ -2123,8 +2122,6 @@
     retryBtn.style.cursor = 'not-allowed';
 
     document.getElementById('autoToastAmount').textContent = 'Loading...';
-    document.getElementById('autoToastDetails').textContent = 'Fetching with 3-attempt retry logic for accuracy...';
-    document.getElementById('autoToastDetails').style.color = '#059669'; // Green during loading
 
     try {
       // Handle both date string (YYYY-MM-DD) and formatted date (YYYYMMDD)
@@ -2138,7 +2135,7 @@
         businessDate = dateInput;
       }
 
-      console.log('🔄 Starting 3-attempt fetch for Toast cash sales:', businessDate);
+      console.log('🔄 Starting 2-attempt fetch for Toast cash sales:', businessDate);
 
       // First authenticate with Toast
       const authResponse = await fetch('/api/toast-auth', {
@@ -2155,14 +2152,12 @@
         throw new Error('Toast authentication failed');
       }
 
-      // RETRY LOGIC: Fetch 3 times and use the highest amount (most complete data)
+      // RETRY LOGIC: Fetch 2 times and use the highest amount (most complete data)
       const attempts = [];
       const token = authData.data.accessToken;
 
-      for (let i = 1; i <= 3; i++) {
-        console.log(`🔄 Attempt ${i}/3: Fetching cash sales...`);
-        document.getElementById('autoToastDetails').textContent = `🔄 Attempt ${i}/3: Fetching payments...`;
-        document.getElementById('autoToastDetails').style.color = '#059669'; // Keep green during attempts
+      for (let i = 1; i <= 2; i++) {
+        console.log(`🔄 Attempt ${i}/2: Fetching cash sales...`);
 
         try {
           const paymentsUrl = `/api/toast-payments?businessDate=${businessDate}&token=${encodeURIComponent(token)}`;
@@ -2193,7 +2188,7 @@
           console.log(`✅ Attempt ${i} success: $${paymentsData.totalCashAmount.toFixed(2)} (${paymentsData.totalCashPayments} payments)`);
 
           // Small delay between attempts to avoid rate limiting
-          if (i < 3) {
+          if (i < 2) {
             await new Promise(resolve => setTimeout(resolve, 500));
           }
 
@@ -2207,7 +2202,7 @@
       const successfulAttempts = attempts.filter(a => a.success);
 
       if (successfulAttempts.length === 0) {
-        throw new Error('All 3 fetch attempts failed. Please try again.');
+        throw new Error('All 2 fetch attempts failed. Please try again.');
       }
 
       // Use the HIGHEST amount (most complete data)
@@ -2215,16 +2210,21 @@
         current.totalCashAmount > max.totalCashAmount ? current : max
       );
 
-      // Check for discrepancies between attempts
+      // Console logs for developer debugging
       const amounts = successfulAttempts.map(a => a.totalCashAmount);
       const minAmount = Math.min(...amounts);
       const maxAmount = Math.max(...amounts);
       const hasDiscrepancy = maxAmount !== minAmount;
 
       console.log('📊 Fetch Results:');
-      console.log(`   - Successful attempts: ${successfulAttempts.length}/3`);
+      console.log(`   - Successful attempts: ${successfulAttempts.length}/2`);
       console.log(`   - Amounts: $${amounts.map(a => a.toFixed(2)).join(', $')}`);
       console.log(`   - Using HIGHEST: $${bestAttempt.totalCashAmount.toFixed(2)} (Attempt ${bestAttempt.attempt})`);
+      if (hasDiscrepancy) {
+        console.log(`   - ⚠️ Discrepancy detected (Range: $${minAmount.toFixed(2)}-$${maxAmount.toFixed(2)})`);
+      } else {
+        console.log(`   - ✅ All ${successfulAttempts.length} attempts matched`);
+      }
 
       // Store the auto-calculated amount
       autoCalculatedToastAmount = bestAttempt.totalCashAmount;
@@ -2232,20 +2232,8 @@
       // Update the hidden field for form processing
       document.getElementById('toastSales').value = autoCalculatedToastAmount.toFixed(2);
 
-      // Show success result with warning if discrepancies detected
+      // Show simple result (just the dollar amount)
       document.getElementById('autoToastAmount').textContent = `$${autoCalculatedToastAmount.toFixed(2)}`;
-
-      let detailsText = `${bestAttempt.totalCashPayments} cash payments • ${bestAttempt.totalPaymentGuids} transactions`;
-
-      if (hasDiscrepancy) {
-        detailsText += ` • ⚠️ DISCREPANCY DETECTED (Range: $${minAmount.toFixed(2)}-$${maxAmount.toFixed(2)}) - Using highest amount`;
-        document.getElementById('autoToastDetails').style.color = '#d97706'; // Orange warning
-      } else {
-        detailsText += ` • ✅ All ${successfulAttempts.length} attempts matched`;
-        document.getElementById('autoToastDetails').style.color = '#065f46'; // Green success
-      }
-
-      document.getElementById('autoToastDetails').textContent = detailsText;
 
       // Hide loading indicator on success
       loadingIndicator.style.display = 'none';
@@ -2275,11 +2263,8 @@
       retryBtn.style.opacity = '1';
       retryBtn.style.cursor = 'pointer';
 
-      // Show error state
-      document.getElementById('autoToastAmount').textContent = 'API Error';
-      document.getElementById('autoToastDetails').textContent =
-        `Failed: ${error.message} • Check connection and retry`;
-      document.getElementById('autoToastDetails').style.color = '#991b1b'; // Red error
+      // Show simple error state (just show $0.00, details in console)
+      document.getElementById('autoToastAmount').textContent = '$0.00';
 
       // Reset auto amount
       autoCalculatedToastAmount = 0;
