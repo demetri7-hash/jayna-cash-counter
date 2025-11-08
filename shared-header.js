@@ -88,6 +88,7 @@ function initializeSharedHeader() {
         <a href="drivers.html" class="menu-btn" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-700); border-radius: 0; background: var(--gray-700); font-size: 11px; font-weight: 700; color: white; cursor: pointer; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; transition: all 0.15s ease;">Drivers</a>
         <a href="scheduling.html" class="menu-btn primary" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-300); border-radius: 0; background: var(--gray-100); font-size: 11px; font-weight: 700; color: var(--gray-900); cursor: pointer; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; transition: all 0.15s ease;">Scheduling</a>
         <a href="manager.html" class="menu-btn" style="text-decoration: none; padding: 16px 12px; border: 2px solid var(--gray-700); border-radius: 0; background: var(--gray-700); font-size: 11px; font-weight: 700; color: white; cursor: pointer; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; transition: all 0.15s ease;">Manager</a>
+        <button onclick="checkCogsPassword()" class="menu-btn" style="padding: 16px 12px; border: 2px solid #dc2626; border-radius: 0; background: #dc2626; font-size: 11px; font-weight: 700; color: white; cursor: pointer; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 1.2px; transition: all 0.15s ease;">COGS</button>
       </div>
     </div>
   `;
@@ -411,6 +412,76 @@ function updateSessionStatus() {
     statusElement.style.color = '#666';
     logoutBtn.style.display = 'none';
   }
+}
+
+function checkCogsPassword() {
+  // Create modal overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+  // Create modal content
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background: white; padding: 24px; max-width: 400px; width: 90%; border: 3px solid var(--gray-700); border-radius: 0;';
+
+  const title = document.createElement('h3');
+  title.textContent = 'COGS ACCESS';
+  title.style.cssText = 'margin: 0 0 16px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-900); text-align: center;';
+
+  const label = document.createElement('label');
+  label.textContent = 'MASTER PASSWORD';
+  label.style.cssText = 'display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;';
+
+  const input = document.createElement('input');
+  input.type = 'password';
+  input.placeholder = 'Enter password';
+  input.style.cssText = 'width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; margin-bottom: 20px; box-sizing: border-box;';
+
+  const errorMsg = document.createElement('div');
+  errorMsg.style.cssText = 'display: none; color: #dc2626; font-size: 12px; margin-bottom: 12px; text-align: center; font-weight: 600;';
+  errorMsg.textContent = '❌ Incorrect password';
+
+  const buttonGroup = document.createElement('div');
+  buttonGroup.style.cssText = 'display: flex; gap: 12px;';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'CANCEL';
+  cancelBtn.style.cssText = 'flex: 1; padding: 12px 24px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 0;';
+  cancelBtn.onclick = () => document.body.removeChild(overlay);
+
+  const submitBtn = document.createElement('button');
+  submitBtn.textContent = 'ENTER';
+  submitBtn.style.cssText = 'flex: 1; padding: 12px 24px; background: #dc2626; border: 2px solid #dc2626; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 0;';
+  submitBtn.onclick = () => {
+    if (input.value === 'JaynaGyro2025!') {
+      window.location.href = 'cost.html';
+    } else {
+      errorMsg.style.display = 'block';
+      input.value = '';
+      input.focus();
+      input.style.borderColor = '#dc2626';
+    }
+  };
+
+  // Allow Enter key to submit
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      submitBtn.click();
+    }
+  });
+
+  buttonGroup.appendChild(cancelBtn);
+  buttonGroup.appendChild(submitBtn);
+
+  modal.appendChild(title);
+  modal.appendChild(label);
+  modal.appendChild(input);
+  modal.appendChild(errorMsg);
+  modal.appendChild(buttonGroup);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Auto-focus password input
+  setTimeout(() => input.focus(), 100);
 }
 
 // Export for use in other scripts
