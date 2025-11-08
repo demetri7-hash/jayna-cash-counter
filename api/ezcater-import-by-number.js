@@ -101,7 +101,7 @@ export default async function handler(req, res) {
       .from('catering_orders')
       .upsert({
         source_system: 'EZCATER',
-        source_type: 'ezCater',
+        source_type: 'ezCater_manual',  // MANUAL IMPORT - distinguishes from webhook 'ezCater'
         external_order_id: parsedOrder.ezcater_order_id,
         order_number: parsedOrder.order_number,
         customer_name: parsedOrder.customer_name,
