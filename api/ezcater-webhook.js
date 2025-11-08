@@ -11,13 +11,22 @@
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
+  // Log ALL incoming requests (even GET for debugging)
+  console.log('🔔 WEBHOOK CALLED:', {
+    method: req.method,
+    headers: Object.keys(req.headers),
+    url: req.url,
+    timestamp: new Date().toISOString()
+  });
+
   // Only allow POST requests
   if (req.method !== 'POST') {
+    console.log(`❌ Wrong method: ${req.method} (expected POST)`);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    console.log('📦 EZCater Webhook: Event received');
+    console.log('📦 EZCater Webhook: Event received (POST confirmed)');
 
     // Initialize Supabase
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -31,6 +40,9 @@ export default async function handler(req, res) {
 
     // Get event data from request body
     const event = req.body;
+
+    // LOG THE FULL PAYLOAD for debugging
+    console.log('📋 Full webhook payload:', JSON.stringify(event, null, 2));
 
     console.log('Event Type:', event.eventType || event.event_type);
     console.log('Order ID:', event.orderId || event.order_id);
