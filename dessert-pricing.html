@@ -201,7 +201,6 @@
 
     .item-header {
       padding: 14px 16px;
-      cursor: pointer;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -219,6 +218,7 @@
       font-weight: 600;
       font-size: 14px;
       color: var(--gray-900);
+      cursor: pointer;
     }
 
     .item-meta {
@@ -247,6 +247,7 @@
       color: var(--gray-500);
       transition: transform 0.15s ease;
       flex-shrink: 0;
+      cursor: pointer;
     }
 
     .item-card.expanded .expand-icon {
@@ -298,12 +299,6 @@
     .field-input:focus {
       border-color: var(--gray-700);
       outline: none;
-    }
-
-    .field-input:disabled {
-      background: var(--gray-100);
-      color: var(--gray-600);
-      cursor: not-allowed;
     }
 
     .calculated-badge {
@@ -696,20 +691,20 @@
 
       return `
         <div class="item-card" id="item-${item.id}">
-          <div class="item-header" onclick="toggleItem(${item.id})">
+          <div class="item-header">
             <input
               type="checkbox"
               class="item-checkbox"
               ${isSelected ? 'checked' : ''}
-              onclick="event.stopPropagation(); toggleSelect(${item.id})"
+              onclick="toggleSelect(${item.id})"
             >
             <div style="flex: 1;">
-              <div class="item-name">${item.item_name}</div>
+              <div class="item-name" onclick="toggleItem(${item.id})">${item.item_name}</div>
               <div class="item-meta">
                 ${metaHtml}
               </div>
             </div>
-            <div class="expand-icon">▼</div>
+            <div class="expand-icon" onclick="toggleItem(${item.id})">▼</div>
           </div>
           <div class="item-details">
             ${renderItemDetails(item, category)}
@@ -719,7 +714,7 @@
     }
 
     /**
-     * Render item details form
+     * Render item details form - ALL FIELDS EDITABLE
      */
     function renderItemDetails(item, category) {
       if (category === 'baklava') {
@@ -746,32 +741,24 @@
               <input type="number" step="0.01" class="field-input" value="${item.invoice_price_per_case || ''}" onchange="recalculateBaklava(${item.id}, 'invoice_price_per_case', parseFloat(this.value))">
             </div>
             <div class="field-group">
-              <label class="field-label">TOTAL CASES</label>
-              <input type="number" step="1" class="field-input" value="${item.total_cases || ''}" onchange="recalculateBaklava(${item.id}, 'total_cases', parseFloat(this.value))">
+              <label class="field-label">COST/PIECE <span class="calculated-badge">AUTO</span></label>
+              <input type="number" step="0.01" class="field-input" value="${(item.cost_per_piece || 0).toFixed(2)}" onchange="recalculateBaklava(${item.id}, 'cost_per_piece', parseFloat(this.value))">
             </div>
             <div class="field-group">
-              <label class="field-label">COST/PIECE <span class="calculated-badge">CALC</span></label>
-              <input type="number" step="0.01" class="field-input" disabled value="${(item.cost_per_piece || 0).toFixed(2)}">
-            </div>
-            <div class="field-group">
-              <label class="field-label">COST/3-PACK <span class="calculated-badge">CALC</span></label>
-              <input type="number" step="0.01" class="field-input" disabled value="${(item.cost_per_pack || 0).toFixed(2)}">
+              <label class="field-label">COST/3-PACK <span class="calculated-badge">AUTO</span></label>
+              <input type="number" step="0.01" class="field-input" value="${(item.cost_per_pack || 0).toFixed(2)}" onchange="recalculateBaklava(${item.id}, 'cost_per_pack', parseFloat(this.value))">
             </div>
             <div class="field-group">
               <label class="field-label">RETAIL (3-PACK)</label>
               <input type="number" step="0.01" class="field-input" value="${item.retail_price || ''}" onchange="recalculateBaklava(${item.id}, 'retail_price', parseFloat(this.value))">
             </div>
             <div class="field-group">
-              <label class="field-label">PROFIT/3-PACK <span class="calculated-badge">CALC</span></label>
-              <input type="number" step="0.01" class="field-input" disabled value="${(item.profit_per_unit || 0).toFixed(2)}">
+              <label class="field-label">PROFIT/3-PACK <span class="calculated-badge">AUTO</span></label>
+              <input type="number" step="0.01" class="field-input" value="${(item.profit_per_unit || 0).toFixed(2)}" onchange="recalculateBaklava(${item.id}, 'profit_per_unit', parseFloat(this.value))">
             </div>
             <div class="field-group">
-              <label class="field-label">MARGIN % <span class="calculated-badge">CALC</span></label>
-              <input type="text" class="field-input" disabled value="${((item.margin_percent || 0) * 100).toFixed(1)}%">
-            </div>
-            <div class="field-group">
-              <label class="field-label">TOTAL PCS <span class="calculated-badge">CALC</span></label>
-              <input type="number" class="field-input" disabled value="${item.total_pieces_available || 0}">
+              <label class="field-label">MARGIN % <span class="calculated-badge">AUTO</span></label>
+              <input type="number" step="0.1" class="field-input" value="${((item.margin_percent || 0) * 100).toFixed(1)}" onchange="recalculateBaklava(${item.id}, 'margin_percent', parseFloat(this.value) / 100)">
             </div>
           </div>
           <div class="item-actions">
@@ -802,20 +789,20 @@
               <input type="number" step="0.01" class="field-input" value="${item.invoice_price || ''}" onchange="recalculateTurkish(${item.id}, 'invoice_price', parseFloat(this.value), false)">
             </div>
             <div class="field-group">
-              <label class="field-label">COST/PIECE <span class="calculated-badge">CALC</span></label>
-              <input type="number" step="0.01" class="field-input" disabled value="${(item.cost_per_piece || 0).toFixed(2)}">
+              <label class="field-label">COST/PIECE <span class="calculated-badge">AUTO</span></label>
+              <input type="number" step="0.01" class="field-input" value="${(item.cost_per_piece || 0).toFixed(2)}" onchange="recalculateTurkish(${item.id}, 'cost_per_piece', parseFloat(this.value), false)">
             </div>
             <div class="field-group">
               <label class="field-label">CURRENT RETAIL</label>
               <input type="number" step="0.01" class="field-input" value="${item.retail_price || ''}" onchange="recalculateTurkish(${item.id}, 'retail_price', parseFloat(this.value), false)">
             </div>
             <div class="field-group">
-              <label class="field-label">PROFIT/PIECE <span class="calculated-badge">CALC</span></label>
-              <input type="number" step="0.01" class="field-input" disabled value="${(item.profit_per_unit || 0).toFixed(2)}">
+              <label class="field-label">PROFIT/PIECE <span class="calculated-badge">AUTO</span></label>
+              <input type="number" step="0.01" class="field-input" value="${(item.profit_per_unit || 0).toFixed(2)}" onchange="recalculateTurkish(${item.id}, 'profit_per_unit', parseFloat(this.value), false)">
             </div>
             <div class="field-group">
-              <label class="field-label">MARGIN % <span class="calculated-badge">CALC</span></label>
-              <input type="text" class="field-input" disabled value="${((item.margin_percent || 0) * 100).toFixed(1)}%">
+              <label class="field-label">MARGIN % <span class="calculated-badge">AUTO</span></label>
+              <input type="number" step="0.1" class="field-input" value="${((item.margin_percent || 0) * 100).toFixed(1)}" onchange="recalculateTurkish(${item.id}, 'margin_percent', parseFloat(this.value) / 100, false)">
             </div>
           </div>
           <div class="item-actions">
@@ -856,20 +843,20 @@
               </select>
             </div>
             <div class="field-group">
-              <label class="field-label">COST/PIECE <span class="calculated-badge">CALC</span></label>
-              <input type="number" step="0.01" class="field-input" disabled value="${(item.cost_per_piece || 0).toFixed(2)}">
+              <label class="field-label">COST/PIECE <span class="calculated-badge">AUTO</span></label>
+              <input type="number" step="0.01" class="field-input" value="${(item.cost_per_piece || 0).toFixed(2)}" onchange="recalculateTurkish(${item.id}, 'cost_per_piece', parseFloat(this.value), true)">
             </div>
             <div class="field-group">
               <label class="field-label">TARGET MARGIN %</label>
-              <input type="number" step="0.01" class="field-input" value="${((item.margin_percent || 0) * 100).toFixed(0)}" onchange="recalculateTurkish(${item.id}, 'margin_percent', parseFloat(this.value) / 100, true)">
+              <input type="number" step="0.1" class="field-input" value="${((item.margin_percent || 0) * 100).toFixed(1)}" onchange="recalculateTurkish(${item.id}, 'margin_percent', parseFloat(this.value) / 100, true)">
             </div>
             <div class="field-group">
-              <label class="field-label">ADJUSTED RETAIL <span class="calculated-badge">CALC</span></label>
-              <input type="number" step="0.01" class="field-input" disabled value="${(item.retail_price || 0).toFixed(2)}">
+              <label class="field-label">ADJUSTED RETAIL <span class="calculated-badge">AUTO</span></label>
+              <input type="number" step="0.01" class="field-input" value="${(item.retail_price || 0).toFixed(2)}" onchange="recalculateTurkish(${item.id}, 'retail_price', parseFloat(this.value), true)">
             </div>
             <div class="field-group">
-              <label class="field-label">PROFIT/PIECE <span class="calculated-badge">CALC</span></label>
-              <input type="number" step="0.01" class="field-input" disabled value="${(item.profit_per_unit || 0).toFixed(2)}">
+              <label class="field-label">PROFIT/PIECE <span class="calculated-badge">AUTO</span></label>
+              <input type="number" step="0.01" class="field-input" value="${(item.profit_per_unit || 0).toFixed(2)}" onchange="recalculateTurkish(${item.id}, 'profit_per_unit', parseFloat(this.value), true)">
             </div>
           </div>
           <div class="item-actions">
@@ -897,6 +884,7 @@
         selectedItems.add(itemId);
       }
       updateExportButton();
+      renderAllItems();
     }
 
     /**
@@ -937,13 +925,8 @@
     }
 
     /**
-     * Recalculate baklava formulas
-     * Formulas:
-     * - Cost/Piece = Invoice Price/Case ÷ Pcs/Case
-     * - Cost/3-Pack = Cost/Piece × 3
-     * - Total Pcs = Pcs/Case × Total Cases
-     * - Profit/3-Pack = Retail (3-Pack) - Cost/3-Pack
-     * - Margin % = Profit/3-Pack ÷ Retail (3-Pack)
+     * BAKLAVA BIDIRECTIONAL FORMULAS
+     * Any field can be edited, others recalculate
      */
     async function recalculateBaklava(itemId, changedField, newValue) {
       const item = allItems.find(i => i.id === itemId);
@@ -952,42 +935,66 @@
       // Update the changed field
       item[changedField] = newValue;
 
-      // Recalculate dependent fields
-      const pcsPerCase = item.pcs_per_case || 0;
-      const invoicePricePerCase = item.invoice_price_per_case || 0;
-      const totalCases = item.total_cases || 0;
-      const retailPrice = item.retail_price || 0;
+      // Get current values
+      let pcsPerCase = item.pcs_per_case || 0;
+      let invoicePricePerCase = item.invoice_price_per_case || 0;
+      let costPerPiece = item.cost_per_piece || 0;
+      let costPerPack = item.cost_per_pack || 0;
+      let retailPrice = item.retail_price || 0;
+      let profitPerUnit = item.profit_per_unit || 0;
+      let marginPercent = item.margin_percent || 0;
 
-      // Cost/Piece = Invoice Price/Case ÷ Pcs/Case
-      item.cost_per_piece = pcsPerCase > 0 ? invoicePricePerCase / pcsPerCase : 0;
+      // Recalculate based on which field was changed
+      if (changedField === 'pcs_per_case' || changedField === 'invoice_price_per_case') {
+        // User changed input fields → calculate cost/piece
+        costPerPiece = pcsPerCase > 0 ? invoicePricePerCase / pcsPerCase : 0;
+        costPerPack = costPerPiece * 3;
+        profitPerUnit = retailPrice - costPerPack;
+        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
+      } else if (changedField === 'cost_per_piece') {
+        // User changed cost/piece → back-calculate invoice price
+        invoicePricePerCase = costPerPiece * pcsPerCase;
+        costPerPack = costPerPiece * 3;
+        profitPerUnit = retailPrice - costPerPack;
+        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
+      } else if (changedField === 'cost_per_pack') {
+        // User changed cost/pack → back-calculate cost/piece
+        costPerPiece = costPerPack / 3;
+        invoicePricePerCase = costPerPiece * pcsPerCase;
+        profitPerUnit = retailPrice - costPerPack;
+        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
+      } else if (changedField === 'retail_price') {
+        // User changed retail → recalc profit and margin
+        profitPerUnit = retailPrice - costPerPack;
+        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
+      } else if (changedField === 'profit_per_unit') {
+        // User changed profit → recalc retail and margin
+        retailPrice = costPerPack + profitPerUnit;
+        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
+      } else if (changedField === 'margin_percent') {
+        // User changed margin % → recalc retail and profit
+        if (marginPercent > 0 && marginPercent < 1) {
+          retailPrice = costPerPack / (1 - marginPercent);
+          profitPerUnit = retailPrice - costPerPack;
+        }
+      }
 
-      // Cost/3-Pack = Cost/Piece × 3
-      item.cost_per_pack = item.cost_per_piece * 3;
-
-      // Total Pcs = Pcs/Case × Total Cases
-      item.total_pieces_available = pcsPerCase * totalCases;
-
-      // Profit/3-Pack = Retail (3-Pack) - Cost/3-Pack
-      item.profit_per_unit = retailPrice - item.cost_per_pack;
-
-      // Margin % = Profit/3-Pack ÷ Retail (3-Pack)
-      item.margin_percent = retailPrice > 0 ? item.profit_per_unit / retailPrice : 0;
+      // Update item with all calculated values
+      item.pcs_per_case = pcsPerCase;
+      item.invoice_price_per_case = invoicePricePerCase;
+      item.cost_per_piece = costPerPiece;
+      item.cost_per_pack = costPerPack;
+      item.retail_price = retailPrice;
+      item.profit_per_unit = profitPerUnit;
+      item.margin_percent = marginPercent;
 
       await saveItemToDatabase(item);
       renderAllItems();
     }
 
     /**
-     * Recalculate Turkish Delight formulas
-     * Current Pricing:
-     * - Cost/Piece = Invoice Price ÷ Total Pcs
-     * - Profit/Piece = Current Retail - Cost/Piece
-     * - Margin % = Profit/Piece ÷ Current Retail
-     *
-     * Adjusted Pricing (80% margin):
-     * - Cost/Piece = Invoice Price ÷ Total Pcs
-     * - Adjusted Retail = Cost/Piece ÷ (1 - Margin %)
-     * - Profit/Piece = Adjusted Retail - Cost/Piece
+     * TURKISH DELIGHT BIDIRECTIONAL FORMULAS
+     * Any field can be edited, others recalculate
      */
     async function recalculateTurkish(itemId, changedField, newValue, isAdjusted) {
       const item = allItems.find(i => i.id === itemId);
@@ -996,33 +1003,62 @@
       // Update the changed field
       item[changedField] = newValue;
 
-      const totalPcs = item.total_pcs || 0;
-      const invoicePrice = item.invoice_price || 0;
+      // Get current values
+      let totalPcs = item.total_pcs || 0;
+      let invoicePrice = item.invoice_price || 0;
+      let costPerPiece = item.cost_per_piece || 0;
+      let retailPrice = item.retail_price || 0;
+      let profitPerUnit = item.profit_per_unit || 0;
+      let marginPercent = item.margin_percent || 0;
 
-      // Cost/Piece = Invoice Price ÷ Total Pcs
-      item.cost_per_piece = totalPcs > 0 ? invoicePrice / totalPcs : 0;
-
-      if (isAdjusted) {
-        // Adjusted pricing: Calculate retail from margin target
-        const marginPercent = item.margin_percent || 0;
-
-        // Adjusted Retail = Cost/Piece ÷ (1 - Margin %)
-        item.retail_price = marginPercent < 1 && marginPercent > 0
-          ? item.cost_per_piece / (1 - marginPercent)
-          : item.cost_per_piece;
-
-        // Profit/Piece = Adjusted Retail - Cost/Piece
-        item.profit_per_unit = item.retail_price - item.cost_per_piece;
-      } else {
-        // Current pricing: Calculate margin from retail
-        const retailPrice = item.retail_price || 0;
-
-        // Profit/Piece = Current Retail - Cost/Piece
-        item.profit_per_unit = retailPrice - item.cost_per_piece;
-
-        // Margin % = Profit/Piece ÷ Current Retail
-        item.margin_percent = retailPrice > 0 ? item.profit_per_unit / retailPrice : 0;
+      // Recalculate based on which field was changed
+      if (changedField === 'total_pcs' || changedField === 'invoice_price') {
+        // User changed inputs → calculate cost/piece
+        costPerPiece = totalPcs > 0 ? invoicePrice / totalPcs : 0;
+        
+        if (isAdjusted) {
+          // For adjusted: retail from margin
+          retailPrice = marginPercent < 1 && marginPercent > 0 ? costPerPiece / (1 - marginPercent) : costPerPiece;
+          profitPerUnit = retailPrice - costPerPiece;
+        } else {
+          // For current: profit and margin from retail
+          profitPerUnit = retailPrice - costPerPiece;
+          marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
+        }
+      } else if (changedField === 'cost_per_piece') {
+        // User changed cost/piece → back-calculate invoice
+        invoicePrice = costPerPiece * totalPcs;
+        
+        if (isAdjusted) {
+          retailPrice = marginPercent < 1 && marginPercent > 0 ? costPerPiece / (1 - marginPercent) : costPerPiece;
+          profitPerUnit = retailPrice - costPerPiece;
+        } else {
+          profitPerUnit = retailPrice - costPerPiece;
+          marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
+        }
+      } else if (changedField === 'retail_price') {
+        // User changed retail → recalc profit and margin
+        profitPerUnit = retailPrice - costPerPiece;
+        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
+      } else if (changedField === 'profit_per_unit') {
+        // User changed profit → recalc retail and margin
+        retailPrice = costPerPiece + profitPerUnit;
+        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
+      } else if (changedField === 'margin_percent') {
+        // User changed margin → recalc retail and profit
+        if (marginPercent > 0 && marginPercent < 1) {
+          retailPrice = costPerPiece / (1 - marginPercent);
+          profitPerUnit = retailPrice - costPerPiece;
+        }
       }
+
+      // Update item with all calculated values
+      item.total_pcs = totalPcs;
+      item.invoice_price = invoicePrice;
+      item.cost_per_piece = costPerPiece;
+      item.retail_price = retailPrice;
+      item.profit_per_unit = profitPerUnit;
+      item.margin_percent = marginPercent;
 
       await saveItemToDatabase(item);
       renderAllItems();
@@ -1109,10 +1145,6 @@
             <input type="number" step="0.01" class="field-input" id="newInvoicePrice">
           </div>
           <div class="field-group">
-            <label class="field-label">TOTAL CASES</label>
-            <input type="number" class="field-input" id="newTotalCases">
-          </div>
-          <div class="field-group">
             <label class="field-label">RETAIL (3-PACK)</label>
             <input type="number" step="0.01" class="field-input" id="newRetailPrice">
           </div>
@@ -1171,7 +1203,7 @@
     }
 
     /**
-     * Save new or edited item
+     * Save new item
      */
     async function saveItem() {
       const itemName = document.getElementById('newItemName').value.trim();
@@ -1199,19 +1231,16 @@
         if (category === 'baklava') {
           const pcsPerCase = parseFloat(document.getElementById('newPcsPerCase')?.value) || 0;
           const invoicePrice = parseFloat(document.getElementById('newInvoicePrice')?.value) || 0;
-          const totalCases = parseFloat(document.getElementById('newTotalCases')?.value) || 0;
           const retailPrice = parseFloat(document.getElementById('newRetailPrice')?.value) || 0;
 
           newItem.pcs_per_case = pcsPerCase;
           newItem.weight_per_case = document.getElementById('newWeightPerCase')?.value || null;
           newItem.invoice_price_per_case = invoicePrice;
-          newItem.total_cases = totalCases;
           newItem.retail_price = retailPrice;
 
           // Calculate fields
           newItem.cost_per_piece = pcsPerCase > 0 ? invoicePrice / pcsPerCase : 0;
           newItem.cost_per_pack = newItem.cost_per_piece * 3;
-          newItem.total_pieces_available = pcsPerCase * totalCases;
           newItem.profit_per_unit = retailPrice - newItem.cost_per_pack;
           newItem.margin_percent = retailPrice > 0 ? newItem.profit_per_unit / retailPrice : 0;
         } else if (category === 'turkish_delight_current') {
