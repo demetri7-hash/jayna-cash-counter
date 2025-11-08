@@ -579,6 +579,7 @@
     let allItems = [];
     let currentEditItem = null;
     let selectedItems = new Set();
+    let expandedItems = new Set();
 
     // Initialize page
     document.addEventListener('DOMContentLoaded', () => {
@@ -689,8 +690,10 @@
         `;
       }
 
+      const isExpanded = expandedItems.has(item.id);
+
       return `
-        <div class="item-card" id="item-${item.id}">
+        <div class="item-card ${isExpanded ? 'expanded' : ''}" id="item-${item.id}">
           <div class="item-header">
             <input
               type="checkbox"
@@ -870,6 +873,12 @@
      * Toggle item expansion
      */
     function toggleItem(itemId) {
+      if (expandedItems.has(itemId)) {
+        expandedItems.delete(itemId);
+      } else {
+        expandedItems.add(itemId);
+      }
+
       const card = document.getElementById(`item-${itemId}`);
       card.classList.toggle('expanded');
     }
@@ -989,7 +998,7 @@
       item.margin_percent = marginPercent;
 
       await saveItemToDatabase(item);
-      renderAllItems();
+      // DON'T re-render - field values update naturally, expanded state preserved
     }
 
     /**
@@ -1061,7 +1070,7 @@
       item.margin_percent = marginPercent;
 
       await saveItemToDatabase(item);
-      renderAllItems();
+      // DON'T re-render - field values update naturally, expanded state preserved
     }
 
     /**

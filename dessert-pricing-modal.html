@@ -22,9 +22,6 @@
       --success-bg: #d1fae5;
       --success-text: #065f46;
       --success-border: #059669;
-      --warning-bg: #fef3c7;
-      --warning-text: #92400e;
-      --warning-border: #f59e0b;
       --error-bg: #fee2e2;
       --error-text: #991b1b;
       --error-border: #dc2626;
@@ -499,37 +496,9 @@
       </div>
     </div>
 
-    <!-- Baklava Section -->
-    <div class="category-section" id="baklavaSection">
-      <div class="category-header">
-        <h2>Baklava 3-Packs</h2>
-        <div class="count" id="baklavaCount">0 items</div>
-      </div>
-      <div class="items-list" id="baklavaList">
-        <!-- Items populated via JavaScript -->
-      </div>
-    </div>
-
-    <!-- Turkish Delight Current Pricing Section -->
-    <div class="category-section" id="turkishCurrentSection">
-      <div class="category-header">
-        <h2>Turkish Delight - Current Pricing</h2>
-        <div class="count" id="turkishCurrentCount">0 items</div>
-      </div>
-      <div class="items-list" id="turkishCurrentList">
-        <!-- Items populated via JavaScript -->
-      </div>
-    </div>
-
-    <!-- Turkish Delight Adjusted Pricing Section -->
-    <div class="category-section" id="turkishAdjustedSection">
-      <div class="category-header">
-        <h2>Turkish Delight - 80% Margin</h2>
-        <div class="count" id="turkishAdjustedCount">0 items</div>
-      </div>
-      <div class="items-list" id="turkishAdjustedList">
-        <!-- Items populated via JavaScript -->
-      </div>
+    <!-- Dynamic Sections Container -->
+    <div id="sectionsContainer">
+      <!-- Sections populated dynamically via JavaScript -->
     </div>
 
   </div>
@@ -563,20 +532,7 @@
       <div class="modal-body">
         <div id="addModalStatus"></div>
         <div class="details-grid" id="addModalFields">
-          <div class="field-group">
-            <label class="field-label">CATEGORY *</label>
-            <select class="select-dropdown" id="newCategory" onchange="updateAddForm()">
-              <option value="">Select Category</option>
-              <option value="baklava">Baklava 3-Packs</option>
-              <option value="turkish_delight_current">Turkish Delight - Current Pricing</option>
-              <option value="turkish_delight_adjusted">Turkish Delight - 80% Margin</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label class="field-label">ITEM NAME *</label>
-            <input type="text" class="field-input" id="newItemName" placeholder="Enter item name">
-          </div>
-          <div id="additionalFields"></div>
+          <!-- Fields populated dynamically -->
         </div>
       </div>
       <div class="modal-footer">
@@ -627,49 +583,68 @@
     }
 
     /**
-     * Render all items to their respective categories
+     * Get all unique categories
+     */
+    function getUniqueCategories() {
+      const categories = [...new Set(allItems.map(item => item.category))];
+      return categories.sort();
+    }
+
+    /**
+     * Render all items to their respective categories (DYNAMIC)
      */
     function renderAllItems() {
-      const baklavaItems = allItems.filter(item => item.category === 'baklava');
-      const turkishCurrentItems = allItems.filter(item => item.category === 'turkish_delight_current');
-      const turkishAdjustedItems = allItems.filter(item => item.category === 'turkish_delight_adjusted');
+      const sectionsContainer = document.getElementById('sectionsContainer');
+      const categories = getUniqueCategories();
 
-      renderCategory('baklavaList', baklavaItems, 'baklava');
-      renderCategory('turkishCurrentList', turkishCurrentItems, 'turkish_delight_current');
-      renderCategory('turkishAdjustedList', turkishAdjustedItems, 'turkish_delight_adjusted');
+      if (categories.length === 0) {
+        sectionsContainer.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--gray-500);">No items yet. Click "+ ADD ITEM" to get started.</div>';
+        return;
+      }
 
-      // Update counts
-      document.getElementById('baklavaCount').textContent = `${baklavaItems.length} items`;
-      document.getElementById('turkishCurrentCount').textContent = `${turkishCurrentItems.length} items`;
-      document.getElementById('turkishAdjustedCount').textContent = `${turkishAdjustedItems.length} items`;
+      sectionsContainer.innerHTML = '';
+
+      categories.forEach(category => {
+        const categoryItems = allItems.filter(item => item.category === category);
+        const section = createCategorySection(category, categoryItems);
+        sectionsContainer.insertAdjacentHTML('beforeend', section);
+      });
 
       updateExportButton();
     }
 
     /**
-     * Render items for a specific category
+     * Create a category section dynamically
      */
-    function renderCategory(listId, items, category) {
-      const listEl = document.getElementById(listId);
+    function createCategorySection(category, items) {
+      const categoryTitle = category.replace(/_/g, ' ').toUpperCase();
+      const itemsHtml = items.length === 0
+        ? '<div style="padding: 20px; text-align: center; color: var(--gray-500);">No items in this section</div>'
+        : items.map(item => createItemCard(item)).join('');
 
-      if (items.length === 0) {
-        listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--gray-500);">No items in this category</div>';
-        return;
-      }
-
-      listEl.innerHTML = items.map(item => createItemCard(item, category)).join('');
+      return `
+        <div class="category-section">
+          <div class="category-header">
+            <h2>${categoryTitle}</h2>
+            <div class="count">${items.length} items</div>
+          </div>
+          <div class="items-list">
+            ${itemsHtml}
+          </div>
+        </div>
+      `;
     }
 
     /**
      * Create HTML for an item card
      */
-    function createItemCard(item, category) {
+    function createItemCard(item) {
       const isSelected = selectedItems.has(item.id);
 
       let metaHtml = `
         <div class="item-meta-item">
-          <span class="item-meta-label">SKU:</span>
-          <span>${item.sku || 'N/A'}</span>
+          <span class="item-meta-label">Section:</span>
+          <span>${item.category.replace(/_/g, ' ')}</span>
         </div>
         <div class="item-meta-item">
           <span class="item-meta-label">Retail:</span>
@@ -680,15 +655,6 @@
           <span>${((item.margin_percent || 0) * 100).toFixed(1)}%</span>
         </div>
       `;
-
-      if (item.pricing_tier) {
-        metaHtml += `
-          <div class="item-meta-item">
-            <span class="item-meta-label">Tier:</span>
-            <span>${item.pricing_tier}</span>
-          </div>
-        `;
-      }
 
       return `
         <div class="item-card">
@@ -753,283 +719,91 @@
       const item = allItems.find(i => i.id === itemId);
       if (!item) return;
 
-      currentEditItem = item;
+      currentEditItem = { ...item }; // Copy to avoid direct mutation
       document.getElementById('editModalTitle').textContent = `Edit: ${item.item_name}`;
       document.getElementById('editModalStatus').innerHTML = '';
 
-      // Render form based on category
-      const fieldsDiv = document.getElementById('editModalFields');
+      const categories = getUniqueCategories();
 
-      if (item.category === 'baklava') {
-        fieldsDiv.innerHTML = `
-          <div class="field-group">
-            <label class="field-label">ITEM NAME</label>
-            <input type="text" class="field-input" id="edit_item_name" value="${item.item_name}" onblur="updateEditItemField('item_name', this.value)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">SKU</label>
-            <input type="text" class="field-input" id="edit_sku" value="${item.sku || ''}" onblur="updateEditItemField('sku', this.value)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">PCS/CASE</label>
-            <input type="number" step="1" class="field-input" id="edit_pcs_per_case" value="${item.pcs_per_case || ''}" onblur="recalculateEditBaklava('pcs_per_case', parseFloat(this.value))">
-          </div>
-          <div class="field-group">
-            <label class="field-label">WEIGHT/CASE</label>
-            <input type="text" class="field-input" id="edit_weight_per_case" value="${item.weight_per_case || ''}" onblur="updateEditItemField('weight_per_case', this.value)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">INVOICE PRICE/CASE</label>
-            <input type="number" step="0.01" class="field-input" id="edit_invoice_price_per_case" value="${item.invoice_price_per_case || ''}" onblur="recalculateEditBaklava('invoice_price_per_case', parseFloat(this.value))">
-          </div>
-          <div class="field-group">
-            <label class="field-label">COST/PIECE <span class="calculated-badge">AUTO</span></label>
-            <input type="number" step="0.01" class="field-input" id="edit_cost_per_piece" value="${(item.cost_per_piece || 0).toFixed(2)}" onblur="recalculateEditBaklava('cost_per_piece', parseFloat(this.value))">
-          </div>
-          <div class="field-group">
-            <label class="field-label">COST/3-PACK <span class="calculated-badge">AUTO</span></label>
-            <input type="number" step="0.01" class="field-input" id="edit_cost_per_pack" value="${(item.cost_per_pack || 0).toFixed(2)}" onblur="recalculateEditBaklava('cost_per_pack', parseFloat(this.value))">
-          </div>
-          <div class="field-group">
-            <label class="field-label">RETAIL (3-PACK)</label>
-            <input type="number" step="0.01" class="field-input" id="edit_retail_price" value="${item.retail_price || ''}" onblur="recalculateEditBaklava('retail_price', parseFloat(this.value))">
-          </div>
-          <div class="field-group">
-            <label class="field-label">PROFIT/3-PACK <span class="calculated-badge">AUTO</span></label>
-            <input type="number" step="0.01" class="field-input" id="edit_profit_per_unit" value="${(item.profit_per_unit || 0).toFixed(2)}" onblur="recalculateEditBaklava('profit_per_unit', parseFloat(this.value))">
-          </div>
-          <div class="field-group">
-            <label class="field-label">MARGIN % <span class="calculated-badge">AUTO</span></label>
-            <input type="number" step="0.1" class="field-input" id="edit_margin_percent" value="${((item.margin_percent || 0) * 100).toFixed(1)}" onblur="recalculateEditBaklava('margin_percent', parseFloat(this.value) / 100)">
-          </div>
-        `;
-      } else if (item.category === 'turkish_delight_current') {
-        fieldsDiv.innerHTML = `
-          <div class="field-group">
-            <label class="field-label">ITEM NAME</label>
-            <input type="text" class="field-input" id="edit_item_name" value="${item.item_name}" onblur="updateEditItemField('item_name', this.value)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">SKU</label>
-            <input type="text" class="field-input" id="edit_sku" value="${item.sku || ''}" onblur="updateEditItemField('sku', this.value)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">TOTAL PCS</label>
-            <input type="number" step="1" class="field-input" id="edit_total_pcs" value="${item.total_pcs || ''}" onblur="recalculateEditTurkish('total_pcs', parseFloat(this.value), false)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">WEIGHT</label>
-            <input type="text" class="field-input" id="edit_weight" value="${item.weight || ''}" onblur="updateEditItemField('weight', this.value)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">INVOICE PRICE</label>
-            <input type="number" step="0.01" class="field-input" id="edit_invoice_price" value="${item.invoice_price || ''}" onblur="recalculateEditTurkish('invoice_price', parseFloat(this.value), false)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">COST/PIECE <span class="calculated-badge">AUTO</span></label>
-            <input type="number" step="0.01" class="field-input" id="edit_cost_per_piece" value="${(item.cost_per_piece || 0).toFixed(2)}" onblur="recalculateEditTurkish('cost_per_piece', parseFloat(this.value), false)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">CURRENT RETAIL</label>
-            <input type="number" step="0.01" class="field-input" id="edit_retail_price" value="${item.retail_price || ''}" onblur="recalculateEditTurkish('retail_price', parseFloat(this.value), false)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">PROFIT/PIECE <span class="calculated-badge">AUTO</span></label>
-            <input type="number" step="0.01" class="field-input" id="edit_profit_per_unit" value="${(item.profit_per_unit || 0).toFixed(2)}" onblur="recalculateEditTurkish('profit_per_unit', parseFloat(this.value), false)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">MARGIN % <span class="calculated-badge">AUTO</span></label>
-            <input type="number" step="0.1" class="field-input" id="edit_margin_percent" value="${((item.margin_percent || 0) * 100).toFixed(1)}" onblur="recalculateEditTurkish('margin_percent', parseFloat(this.value) / 100, false)">
-          </div>
-        `;
-      } else {
-        // turkish_delight_adjusted
-        fieldsDiv.innerHTML = `
-          <div class="field-group">
-            <label class="field-label">ITEM NAME</label>
-            <input type="text" class="field-input" id="edit_item_name" value="${item.item_name}" onblur="updateEditItemField('item_name', this.value)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">SKU</label>
-            <input type="text" class="field-input" id="edit_sku" value="${item.sku || ''}" onblur="updateEditItemField('sku', this.value)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">TOTAL PCS</label>
-            <input type="number" step="1" class="field-input" id="edit_total_pcs" value="${item.total_pcs || ''}" onblur="recalculateEditTurkish('total_pcs', parseFloat(this.value), true)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">WEIGHT</label>
-            <input type="text" class="field-input" id="edit_weight" value="${item.weight || ''}" onblur="updateEditItemField('weight', this.value)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">INVOICE PRICE</label>
-            <input type="number" step="0.01" class="field-input" id="edit_invoice_price" value="${item.invoice_price || ''}" onblur="recalculateEditTurkish('invoice_price', parseFloat(this.value), true)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">PRICING TIER</label>
-            <select class="select-dropdown" id="edit_pricing_tier" onchange="updateEditItemField('pricing_tier', this.value)">
-              <option value="">Select Tier</option>
-              <option value="Budget" ${item.pricing_tier === 'Budget' ? 'selected' : ''}>Budget</option>
-              <option value="Mid-Tier" ${item.pricing_tier === 'Mid-Tier' ? 'selected' : ''}>Mid-Tier</option>
-              <option value="Premium" ${item.pricing_tier === 'Premium' ? 'selected' : ''}>Premium</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label class="field-label">COST/PIECE <span class="calculated-badge">AUTO</span></label>
-            <input type="number" step="0.01" class="field-input" id="edit_cost_per_piece" value="${(item.cost_per_piece || 0).toFixed(2)}" onblur="recalculateEditTurkish('cost_per_piece', parseFloat(this.value), true)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">TARGET MARGIN %</label>
-            <input type="number" step="0.1" class="field-input" id="edit_margin_percent" value="${((item.margin_percent || 0) * 100).toFixed(1)}" onblur="recalculateEditTurkish('margin_percent', parseFloat(this.value) / 100, true)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">ADJUSTED RETAIL <span class="calculated-badge">AUTO</span></label>
-            <input type="number" step="0.01" class="field-input" id="edit_retail_price" value="${(item.retail_price || 0).toFixed(2)}" onblur="recalculateEditTurkish('retail_price', parseFloat(this.value), true)">
-          </div>
-          <div class="field-group">
-            <label class="field-label">PROFIT/PIECE <span class="calculated-badge">AUTO</span></label>
-            <input type="number" step="0.01" class="field-input" id="edit_profit_per_unit" value="${(item.profit_per_unit || 0).toFixed(2)}" onblur="recalculateEditTurkish('profit_per_unit', parseFloat(this.value), true)">
-          </div>
-        `;
-      }
+      let fieldsHtml = `
+        <div class="field-group" style="grid-column: 1 / -1;">
+          <label class="field-label">SECTION *</label>
+          <select class="select-dropdown" id="edit_category" onchange="handleEditCategoryChange()">
+            ${categories.map(cat => `<option value="${cat}" ${cat === item.category ? 'selected' : ''}>${cat.replace(/_/g, ' ').toUpperCase()}</option>`).join('')}
+            <option value="__CREATE_NEW__">+ CREATE NEW SECTION</option>
+          </select>
+        </div>
+        <div class="field-group" id="edit_new_section_group" style="grid-column: 1 / -1; display: none;">
+          <label class="field-label">NEW SECTION NAME *</label>
+          <input type="text" class="field-input" id="edit_new_section_name" placeholder="Enter new section name">
+        </div>
+        <div class="field-group">
+          <label class="field-label">ITEM NAME *</label>
+          <input type="text" class="field-input" id="edit_item_name" value="${item.item_name}" onblur="updateEditField('item_name', this.value)">
+        </div>
+        <div class="field-group">
+          <label class="field-label">SKU</label>
+          <input type="text" class="field-input" id="edit_sku" value="${item.sku || ''}" onblur="updateEditField('sku', this.value)">
+        </div>
+        <div class="field-group">
+          <label class="field-label">RETAIL PRICE</label>
+          <input type="number" step="0.01" class="field-input" id="edit_retail_price" value="${item.retail_price || ''}" onblur="updateEditField('retail_price', parseFloat(this.value))">
+        </div>
+        <div class="field-group">
+          <label class="field-label">COST</label>
+          <input type="number" step="0.01" class="field-input" id="edit_cost_per_piece" value="${(item.cost_per_piece || 0).toFixed(2)}" onblur="updateEditField('cost_per_piece', parseFloat(this.value))">
+        </div>
+        <div class="field-group">
+          <label class="field-label">MARGIN % <span class="calculated-badge">AUTO</span></label>
+          <input type="number" step="0.1" class="field-input" id="edit_margin_percent" value="${((item.margin_percent || 0) * 100).toFixed(1)}" readonly>
+        </div>
+      `;
 
+      document.getElementById('editModalFields').innerHTML = fieldsHtml;
+      recalculateEditMargin();
       document.getElementById('editModal').classList.add('active');
     }
 
     /**
-     * Update edit item field (non-calculated)
+     * Handle category change in edit modal
      */
-    function updateEditItemField(field, value) {
+    function handleEditCategoryChange() {
+      const categorySelect = document.getElementById('edit_category');
+      const newSectionGroup = document.getElementById('edit_new_section_group');
+
+      if (categorySelect.value === '__CREATE_NEW__') {
+        newSectionGroup.style.display = 'block';
+      } else {
+        newSectionGroup.style.display = 'none';
+        currentEditItem.category = categorySelect.value;
+      }
+    }
+
+    /**
+     * Update edit item field
+     */
+    function updateEditField(field, value) {
       if (!currentEditItem) return;
       currentEditItem[field] = value;
+      recalculateEditMargin();
     }
 
     /**
-     * Recalculate baklava fields in REAL-TIME
+     * Recalculate margin in edit modal
      */
-    function recalculateEditBaklava(changedField, newValue) {
-      if (!currentEditItem) return;
+    function recalculateEditMargin() {
+      const retail = currentEditItem.retail_price || 0;
+      const cost = currentEditItem.cost_per_piece || 0;
+      const profit = retail - cost;
+      const margin = retail > 0 ? (profit / retail) : 0;
 
-      currentEditItem[changedField] = newValue;
+      currentEditItem.margin_percent = margin;
+      currentEditItem.profit_per_unit = profit;
 
-      let pcsPerCase = currentEditItem.pcs_per_case || 0;
-      let invoicePricePerCase = currentEditItem.invoice_price_per_case || 0;
-      let costPerPiece = currentEditItem.cost_per_piece || 0;
-      let costPerPack = currentEditItem.cost_per_pack || 0;
-      let retailPrice = currentEditItem.retail_price || 0;
-      let profitPerUnit = currentEditItem.profit_per_unit || 0;
-      let marginPercent = currentEditItem.margin_percent || 0;
-
-      if (changedField === 'pcs_per_case' || changedField === 'invoice_price_per_case') {
-        costPerPiece = pcsPerCase > 0 ? invoicePricePerCase / pcsPerCase : 0;
-        costPerPack = costPerPiece * 3;
-        profitPerUnit = retailPrice - costPerPack;
-        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
-      } else if (changedField === 'cost_per_piece') {
-        invoicePricePerCase = costPerPiece * pcsPerCase;
-        costPerPack = costPerPiece * 3;
-        profitPerUnit = retailPrice - costPerPack;
-        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
-      } else if (changedField === 'cost_per_pack') {
-        costPerPiece = costPerPack / 3;
-        invoicePricePerCase = costPerPiece * pcsPerCase;
-        profitPerUnit = retailPrice - costPerPack;
-        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
-      } else if (changedField === 'retail_price') {
-        profitPerUnit = retailPrice - costPerPack;
-        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
-      } else if (changedField === 'profit_per_unit') {
-        retailPrice = costPerPack + profitPerUnit;
-        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
-      } else if (changedField === 'margin_percent') {
-        if (marginPercent > 0 && marginPercent < 1) {
-          retailPrice = costPerPack / (1 - marginPercent);
-          profitPerUnit = retailPrice - costPerPack;
-        }
+      const marginInput = document.getElementById('edit_margin_percent');
+      if (marginInput) {
+        marginInput.value = (margin * 100).toFixed(1);
       }
-
-      // Update item data
-      currentEditItem.pcs_per_case = pcsPerCase;
-      currentEditItem.invoice_price_per_case = invoicePricePerCase;
-      currentEditItem.cost_per_piece = costPerPiece;
-      currentEditItem.cost_per_pack = costPerPack;
-      currentEditItem.retail_price = retailPrice;
-      currentEditItem.profit_per_unit = profitPerUnit;
-      currentEditItem.margin_percent = marginPercent;
-
-      // Update all input fields in REAL-TIME
-      document.getElementById('edit_pcs_per_case').value = pcsPerCase;
-      document.getElementById('edit_invoice_price_per_case').value = invoicePricePerCase.toFixed(2);
-      document.getElementById('edit_cost_per_piece').value = costPerPiece.toFixed(2);
-      document.getElementById('edit_cost_per_pack').value = costPerPack.toFixed(2);
-      document.getElementById('edit_retail_price').value = retailPrice.toFixed(2);
-      document.getElementById('edit_profit_per_unit').value = profitPerUnit.toFixed(2);
-      document.getElementById('edit_margin_percent').value = (marginPercent * 100).toFixed(1);
-    }
-
-    /**
-     * Recalculate Turkish delight fields in REAL-TIME
-     */
-    function recalculateEditTurkish(changedField, newValue, isAdjusted) {
-      if (!currentEditItem) return;
-
-      currentEditItem[changedField] = newValue;
-
-      let totalPcs = currentEditItem.total_pcs || 0;
-      let invoicePrice = currentEditItem.invoice_price || 0;
-      let costPerPiece = currentEditItem.cost_per_piece || 0;
-      let retailPrice = currentEditItem.retail_price || 0;
-      let profitPerUnit = currentEditItem.profit_per_unit || 0;
-      let marginPercent = currentEditItem.margin_percent || 0;
-
-      if (changedField === 'total_pcs' || changedField === 'invoice_price') {
-        costPerPiece = totalPcs > 0 ? invoicePrice / totalPcs : 0;
-
-        if (isAdjusted) {
-          retailPrice = marginPercent < 1 && marginPercent > 0 ? costPerPiece / (1 - marginPercent) : costPerPiece;
-          profitPerUnit = retailPrice - costPerPiece;
-        } else {
-          profitPerUnit = retailPrice - costPerPiece;
-          marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
-        }
-      } else if (changedField === 'cost_per_piece') {
-        invoicePrice = costPerPiece * totalPcs;
-
-        if (isAdjusted) {
-          retailPrice = marginPercent < 1 && marginPercent > 0 ? costPerPiece / (1 - marginPercent) : costPerPiece;
-          profitPerUnit = retailPrice - costPerPiece;
-        } else {
-          profitPerUnit = retailPrice - costPerPiece;
-          marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
-        }
-      } else if (changedField === 'retail_price') {
-        profitPerUnit = retailPrice - costPerPiece;
-        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
-      } else if (changedField === 'profit_per_unit') {
-        retailPrice = costPerPiece + profitPerUnit;
-        marginPercent = retailPrice > 0 ? profitPerUnit / retailPrice : 0;
-      } else if (changedField === 'margin_percent') {
-        if (marginPercent > 0 && marginPercent < 1) {
-          retailPrice = costPerPiece / (1 - marginPercent);
-          profitPerUnit = retailPrice - costPerPiece;
-        }
-      }
-
-      // Update item data
-      currentEditItem.total_pcs = totalPcs;
-      currentEditItem.invoice_price = invoicePrice;
-      currentEditItem.cost_per_piece = costPerPiece;
-      currentEditItem.retail_price = retailPrice;
-      currentEditItem.profit_per_unit = profitPerUnit;
-      currentEditItem.margin_percent = marginPercent;
-
-      // Update all input fields in REAL-TIME
-      document.getElementById('edit_total_pcs').value = totalPcs;
-      document.getElementById('edit_invoice_price').value = invoicePrice.toFixed(2);
-      document.getElementById('edit_cost_per_piece').value = costPerPiece.toFixed(2);
-      document.getElementById('edit_retail_price').value = retailPrice.toFixed(2);
-      document.getElementById('edit_profit_per_unit').value = profitPerUnit.toFixed(2);
-      document.getElementById('edit_margin_percent').value = (marginPercent * 100).toFixed(1);
     }
 
     /**
@@ -1037,6 +811,22 @@
      */
     async function saveEditedItem() {
       if (!currentEditItem) return;
+
+      // Check if creating new section
+      const categorySelect = document.getElementById('edit_category');
+      if (categorySelect.value === '__CREATE_NEW__') {
+        const newSectionName = document.getElementById('edit_new_section_name').value.trim();
+        if (!newSectionName) {
+          showEditModalError('Please enter a new section name');
+          return;
+        }
+        currentEditItem.category = newSectionName.toLowerCase().replace(/\s+/g, '_');
+      }
+
+      if (!currentEditItem.item_name) {
+        showEditModalError('Item name is required');
+        return;
+      }
 
       showLoading(true);
 
@@ -1050,13 +840,8 @@
         const result = await response.json();
 
         if (result.success) {
-          // Update local data
-          const index = allItems.findIndex(i => i.id === currentEditItem.id);
-          if (index !== -1) {
-            allItems[index] = result.data;
-          }
-          renderAllItems();
           closeEditModal();
+          await loadAllItems(); // RELOAD PAGE
         } else {
           showEditModalError('Save failed: ' + result.error);
         }
@@ -1096,9 +881,8 @@
 
         if (result.success) {
           selectedItems.delete(itemId);
-          allItems = allItems.filter(i => i.id !== itemId);
-          renderAllItems();
           closeEditModal();
+          await loadAllItems(); // RELOAD PAGE
         } else {
           showError('Delete failed: ' + result.error);
         }
@@ -1123,10 +907,56 @@
      */
     function openAddModal() {
       document.getElementById('addModalStatus').innerHTML = '';
-      document.getElementById('newCategory').value = '';
-      document.getElementById('newItemName').value = '';
-      document.getElementById('additionalFields').innerHTML = '';
+
+      const categories = getUniqueCategories();
+
+      let fieldsHtml = `
+        <div class="field-group" style="grid-column: 1 / -1;">
+          <label class="field-label">SECTION *</label>
+          <select class="select-dropdown" id="new_category" onchange="handleAddCategoryChange()">
+            <option value="">Select Section</option>
+            ${categories.map(cat => `<option value="${cat}">${cat.replace(/_/g, ' ').toUpperCase()}</option>`).join('')}
+            <option value="__CREATE_NEW__">+ CREATE NEW SECTION</option>
+          </select>
+        </div>
+        <div class="field-group" id="new_section_group" style="grid-column: 1 / -1; display: none;">
+          <label class="field-label">NEW SECTION NAME *</label>
+          <input type="text" class="field-input" id="new_section_name" placeholder="Enter new section name">
+        </div>
+        <div class="field-group">
+          <label class="field-label">ITEM NAME *</label>
+          <input type="text" class="field-input" id="new_item_name" placeholder="Enter item name">
+        </div>
+        <div class="field-group">
+          <label class="field-label">SKU</label>
+          <input type="text" class="field-input" id="new_sku">
+        </div>
+        <div class="field-group">
+          <label class="field-label">RETAIL PRICE</label>
+          <input type="number" step="0.01" class="field-input" id="new_retail_price">
+        </div>
+        <div class="field-group">
+          <label class="field-label">COST</label>
+          <input type="number" step="0.01" class="field-input" id="new_cost">
+        </div>
+      `;
+
+      document.getElementById('addModalFields').innerHTML = fieldsHtml;
       document.getElementById('addModal').classList.add('active');
+    }
+
+    /**
+     * Handle category change in add modal
+     */
+    function handleAddCategoryChange() {
+      const categorySelect = document.getElementById('new_category');
+      const newSectionGroup = document.getElementById('new_section_group');
+
+      if (categorySelect.value === '__CREATE_NEW__') {
+        newSectionGroup.style.display = 'block';
+      } else {
+        newSectionGroup.style.display = 'none';
+      }
     }
 
     /**
@@ -1137,106 +967,38 @@
     }
 
     /**
-     * Update add form based on category
-     */
-    function updateAddForm() {
-      const category = document.getElementById('newCategory').value;
-      const additionalFields = document.getElementById('additionalFields');
-
-      if (!category) {
-        additionalFields.innerHTML = '';
-        return;
-      }
-
-      let fieldsHtml = '<div class="field-group"><label class="field-label">SKU</label><input type="text" class="field-input" id="newSKU"></div>';
-
-      if (category === 'baklava') {
-        fieldsHtml += `
-          <div class="field-group">
-            <label class="field-label">PCS/CASE</label>
-            <input type="number" class="field-input" id="newPcsPerCase">
-          </div>
-          <div class="field-group">
-            <label class="field-label">WEIGHT/CASE</label>
-            <input type="text" class="field-input" id="newWeightPerCase">
-          </div>
-          <div class="field-group">
-            <label class="field-label">INVOICE PRICE/CASE</label>
-            <input type="number" step="0.01" class="field-input" id="newInvoicePrice">
-          </div>
-          <div class="field-group">
-            <label class="field-label">RETAIL (3-PACK)</label>
-            <input type="number" step="0.01" class="field-input" id="newRetailPrice">
-          </div>
-        `;
-      } else if (category === 'turkish_delight_current') {
-        fieldsHtml += `
-          <div class="field-group">
-            <label class="field-label">TOTAL PCS</label>
-            <input type="number" class="field-input" id="newTotalPcs">
-          </div>
-          <div class="field-group">
-            <label class="field-label">WEIGHT</label>
-            <input type="text" class="field-input" id="newWeight">
-          </div>
-          <div class="field-group">
-            <label class="field-label">INVOICE PRICE</label>
-            <input type="number" step="0.01" class="field-input" id="newInvoicePrice">
-          </div>
-          <div class="field-group">
-            <label class="field-label">CURRENT RETAIL</label>
-            <input type="number" step="0.01" class="field-input" id="newRetailPrice">
-          </div>
-        `;
-      } else {
-        fieldsHtml += `
-          <div class="field-group">
-            <label class="field-label">TOTAL PCS</label>
-            <input type="number" class="field-input" id="newTotalPcs">
-          </div>
-          <div class="field-group">
-            <label class="field-label">WEIGHT</label>
-            <input type="text" class="field-input" id="newWeight">
-          </div>
-          <div class="field-group">
-            <label class="field-label">INVOICE PRICE</label>
-            <input type="number" step="0.01" class="field-input" id="newInvoicePrice">
-          </div>
-          <div class="field-group">
-            <label class="field-label">TARGET MARGIN %</label>
-            <input type="number" step="1" class="field-input" id="newMargin" value="80">
-          </div>
-          <div class="field-group">
-            <label class="field-label">PRICING TIER</label>
-            <select class="select-dropdown" id="newPricingTier">
-              <option value="">Select Tier</option>
-              <option value="Budget">Budget</option>
-              <option value="Mid-Tier">Mid-Tier</option>
-              <option value="Premium">Premium</option>
-            </select>
-          </div>
-        `;
-      }
-
-      additionalFields.innerHTML = fieldsHtml;
-    }
-
-    /**
      * Save new item
      */
     async function saveNewItem() {
-      const itemName = document.getElementById('newItemName').value.trim();
-      const category = document.getElementById('newCategory').value;
+      const categorySelect = document.getElementById('new_category');
+      let category = categorySelect.value;
 
+      if (category === '__CREATE_NEW__') {
+        const newSectionName = document.getElementById('new_section_name').value.trim();
+        if (!newSectionName) {
+          showAddModalError('Please enter a new section name');
+          return;
+        }
+        category = newSectionName.toLowerCase().replace(/\s+/g, '_');
+      }
+
+      if (!category) {
+        showAddModalError('Please select or create a section');
+        return;
+      }
+
+      const itemName = document.getElementById('new_item_name').value.trim();
       if (!itemName) {
         showAddModalError('Item name is required');
         return;
       }
 
-      if (!category) {
-        showAddModalError('Category is required');
-        return;
-      }
+      const sku = document.getElementById('new_sku').value.trim();
+      const retailPrice = parseFloat(document.getElementById('new_retail_price').value) || 0;
+      const cost = parseFloat(document.getElementById('new_cost').value) || 0;
+
+      const profit = retailPrice - cost;
+      const margin = retailPrice > 0 ? profit / retailPrice : 0;
 
       showLoading(true);
 
@@ -1244,53 +1006,12 @@
         const newItem = {
           item_name: itemName,
           category: category,
-          sku: document.getElementById('newSKU')?.value || null
+          sku: sku || null,
+          retail_price: retailPrice,
+          cost_per_piece: cost,
+          profit_per_unit: profit,
+          margin_percent: margin
         };
-
-        if (category === 'baklava') {
-          const pcsPerCase = parseFloat(document.getElementById('newPcsPerCase')?.value) || 0;
-          const invoicePrice = parseFloat(document.getElementById('newInvoicePrice')?.value) || 0;
-          const retailPrice = parseFloat(document.getElementById('newRetailPrice')?.value) || 0;
-
-          newItem.pcs_per_case = pcsPerCase;
-          newItem.weight_per_case = document.getElementById('newWeightPerCase')?.value || null;
-          newItem.invoice_price_per_case = invoicePrice;
-          newItem.retail_price = retailPrice;
-
-          newItem.cost_per_piece = pcsPerCase > 0 ? invoicePrice / pcsPerCase : 0;
-          newItem.cost_per_pack = newItem.cost_per_piece * 3;
-          newItem.profit_per_unit = retailPrice - newItem.cost_per_pack;
-          newItem.margin_percent = retailPrice > 0 ? newItem.profit_per_unit / retailPrice : 0;
-        } else if (category === 'turkish_delight_current') {
-          const totalPcs = parseFloat(document.getElementById('newTotalPcs')?.value) || 0;
-          const invoicePrice = parseFloat(document.getElementById('newInvoicePrice')?.value) || 0;
-          const retailPrice = parseFloat(document.getElementById('newRetailPrice')?.value) || 0;
-
-          newItem.total_pcs = totalPcs;
-          newItem.weight = document.getElementById('newWeight')?.value || null;
-          newItem.invoice_price = invoicePrice;
-          newItem.retail_price = retailPrice;
-
-          newItem.cost_per_piece = totalPcs > 0 ? invoicePrice / totalPcs : 0;
-          newItem.profit_per_unit = retailPrice - newItem.cost_per_piece;
-          newItem.margin_percent = retailPrice > 0 ? newItem.profit_per_unit / retailPrice : 0;
-        } else {
-          const totalPcs = parseFloat(document.getElementById('newTotalPcs')?.value) || 0;
-          const invoicePrice = parseFloat(document.getElementById('newInvoicePrice')?.value) || 0;
-          const marginPercent = parseFloat(document.getElementById('newMargin')?.value) / 100 || 0.8;
-
-          newItem.total_pcs = totalPcs;
-          newItem.weight = document.getElementById('newWeight')?.value || null;
-          newItem.invoice_price = invoicePrice;
-          newItem.margin_percent = marginPercent;
-          newItem.pricing_tier = document.getElementById('newPricingTier')?.value || null;
-
-          newItem.cost_per_piece = totalPcs > 0 ? invoicePrice / totalPcs : 0;
-          newItem.retail_price = marginPercent < 1 && marginPercent > 0
-            ? newItem.cost_per_piece / (1 - marginPercent)
-            : newItem.cost_per_piece;
-          newItem.profit_per_unit = newItem.retail_price - newItem.cost_per_piece;
-        }
 
         const response = await fetch('/api/dessert-pricing', {
           method: 'POST',
@@ -1302,7 +1023,7 @@
 
         if (result.success) {
           closeAddModal();
-          loadAllItems();
+          await loadAllItems(); // RELOAD PAGE
         } else {
           showAddModalError('Failed to save: ' + result.error);
         }
@@ -1343,98 +1064,43 @@
         doc.text(`Generated: ${dateStr}`, 15, 22);
 
         const selectedItemsData = allItems.filter(item => selectedItems.has(item.id));
-        const baklava = selectedItemsData.filter(i => i.category === 'baklava');
-        const turkishCurrent = selectedItemsData.filter(i => i.category === 'turkish_delight_current');
-        const turkishAdjusted = selectedItemsData.filter(i => i.category === 'turkish_delight_adjusted');
+        const categories = getUniqueCategories();
 
         let yPos = 30;
 
-        if (baklava.length > 0) {
-          doc.autoTable({
-            startY: yPos,
-            head: [['Item', 'SKU', 'Pcs/Case', 'Invoice/Case', 'Cost/Pc', 'Cost/3pk', 'Retail', 'Profit', 'Margin %']],
-            body: baklava.map(item => [
-              item.item_name,
-              item.sku || '',
-              item.pcs_per_case || '',
-              `$${(item.invoice_price_per_case || 0).toFixed(2)}`,
-              `$${(item.cost_per_piece || 0).toFixed(2)}`,
-              `$${(item.cost_per_pack || 0).toFixed(2)}`,
-              `$${(item.retail_price || 0).toFixed(2)}`,
-              `$${(item.profit_per_unit || 0).toFixed(2)}`,
-              `${((item.margin_percent || 0) * 100).toFixed(1)}%`
-            ]),
-            theme: 'grid',
-            headStyles: { fillColor: [26, 26, 26], fontSize: 9, fontStyle: 'bold' },
-            styles: { fontSize: 8 },
-            margin: { left: 15, right: 15 }
-          });
-          yPos = doc.lastAutoTable.finalY + 10;
-        }
+        categories.forEach(category => {
+          const categoryItems = selectedItemsData.filter(i => i.category === category);
 
-        if (turkishCurrent.length > 0) {
-          if (yPos > 150) {
-            doc.addPage();
-            yPos = 15;
+          if (categoryItems.length > 0) {
+            if (yPos > 150) {
+              doc.addPage();
+              yPos = 15;
+            }
+
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(category.replace(/_/g, ' ').toUpperCase(), 15, yPos);
+            yPos += 7;
+
+            doc.autoTable({
+              startY: yPos,
+              head: [['Item', 'SKU', 'Retail', 'Cost', 'Profit', 'Margin %']],
+              body: categoryItems.map(item => [
+                item.item_name,
+                item.sku || '',
+                `$${(item.retail_price || 0).toFixed(2)}`,
+                `$${(item.cost_per_piece || 0).toFixed(2)}`,
+                `$${(item.profit_per_unit || 0).toFixed(2)}`,
+                `${((item.margin_percent || 0) * 100).toFixed(1)}%`
+              ]),
+              theme: 'grid',
+              headStyles: { fillColor: [26, 26, 26], fontSize: 9, fontStyle: 'bold' },
+              styles: { fontSize: 8 },
+              margin: { left: 15, right: 15 }
+            });
+            yPos = doc.lastAutoTable.finalY + 10;
           }
-
-          doc.setFontSize(12);
-          doc.setFont(undefined, 'bold');
-          doc.text('TURKISH DELIGHT - CURRENT PRICING', 15, yPos);
-          yPos += 7;
-
-          doc.autoTable({
-            startY: yPos,
-            head: [['Item', 'SKU', 'Total Pcs', 'Invoice Price', 'Cost/Pc', 'Retail', 'Profit', 'Margin %']],
-            body: turkishCurrent.map(item => [
-              item.item_name,
-              item.sku || '',
-              item.total_pcs || '',
-              `$${(item.invoice_price || 0).toFixed(2)}`,
-              `$${(item.cost_per_piece || 0).toFixed(2)}`,
-              `$${(item.retail_price || 0).toFixed(2)}`,
-              `$${(item.profit_per_unit || 0).toFixed(2)}`,
-              `${((item.margin_percent || 0) * 100).toFixed(1)}%`
-            ]),
-            theme: 'grid',
-            headStyles: { fillColor: [26, 26, 26], fontSize: 9, fontStyle: 'bold' },
-            styles: { fontSize: 8 },
-            margin: { left: 15, right: 15 }
-          });
-          yPos = doc.lastAutoTable.finalY + 10;
-        }
-
-        if (turkishAdjusted.length > 0) {
-          if (yPos > 150) {
-            doc.addPage();
-            yPos = 15;
-          }
-
-          doc.setFontSize(12);
-          doc.setFont(undefined, 'bold');
-          doc.text('TURKISH DELIGHT - 80% MARGIN', 15, yPos);
-          yPos += 7;
-
-          doc.autoTable({
-            startY: yPos,
-            head: [['Item', 'SKU', 'Total Pcs', 'Invoice Price', 'Cost/Pc', 'Adj. Retail', 'Profit', 'Margin %', 'Tier']],
-            body: turkishAdjusted.map(item => [
-              item.item_name,
-              item.sku || '',
-              item.total_pcs || '',
-              `$${(item.invoice_price || 0).toFixed(2)}`,
-              `$${(item.cost_per_piece || 0).toFixed(2)}`,
-              `$${(item.retail_price || 0).toFixed(2)}`,
-              `$${(item.profit_per_unit || 0).toFixed(2)}`,
-              `${((item.margin_percent || 0) * 100).toFixed(1)}%`,
-              item.pricing_tier || ''
-            ]),
-            theme: 'grid',
-            headStyles: { fillColor: [26, 26, 26], fontSize: 9, fontStyle: 'bold' },
-            styles: { fontSize: 8 },
-            margin: { left: 15, right: 15 }
-          });
-        }
+        });
 
         doc.save(`Profit_Margin_Report_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}.pdf`);
 
