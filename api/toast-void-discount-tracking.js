@@ -171,8 +171,10 @@ export default async function handler(req, res) {
                   check.appliedDiscounts.forEach(discount => {
                     const discountName = discount.name || 'Unknown Discount';
 
-                    // FILTER: Exclude "REWARD DOLLARS" and "ONLINE ORDER" discounts
-                    if (discountName === 'REWARD DOLLARS' || discountName === 'ONLINE ORDER') {
+                    // FILTER: Exclude "REWARD DOLLARS" and "ONLINE ORDER" discounts (case-insensitive)
+                    const discountNameUpper = discountName.toUpperCase();
+                    if (discountNameUpper === 'REWARD DOLLARS' || discountNameUpper === 'ONLINE ORDER') {
+                      console.log(`🚫 Filtered out discount: "${discountName}" (automated discount, not staff-visible)`);
                       return; // Skip this discount
                     }
 
@@ -203,8 +205,10 @@ export default async function handler(req, res) {
                       selection.appliedDiscounts.forEach(discount => {
                         const discountName = discount.name || 'Unknown Discount';
 
-                        // FILTER: Exclude "REWARD DOLLARS" and "ONLINE ORDER" discounts
-                        if (discountName === 'REWARD DOLLARS' || discountName === 'ONLINE ORDER') {
+                        // FILTER: Exclude "REWARD DOLLARS" and "ONLINE ORDER" discounts (case-insensitive)
+                        const discountNameUpper = discountName.toUpperCase();
+                        if (discountNameUpper === 'REWARD DOLLARS' || discountNameUpper === 'ONLINE ORDER') {
+                          console.log(`🚫 Filtered out discount: "${discountName}" (automated discount, not staff-visible)`);
                           return; // Skip this discount
                         }
 
