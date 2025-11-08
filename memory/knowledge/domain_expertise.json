@@ -307,6 +307,111 @@
         "NO DEPLOYMENT IMPACT: Zero references to archived files in active pages",
         "User satisfied - repo organized, nothing broken"
       ]
+    },
+    "toast_discount_schema": {
+      "concepts_learned": [
+        "Discount names are case-insensitive strings (not standardized)",
+        "Discount filter must handle all variations (Reward Dollars, reward dollars, REWARD DOLLARS)",
+        "AppliedDiscount object has: name, discountAmount, type, discount.guid, approvalUser",
+        "Discounts can be check-level (appliedDiscounts on check) or item-level (appliedDiscounts on selection)",
+        "Automated discounts (Reward Dollars, Online Order) should be filtered from staff-visible counts"
+      ],
+      "tools_used": ["Toast Orders API", "Toast discount documentation"],
+      "patterns_identified": [
+        "WRONG: if (discount.name === 'REWARD DOLLARS') - misses other case variations",
+        "RIGHT: if (discount.name.toUpperCase() === 'REWARD DOLLARS') - catches all cases",
+        "Filter applies to BOTH check-level and item-level discounts",
+        "Add console logging to track filtered discounts for debugging"
+      ],
+      "resources": [
+        "api/toast-void-discount-tracking.js - Void and discount tracking API",
+        "app-header.js lines 524-596 - Frontend discount display",
+        "https://doc.toasttab.com/doc/devguide/apiDiscountingOrders.html"
+      ],
+      "notes": [
+        "SESSION: Nov 7, 2025 - Fixed discount filter case-sensitivity bug",
+        "USER REQUEST: 'i need it to NOT include reward dollars and online order... staff dont see when thiose happen'",
+        "PROBLEM: Filter only caught exact case 'REWARD DOLLARS', missed 'Reward Dollars'",
+        "FIX: Convert to uppercase before comparison (lines 175-177, 209-211)",
+        "LOGGING ADDED: console.log filtered discounts for developer visibility",
+        "COMMIT: 9e39854 - fix(tracking): Make discount filter case-insensitive",
+        "DISCOUNT EXAMPLES FROM TOAST DOCS: '$25 Off', 'Buy one get one', 'Comp', 'MyCheckDiscount'",
+        "Toast API does NOT standardize capitalization - can be anything",
+        "User context: Reward Dollars is likely universal, Online Order is custom 10% coupon"
+      ]
+    },
+    "restaurant_ml_forecasting": {
+      "concepts_learned": [
+        "Ingredient-level demand forecasting using POS data + order history",
+        "Recipe costing algorithms map menu items to raw ingredients",
+        "Time series forecasting (ARIMA, Prophet) for sales prediction",
+        "Continuous learning via model retraining with new data",
+        "Inverse learning: observe sales + inventory changes to infer recipe portions"
+      ],
+      "tools_used": ["Prophet (Facebook)", "ARIMA", "Serverless ML pipelines", "Vercel cron jobs"],
+      "patterns_identified": [
+        "INVERSE LEARNING: '50 gyros sold → 12 lbs meat used → each gyro = 0.24 lbs'",
+        "PMIX MAPPING: Associate POS buttons with recipe ingredients",
+        "RETRAINING STRATEGIES: Periodic (weekly/monthly) or trigger-based (performance drops)",
+        "SERVERLESS ARCHITECTURE: Data ingestion → processing → ML inference → insights delivery",
+        "RULE-BASED FIRST: Start with statistical methods, upgrade to ML after data collection"
+      ],
+      "resources": [
+        "https://www.strong.io/blog/optimizing-restaurant-inventory-using-ingredient-level-demand-forecasting",
+        "https://supy.io/blog/implementing-ai-and-machine-learning-in-restaurant-inventory-management/",
+        "https://vercel.com/docs/cron-jobs",
+        "JAYNA_BRAIN_SYSTEM_PLAN.md - 734-line comprehensive implementation plan"
+      ],
+      "notes": [
+        "SESSION: Nov 7, 2025 - Created Jayna AI Brain System master plan",
+        "USER VISION: 'brain that lives in our code and watches our sales and estimates our ingredient usage'",
+        "USER GOAL: 'learns and watches and gets samrter and send me its insights'",
+        "ARCHITECTURE: 4 phases over 8 weeks (Foundation → Recipe Intelligence → Predictions → Insights)",
+        "DATABASE: 5 new tables (brain_daily_sales, brain_recipes, brain_predictions, brain_insights, brain_events_log)",
+        "PHASE 1: Rule-based intelligence (moving averages, historical comparisons)",
+        "PHASE 2: Recipe mapping via inverse learning (sales + prep counts → portions)",
+        "PHASE 3: Time series forecasting (Prophet for 7-day sales predictions)",
+        "PHASE 4: Private email insights (daily alerts, weekly forecasts, monthly deep dives)",
+        "KEY PRINCIPLE: Silent operation - staff never see it, only ownership receives insights",
+        "REAL-WORLD EXAMPLES: Sweetgreen (AI inventory tracking), Dishoom (20% waste reduction)",
+        "COST: $0-100/month (Vercel free tier + optional ML API)",
+        "SUCCESS METRICS: Week 4 - 70% accuracy, Week 8 - insights flowing, Month 6 - $1000+ waste prevented",
+        "WAITING ON: User to review plan, answer 4 questions, provide recipe data"
+      ]
+    },
+    "api_retry_patterns": {
+      "concepts_learned": [
+        "Exponential backoff for rate limiting (500ms → 1s → 2s)",
+        "Retry pagination separately from individual item fetches",
+        "Multiple retry attempts prevent missing data due to transient errors",
+        "Higher retry count for critical operations (3x pagination vs 2x items)",
+        "Keep console logs detailed for developers while hiding complexity from users"
+      ],
+      "tools_used": ["Toast Payments API", "Fetch API with retry logic"],
+      "patterns_identified": [
+        "PAGINATION RETRY: 3 attempts with exponential backoff (lines 49-93 in toast-payments.js)",
+        "INDIVIDUAL RETRY: 2 attempts with small backoff (lines 142-183)",
+        "BACKOFF FORMULA: await new Promise(resolve => setTimeout(resolve, 500 * attempt))",
+        "ERROR HANDLING: Continue on individual failures, only error if ALL attempts fail",
+        "RATE LIMITING: 300ms delay between pages, 100ms delay every 10 items"
+      ],
+      "resources": [
+        "api/toast-payments.js - Payment data fetching with retry logic",
+        "cash.html lines 2155-2227 - Frontend retry logic with highest amount selection"
+      ],
+      "notes": [
+        "SESSION: Nov 7, 2025 - Added comprehensive retry logic for reliability",
+        "USER REQUEST: 'we are using the retry method for errors when fetching with pagination or going too fast we dont want to miss any orders'",
+        "PROBLEM: Single failed page fetch could lose 100 orders from dataset",
+        "SOLUTION: Retry each page up to 3 times before giving up",
+        "BACKEND RETRY: toast-payments.js handles pagination + individual payment retries",
+        "FRONTEND RETRY: cash.html fetches TWICE and uses highest amount (most complete data)",
+        "USER EXPERIENCE: Staff only see 'Loading...' → Dollar amount (no technical details)",
+        "DEVELOPER EXPERIENCE: Console logs show all attempts, successes, failures for debugging",
+        "COMMIT: 7a7539f - feat(cash): Simplify UI feedback & add retry logic for reliability",
+        "RELIABILITY GAIN: Prevents data loss from rate limiting, network hiccups, API timeouts",
+        "PATTERN USED: Same as tip pool calculator - fetch multiple times, use best result"
+      ]
     }
   }
 }
