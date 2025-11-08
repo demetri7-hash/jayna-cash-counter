@@ -76,12 +76,45 @@ export default async function handler(req, res) {
 
     console.log(`✅ Successfully saved ${savedOrders.length} new orders`);
 
+    // AUTO-PRINT: Automatically print each new Toast order
+    console.log(`🖨️ Triggering auto-print for ${savedOrders.length} new Toast orders...`);
+    const printResults = [];
+
+    for (const order of savedOrders) {
+      try {
+        const printResponse = await fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/auto-print-catering-order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            order_id: order.id,
+            source_system: 'TOAST'
+          })
+        });
+
+        const printResult = await printResponse.json();
+
+        if (printResult.success) {
+          console.log(`✅ Auto-print successful for Toast order ${order.id}`);
+          printResults.push({ order_id: order.id, success: true });
+        } else {
+          console.error(`⚠️  Auto-print failed for Toast order ${order.id}:`, printResult);
+          printResults.push({ order_id: order.id, success: false, error: printResult.message });
+        }
+      } catch (printError) {
+        console.error(`❌ Auto-print error for Toast order ${order.id}:`, printError);
+        printResults.push({ order_id: order.id, success: false, error: printError.message });
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message: `Saved ${savedOrders.length} new orders`,
       data: {
         savedCount: savedOrders.length,
-        orders: savedOrders
+        orders: savedOrders,
+        printResults: printResults
       }
     });
 

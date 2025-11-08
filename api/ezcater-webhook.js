@@ -120,6 +120,33 @@ export default async function handler(req, res) {
       const savedOrderId = data[0].id;
       const savedExternalId = data[0].external_order_id;
       await saveLineItems(savedOrderId, savedExternalId, orderDetails.catererCart?.orderItems || []);
+
+      // AUTO-PRINT: Automatically print order and prep list
+      console.log(`🖨️ Triggering auto-print for order ${savedOrderId}...`);
+      try {
+        const printResponse = await fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/auto-print-catering-order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            order_id: savedOrderId,
+            source_system: 'EZCATER'
+          })
+        });
+
+        const printResult = await printResponse.json();
+
+        if (printResult.success) {
+          console.log(`✅ Auto-print successful for order ${savedOrderId}`);
+        } else {
+          console.error(`⚠️  Auto-print failed for order ${savedOrderId}:`, printResult);
+          // Don't fail the webhook if printing fails - order is still saved
+        }
+      } catch (printError) {
+        console.error(`❌ Auto-print error for order ${savedOrderId}:`, printError);
+        // Don't fail the webhook if printing fails - order is still saved
+      }
     }
 
     // Return success response to EZCater

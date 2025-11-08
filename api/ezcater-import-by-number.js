@@ -142,6 +142,33 @@ export default async function handler(req, res) {
     // Save line items
     await saveLineItems(savedOrder.id, parsedOrder.ezcater_order_id, orderData.catererCart?.orderItems || []);
 
+    // AUTO-PRINT: Automatically print order and prep list
+    console.log(`🖨️ Triggering auto-print for manually imported order ${savedOrder.id}...`);
+    try {
+      const printResponse = await fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/auto-print-catering-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          order_id: savedOrder.id,
+          source_system: 'EZCATER_MANUAL'
+        })
+      });
+
+      const printResult = await printResponse.json();
+
+      if (printResult.success) {
+        console.log(`✅ Auto-print successful for manually imported order ${savedOrder.id}`);
+      } else {
+        console.error(`⚠️  Auto-print failed for manually imported order ${savedOrder.id}:`, printResult);
+        // Don't fail the import if printing fails - order is still saved
+      }
+    } catch (printError) {
+      console.error(`❌ Auto-print error for manually imported order ${savedOrder.id}:`, printError);
+      // Don't fail the import if printing fails - order is still saved
+    }
+
     return res.status(200).json({
       success: true,
       alreadyExists: false,
