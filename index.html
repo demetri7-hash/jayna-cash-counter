@@ -1726,7 +1726,7 @@
           </div>
 
           <!-- Action Buttons (Redesigned - Small Jayna Blue) -->
-          <div style="display: flex; gap: 12px; margin-bottom: 20px; justify-content: flex-start; flex-wrap: wrap;">
+          <div style="display: flex; gap: 12px; margin-bottom: 20px; justify-content: flex-start;">
             <button onclick="generatePrepSheetPDF()" style="
               background: #2196f3 !important;
               color: white !important;
@@ -1766,26 +1766,6 @@
               justify-content: center !important;
             " onmouseover="this.style.background='#1976d2'" onmouseout="this.style.background='#2196f3'">
               EMAIL TO PRINTER
-            </button>
-            <button onclick="printAllPrepItems()" style="
-              background: var(--gray-700) !important;
-              color: white !important;
-              border: 2px solid var(--gray-700) !important;
-              padding: 12px 24px !important;
-              font-size: 13px !important;
-              font-weight: 700 !important;
-              text-transform: uppercase !important;
-              letter-spacing: 0.5px !important;
-              cursor: pointer !important;
-              border-radius: 0 !important;
-              transition: all 0.2s !important;
-              box-sizing: border-box !important;
-              min-height: 44px !important;
-              display: inline-flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-            " onmouseover="this.style.background='var(--gray-900)'" onmouseout="this.style.background='var(--gray-700)'">
-              PRINT ALL
             </button>
           </div>
 
@@ -1862,7 +1842,7 @@
           </div>
 
           <!-- Action Buttons (Bottom - Duplicate) -->
-          <div style="display: flex; gap: 12px; margin-bottom: 20px; justify-content: flex-start; flex-wrap: wrap;">
+          <div style="display: flex; gap: 12px; margin-bottom: 20px; justify-content: flex-start;">
             <button onclick="generatePrepSheetPDF()" style="
               background: #2196f3 !important;
               color: white !important;
@@ -1902,26 +1882,6 @@
               justify-content: center !important;
             " onmouseover="this.style.background='#1976d2'" onmouseout="this.style.background='#2196f3'">
               EMAIL TO PRINTER
-            </button>
-            <button onclick="printAllPrepItems()" style="
-              background: var(--gray-700) !important;
-              color: white !important;
-              border: 2px solid var(--gray-700) !important;
-              padding: 12px 24px !important;
-              font-size: 13px !important;
-              font-weight: 700 !important;
-              text-transform: uppercase !important;
-              letter-spacing: 0.5px !important;
-              cursor: pointer !important;
-              border-radius: 0 !important;
-              transition: all 0.2s !important;
-              box-sizing: border-box !important;
-              min-height: 44px !important;
-              display: inline-flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-            " onmouseover="this.style.background='var(--gray-900)'" onmouseout="this.style.background='var(--gray-700)'">
-              PRINT ALL
             </button>
           </div>
 
@@ -20732,109 +20692,6 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       console.error('PDF generation error:', error);
       showMessage('Failed to generate PDF: ' + error.message, 'error');
       throw error;
-    }
-  }
-
-  /**
-   * Print all prep items in simple 3-column format
-   */
-  function printAllPrepItems() {
-    try {
-      // Get all prep items
-      const prepItems = orderingSystemState.items.filter(item =>
-        item.vendor === 'PREP' || item.itemType === 'prep'
-      );
-
-      if (prepItems.length === 0) {
-        showMessage('No prep items to print', 'warning');
-        return;
-      }
-
-      // Generate PDF
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-
-      // Title
-      doc.setFontSize(20);
-      doc.setFont('helvetica', 'bold');
-      doc.text('PREP ITEMS', 40, 50);
-
-      // Timestamp
-      const now = new Date();
-      const dateStr = now.toLocaleDateString('en-US', {
-        month: '2-digit',
-        day: '2-digit',
-        year: 'numeric'
-      });
-      const timeStr = now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
-
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Generated on: ${dateStr} at: ${timeStr}`, 40, 70);
-
-      // Prepare table data
-      const tableData = [];
-
-      prepItems.forEach(item => {
-        // Handle multi-location items
-        if (item.hasMultipleLocations && item.locationCounts) {
-          // Calculate total current stock across all locations
-          let totalStock = 0;
-          Object.values(item.locationCounts).forEach(locationData => {
-            totalStock += locationData.currentStock || 0;
-          });
-
-          tableData.push([
-            item.itemName,
-            totalStock.toString(),
-            (item.parLevel || 0).toString()
-          ]);
-        } else {
-          // Single location item
-          tableData.push([
-            item.itemName,
-            (item.currentStock || 0).toString(),
-            (item.parLevel || 0).toString()
-          ]);
-        }
-      });
-
-      // Generate table
-      doc.autoTable({
-        startY: 90,
-        head: [['Item Name', 'Current Count', 'Par']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: {
-          fillColor: [26, 26, 26],
-          fontSize: 12,
-          fontStyle: 'bold',
-          halign: 'left'
-        },
-        styles: {
-          fontSize: 10,
-          cellPadding: 8
-        },
-        columnStyles: {
-          0: { cellWidth: 300 }, // Item Name
-          1: { cellWidth: 100, halign: 'center' }, // Current Count
-          2: { cellWidth: 100, halign: 'center' }  // Par
-        },
-        margin: { left: 40, right: 40 }
-      });
-
-      // Save PDF
-      doc.save(`Prep_Items_${dateStr.replace(/\//g, '-')}.pdf`);
-
-      showMessage('✓ PDF generated successfully!', 'success');
-
-    } catch (error) {
-      console.error('Print all prep items error:', error);
-      showMessage('Failed to generate PDF: ' + error.message, 'error');
     }
   }
 
