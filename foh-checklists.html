@@ -4117,6 +4117,25 @@
               Auto-saving...
             </div>
             ` : ''}
+            <button
+              onclick="printBlankChecklist()"
+              style="
+                margin-top: 12px;
+                padding: 10px 20px;
+                background: var(--gray-700);
+                color: white;
+                border: 2px solid var(--gray-700);
+                border-radius: 0;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+              "
+              onmouseover="this.style.background='var(--gray-900)'"
+              onmouseout="this.style.background='var(--gray-700)'"
+            >🖨️ PRINT</button>
           </div>
         </div>
       </div>
@@ -6127,6 +6146,161 @@
       console.error('Error printing PDF:', error);
       hideLoading();
       showMessage('Error sending to printer: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Print BLANK checklist for staff to fill out
+   */
+  async function printBlankChecklist() {
+    try {
+      const currentChecklist = fohSystemState.currentChecklist;
+
+      if (!currentChecklist) {
+        showMessage('❌ No checklist selected', 'error');
+        return;
+      }
+
+      showLoading('Generating Checklist...', 'Creating PDF...');
+
+      // Create PDF
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+
+      const pageWidth = doc.internal.pageSize.width; // 612pt
+      const pageHeight = doc.internal.pageSize.height; // 792pt
+      const margin = 40;
+      let y = margin;
+
+      // Get current date and time in Pacific Time
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
+      const timeStr = now.toLocaleTimeString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }) + ' PT';
+
+      // ========== TITLE (ALL CAPS, BOLD, BLACK) ==========
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(0, 0, 0);
+      doc.text(currentChecklist.title.toUpperCase(), pageWidth / 2, y, { align: 'center' });
+      y += 30;
+
+      // ========== DATE AND TIME ==========
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      doc.text(dateStr, pageWidth / 2, y, { align: 'center' });
+      y += 18;
+      doc.text(timeStr, pageWidth / 2, y, { align: 'center' });
+      y += 30;
+
+      // ========== NAME LINES (2 LINES FOR STAFF TO WRITE) ==========
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Staff Names:', margin, y);
+      y += 20;
+
+      doc.setFont('helvetica', 'normal');
+      doc.text('1. ', margin, y);
+      doc.line(margin + 20, y + 2, pageWidth - margin, y + 2); // Underline
+      y += 25;
+
+      doc.text('2. ', margin, y);
+      doc.line(margin + 20, y + 2, pageWidth - margin, y + 2); // Underline
+      y += 35;
+
+      // ========== SECTIONS AND TASKS ==========
+      doc.setFontSize(10);
+
+      for (const section of currentChecklist.sections) {
+        // Check if we need a new page
+        if (y > pageHeight - 100) {
+          doc.addPage();
+          y = margin;
+        }
+
+        // Section Header
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text(section.title.toUpperCase(), margin, y);
+        y += 20;
+
+        // Tasks in this section
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+
+        for (const task of section.tasks) {
+          // Check if we need a new page
+          if (y > pageHeight - 60) {
+            doc.addPage();
+            y = margin;
+          }
+
+          // Task text (left side)
+          const taskText = task.text;
+          const maxWidth = pageWidth - margin - 80; // Leave room for checkbox
+          const lines = doc.splitTextToSize(taskText, maxWidth);
+
+          doc.text(lines, margin + 10, y);
+
+          // Empty checkbox (right side)
+          const checkboxSize = 12;
+          const checkboxX = pageWidth - margin - checkboxSize - 5;
+          const checkboxY = y - 10;
+          doc.rect(checkboxX, checkboxY, checkboxSize, checkboxSize); // Empty square
+
+          // Move y down based on number of lines
+          y += lines.length * 12 + 8;
+        }
+
+        y += 15; // Extra space between sections
+      }
+
+      hideLoading();
+
+      // ========== SEND TO PRINTER ==========
+      showLoading('Sending to printer...', 'Please wait...');
+
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      const filename = `${currentChecklist.title.replace(/\s+/g, '_')}_${dateStr.replace(/\s+/g, '_')}.pdf`;
+
+      // Send via backend Gmail API to Epson printer
+      const response = await fetch('/api/send-prep-sheet-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          pdfBase64: pdfBase64,
+          filename: filename,
+          subject: `FOH Checklist - ${currentChecklist.title} - ${dateStr}`,
+          toEmail: 'GSS4168CTJJA73@print.epsonconnect.com'
+        })
+      });
+
+      const result = await response.json();
+
+      hideLoading();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send to printer');
+      }
+
+      showMessage('✅ Checklist sent to printer successfully!', 'success');
+
+    } catch (error) {
+      console.error('Error printing blank checklist:', error);
+      hideLoading();
+      showMessage('❌ Error sending to printer: ' + error.message, 'error');
     }
   }
 
