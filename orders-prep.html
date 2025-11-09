@@ -11732,23 +11732,23 @@ async function refreshUpcomingOrdersUI(targetContainer) {
           1: { cellWidth: 100, halign: 'center' }, // Current Count
           2: { cellWidth: 100, halign: 'center' }  // Par
         },
-        margin: { left: 40, right: 40 },
-        didDrawPage: function(data) {
-          // Add page numbers at bottom of each page
-          const pageCount = doc.internal.getNumberOfPages();
-          const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
-
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(100);
-          doc.text(
-            `Page ${pageNumber} of ${pageCount}`,
-            doc.internal.pageSize.getWidth() / 2,
-            doc.internal.pageSize.getHeight() - 20,
-            { align: 'center' }
-          );
-        }
+        margin: { left: 40, right: 40 }
       });
+
+      // Add page numbers after table is complete (ensures correct total page count)
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100);
+        doc.text(
+          `Page ${i} of ${totalPages}`,
+          doc.internal.pageSize.getWidth() / 2,
+          doc.internal.pageSize.getHeight() - 20,
+          { align: 'center' }
+        );
+      }
 
       // Get PDF as base64
       const pdfBase64 = doc.output('datauristring').split(',')[1];
