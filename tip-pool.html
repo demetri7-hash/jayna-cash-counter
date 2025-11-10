@@ -1387,11 +1387,20 @@
     window.location.href = 'tip-pool.html';
   }
   // ===== TIP POOL CALCULATOR FUNCTIONS =====
-  
+
   // Global state for tip pool calculations
   let tipPoolRecords = [];
   let tipPoolSummary = {};
-  
+
+  // Track manually edited fields (prevents auto-fetch from overwriting user input)
+  const manuallyEditedFields = {
+    creditCardTips: false,
+    ezcaterTips: false,
+    calculatedCashTips: false,
+    ezcaterNetSales: false,
+    manualLaborCost: false
+  };
+
   // Predefined equity mapping - can be extended as needed
   const defaultEquity = {
     'Dokcu, Huseyin': 0.5,
@@ -1800,8 +1809,13 @@
       // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
       const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
 
-      // Update the display
-      document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
+      // Update the display (only if not manually edited)
+      if (!manuallyEditedFields.calculatedCashTips) {
+        document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
+        console.log(`✅ Cash tips auto-calculated: $${calculatedCashTips.toFixed(2)}`);
+      } else {
+        console.log(`📝 Skipping cash tips auto-calculate (user manually edited)`);
+      }
 
       // TDS Driver tips are now auto-fetched with other data when dates change (no delay!)
 
@@ -2010,8 +2024,13 @@
 
       const orderCount = ezCaterOrders.length;
 
-      // Auto-populate the ezCater tips field
-      document.getElementById('ezcaterTips').value = totalTips.toFixed(2);
+      // Auto-populate the ezCater tips field (only if not manually edited)
+      if (!manuallyEditedFields.ezcaterTips) {
+        document.getElementById('ezcaterTips').value = totalTips.toFixed(2);
+        console.log(`✅ EZCater tips auto-populated: $${totalTips.toFixed(2)}`);
+      } else {
+        console.log(`📝 Skipping EZCater tips auto-populate (user manually edited)`);
+      }
 
       // Update status div with success message
       if (orderCount > 0) {
@@ -2069,8 +2088,13 @@
 
       const orderCount = ezCaterOrders.length;
 
-      // Auto-populate the ezCater net sales field
-      document.getElementById('ezcaterNetSales').value = totalNetSales.toFixed(2);
+      // Auto-populate the ezCater net sales field (only if not manually edited)
+      if (!manuallyEditedFields.ezcaterNetSales) {
+        document.getElementById('ezcaterNetSales').value = totalNetSales.toFixed(2);
+        console.log(`✅ EZCater net sales auto-populated: $${totalNetSales.toFixed(2)}`);
+      } else {
+        console.log(`📝 Skipping EZCater net sales auto-populate (user manually edited)`);
+      }
 
       // Update status div with success message
       if (orderCount > 0) {
@@ -2426,17 +2450,22 @@
         netSales: salesResult.netSales
       };
 
-      // Auto-populate Credit Card Tips field
-      if (salesResult.creditTips) {
+      // Auto-populate Credit Card Tips field (only if not manually edited)
+      if (salesResult.creditTips && !manuallyEditedFields.creditCardTips) {
         document.getElementById('creditCardTips').value = salesResult.creditTips.toFixed(2);
         updateTipsSummary();
+        console.log(`✅ Credit card tips auto-populated: $${salesResult.creditTips.toFixed(2)}`);
+      } else if (manuallyEditedFields.creditCardTips) {
+        console.log(`📝 Skipping credit card tips auto-populate (user manually edited)`);
       }
 
-      // Auto-populate Labor Cost field
-      if (laborResult.totalLaborCost) {
+      // Auto-populate Labor Cost field (only if not manually edited)
+      if (laborResult.totalLaborCost && !manuallyEditedFields.manualLaborCost) {
         document.getElementById('manualLaborCost').value = laborResult.totalLaborCost.toFixed(2);
         updateSalesLaborSummary();
         console.log(`✅ Labor cost auto-populated: $${laborResult.totalLaborCost.toFixed(2)}`);
+      } else if (manuallyEditedFields.manualLaborCost) {
+        console.log(`📝 Skipping labor cost auto-populate (user manually edited)`);
       }
 
       // Hide status indicator (data auto-populates in fields)
@@ -2712,8 +2741,13 @@
       // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
       const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
 
-      // Update the cash tips display
-      document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
+      // Update the cash tips display (only if not manually edited)
+      if (!manuallyEditedFields.calculatedCashTips) {
+        document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
+        console.log(`✅ Cash tips auto-calculated: $${calculatedCashTips.toFixed(2)}`);
+      } else {
+        console.log(`📝 Skipping cash tips auto-calculate (user manually edited)`);
+      }
 
       // Calculate labor metrics
       const manualLaborCostInput = parseFloat(document.getElementById('manualLaborCost').value) || 0;
@@ -5196,6 +5230,19 @@
     setTimeout(() => {
       document.getElementById('tipPoolForm').classList.add('active');
     }, 100);
+
+    // Track manual edits to auto-populated fields
+    const trackableFields = ['creditCardTips', 'ezcaterTips', 'calculatedCashTips', 'ezcaterNetSales', 'manualLaborCost'];
+    trackableFields.forEach(fieldId => {
+      const field = document.getElementById(fieldId);
+      if (field) {
+        // Track when user manually types/edits the field
+        field.addEventListener('input', () => {
+          manuallyEditedFields[fieldId] = true;
+          console.log(`📝 User manually edited ${fieldId}`);
+        });
+      }
+    });
   });
 </script>
 
