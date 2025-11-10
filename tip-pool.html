@@ -978,6 +978,22 @@
             Cashbox <span id="cashboxSummaryAmount" style="color: #007bff; font-weight: 700;">$0.00</span>
           </summary>
           <div style="margin-top: 15px;">
+            <!-- Counter Selection -->
+            <div style="margin-bottom: 20px;">
+              <label for="tipPoolCashboxCounter" style="display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #666;">Who Counted Cashbox?</label>
+              <select id="tipPoolCashboxCounter" class="form-input" onchange="if(this.value === 'Other') { document.getElementById('tipPoolCashboxOtherNameDiv').style.display = 'block'; } else { document.getElementById('tipPoolCashboxOtherNameDiv').style.display = 'none'; }">
+                <option value="">Select Counter...</option>
+                <option value="Demetri Gregorakis">Demetri Gregorakis</option>
+                <option value="Katerina Perakis">Katerina Perakis</option>
+                <option value="Kayla Mccullough">Kayla Mccullough</option>
+                <option value="Other">Other</option>
+              </select>
+              <div id="tipPoolCashboxOtherNameDiv" style="display: none; margin-top: 10px;">
+                <label for="tipPoolCashboxOtherName" style="display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #666;">Other Counter Name:</label>
+                <input type="text" id="tipPoolCashboxOtherName" class="form-input" placeholder="Enter name...">
+              </div>
+            </div>
+
             <!-- Denomination Inputs -->
             <div id="tipPoolCashboxDenominationInputs" style="margin-top: 15px;">
               <h5 style="color: #666; margin-bottom: 15px;">Count by Denomination</h5>
@@ -1498,10 +1514,8 @@
   }
 
   function getTipPoolCashboxData() {
-    // Get counter name
     const counterSelect = document.getElementById('tipPoolCashboxCounter');
 
-    // If element doesn't exist, return null (cashbox count is optional)
     if (!counterSelect) {
       return null;
     }
@@ -1513,20 +1527,16 @@
       counterName = otherNameInput ? otherNameInput.value : '';
     }
 
-    // If no counter selected, return null (cashbox count is optional)
     if (!counterName) {
       return null;
     }
 
-    // Get total
     const total = calculateTipPoolCashboxTotal();
 
-    // If total is 0, return null
     if (total === 0) {
       return null;
     }
 
-    // Get denominations
     const denominations = {
       hundreds: parseInt(document.getElementById('tipPool_cashbox_hundreds').value) || 0,
       fifties: parseInt(document.getElementById('tipPool_cashbox_fifties').value) || 0,
@@ -1540,8 +1550,15 @@
       pennies: parseInt(document.getElementById('tipPool_cashbox_pennies').value) || 0
     };
 
+    // Calculate Monday after the week ends (cashbox counted on Monday after Sunday)
+    const endDate = document.getElementById('tipPoolEndDate').value;
+    const weekEndDate = new Date(endDate + 'T12:00:00');
+    const mondayAfter = new Date(weekEndDate);
+    mondayAfter.setDate(mondayAfter.getDate() + 1);
+    const cashboxCountDate = mondayAfter.toISOString().split('T')[0];
+
     return {
-      date: new Date().toISOString().split('T')[0],
+      date: cashboxCountDate,
       counter: counterName,
       total: total,
       denominations: denominations
