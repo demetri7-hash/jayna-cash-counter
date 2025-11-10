@@ -496,7 +496,7 @@ async function sendOrderEmail(order, orderDate) {
   if (includePDF) {
     try {
       const pdfBase64 = await generateOrderingGuidePDF(order.vendor, order.items);
-      const filename = `${order.vendor.replace(/\s+/g, '_')}_Ordering_Guide_${orderDate.toISOString().split('T')[0]}.pdf`;
+      const filename = `${order.vendor.replace(/\s+/g, '_')}_Item_List_${orderDate.toISOString().split('T')[0]}.pdf`;
 
       mailOptions.attachments = [{
         filename: filename,
@@ -766,71 +766,29 @@ async function logOrderToDatabase(order, orderDate, status, errorMessage = null)
 }
 
 /**
- * Generate ordering guide PDF (2 pages: blank guide + inventory reference)
+ * Generate ordering guide PDF (VENDOR ITEM LIST ONLY - no blank worksheet)
  */
 async function generateOrderingGuidePDF(vendorName, orderItems) {
   const { jsPDF } = await import('jspdf');
   await import('jspdf-autotable');
-  
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-  
+
   const today = new Date().toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric'
   });
 
-  // PAGE 1: Blank ordering guide with 35 rows
-  doc.setFontSize(18);
+  // SINGLE PAGE: Complete inventory list from database
+  doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(`${vendorName} Ordering Guide`, 40, 40);
+  doc.text(`${vendorName} - Item List`, 40, 40);
 
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Date: ${today}`, 40, 60);
-  doc.text('Jayna Gyro - Internal Use Only', 40, 75);
-
-  const tableData = [];
-  for (let i = 0; i < 35; i++) {
-    tableData.push(['', '', '', '']); // Empty rows for manual filling
-  }
-
-  doc.autoTable({
-    head: [['QTY NEEDED', 'QTY ON HAND', 'ITEM NAME', 'ITEM #']],
-    body: tableData,
-    startY: 95,
-    theme: 'grid',
-    styles: {
-      fontSize: 10,
-      cellPadding: 8,
-      lineColor: [200, 200, 200],
-      lineWidth: 0.5
-    },
-    headStyles: {
-      fillColor: [74, 74, 74],
-      textColor: 255,
-      fontStyle: 'bold',
-      halign: 'center'
-    },
-    columnStyles: {
-      0: { cellWidth: 80, halign: 'center' },  // QTY NEEDED
-      1: { cellWidth: 80, halign: 'center' },  // QTY ON HAND
-      2: { cellWidth: 280 },                   // ITEM NAME
-      3: { cellWidth: 80, halign: 'center' }   // ITEM #
-    },
-    margin: { left: 40, right: 40 }
-  });
-
-  // PAGE 2: Complete inventory list from database
-  doc.addPage();
-
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${vendorName} - Complete Inventory Reference`, 40, 40);
-
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Full list of all inventory items for this vendor', 40, 55);
+  doc.text(`Generated: ${today}`, 40, 60);
+  doc.text('Full list of all inventory items for this vendor', 40, 75);
 
   // Load ALL inventory items for this vendor from database
   const { data: vendorItems, error: inventoryError } = await supabase
@@ -860,7 +818,7 @@ async function generateOrderingGuidePDF(vendorName, orderItems) {
     doc.autoTable({
       head: [['ITEM NAME', 'CURRENT STOCK', 'PAR', 'LAST COUNT']],
       body: inventoryTableData,
-      startY: 70,
+      startY: 90,
       theme: 'grid',
       styles: {
         fontSize: 7,
