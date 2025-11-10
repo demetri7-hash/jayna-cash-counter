@@ -3775,20 +3775,21 @@
       doc.setLineWidth(0.5);
       doc.line(margin, currentY + 56, pageWidth - margin, currentY + 56); // Reduced spacing
       
-      // Calculate cash report totals using same logic
+      // Calculate cash report totals
       let totalToastSalesReported = 0;
-      let totalActualCashIn = 0;
-      let totalDiscrepancy = 0;
       let totalEnvelopeDeposits = 0;
       let totalBackToCashbox = 0;
 
       cashData.forEach(day => {
         totalToastSalesReported += day.pm_toast_sales || 0;
-        totalActualCashIn += (day.pm_total - day.am_total) || 0;
-        totalDiscrepancy += day.pm_discrepancy || 0;
         totalEnvelopeDeposits += day.pm_deposit_amount || 0;
         totalBackToCashbox += (day.pm_amount_to_keep - day.am_total) || 0;
       });
+
+      // Since we reconcile discrepancies each night by adjusting cash tips,
+      // Actual Cash In ALWAYS equals Toast Cash Sales (discrepancy is always zero)
+      const totalActualCashIn = totalToastSalesReported;
+      const totalDiscrepancy = 0;
 
       // Summary section: arrange entries in three columns with tighter spacing
       doc.setFontSize(7);   // Further reduced for better fit
@@ -4597,25 +4598,24 @@
       employees.sort((a, b) => a.first.localeCompare(b.first));
 
       employees.forEach((employee, index) => {
-        const rowHeight = 24; // Increased to 24 for better spacing
+        const rowHeight = 26;
         const yPos = currentY + (index * rowHeight);
 
-        // Alternating row background - properly aligned with row
+        // Alternating row background
         if (index % 2 === 1) {
-          doc.setFillColor(232, 240, 254); // Light blue background
-          // Draw rectangle starting from top of row, spanning full row height
-          doc.rect(margin - 5, yPos - 4, pageWidth - 2 * margin + 10, rowHeight, 'F');
+          doc.setFillColor(232, 240, 254);
+          doc.rect(margin - 5, yPos, pageWidth - 2 * margin + 10, rowHeight, 'F');
         }
 
-        // Employee name - positioned near top of row
+        // Employee name
         doc.setTextColor(0, 0, 0);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
-        doc.text(`${employee.first} ${employee.last}`, margin, yPos + 6);
+        doc.text(`${employee.first} ${employee.last}`, margin, yPos + 8);
 
-        // Signature line - positioned BELOW the name to leave room for signature
+        // Signature line
         doc.setDrawColor(0, 0, 0);
-        doc.line(margin + 250, yPos + 14, pageWidth - margin - 10, yPos + 14);
+        doc.line(margin + 250, yPos + 16, pageWidth - margin - 10, yPos + 16);
       });
       
       return doc;
