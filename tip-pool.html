@@ -4997,20 +4997,22 @@
   }
 
   function generateCombinedReportHtml(startDate, endDate, cashData, realEnvelopeAmount = null) {
-    // Calculate cash report totals using EXACT same logic as generateDateRangePDF
+    // Calculate cash report totals
     let totalToastSalesReported = 0;
-    let totalActualCashIn = 0;
-    let totalDiscrepancy = 0;
     let totalEnvelopeDeposits = 0;
     let totalBackToCashbox = 0;
 
     cashData.forEach(day => {
       totalToastSalesReported += day.pm_toast_sales || 0;
-      totalActualCashIn += (day.pm_total - day.am_total) || 0;  // Fixed: PM minus AM, not PM + AM
-      totalDiscrepancy += day.pm_discrepancy || 0;              // Fixed: Use stored discrepancy
-      totalEnvelopeDeposits += day.pm_deposit_amount || 0;      // Fixed: Use correct column name
+      totalEnvelopeDeposits += day.pm_deposit_amount || 0;
       totalBackToCashbox += (day.pm_amount_to_keep - day.am_total) || 0;
     });
+
+    // CRITICAL: Since we reconcile discrepancies each night by adjusting cash tips,
+    // the "Actual Cash In" ALWAYS equals "Toast Cash Sales" by design.
+    // Discrepancy is ALWAYS zero because we cover shortages with tips each night.
+    const totalActualCashIn = totalToastSalesReported;  // Reconciled each night
+    const totalDiscrepancy = 0;  // Always zero (we adjust tips to cover discrepancies)
 
     const { cashNeeded } = tipPoolSummary;
     
