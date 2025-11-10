@@ -1593,6 +1593,86 @@
     }
   }
 
+  async function getCashboxReconciliation(currentTotal) {
+    try {
+      const { data, error } = await supabase
+        .from('cashbox_counts')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(2);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        return {
+          isFirstCount: true,
+          currentTotal: currentTotal,
+          message: 'First cashbox count recorded - baseline established'
+        };
+      }
+
+      if (data.length === 1) {
+        return {
+          isFirstCount: true,
+          currentTotal: currentTotal,
+          previousTotal: null,
+          message: 'Second cashbox count - reconciliation will begin next week'
+        };
+      }
+
+      const current = data[0];
+      const previous = data[1];
+
+      const { data: discrepancyData, error: discrepancyError } = await supabase
+        .from('cash_counts')
+        .select('pm_discrepancy, pm_amount_to_keep, am_total, date')
+        .gte('date', previous.date)
+        .lt('date', current.date)
+        .not('pm_discrepancy', 'is', null)
+        .order('date', { ascending: true });
+
+      if (discrepancyError) throw discrepancyError;
+
+      const totalDiscrepancies = discrepancyData ?
+        discrepancyData.reduce((sum, day) => sum + (day.pm_discrepancy || 0), 0) : 0;
+
+      const totalExcessReturned = discrepancyData ?
+        discrepancyData.reduce((sum, day) => {
+          const pmKeep = day.pm_amount_to_keep || 0;
+          const amTotal = day.am_total || 0;
+          const dailyExcess = pmKeep - amTotal;
+          return sum + dailyExcess;
+        }, 0) : 0;
+
+      const expectedEnding = previous.total + totalDiscrepancies + totalExcessReturned;
+      const actualVariance = currentTotal - expectedEnding;
+
+      return {
+        isFirstCount: false,
+        currentTotal: currentTotal,
+        currentDate: new Date(current.date).toLocaleDateString(),
+        previousTotal: previous.total,
+        previousDate: new Date(previous.date).toLocaleDateString(),
+        totalDiscrepancies: totalDiscrepancies,
+        totalExcessReturned: totalExcessReturned,
+        expectedEnding: expectedEnding,
+        actualVariance: actualVariance,
+        discrepancyDays: discrepancyData ? discrepancyData.length : 0,
+        reconciliationStatus: Math.abs(actualVariance) < 0.01 ? 'BALANCED' :
+                             actualVariance > 0 ? 'OVERAGE' : 'SHORTAGE',
+        message: Math.abs(actualVariance) < 0.01 ?
+                'Perfect reconciliation! Cashbox balances correctly.' :
+                actualVariance > 0 ?
+                `Unexplained overage of $${actualVariance.toFixed(2)}` :
+                `Unexplained shortage of $${Math.abs(actualVariance).toFixed(2)}`
+      };
+
+    } catch (error) {
+      console.error('Error getting cashbox reconciliation:', error);
+      return null;
+    }
+  }
+
   // Save combined report data to localStorage
   function saveCombinedReportData() {
     try {
