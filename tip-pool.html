@@ -4263,14 +4263,14 @@
             doc.text(label, rightBoxX + 5, laborY);
             doc.setFont('helvetica', 'bold');
             doc.text(value, rightBoxX + boxWidth - 5, laborY, { align: 'right' });
-            laborY += 8.5; // Increased spacing for better readability
+            laborY += 8; // Reduced slightly for tighter spacing
           });
 
           // Line before total
           doc.setLineWidth(0.5);
           doc.setDrawColor(200, 200, 200);
           doc.line(rightBoxX + 5, laborY + 1, rightBoxX + boxWidth - 5, laborY + 1);
-          laborY += 8; // Increased spacing
+          laborY += 7; // Reduced spacing
 
           // True Total Labor Cost
           doc.setFont('helvetica', 'bold');
@@ -4278,45 +4278,58 @@
           doc.setTextColor(0, 0, 0);
           doc.text('True Total Labor Cost:', rightBoxX + 5, laborY);
           doc.text(`$${ld.trueTotalLaborCost.toFixed(2)}`, rightBoxX + boxWidth - 5, laborY, { align: 'right' });
-          laborY += 11; // Increased spacing before Net Sales section
+          laborY += 10; // Spacing before Net Sales section
 
-          // Net Sales and Labor %
+          // Net Sales and Labor % - FIXED LAYOUT
           const isOverBudget = ld.laborVariance > 0;
           const textColor = isOverBudget ? [220, 53, 69] : [40, 167, 69];
 
-          // Background bar
+          // Background bar - increased height to accommodate all content
           doc.setFillColor(245, 245, 245);
-          doc.rect(rightBoxX + 5, laborY, boxWidth - 10, 18, 'F'); // Reduced from 24
+          const barHeight = ld.usingEzcaterSales ? 24 : 18; // Taller if showing EZCater breakdown
+          doc.rect(rightBoxX + 5, laborY, boxWidth - 10, barHeight, 'F');
 
+          // NET SALES - first line
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6); // Reduced from 7
+          doc.setFontSize(6);
           doc.setTextColor(0, 0, 0);
           doc.text(`NET SALES${ld.usingEzcaterSales ? ' (incl. EZCater)' : ''}`, rightBoxX + 10, laborY + 5);
           doc.setFont('helvetica', 'bold');
           doc.text(`$${ld.netSales.toFixed(2)}`, rightBoxX + boxWidth - 10, laborY + 5, { align: 'right' });
 
-          // Show EZCater breakdown if applicable
+          // Show EZCater breakdown if applicable - second line
           if (ld.usingEzcaterSales) {
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(5);
             doc.setTextColor(100, 100, 100);
-            doc.text(`Base: $${ld.baseNetSales.toFixed(2)} + EZCater: $${ld.ezcaterSales.toFixed(2)}`, rightBoxX + 10, laborY + 9);
+            doc.text(`Base: $${ld.baseNetSales.toFixed(2)} + EZCater: $${ld.ezcaterSales.toFixed(2)}`, rightBoxX + 10, laborY + 11);
+
+            // LABOR PERCENTAGE - third line (only if EZCater)
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(6);
+            doc.text('LABOR PERCENTAGE', rightBoxX + 10, laborY + 17);
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(7.5);
+            doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+            doc.text(`${ld.laborPercentage.toFixed(2)}%`, rightBoxX + boxWidth - 10, laborY + 17, { align: 'right' });
+          } else {
+            // LABOR PERCENTAGE - second line (if no EZCater)
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(6);
+            doc.setTextColor(100, 100, 100);
+            doc.text('LABOR PERCENTAGE', rightBoxX + 10, laborY + 12);
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(7.5);
+            doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+            doc.text(`${ld.laborPercentage.toFixed(2)}%`, rightBoxX + boxWidth - 10, laborY + 12, { align: 'right' });
           }
 
+          // Variance note (smaller) - positioned below the bar
+          laborY += barHeight + 6; // Position below bar
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6); // Reduced from 7
-          doc.setTextColor(100, 100, 100);
-          doc.text('LABOR PERCENTAGE', rightBoxX + 10, laborY + 11);
-
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(7.5); // Reduced from 9
-          doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-          doc.text(`${ld.laborPercentage.toFixed(2)}%`, rightBoxX + boxWidth - 10, laborY + 11, { align: 'right' });
-
-          // Variance note (smaller)
-          laborY += 20; // Reduced from 26
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(5.5); // Reduced from 6
+          doc.setFontSize(5.5);
           doc.setTextColor(100, 100, 100);
           const varianceText = `Target: 30.00% | ${ld.laborVariance > 0 ? '+' : ''}${ld.laborVariance.toFixed(2)}% ${isOverBudget ? 'over' : 'under'}`;
           doc.text(varianceText, rightBoxX + boxWidth / 2, laborY, { align: 'center' });
@@ -4588,24 +4601,25 @@
       employees.sort((a, b) => a.first.localeCompare(b.first));
 
       employees.forEach((employee, index) => {
-        const rowHeight = 22; // Reduced from 25 to 22
+        const rowHeight = 24; // Increased to 24 for better spacing
         const yPos = currentY + (index * rowHeight);
 
-        // Alternating row background - aligned with text baseline
+        // Alternating row background - properly aligned with row
         if (index % 2 === 1) {
           doc.setFillColor(232, 240, 254); // Light blue background
-          doc.rect(margin - 5, yPos - 8, pageWidth - 2 * margin + 10, rowHeight, 'F');
+          // Draw rectangle starting from top of row, spanning full row height
+          doc.rect(margin - 5, yPos - 4, pageWidth - 2 * margin + 10, rowHeight, 'F');
         }
 
-        // Employee name
+        // Employee name - positioned near top of row
         doc.setTextColor(0, 0, 0);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
-        doc.text(`${employee.first} ${employee.last}`, margin, yPos);
+        doc.text(`${employee.first} ${employee.last}`, margin, yPos + 6);
 
-        // Signature line - positioned at same baseline as employee name for signing on top
+        // Signature line - positioned BELOW the name to leave room for signature
         doc.setDrawColor(0, 0, 0);
-        doc.line(margin + 250, yPos, pageWidth - margin - 10, yPos);
+        doc.line(margin + 250, yPos + 14, pageWidth - margin - 10, yPos + 14);
       });
       
       return doc;
