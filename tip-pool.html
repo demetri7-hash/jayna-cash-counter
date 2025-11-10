@@ -1392,15 +1392,6 @@
   let tipPoolRecords = [];
   let tipPoolSummary = {};
 
-  // Track manually edited fields (prevents auto-fetch from overwriting user input)
-  const manuallyEditedFields = {
-    creditCardTips: false,
-    ezcaterTips: false,
-    calculatedCashTips: false,
-    ezcaterNetSales: false,
-    manualLaborCost: false
-  };
-
   // Predefined equity mapping - can be extended as needed
   const defaultEquity = {
     'Dokcu, Huseyin': 0.5,
@@ -2024,13 +2015,9 @@
 
       const orderCount = ezCaterOrders.length;
 
-      // Auto-populate the ezCater tips field (only if not manually edited)
-      if (!manuallyEditedFields.ezcaterTips) {
-        document.getElementById('ezcaterTips').value = totalTips.toFixed(2);
-        console.log(`✅ EZCater tips auto-populated: $${totalTips.toFixed(2)}`);
-      } else {
-        console.log(`📝 Skipping EZCater tips auto-populate (user manually edited)`);
-      }
+      // Auto-populate the ezCater tips field
+      document.getElementById('ezcaterTips').value = totalTips.toFixed(2);
+      console.log(`✅ EZCater tips auto-populated: $${totalTips.toFixed(2)}`);
 
       // Update status div with success message
       if (orderCount > 0) {
@@ -2088,13 +2075,9 @@
 
       const orderCount = ezCaterOrders.length;
 
-      // Auto-populate the ezCater net sales field (only if not manually edited)
-      if (!manuallyEditedFields.ezcaterNetSales) {
-        document.getElementById('ezcaterNetSales').value = totalNetSales.toFixed(2);
-        console.log(`✅ EZCater net sales auto-populated: $${totalNetSales.toFixed(2)}`);
-      } else {
-        console.log(`📝 Skipping EZCater net sales auto-populate (user manually edited)`);
-      }
+      // Auto-populate the ezCater net sales field
+      document.getElementById('ezcaterNetSales').value = totalNetSales.toFixed(2);
+      console.log(`✅ EZCater net sales auto-populated: $${totalNetSales.toFixed(2)}`);
 
       // Update status div with success message
       if (orderCount > 0) {
@@ -2450,22 +2433,18 @@
         netSales: salesResult.netSales
       };
 
-      // Auto-populate Credit Card Tips field (only if not manually edited)
-      if (salesResult.creditTips && !manuallyEditedFields.creditCardTips) {
+      // Auto-populate Credit Card Tips field
+      if (salesResult.creditTips) {
         document.getElementById('creditCardTips').value = salesResult.creditTips.toFixed(2);
         updateTipsSummary();
         console.log(`✅ Credit card tips auto-populated: $${salesResult.creditTips.toFixed(2)}`);
-      } else if (manuallyEditedFields.creditCardTips) {
-        console.log(`📝 Skipping credit card tips auto-populate (user manually edited)`);
       }
 
-      // Auto-populate Labor Cost field (only if not manually edited)
-      if (laborResult.totalLaborCost && !manuallyEditedFields.manualLaborCost) {
+      // Auto-populate Labor Cost field
+      if (laborResult.totalLaborCost) {
         document.getElementById('manualLaborCost').value = laborResult.totalLaborCost.toFixed(2);
         updateSalesLaborSummary();
         console.log(`✅ Labor cost auto-populated: $${laborResult.totalLaborCost.toFixed(2)}`);
-      } else if (manuallyEditedFields.manualLaborCost) {
-        console.log(`📝 Skipping labor cost auto-populate (user manually edited)`);
       }
 
       // Hide status indicator (data auto-populates in fields)
@@ -2705,7 +2684,7 @@
         throw new Error('No cash count data found for this date range');
       }
 
-      // Get data from either files OR API
+      // Get data from either files OR input fields (which may be auto-populated OR manually edited)
       let payrollData, creditTips, cashSales, netSales;
 
       if (hasFiles) {
@@ -2717,12 +2696,23 @@
         cashSales = salesData.cashSales;
         netSales = salesData.netSales;
       } else {
-        // Use API-fetched data
-        console.log('Using API-fetched data...');
+        // Read directly from input fields (respects both auto-populated AND manual edits)
+        console.log('Reading values from input fields...');
         payrollData = apiFetchedData.laborData;
-        creditTips = apiFetchedData.salesData.creditTips;
+
+        // CRITICAL: Read from input fields, not cached API data
+        // This ensures manual edits are respected
+        creditTips = parseFloat(document.getElementById('creditCardTips').value) || 0;
+
+        // For cash sales, use API data (not user-editable)
         cashSales = apiFetchedData.salesData.cashSales;
-        netSales = apiFetchedData.salesData.netSales;
+
+        // For net sales, check if manual override exists, otherwise use API
+        const manualNetSales = parseFloat(document.getElementById('manualNetSales').value) || 0;
+        netSales = manualNetSales > 0 ? manualNetSales : apiFetchedData.salesData.netSales;
+
+        console.log(`Credit Tips from field: $${creditTips.toFixed(2)}`);
+        console.log(`Net Sales: $${netSales.toFixed(2)} ${manualNetSales > 0 ? '(manual override)' : '(API)'}`);
       }
 
       // Calculate total Toast cash sales
@@ -2739,15 +2729,11 @@
       }
 
       // Calculate cash tips: Real Envelope Deposit - Toast Cash Sales
-      const calculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
+      const autoCalculatedCashTips = realEnvelopeDeposit - totalToastCashSales;
 
-      // Update the cash tips display (only if not manually edited)
-      if (!manuallyEditedFields.calculatedCashTips) {
-        document.getElementById('calculatedCashTips').value = calculatedCashTips.toFixed(2);
-        console.log(`✅ Cash tips auto-calculated: $${calculatedCashTips.toFixed(2)}`);
-      } else {
-        console.log(`📝 Skipping cash tips auto-calculate (user manually edited)`);
-      }
+      // Update the cash tips display
+      document.getElementById('calculatedCashTips').value = autoCalculatedCashTips.toFixed(2);
+      console.log(`✅ Cash tips auto-calculated: $${autoCalculatedCashTips.toFixed(2)}`);
 
       // Calculate labor metrics
       const manualLaborCostInput = parseFloat(document.getElementById('manualLaborCost').value) || 0;
@@ -2794,12 +2780,22 @@
       const industryBenchmark = 30.0;
       const laborVariance = laborPercentage - industryBenchmark;
 
-      // Compute tip pool using calculated cash tips + previous variance carryover + previous cash surplus
+      // CRITICAL: Read final values from input fields (respects both auto-populated AND manual edits)
+      const finalCashTips = parseFloat(document.getElementById('calculatedCashTips').value) || 0;
+      const finalEzcaterTips = parseFloat(document.getElementById('ezcaterTips').value) || 0;
+      const finalCreditTips = parseFloat(document.getElementById('creditCardTips').value) || 0;
+
+      console.log(`Final values used for tip pool calculation:`);
+      console.log(`  Cash Tips: $${finalCashTips.toFixed(2)}`);
+      console.log(`  Credit Tips: $${finalCreditTips.toFixed(2)}`);
+      console.log(`  EZCater Tips: $${finalEzcaterTips.toFixed(2)}`);
+
+      // Compute tip pool using values from input fields (respects manual edits)
       const result = computeTipPool(
         payrollData,
-        creditTips,
-        calculatedCashTips,
-        ezcaterTips,
+        finalCreditTips,
+        finalCashTips,
+        finalEzcaterTips,
         tdsDriverTips,
         cashSales,
         previousVariance,
@@ -5232,19 +5228,6 @@
     setTimeout(() => {
       document.getElementById('tipPoolForm').classList.add('active');
     }, 100);
-
-    // Track manual edits to auto-populated fields
-    const trackableFields = ['creditCardTips', 'ezcaterTips', 'calculatedCashTips', 'ezcaterNetSales', 'manualLaborCost'];
-    trackableFields.forEach(fieldId => {
-      const field = document.getElementById(fieldId);
-      if (field) {
-        // Track when user manually types/edits the field
-        field.addEventListener('input', () => {
-          manuallyEditedFields[fieldId] = true;
-          console.log(`📝 User manually edited ${fieldId}`);
-        });
-      }
-    });
   });
 </script>
 
