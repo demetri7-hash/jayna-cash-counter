@@ -3610,6 +3610,14 @@
       warningIcon = '';
     }
     
+    // Add recount notice for any discrepancy above $3
+    let recountNotice = '';
+    if (absDiscrepancy > 3) {
+      recountNotice = `<div style="background: rgba(23, 162, 184, 0.1); padding: 10px; border-radius: 0; font-size: 13px; margin-top: 10px; border-left: 3px solid #17a2b8;">
+        <strong>💡 Tip:</strong> Please recount your drawers, and if you still have a discrepancy, try to press the <strong>"RETRY"</strong> button above to make sure Toast Cash Sales are up to date.
+      </div>`;
+    }
+
     // Add special message for negative discrepancies
     let negativeWarning = '';
     if (discrepancy < 0) {
@@ -3617,11 +3625,11 @@
         <strong>Cash Tips Impact:</strong> This ${Math.abs(discrepancy).toFixed(2)} shortage will be deducted from cash tips. Please verify your count is accurate.
       </div>`;
     }
-    
+
     discrepancyDisplay.style.border = `2px solid ${borderColor}`;
     discrepancyDisplay.style.background = backgroundColor;
     discrepancyDisplay.style.color = textColor;
-    
+
     discrepancyDisplay.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <span style="font-weight: 700; font-size: 16px;">${warningIcon} Cash vs Toast Validation</span>
@@ -3629,7 +3637,7 @@
           ${warningLevel}
         </span>
       </div>
-      
+
       <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 15px 0; text-align: center;">
         <div>
           <div style="font-size: 12px; opacity: 0.8;">Net Cash Change</div>
@@ -3649,11 +3657,12 @@
           <div style="font-size: 11px; opacity: 0.7;">${discrepancy >= 0 ? 'Overage' : 'Shortage'}</div>
         </div>
       </div>
-      
+
       <div style="background: rgba(${borderColor === '#28a745' ? '40, 167, 69' : borderColor === '#ffc107' ? '255, 193, 7' : '220, 53, 69'}, 0.1); padding: 10px; border-radius: 0; font-size: 13px; text-align: center;">
         <strong>${warningMessage}</strong>
       </div>
-      
+
+      ${recountNotice}
       ${negativeWarning}
     `;
   }
