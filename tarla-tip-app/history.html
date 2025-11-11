@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report History - TipShare</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+  <!-- Navigation Header -->
+  <nav class="bg-white shadow-md mb-6">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex space-x-8">
+          <a href="index.html" class="text-slate-600 hover:text-blue-600 font-semibold transition-colors">
+            Calculate New Report
+          </a>
+          <a href="history.html" class="text-blue-600 hover:text-blue-800 font-semibold border-b-2 border-blue-600 transition-colors">
+            View History
+          </a>
+          <a href="roster.html" class="text-slate-600 hover:text-blue-600 font-semibold transition-colors">
+            Manage Roster
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <div class="max-w-4xl mx-auto p-4 sm:p-6 lg:px-8">
+
+    <!-- Page Header -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h1 class="text-2xl font-bold text-slate-900 mb-2">Report History</h1>
+      <p class="text-slate-600">View all past shift reports and individual payouts</p>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="bg-white rounded-lg shadow-md p-8 text-center">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <p class="text-slate-600 mt-2">Loading reports...</p>
+    </div>
+
+    <!-- History Table -->
+    <div id="history-container" class="hidden bg-white rounded-lg shadow-md p-6">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Shift</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Total Sales</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Total Tips</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Pool Total</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body" class="bg-white divide-y divide-slate-200">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden bg-white rounded-lg shadow-md p-8 text-center">
+      <p class="text-slate-500 mb-4">No reports found. <a href="index.html" class="text-blue-600 hover:underline">Create your first report</a></p>
+    </div>
+
+  </div>
+
+  <!-- Report Detail Modal -->
+  <div id="report-modal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+
+      <!-- Modal Header -->
+      <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+        <h3 id="modal-title" class="text-xl font-bold text-slate-900">Report Details</h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6">
+
+        <!-- Summary Card -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div>
+            <p class="text-sm text-slate-600">Date</p>
+            <p id="modal-date" class="text-lg font-semibold text-slate-900">-</p>
+          </div>
+          <div>
+            <p class="text-sm text-slate-600">Shift</p>
+            <p id="modal-shift" class="text-lg font-semibold text-slate-900">-</p>
+          </div>
+          <div>
+            <p class="text-sm text-slate-600">Total Net Sales</p>
+            <p id="modal-total-sales" class="text-lg font-semibold text-slate-900">$0.00</p>
+          </div>
+          <div>
+            <p class="text-sm text-slate-600">Total CC Tips</p>
+            <p id="modal-total-tips" class="text-lg font-semibold text-slate-900">$0.00</p>
+          </div>
+        </div>
+
+        <div class="bg-blue-50 border-2 border-blue-200 rounded-md p-4 mb-6">
+          <p class="text-sm text-blue-700 font-medium">Support Pool Total</p>
+          <p id="modal-support-pool" class="text-2xl font-bold text-blue-900">$0.00</p>
+        </div>
+
+        <!-- Detailed Payout Table -->
+        <h4 class="text-lg font-semibold text-slate-900 mb-4">Individual Payouts</h4>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Role</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Net Sales</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">CC Tips</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Tip Out</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Tip In</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase font-bold">Final Payout</th>
+              </tr>
+            </thead>
+            <tbody id="modal-table-body" class="bg-white divide-y divide-slate-200">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="bg-slate-50 px-6 py-4 border-t border-slate-200 flex justify-end gap-4">
+        <button onclick="closeModal()" class="bg-slate-200 text-slate-700 font-semibold py-2 px-6 rounded-md shadow-sm hover:bg-slate-300 transition-colors">
+          Close
+        </button>
+        <button onclick="window.print()" class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-md shadow-sm hover:bg-blue-700 transition-colors">
+          Print Report
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Supabase Client -->
+  <script src="./supabase-client.js"></script>
+
+  <!-- Page Logic -->
+  <script>
+    const supabase = window.supabaseClient;
+
+    // On page load
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchShiftHistory();
+    });
+
+    /**
+     * Fetch all shift reports from database
+     */
+    async function fetchShiftHistory() {
+      console.log('📥 Fetching shift history...');
+
+      const { data, error } = await supabase
+        .from('Tarla_Shifts')
+        .select('*')
+        .order('tarla_shift_date', { ascending: false })
+        .order('tarla_id', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error fetching history:', error);
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('empty-state').classList.remove('hidden');
+        return;
+      }
+
+      console.log('✅ Fetched history:', data);
+      renderHistoryTable(data);
+    }
+
+    /**
+     * Render history table
+     */
+    function renderHistoryTable(shifts) {
+      const tbody = document.getElementById('history-table-body');
+      const loading = document.getElementById('loading');
+      const container = document.getElementById('history-container');
+      const emptyState = document.getElementById('empty-state');
+
+      loading.classList.add('hidden');
+
+      if (!shifts || shifts.length === 0) {
+        container.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      container.classList.remove('hidden');
+
+      tbody.innerHTML = '';
+
+      shifts.forEach(shift => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">${shift.tarla_shift_date}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+              shift.tarla_shift_period === 'AM' ? 'bg-yellow-100 text-yellow-800' : 'bg-purple-100 text-purple-800'
+            }">
+              ${shift.tarla_shift_period}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-900">$${parseFloat(shift.tarla_total_net_sales).toFixed(2)}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-900">$${parseFloat(shift.tarla_total_cc_tips).toFixed(2)}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-blue-600">$${parseFloat(shift.tarla_total_support_pool).toFixed(2)}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <button onclick="viewReport(${shift.tarla_id})" class="text-blue-600 hover:text-blue-900">View Details</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    /**
+     * View report details in modal
+     */
+    async function viewReport(shiftId) {
+      console.log('👁️ Viewing report:', shiftId);
+
+      // Fetch shift header
+      const { data: shift, error: shiftError } = await supabase
+        .from('Tarla_Shifts')
+        .select('*')
+        .eq('tarla_id', shiftId)
+        .single();
+
+      if (shiftError) {
+        console.error('❌ Error fetching shift:', shiftError);
+        alert('Failed to load report. Check console for details.');
+        return;
+      }
+
+      // Fetch shift entries with employee details (JOIN)
+      const { data: entries, error: entriesError } = await supabase
+        .from('Tarla_Shift_Entries')
+        .select(`
+          tarla_net_sales,
+          tarla_cc_tips,
+          tarla_tip_out,
+          tarla_tip_in,
+          tarla_final_payout,
+          Tarla_Employees (
+            tarla_name,
+            tarla_role
+          )
+        `)
+        .eq('tarla_shift_id', shiftId);
+
+      if (entriesError) {
+        console.error('❌ Error fetching entries:', entriesError);
+        alert('Failed to load report details. Check console for details.');
+        return;
+      }
+
+      console.log('✅ Report data:', { shift, entries });
+      renderReportModal(shift, entries);
+    }
+
+    /**
+     * Render report detail modal
+     */
+    function renderReportModal(shift, entries) {
+      // Summary
+      document.getElementById('modal-title').textContent = `Report for ${shift.tarla_shift_date} (${shift.tarla_shift_period})`;
+      document.getElementById('modal-date').textContent = shift.tarla_shift_date;
+      document.getElementById('modal-shift').textContent = shift.tarla_shift_period;
+      document.getElementById('modal-total-sales').textContent = `$${parseFloat(shift.tarla_total_net_sales).toFixed(2)}`;
+      document.getElementById('modal-total-tips').textContent = `$${parseFloat(shift.tarla_total_cc_tips).toFixed(2)}`;
+      document.getElementById('modal-support-pool').textContent = `$${parseFloat(shift.tarla_total_support_pool).toFixed(2)}`;
+
+      // Detailed table
+      const tbody = document.getElementById('modal-table-body');
+      tbody.innerHTML = '';
+
+      entries.forEach(entry => {
+        const employee = entry.Tarla_Employees;
+        const tr = document.createElement('tr');
+
+        const netSales = parseFloat(entry.tarla_net_sales);
+        const ccTips = parseFloat(entry.tarla_cc_tips);
+        const tipOut = parseFloat(entry.tarla_tip_out);
+        const tipIn = parseFloat(entry.tarla_tip_in);
+        const finalPayout = parseFloat(entry.tarla_final_payout);
+
+        tr.innerHTML = `
+          <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900">${employee.tarla_name}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">${employee.tarla_role}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-900">$${netSales.toFixed(2)}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-900">$${ccTips.toFixed(2)}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-right ${tipOut > 0 ? 'text-red-600' : 'text-slate-400'}">
+            ${tipOut > 0 ? '-' : ''}$${tipOut.toFixed(2)}
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-right ${tipIn > 0 ? 'text-green-600' : 'text-slate-400'}">
+            ${tipIn > 0 ? '+' : ''}$${tipIn.toFixed(2)}
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-bold text-slate-900">
+            $${finalPayout.toFixed(2)}
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      // Show modal
+      document.getElementById('report-modal').classList.remove('hidden');
+    }
+
+    /**
+     * Close modal
+     */
+    function closeModal() {
+      document.getElementById('report-modal').classList.add('hidden');
+    }
+
+    // Close modal on background click
+    document.getElementById('report-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'report-modal') {
+        closeModal();
+      }
+    });
+  </script>
+
+</body>
+</html>

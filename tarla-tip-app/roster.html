@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Roster - TipShare</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+  <!-- Navigation Header -->
+  <nav class="bg-white shadow-md mb-6">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex space-x-8">
+          <a href="index.html" class="text-blue-600 hover:text-blue-800 font-semibold transition-colors">
+            Calculate New Report
+          </a>
+          <a href="history.html" class="text-slate-600 hover:text-blue-600 font-semibold transition-colors">
+            View History
+          </a>
+          <a href="roster.html" class="text-blue-600 hover:text-blue-800 font-semibold border-b-2 border-blue-600 transition-colors">
+            Manage Roster
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <div class="max-w-4xl mx-auto p-4 sm:p-6 lg:px-8">
+
+    <!-- Page Header -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h1 class="text-2xl font-bold text-slate-900 mb-2">Manage Roster</h1>
+      <p class="text-slate-600">Add, edit, and manage FOH employees for tip calculations</p>
+    </div>
+
+    <!-- Add Employee Form -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 class="text-lg font-semibold text-slate-900 mb-4">Add New Employee</h2>
+
+      <form id="add-employee-form" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Employee Name -->
+          <div>
+            <label for="employee-name" class="block text-sm font-medium text-slate-700 mb-2">
+              Employee Name *
+            </label>
+            <input
+              type="text"
+              id="employee-name"
+              required
+              placeholder="John D."
+              class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
+            >
+          </div>
+
+          <!-- Role -->
+          <div>
+            <label for="employee-role" class="block text-sm font-medium text-slate-700 mb-2">
+              Role *
+            </label>
+            <select
+              id="employee-role"
+              required
+              class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
+            >
+              <option value="">Select Role</option>
+              <option value="Server">Server</option>
+              <option value="Bartender">Bartender</option>
+              <option value="Support Staff">Support Staff</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <button
+            type="submit"
+            class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-md shadow-sm hover:bg-blue-700 transition-colors"
+          >
+            Add Employee
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Roster Table -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-lg font-semibold text-slate-900 mb-4">Current Roster</h2>
+
+      <!-- Loading State -->
+      <div id="loading" class="text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p class="text-slate-600 mt-2">Loading roster...</p>
+      </div>
+
+      <!-- Roster Table -->
+      <div id="roster-container" class="hidden overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="roster-table-body" class="bg-white divide-y divide-slate-200">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="hidden text-center py-8">
+        <p class="text-slate-500">No employees in roster. Add your first employee above!</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Supabase Client -->
+  <script src="./supabase-client.js"></script>
+
+  <!-- Page Logic -->
+  <script>
+    const supabase = window.supabaseClient;
+
+    // On page load, fetch roster
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchRoster();
+
+      // Handle form submission
+      document.getElementById('add-employee-form').addEventListener('submit', handleAddEmployee);
+    });
+
+    /**
+     * Fetch all employees from database
+     */
+    async function fetchRoster() {
+      console.log('📥 Fetching roster...');
+
+      const { data, error } = await supabase
+        .from('Tarla_Employees')
+        .select('*')
+        .order('tarla_name');
+
+      if (error) {
+        console.error('❌ Error fetching roster:', error);
+        alert('Failed to load roster. Check console for details.');
+        document.getElementById('loading').classList.add('hidden');
+        return;
+      }
+
+      console.log('✅ Fetched roster:', data);
+      renderRosterTable(data);
+    }
+
+    /**
+     * Render roster table
+     */
+    function renderRosterTable(employees) {
+      const tbody = document.getElementById('roster-table-body');
+      const loading = document.getElementById('loading');
+      const container = document.getElementById('roster-container');
+      const emptyState = document.getElementById('empty-state');
+
+      loading.classList.add('hidden');
+
+      if (!employees || employees.length === 0) {
+        container.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      container.classList.remove('hidden');
+
+      tbody.innerHTML = '';
+
+      employees.forEach(emp => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">${emp.tarla_name}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">${emp.tarla_role}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm">
+            ${emp.tarla_is_active
+              ? '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>'
+              : '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">Archived</span>'
+            }
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+            ${emp.tarla_is_active
+              ? `<button onclick="archiveEmployee(${emp.tarla_id})" class="text-yellow-600 hover:text-yellow-900">Archive</button>`
+              : `<button onclick="reactivateEmployee(${emp.tarla_id})" class="text-green-600 hover:text-green-900">Reactivate</button>`
+            }
+            <button onclick="deleteEmployee(${emp.tarla_id})" class="text-red-600 hover:text-red-900">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    /**
+     * Add new employee
+     */
+    async function handleAddEmployee(e) {
+      e.preventDefault();
+
+      const name = document.getElementById('employee-name').value.trim();
+      const role = document.getElementById('employee-role').value;
+
+      if (!name || !role) {
+        alert('Please fill in all fields');
+        return;
+      }
+
+      console.log('➕ Adding employee:', name, role);
+
+      const { error } = await supabase
+        .from('Tarla_Employees')
+        .insert({
+          tarla_name: name,
+          tarla_role: role,
+          tarla_is_active: true
+        });
+
+      if (error) {
+        console.error('❌ Error adding employee:', error);
+        alert('Failed to add employee. Check console for details.');
+        return;
+      }
+
+      console.log('✅ Employee added');
+
+      // Reset form
+      document.getElementById('add-employee-form').reset();
+
+      // Refresh roster
+      fetchRoster();
+    }
+
+    /**
+     * Archive employee (set is_active = false)
+     */
+    async function archiveEmployee(id) {
+      if (!confirm('Archive this employee? They will not appear in new reports.')) {
+        return;
+      }
+
+      console.log('📦 Archiving employee:', id);
+
+      const { error } = await supabase
+        .from('Tarla_Employees')
+        .update({ tarla_is_active: false })
+        .eq('tarla_id', id);
+
+      if (error) {
+        console.error('❌ Error archiving employee:', error);
+        alert('Failed to archive employee. Check console for details.');
+        return;
+      }
+
+      console.log('✅ Employee archived');
+      fetchRoster();
+    }
+
+    /**
+     * Reactivate employee (set is_active = true)
+     */
+    async function reactivateEmployee(id) {
+      console.log('🔄 Reactivating employee:', id);
+
+      const { error } = await supabase
+        .from('Tarla_Employees')
+        .update({ tarla_is_active: true })
+        .eq('tarla_id', id);
+
+      if (error) {
+        console.error('❌ Error reactivating employee:', error);
+        alert('Failed to reactivate employee. Check console for details.');
+        return;
+      }
+
+      console.log('✅ Employee reactivated');
+      fetchRoster();
+    }
+
+    /**
+     * Delete employee permanently
+     */
+    async function deleteEmployee(id) {
+      if (!confirm('Permanently delete this employee? This action cannot be undone.')) {
+        return;
+      }
+
+      console.log('🗑️ Deleting employee:', id);
+
+      const { error } = await supabase
+        .from('Tarla_Employees')
+        .delete()
+        .eq('tarla_id', id);
+
+      if (error) {
+        console.error('❌ Error deleting employee:', error);
+        alert('Failed to delete employee. Check console for details.');
+        return;
+      }
+
+      console.log('✅ Employee deleted');
+      fetchRoster();
+    }
+  </script>
+
+</body>
+</html>

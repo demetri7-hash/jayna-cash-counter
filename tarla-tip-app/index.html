@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TipShare - FOH Tip Calculator</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Print Styles */
+    @media print {
+      body {
+        background: white;
+      }
+      nav, #config-section, #data-entry-section, #actions-section {
+        display: none !important;
+      }
+      #results-section {
+        display: block !important;
+        box-shadow: none;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+  <!-- Navigation Header -->
+  <nav class="bg-white shadow-md mb-6">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex space-x-8">
+          <a href="index.html" class="text-blue-600 hover:text-blue-800 font-semibold border-b-2 border-blue-600 transition-colors">
+            Calculate New Report
+          </a>
+          <a href="history.html" class="text-slate-600 hover:text-blue-600 font-semibold transition-colors">
+            View History
+          </a>
+          <a href="roster.html" class="text-slate-600 hover:text-blue-600 font-semibold transition-colors">
+            Manage Roster
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <div class="max-w-4xl mx-auto p-4 sm:p-6 lg:px-8">
+
+    <!-- Section 1: Global Configuration -->
+    <div id="config-section" class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 class="text-xl font-bold text-slate-900 mb-4">New Shift Report</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Date -->
+        <div>
+          <label for="shift-date" class="block text-sm font-medium text-slate-700 mb-2">
+            Date *
+          </label>
+          <input
+            type="date"
+            id="shift-date"
+            required
+            class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
+          >
+        </div>
+
+        <!-- Shift -->
+        <div>
+          <label for="shift-period" class="block text-sm font-medium text-slate-700 mb-2">
+            Shift *
+          </label>
+          <select
+            id="shift-period"
+            required
+            class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
+          >
+            <option value="">Select Shift</option>
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>
+
+        <!-- Server Tip-Out % -->
+        <div>
+          <label for="server-tip-percent" class="block text-sm font-medium text-slate-700 mb-2">
+            Server Tip-Out % *
+          </label>
+          <input
+            type="number"
+            id="server-tip-percent"
+            step="0.01"
+            min="0"
+            max="100"
+            placeholder="3.00"
+            required
+            class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
+          >
+        </div>
+
+        <!-- Bartender Tip-Out % -->
+        <div>
+          <label for="bartender-tip-percent" class="block text-sm font-medium text-slate-700 mb-2">
+            Bartender Tip-Out % *
+          </label>
+          <input
+            type="number"
+            id="bartender-tip-percent"
+            step="0.01"
+            min="0"
+            max="100"
+            placeholder="1.00"
+            required
+            class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Daily Data Entry -->
+    <div id="data-entry-section" class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 class="text-xl font-bold text-slate-900 mb-4">Daily Data Entry</h2>
+
+      <!-- Loading State -->
+      <div id="roster-loading" class="text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p class="text-slate-600 mt-2">Loading roster...</p>
+      </div>
+
+      <!-- Data Entry Table -->
+      <div id="data-entry-container" class="hidden overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Working?</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Net Sales</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">CC Tips</th>
+            </tr>
+          </thead>
+          <tbody id="data-entry-table-body" class="bg-white divide-y divide-slate-200">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="roster-empty" class="hidden text-center py-8">
+        <p class="text-slate-500">No active employees found. <a href="roster.html" class="text-blue-600 hover:underline">Add employees to roster</a></p>
+      </div>
+    </div>
+
+    <!-- Section 3: Actions -->
+    <div id="actions-section" class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="flex gap-4">
+        <button
+          id="calculate-button"
+          class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-md shadow-sm hover:bg-blue-700 transition-colors flex-1"
+        >
+          Save & Calculate Report
+        </button>
+        <button
+          id="reset-button"
+          class="bg-slate-200 text-slate-700 font-semibold py-3 px-6 rounded-md shadow-sm hover:bg-slate-300 transition-colors"
+        >
+          Reset Form
+        </button>
+      </div>
+    </div>
+
+    <!-- Section 4: Results Display (Hidden by default) -->
+    <div id="results-section" class="hidden">
+
+      <!-- Summary Card -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-2xl font-bold text-slate-900 mb-4">Shift Payout Report</h2>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div>
+            <p class="text-sm text-slate-600">Date</p>
+            <p id="result-date" class="text-lg font-semibold text-slate-900">-</p>
+          </div>
+          <div>
+            <p class="text-sm text-slate-600">Shift</p>
+            <p id="result-shift" class="text-lg font-semibold text-slate-900">-</p>
+          </div>
+          <div>
+            <p class="text-sm text-slate-600">Total Net Sales</p>
+            <p id="result-total-sales" class="text-lg font-semibold text-slate-900">$0.00</p>
+          </div>
+          <div>
+            <p class="text-sm text-slate-600">Total CC Tips</p>
+            <p id="result-total-tips" class="text-lg font-semibold text-slate-900">$0.00</p>
+          </div>
+        </div>
+
+        <div class="bg-blue-50 border-2 border-blue-200 rounded-md p-4">
+          <p class="text-sm text-blue-700 font-medium">Support Pool Total</p>
+          <p id="result-support-pool" class="text-2xl font-bold text-blue-900">$0.00</p>
+        </div>
+      </div>
+
+      <!-- Detailed Payout Table -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h3 class="text-lg font-semibold text-slate-900 mb-4">Individual Payouts</h3>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Role</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Net Sales</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">CC Tips</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Tip Out</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Tip In</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase font-bold">Final Payout</th>
+              </tr>
+            </thead>
+            <tbody id="results-table-body" class="bg-white divide-y divide-slate-200">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex gap-4">
+          <button
+            onclick="window.print()"
+            class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-md shadow-sm hover:bg-blue-700 transition-colors flex-1"
+          >
+            Print Report
+          </button>
+          <button
+            onclick="location.reload()"
+            class="bg-slate-200 text-slate-700 font-semibold py-3 px-6 rounded-md shadow-sm hover:bg-slate-300 transition-colors"
+          >
+            New Report
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Supabase Client -->
+  <script src="./supabase-client.js"></script>
+
+  <!-- Page Logic -->
+  <script>
+    const supabase = window.supabaseClient;
+
+    // Set today's date as default
+    document.getElementById('shift-date').valueAsDate = new Date();
+
+    // On page load
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchActiveRoster();
+
+      // Attach event listeners
+      document.getElementById('calculate-button').addEventListener('click', handleSaveAndCalculate);
+      document.getElementById('reset-button').addEventListener('click', handleReset);
+    });
+
+    /**
+     * Fetch active employees from database
+     */
+    async function fetchActiveRoster() {
+      console.log('📥 Fetching active roster...');
+
+      const { data, error } = await supabase
+        .from('Tarla_Employees')
+        .select('*')
+        .eq('tarla_is_active', true)
+        .order('tarla_name');
+
+      if (error) {
+        console.error('❌ Error fetching roster:', error);
+        document.getElementById('roster-loading').classList.add('hidden');
+        document.getElementById('roster-empty').classList.remove('hidden');
+        return;
+      }
+
+      console.log('✅ Fetched active roster:', data);
+      renderDataEntryTable(data);
+    }
+
+    /**
+     * Render data entry table
+     */
+    function renderDataEntryTable(employees) {
+      const tbody = document.getElementById('data-entry-table-body');
+      const loading = document.getElementById('roster-loading');
+      const container = document.getElementById('data-entry-container');
+      const emptyState = document.getElementById('roster-empty');
+
+      loading.classList.add('hidden');
+
+      if (!employees || employees.length === 0) {
+        container.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      container.classList.remove('hidden');
+
+      tbody.innerHTML = '';
+
+      employees.forEach(emp => {
+        const tr = document.createElement('tr');
+        tr.dataset.employeeId = emp.tarla_id;
+        tr.dataset.employeeName = emp.tarla_name;
+        tr.dataset.employeeRole = emp.tarla_role;
+
+        tr.innerHTML = `
+          <td class="px-4 py-3 whitespace-nowrap">
+            <input type="checkbox" class="working-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded">
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900">${emp.tarla_name}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">${emp.tarla_role}</td>
+          <td class="px-4 py-3 whitespace-nowrap">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              class="net-sales-input w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-2 py-1 text-sm"
+              disabled
+            >
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              class="cc-tips-input w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-2 py-1 text-sm"
+              disabled
+            >
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+
+        // Enable/disable inputs based on checkbox
+        const checkbox = tr.querySelector('.working-checkbox');
+        const netSalesInput = tr.querySelector('.net-sales-input');
+        const ccTipsInput = tr.querySelector('.cc-tips-input');
+
+        checkbox.addEventListener('change', () => {
+          netSalesInput.disabled = !checkbox.checked;
+          ccTipsInput.disabled = !checkbox.checked;
+          if (!checkbox.checked) {
+            netSalesInput.value = '';
+            ccTipsInput.value = '';
+          }
+        });
+      });
+    }
+
+    /**
+     * Handle Save & Calculate
+     */
+    async function handleSaveAndCalculate() {
+      console.log('💾 Starting calculation...');
+
+      // Show loading state
+      const button = document.getElementById('calculate-button');
+      button.disabled = true;
+      button.textContent = 'Calculating...';
+
+      try {
+        // Step A: Read Configuration
+        const date = document.getElementById('shift-date').value;
+        const shift = document.getElementById('shift-period').value;
+        const serverPercent = parseFloat(document.getElementById('server-tip-percent').value) / 100;
+        const bartenderPercent = parseFloat(document.getElementById('bartender-tip-percent').value) / 100;
+
+        if (!date || !shift || isNaN(serverPercent) || isNaN(bartenderPercent)) {
+          alert('Please fill in all configuration fields');
+          return;
+        }
+
+        // Step B: Read Working Employees
+        const rows = document.querySelectorAll('#data-entry-table-body tr');
+        const workingEmployees = [];
+
+        rows.forEach(row => {
+          const checkbox = row.querySelector('.working-checkbox');
+          if (!checkbox.checked) return;
+
+          const id = parseInt(row.dataset.employeeId);
+          const name = row.dataset.employeeName;
+          const role = row.dataset.employeeRole;
+          const netSales = parseFloat(row.querySelector('.net-sales-input').value) || 0;
+          const ccTips = parseFloat(row.querySelector('.cc-tips-input').value) || 0;
+
+          workingEmployees.push({ id, name, role, netSales, ccTips });
+        });
+
+        if (workingEmployees.length === 0) {
+          alert('Please select at least one working employee');
+          return;
+        }
+
+        console.log('Working employees:', workingEmployees);
+
+        // Step C: Perform Calculations (THE CORE TIP-OUT LOGIC)
+
+        // Calculate Support Pool (from Servers only)
+        let totalSupportPool = 0;
+        workingEmployees.forEach(emp => {
+          if (emp.role === 'Server') {
+            totalSupportPool += emp.netSales * serverPercent;
+          }
+        });
+
+        // Count Support Staff
+        const supportStaffCount = workingEmployees.filter(emp => emp.role === 'Support Staff').length;
+        const payoutPerSupportStaff = supportStaffCount > 0 ? totalSupportPool / supportStaffCount : 0;
+
+        // Calculate Final Payouts
+        workingEmployees.forEach(emp => {
+          if (emp.role === 'Server') {
+            // Server: CC Tips - (Net Sales * Server %)
+            emp.tipOut = emp.netSales * serverPercent;
+            emp.tipIn = 0;
+            emp.finalPayout = emp.ccTips - emp.tipOut;
+          } else if (emp.role === 'Support Staff') {
+            // Support Staff: Equal share of Support Pool
+            emp.tipOut = 0;
+            emp.tipIn = payoutPerSupportStaff;
+            emp.finalPayout = payoutPerSupportStaff;
+          } else if (emp.role === 'Bartender') {
+            // Bartender: CC Tips - (Net Sales * Bartender %)
+            emp.tipOut = emp.netSales * bartenderPercent;
+            emp.tipIn = 0;
+            emp.finalPayout = emp.ccTips - emp.tipOut;
+          }
+        });
+
+        // Calculate totals
+        const totalNetSales = workingEmployees.reduce((sum, emp) => sum + emp.netSales, 0);
+        const totalCCTips = workingEmployees.reduce((sum, emp) => sum + emp.ccTips, 0);
+
+        console.log('Calculations complete:', {
+          totalNetSales,
+          totalCCTips,
+          totalSupportPool,
+          workingEmployees
+        });
+
+        // Step D: Save to Supabase
+
+        // Insert Shift Header
+        const { data: shiftData, error: shiftError } = await supabase
+          .from('Tarla_Shifts')
+          .insert({
+            tarla_shift_date: date,
+            tarla_shift_period: shift,
+            tarla_server_tip_percent: serverPercent * 100,
+            tarla_bartender_tip_percent: bartenderPercent * 100,
+            tarla_total_net_sales: totalNetSales.toFixed(2),
+            tarla_total_cc_tips: totalCCTips.toFixed(2),
+            tarla_total_support_pool: totalSupportPool.toFixed(2)
+          })
+          .select('tarla_id')
+          .single();
+
+        if (shiftError) {
+          console.error('❌ Error saving shift:', shiftError);
+          alert('Failed to save shift data. Check console for details.');
+          return;
+        }
+
+        const newShiftId = shiftData.tarla_id;
+        console.log('✅ Shift saved with ID:', newShiftId);
+
+        // Batch Insert Shift Entries
+        const shiftEntries = workingEmployees.map(emp => ({
+          tarla_shift_id: newShiftId,
+          tarla_employee_id: emp.id,
+          tarla_net_sales: emp.netSales.toFixed(2),
+          tarla_cc_tips: emp.ccTips.toFixed(2),
+          tarla_tip_out: emp.tipOut.toFixed(2),
+          tarla_tip_in: emp.tipIn.toFixed(2),
+          tarla_final_payout: emp.finalPayout.toFixed(2)
+        }));
+
+        const { error: entriesError } = await supabase
+          .from('Tarla_Shift_Entries')
+          .insert(shiftEntries);
+
+        if (entriesError) {
+          console.error('❌ Error saving entries:', entriesError);
+          alert('Failed to save employee entries. Check console for details.');
+          return;
+        }
+
+        console.log('✅ Shift entries saved');
+
+        // Step E: Render Results
+        renderResults(date, shift, totalNetSales, totalCCTips, totalSupportPool, workingEmployees);
+
+        // Hide form sections, show results
+        document.getElementById('config-section').classList.add('hidden');
+        document.getElementById('data-entry-section').classList.add('hidden');
+        document.getElementById('actions-section').classList.add('hidden');
+        document.getElementById('results-section').classList.remove('hidden');
+
+        // Scroll to results
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      } catch (error) {
+        console.error('❌ Calculation error:', error);
+        alert('An error occurred. Check console for details.');
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Save & Calculate Report';
+      }
+    }
+
+    /**
+     * Render results display
+     */
+    function renderResults(date, shift, totalNetSales, totalCCTips, totalSupportPool, workingEmployees) {
+      // Summary card
+      document.getElementById('result-date').textContent = date;
+      document.getElementById('result-shift').textContent = shift;
+      document.getElementById('result-total-sales').textContent = `$${totalNetSales.toFixed(2)}`;
+      document.getElementById('result-total-tips').textContent = `$${totalCCTips.toFixed(2)}`;
+      document.getElementById('result-support-pool').textContent = `$${totalSupportPool.toFixed(2)}`;
+
+      // Detailed table
+      const tbody = document.getElementById('results-table-body');
+      tbody.innerHTML = '';
+
+      workingEmployees.forEach(emp => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900">${emp.name}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">${emp.role}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-900">$${emp.netSales.toFixed(2)}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-900">$${emp.ccTips.toFixed(2)}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-right ${emp.tipOut > 0 ? 'text-red-600' : 'text-slate-400'}">
+            ${emp.tipOut > 0 ? '-' : ''}$${emp.tipOut.toFixed(2)}
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-right ${emp.tipIn > 0 ? 'text-green-600' : 'text-slate-400'}">
+            ${emp.tipIn > 0 ? '+' : ''}$${emp.tipIn.toFixed(2)}
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-bold text-slate-900">
+            $${emp.finalPayout.toFixed(2)}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    /**
+     * Reset form
+     */
+    function handleReset() {
+      if (confirm('Reset form and clear all data?')) {
+        location.reload();
+      }
+    }
+  </script>
+
+</body>
+</html>
