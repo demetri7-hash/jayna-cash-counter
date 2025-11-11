@@ -4005,10 +4005,10 @@
       try {
         event.preventDefault();
         console.log(`🖨️ Generating 3" labels for order ${orderId}...`);
-        showLoading('GENERATING 3" LABELS', 'Creating PDF for printer...');
+        showLoading('CALCULATING LABELS', 'Preparing label count...');
 
-        // Call backend API in download mode for testing
-        const response = await fetch(`/api/print-3inch-labels?download=true`, {
+        // First, generate PDF to get metadata (label count)
+        const metadataResponse = await fetch(`/api/print-3inch-labels?download=true`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -4018,17 +4018,25 @@
 
         hideLoading();
 
-        if (!response.ok) {
-          const result = await response.json();
+        if (!metadataResponse.ok) {
+          const result = await metadataResponse.json();
           console.error(`❌ Failed to generate 3" labels PDF: ${result.error}`);
           alert(`Failed to generate labels: ${result.error}`);
           return;
         }
 
         // Get the PDF blob
-        const blob = await response.blob();
+        const blob = await metadataResponse.blob();
 
-        // Download the PDF
+        // Read page count from response headers
+        const pageCount = parseInt(metadataResponse.headers.get('X-Page-Count') || '1');
+        const totalLabels = parseInt(metadataResponse.headers.get('X-Total-Labels') || '0');
+        const itemLabels = parseInt(metadataResponse.headers.get('X-Item-Labels') || '0');
+        const ingredientLabels = parseInt(metadataResponse.headers.get('X-Ingredient-Labels') || '0');
+
+        console.log(`📊 Label summary: ${totalLabels} total (${itemLabels} items + ${ingredientLabels} ingredients) = ${pageCount} pages`);
+
+        // CURRENTLY IN TESTING MODE: Just download the PDF
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -4045,11 +4053,176 @@
 
         console.log(`✅ 3" labels PDF downloaded successfully!`);
 
+        // TODO: When ready for print mode, uncomment this line:
+        // showPrintConfirmationPopup(orderId, pageCount);
+
       } catch (error) {
         console.error('❌ 3" labels error:', error);
         hideLoading();
         alert(`Error generating 3" labels: ${error.message}`);
       }
+    }
+
+    /**
+     * Show print confirmation popup with page count
+     * Google Sites friendly (pure DOM, no external dependencies)
+     */
+    function showPrintConfirmationPopup(orderId, pageCount) {
+      // Create modal overlay
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      `;
+
+      // Create modal content
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+        background: white;
+        padding: 32px;
+        max-width: 500px;
+        width: 90%;
+        border: 3px solid var(--gray-700);
+      `;
+
+      // Header
+      const header = document.createElement('h2');
+      header.textContent = 'PRINT 3" LABELS';
+      header.style.cssText = `
+        margin: 0 0 20px 0;
+        font-size: 20px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--gray-900);
+      `;
+      modal.appendChild(header);
+
+      // Instructions
+      const instructions = document.createElement('div');
+      instructions.style.cssText = `
+        background: var(--blue-bg);
+        border: 2px solid #3b82f6;
+        padding: 16px;
+        margin-bottom: 24px;
+      `;
+      instructions.innerHTML = `
+        <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #1e40af;">
+          LOAD LABEL SHEETS INTO PRINTER
+        </p>
+        <p style="margin: 0; font-size: 16px; font-weight: 700; color: #1e40af;">
+          📄 ${pageCount} ${pageCount === 1 ? 'SHEET' : 'SHEETS'} REQUIRED
+        </p>
+      `;
+      modal.appendChild(instructions);
+
+      // Button group
+      const buttonGroup = document.createElement('div');
+      buttonGroup.style.cssText = 'display: flex; gap: 12px; justify-content: flex-end;';
+
+      // Cancel button
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'CANCEL';
+      cancelBtn.style.cssText = `
+        padding: 14px 28px;
+        background: var(--gray-100);
+        border: 2px solid var(--gray-300);
+        color: var(--gray-900);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      `;
+      cancelBtn.onclick = () => {
+        document.body.removeChild(overlay);
+      };
+      buttonGroup.appendChild(cancelBtn);
+
+      // Print Now button
+      const printBtn = document.createElement('button');
+      printBtn.textContent = '🖨️ PRINT NOW';
+      printBtn.style.cssText = `
+        padding: 14px 28px;
+        background: var(--gray-900);
+        border: 2px solid var(--gray-900);
+        color: white;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      `;
+      printBtn.onclick = async () => {
+        // Disable button and show loading state
+        printBtn.disabled = true;
+        printBtn.style.opacity = '0.6';
+        printBtn.style.cursor = 'not-allowed';
+        printBtn.textContent = 'SENDING TO PRINTER...';
+
+        try {
+          // Call API in PRINT mode (download=false)
+          const response = await fetch(`/api/print-3inch-labels`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ order_id: orderId })
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to send to printer');
+          }
+
+          // Success feedback - turn button green
+          printBtn.style.background = '#059669';
+          printBtn.style.borderColor = '#059669';
+          printBtn.textContent = '✅ SENT TO PRINTER!';
+
+          // Close popup after 1.5 seconds
+          setTimeout(() => {
+            document.body.removeChild(overlay);
+          }, 1500);
+
+        } catch (error) {
+          console.error('❌ Print error:', error);
+
+          // Error feedback - turn button red
+          printBtn.style.background = '#dc2626';
+          printBtn.style.borderColor = '#dc2626';
+          printBtn.textContent = '❌ FAILED';
+
+          // Re-enable after 2 seconds
+          setTimeout(() => {
+            printBtn.disabled = false;
+            printBtn.style.opacity = '1';
+            printBtn.style.cursor = 'pointer';
+            printBtn.style.background = 'var(--gray-900)';
+            printBtn.style.borderColor = 'var(--gray-900)';
+            printBtn.textContent = '🖨️ PRINT NOW';
+          }, 2000);
+        }
+      };
+      buttonGroup.appendChild(printBtn);
+
+      modal.appendChild(buttonGroup);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      // Close on overlay click
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          document.body.removeChild(overlay);
+        }
+      });
     }
 
     /**

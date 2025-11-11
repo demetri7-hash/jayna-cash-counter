@@ -121,13 +121,22 @@ export default async function handler(req, res) {
 
     // DOWNLOAD MODE: Return PDF as blob for download
     if (downloadMode) {
-      console.log(`✅ 3" labels PDF generated for download (${labels.length} item labels + ${ingredientLabels.length} ingredient labels)`);
+      const totalLabels = labels.length + ingredientLabels.length;
+      const pageCount = Math.ceil(totalLabels / 6); // 6 labels per page
+
+      console.log(`✅ 3" labels PDF generated for download (${labels.length} item labels + ${ingredientLabels.length} ingredient labels = ${totalLabels} total, ${pageCount} pages)`);
 
       const pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', pdfBuffer.length);
+
+      // Add custom headers for page count and label counts
+      res.setHeader('X-Page-Count', pageCount.toString());
+      res.setHeader('X-Total-Labels', totalLabels.toString());
+      res.setHeader('X-Item-Labels', labels.length.toString());
+      res.setHeader('X-Ingredient-Labels', ingredientLabels.length.toString());
 
       return res.status(200).send(pdfBuffer);
     }
