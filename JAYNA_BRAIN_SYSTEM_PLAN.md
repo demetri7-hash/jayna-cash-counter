@@ -583,7 +583,7 @@ Introduce actual ML models:
 - Implement auto-retraining
 - Introduce Prophet time series model
 - Optimize for high-accuracy predictions
-
+per
 ### **Phase 6: Advanced Features (Months 4-6)**
 - Customer behavior analysis
 - Menu optimization recommendations

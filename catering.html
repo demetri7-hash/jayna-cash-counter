@@ -2707,6 +2707,9 @@
                     <button onclick="exportLabelsCSV(event, ${order.id})" style="background: var(--primary-blue); border: 2px solid var(--primary-blue); color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
                       🏷️ EXPORT LABELS
                     </button>
+                    <button onclick="print3InchLabels(event, ${order.id})" style="background: #9333ea; border: 2px solid #9333ea; color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
+                      🖨️ PRINT 3 INCH LABELS
+                    </button>
                     <button onclick="downloadPrepListPDF(event, ${order.id})" style="background: #059669; border: 2px solid #059669; color: white; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase;">
                       📥 DOWNLOAD PDF
                     </button>
@@ -3990,6 +3993,62 @@
       } catch (error) {
         console.error('❌ Label export error:', error);
         hideLoading();
+      }
+    }
+
+    /**
+     * Print 3-Inch Round Labels to Epson Printer
+     * Generates PDF with 6 labels per page (2 columns x 3 rows)
+     * Sends to printer via email (empty body, PDF attachment only)
+     */
+    async function print3InchLabels(event, orderId) {
+      try {
+        event.preventDefault();
+        console.log(`🖨️ Generating 3" labels for order ${orderId}...`);
+        showLoading('GENERATING 3" LABELS', 'Creating PDF for printer...');
+
+        // Call backend API in download mode for testing
+        const response = await fetch(`/api/print-3inch-labels?download=true`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ order_id: orderId })
+        });
+
+        hideLoading();
+
+        if (!response.ok) {
+          const result = await response.json();
+          console.error(`❌ Failed to generate 3" labels PDF: ${result.error}`);
+          alert(`Failed to generate labels: ${result.error}`);
+          return;
+        }
+
+        // Get the PDF blob
+        const blob = await response.blob();
+
+        // Download the PDF
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `3Inch_Labels_Order_${orderId}_${new Date().toISOString().split('T')[0]}.pdf`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+
+        // Cleanup
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+
+        console.log(`✅ 3" labels PDF downloaded successfully!`);
+
+      } catch (error) {
+        console.error('❌ 3" labels error:', error);
+        hideLoading();
+        alert(`Error generating 3" labels: ${error.message}`);
       }
     }
 
