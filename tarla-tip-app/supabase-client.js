@@ -6,10 +6,9 @@
 // Import Supabase from CDN (loaded in HTML)
 const { createClient } = supabase;
 
-// PASTE YOUR CREDENTIALS HERE (from Vercel Environment Variables)
-// Find these in: Vercel Dashboard -> Settings -> Environment Variables
-const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE'; // e.g., 'https://xxxxx.supabase.co'
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE'; // Your public anon key
+// Supabase credentials
+const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
 
 // Initialize Supabase client
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
