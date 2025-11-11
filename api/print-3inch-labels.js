@@ -89,6 +89,20 @@ export default async function handler(req, res) {
 
     // Generate labels
     const labels = generateLabelsFromPrep(prep, order);
+
+    // SORT LABELS: Group similar items together (e.g., all TZATZIKI labels consecutive)
+    labels.sort((a, b) => {
+      const itemA = (a.item || '').toUpperCase();
+      const itemB = (b.item || '').toUpperCase();
+
+      // Extract base item name (remove container info like "- 1 OF 3")
+      const baseA = itemA.split(' - ')[0].split(',')[0].trim();
+      const baseB = itemB.split(' - ')[0].split(',')[0].trim();
+
+      // Sort alphabetically by base item name
+      return baseA.localeCompare(baseB);
+    });
+
     const ingredientLabels = generateIngredientLabels(labels);
 
     if (labels.length === 0 && ingredientLabels.length === 0) {
@@ -161,6 +175,41 @@ export default async function handler(req, res) {
 }
 
 /**
+ * Draw a blue heart shape at the specified position
+ * @param {object} doc - jsPDF document instance
+ * @param {number} x - X coordinate (center)
+ * @param {number} y - Y coordinate (top of heart)
+ * @param {number} size - Size of heart (default 5pt)
+ */
+function drawBlueHeart(doc, x, y, size = 5) {
+  const halfWidth = size * 0.5;
+  const height = size * 0.9;
+
+  // Save current state
+  const currentColor = doc.getFillColor();
+
+  // Set blue color (RGB: 59, 130, 246 = #3b82f6)
+  doc.setFillColor(59, 130, 246);
+
+  // Draw heart using bezier curves
+  // Left lobe
+  doc.circle(x - halfWidth * 0.5, y + halfWidth * 0.5, halfWidth * 0.65, 'F');
+  // Right lobe
+  doc.circle(x + halfWidth * 0.5, y + halfWidth * 0.5, halfWidth * 0.65, 'F');
+
+  // Bottom triangle
+  doc.triangle(
+    x - halfWidth * 1.1, y + halfWidth * 0.4,  // Left point
+    x + halfWidth * 1.1, y + halfWidth * 0.4,  // Right point
+    x, y + height,                              // Bottom point
+    'F'
+  );
+
+  // Restore previous fill color
+  doc.setFillColor(currentColor);
+}
+
+/**
  * Generate 3-inch round labels PDF
  * Layout: 2 columns x 3 rows = 6 labels per page
  * Page: 8.5" x 11" (612pt x 792pt)
@@ -225,7 +274,14 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       doc.setTextColor(100, 100, 100);
       doc.text('MADE WITH LOVE', centerX, centerY - 85, { align: 'center' });
       doc.text('BY YOUR FRIENDS', centerX, centerY - 76, { align: 'center' });
-      doc.text('AT JAYNA GYRO \u2665', centerX, centerY - 67, { align: 'center' });
+      doc.text('AT JAYNA GYRO', centerX, centerY - 67, { align: 'center' });
+
+      // Draw blue heart after "AT JAYNA GYRO"
+      const gyroText = 'AT JAYNA GYRO';
+      const gyroTextWidth = doc.getTextWidth(gyroText);
+      const heartX = centerX + (gyroTextWidth / 2) + 4; // 4pt spacing after text
+      const heartY = centerY - 67 - 3; // Align with text baseline
+      drawBlueHeart(doc, heartX, heartY, 5);
 
       // Item name (big, center, BOLD ALL CAPS)
       doc.setFont('helvetica', 'bold');
@@ -305,7 +361,14 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       doc.setTextColor(100, 100, 100);
       doc.text('MADE WITH LOVE', centerX, centerY - 85, { align: 'center' });
       doc.text('BY YOUR FRIENDS', centerX, centerY - 76, { align: 'center' });
-      doc.text('AT JAYNA GYRO \u2665', centerX, centerY - 67, { align: 'center' });
+      doc.text('AT JAYNA GYRO', centerX, centerY - 67, { align: 'center' });
+
+      // Draw blue heart after "AT JAYNA GYRO"
+      const gyroText = 'AT JAYNA GYRO';
+      const gyroTextWidth = doc.getTextWidth(gyroText);
+      const heartX = centerX + (gyroTextWidth / 2) + 4; // 4pt spacing after text
+      const heartY = centerY - 67 - 3; // Align with text baseline
+      drawBlueHeart(doc, heartX, heartY, 5);
 
       // Item name (big, center, BOLD ALL CAPS)
       doc.setFont('helvetica', 'bold');
@@ -823,7 +886,7 @@ function generateLabelsFromPrep(prep, order) {
 
 /**
  * Generate ingredient labels for sauces
- * Only creates labels for items with ingredient mappings
+ * Creates ONE ingredient label PER container/item label
  */
 function generateIngredientLabels(labels) {
   const ingredientMapping = {
@@ -835,19 +898,20 @@ function generateIngredientLabels(labels) {
   };
 
   const ingredientLabels = [];
-  const addedIngredients = new Set(); // Track to avoid duplicates
 
+  // Generate ONE ingredient label per item label (no duplicate prevention)
   labels.forEach(label => {
     const itemName = String(label.item || '').toUpperCase();
 
     // Check if this label contains any of the tracked sauces
     for (const [sauceName, ingredients] of Object.entries(ingredientMapping)) {
-      if (itemName.includes(sauceName) && !addedIngredients.has(sauceName)) {
+      if (itemName.includes(sauceName)) {
+        // Generate ingredient label for THIS specific container
         ingredientLabels.push({
           item: sauceName,
           ingredients: ingredients
         });
-        addedIngredients.add(sauceName);
+        break; // Only match one sauce per label
       }
     }
   });
