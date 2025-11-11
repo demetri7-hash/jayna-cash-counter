@@ -180,7 +180,7 @@
       console.log('📥 Fetching shift history...');
 
       const { data, error } = await supabase
-        .from('Tarla_Shifts')
+        .from('tarla_shifts')
         .select('*')
         .order('tarla_shift_date', { ascending: false })
         .order('tarla_id', { ascending: false });
@@ -248,7 +248,7 @@
 
       // Fetch shift header
       const { data: shift, error: shiftError } = await supabase
-        .from('Tarla_Shifts')
+        .from('tarla_shifts')
         .select('*')
         .eq('tarla_id', shiftId)
         .single();
@@ -261,14 +261,14 @@
 
       // Fetch shift entries with employee details (JOIN)
       const { data: entries, error: entriesError } = await supabase
-        .from('Tarla_Shift_Entries')
+        .from('tarla_shift_entries')
         .select(`
           tarla_net_sales,
           tarla_cc_tips,
           tarla_tip_out,
           tarla_tip_in,
           tarla_final_payout,
-          Tarla_Employees (
+          tarla_employees (
             tarla_name,
             tarla_role
           )
@@ -302,7 +302,7 @@
       tbody.innerHTML = '';
 
       entries.forEach(entry => {
-        const employee = entry.Tarla_Employees;
+        const employee = entry.tarla_employees;
         const tr = document.createElement('tr');
 
         const netSales = parseFloat(entry.tarla_net_sales);
