@@ -32,7 +32,7 @@ function formatPacificDateShort(dateStr) {
     year: '2-digit',
     timeZone: 'America/Los_Angeles'
   }).format(utcDate);
-  return formatted.replace(/\//g, ''); // Remove slashes: 11/14/25 -> 111425
+  return formatted; // Keep slashes: 11/14/25
 }
 
 export default async function handler(req, res) {
@@ -225,32 +225,60 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       doc.setTextColor(100, 100, 100);
       doc.text('MADE WITH LOVE', centerX, centerY - 85, { align: 'center' });
       doc.text('BY YOUR FRIENDS', centerX, centerY - 76, { align: 'center' });
-      doc.text('AT JAYNA 💙', centerX, centerY - 67, { align: 'center' });
+      doc.text('AT JAYNA GYRO \u2665', centerX, centerY - 67, { align: 'center' });
 
       // Item name (big, center, BOLD ALL CAPS)
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(20);
       doc.setTextColor(0, 0, 0);
 
-      // Wrap text if too long
       const itemText = (label.item || '').toUpperCase();
       const maxWidth = LABEL_DIAMETER - 40;
-      const wrappedItem = doc.splitTextToSize(itemText, maxWidth);
 
-      // Calculate starting Y position for centered multiline text
-      const lineHeight = 22;
-      const totalHeight = wrappedItem.length * lineHeight;
-      let itemY = centerY - (totalHeight / 2) + 10;
+      // Dynamic font sizing - scale down to fit without breaking words
+      let fontSize = 20;
+      let wrappedLines = [];
 
-      // Adjust font size if text is too long
-      if (wrappedItem.length > 2) {
-        doc.setFontSize(16);
-        itemY = centerY - 20;
+      // Keep reducing font size until text fits without breaking words mid-line
+      while (fontSize >= 12) {
+        doc.setFontSize(fontSize);
+
+        // Split ONLY on spaces (preserve whole words)
+        const words = itemText.split(' ');
+        wrappedLines = [];
+        let currentLine = '';
+
+        words.forEach((word, idx) => {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          const testWidth = doc.getTextWidth(testLine);
+
+          if (testWidth <= maxWidth) {
+            currentLine = testLine;
+          } else {
+            if (currentLine) wrappedLines.push(currentLine);
+            currentLine = word;
+          }
+        });
+
+        if (currentLine) wrappedLines.push(currentLine);
+
+        // Check if any single word is too wide
+        const maxLineWidth = Math.max(...wrappedLines.map(line => doc.getTextWidth(line)));
+
+        if (maxLineWidth <= maxWidth && wrappedLines.length <= 3) {
+          break; // Found a font size that fits!
+        }
+
+        fontSize -= 2; // Reduce and try again
       }
 
-      wrappedItem.forEach((line) => {
+      // Calculate starting Y position for centered multiline text
+      const lineHeight = fontSize * 1.1;
+      const totalHeight = wrappedLines.length * lineHeight;
+      let itemY = centerY - (totalHeight / 2) + 10;
+
+      wrappedLines.forEach((line) => {
         doc.text(line, centerX, itemY, { align: 'center' });
-        itemY += (doc.internal.getFontSize() * 1.15);
+        itemY += lineHeight;
       });
 
       // Ingredients (smaller, below item name, NORMAL weight but still caps)
@@ -277,35 +305,59 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       doc.setTextColor(100, 100, 100);
       doc.text('MADE WITH LOVE', centerX, centerY - 85, { align: 'center' });
       doc.text('BY YOUR FRIENDS', centerX, centerY - 76, { align: 'center' });
-      doc.text('AT JAYNA 💙', centerX, centerY - 67, { align: 'center' });
+      doc.text('AT JAYNA GYRO \u2665', centerX, centerY - 67, { align: 'center' });
 
       // Item name (big, center, BOLD ALL CAPS)
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(24);
       doc.setTextColor(0, 0, 0);
 
-      // Wrap text if too long
       const itemText = (label.item || '').toUpperCase();
       const maxWidth = LABEL_DIAMETER - 40;
-      const wrappedItem = doc.splitTextToSize(itemText, maxWidth);
 
-      // Calculate starting Y position for centered multiline text
-      let lineHeight = 26;
-      const totalHeight = wrappedItem.length * lineHeight;
-      let itemY = centerY - (totalHeight / 2) + 5;
+      // Dynamic font sizing - scale down to fit without breaking words
+      let fontSize = 24;
+      let textWidth = 0;
+      let wrappedLines = [];
 
-      // Adjust font size if text is too long
-      if (wrappedItem.length > 2) {
-        doc.setFontSize(18);
-        lineHeight = 20;
-        itemY = centerY - 25;
-      } else if (wrappedItem.length > 1) {
-        doc.setFontSize(20);
-        lineHeight = 22;
-        itemY = centerY - 15;
+      // Keep reducing font size until text fits without breaking words mid-line
+      while (fontSize >= 12) {
+        doc.setFontSize(fontSize);
+
+        // Split ONLY on spaces (preserve whole words)
+        const words = itemText.split(' ');
+        wrappedLines = [];
+        let currentLine = '';
+
+        words.forEach((word, idx) => {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          const testWidth = doc.getTextWidth(testLine);
+
+          if (testWidth <= maxWidth) {
+            currentLine = testLine;
+          } else {
+            if (currentLine) wrappedLines.push(currentLine);
+            currentLine = word;
+          }
+        });
+
+        if (currentLine) wrappedLines.push(currentLine);
+
+        // Check if any single word is too wide
+        const maxLineWidth = Math.max(...wrappedLines.map(line => doc.getTextWidth(line)));
+
+        if (maxLineWidth <= maxWidth && wrappedLines.length <= 3) {
+          break; // Found a font size that fits!
+        }
+
+        fontSize -= 2; // Reduce and try again
       }
 
-      wrappedItem.forEach((line) => {
+      // Calculate starting Y position for centered multiline text
+      const lineHeight = fontSize * 1.1;
+      const totalHeight = wrappedLines.length * lineHeight;
+      let itemY = centerY - (totalHeight / 2) + (fontSize * 0.3);
+
+      wrappedLines.forEach((line) => {
         doc.text(line, centerX, itemY, { align: 'center' });
         itemY += lineHeight;
       });
@@ -535,14 +587,40 @@ function generateLabelsFromPrep(prep, order) {
   // BYO GYROS
   if (prep.byoGyros.total > 0) {
     const sets = Math.ceil(prep.byoGyros.total / 10);
+    const totalPortions = prep.byoGyros.total;
 
-    // Protein labels
+    // Protein labels - ONE LABEL PER PAN
     const proteinPans = calculateProteinPans(prep.byoGyros.items || []);
     proteinPans.forEach(protein => {
-      labels.push({
-        item: getLabelName(protein.name),
-        qty: protein.container
-      });
+      // Parse container string to count total pans
+      const containerStr = protein.container;
+      let totalPans = 0;
+
+      // Count full pans (e.g., "3 FULL PANS" = 3 labels)
+      const fullPanMatch = containerStr.match(/(\d+)\s*FULL\s*PAN/i);
+      if (fullPanMatch) {
+        totalPans += parseInt(fullPanMatch[1]);
+      }
+
+      // Count half pans (e.g., "1 HALF PAN" = 1 label)
+      const halfPanMatch = containerStr.match(/(\d+)\s*HALF\s*PAN/i);
+      if (halfPanMatch) {
+        totalPans += parseInt(halfPanMatch[1]);
+      }
+
+      // If brown bowls, just one label
+      if (containerStr.includes('BROWN BOWLS')) {
+        totalPans = 1;
+      }
+
+      // Generate one label per pan (full or half)
+      const labelsToGenerate = Math.max(1, totalPans);
+      for (let i = 0; i < labelsToGenerate; i++) {
+        labels.push({
+          item: getLabelName(protein.name),
+          qty: `${protein.qty} PORTIONS, ${protein.container}`
+        });
+      }
     });
 
     // Sauce containers
@@ -562,7 +640,7 @@ function generateLabelsFromPrep(prep, order) {
     }
 
     // Mixed Greens
-    const greensSets = Math.ceil(prep.byoGyros.total / 15);
+    const greensSets = Math.ceil(totalPortions / 15);
     for (let i = 1; i <= greensSets; i++) {
       labels.push({
         item: getLabelName('Mixed Greens'),
@@ -570,11 +648,23 @@ function generateLabelsFromPrep(prep, order) {
       });
     }
 
-    // Toppings
-    labels.push({ item: getLabelName('Diced Tomatoes'), qty: 'AS NEEDED' });
-    labels.push({ item: getLabelName('Sliced Red Onion'), qty: 'AS NEEDED' });
-    labels.push({ item: getLabelName('Whole Pepperoncini'), qty: 'AS NEEDED' });
-    labels.push({ item: getLabelName('Grilled Pita Bread'), qty: 'AS NEEDED' });
+    // Toppings - Show portion count, print 2 labels if 25+ portions
+    const toppingLabelsNeeded = totalPortions >= 25 ? 2 : 1;
+
+    for (let i = 0; i < toppingLabelsNeeded; i++) {
+      labels.push({ item: getLabelName('Diced Tomatoes'), qty: `${totalPortions}` });
+    }
+    for (let i = 0; i < toppingLabelsNeeded; i++) {
+      labels.push({ item: getLabelName('Sliced Red Onion'), qty: `${totalPortions}` });
+    }
+    for (let i = 0; i < toppingLabelsNeeded; i++) {
+      labels.push({ item: getLabelName('Whole Pepperoncini'), qty: `${totalPortions}` });
+    }
+
+    // Grilled Pita - same logic
+    for (let i = 0; i < toppingLabelsNeeded; i++) {
+      labels.push({ item: getLabelName('Grilled Pita Bread'), qty: `${totalPortions}` });
+    }
   }
 
   // SALADS
