@@ -16558,6 +16558,17 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         .select()
         .single();
 
+      if (invoiceError) {
+        console.error('❌ Failed to create learning invoice:', invoiceError);
+        console.error('Invoice data attempted:', {
+          invoice_date: getPacificDate(),
+          vendor_name: vendor,
+          invoice_type: 'order',
+          entered_by: 'System',
+          processed: true
+        });
+      }
+
       if (!invoiceError && invoiceData) {
         // Save each match for learning
         const learningItems = matchedItems.map(item => {
