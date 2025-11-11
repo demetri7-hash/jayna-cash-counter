@@ -4130,6 +4130,90 @@
       };
       buttonGroup.appendChild(cancelBtn);
 
+      // Download button
+      const downloadBtn = document.createElement('button');
+      downloadBtn.textContent = '📥 DOWNLOAD';
+      downloadBtn.style.cssText = `
+        padding: 14px 28px;
+        background: #3b82f6;
+        border: 2px solid #3b82f6;
+        color: white;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      `;
+      downloadBtn.onclick = async () => {
+        // Disable button and show loading state
+        downloadBtn.disabled = true;
+        downloadBtn.style.opacity = '0.6';
+        downloadBtn.style.cursor = 'not-allowed';
+        downloadBtn.textContent = 'DOWNLOADING...';
+
+        try {
+          // Call API in DOWNLOAD mode
+          const response = await fetch(`/api/print-3inch-labels?download=true`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ order_id: orderId })
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to download PDF');
+          }
+
+          // Get the PDF blob
+          const blob = await response.blob();
+
+          // Download the PDF
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `3Inch_Labels_Order_${orderId}_${new Date().toISOString().split('T')[0]}.pdf`;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+
+          // Cleanup
+          setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, 100);
+
+          // Success feedback - turn button green
+          downloadBtn.style.background = '#059669';
+          downloadBtn.style.borderColor = '#059669';
+          downloadBtn.textContent = '✅ DOWNLOADED!';
+
+          // Close popup after 1.5 seconds
+          setTimeout(() => {
+            document.body.removeChild(overlay);
+          }, 1500);
+
+        } catch (error) {
+          console.error('❌ Download error:', error);
+
+          // Error feedback - turn button red
+          downloadBtn.style.background = '#dc2626';
+          downloadBtn.style.borderColor = '#dc2626';
+          downloadBtn.textContent = '❌ FAILED';
+
+          // Re-enable after 2 seconds
+          setTimeout(() => {
+            downloadBtn.disabled = false;
+            downloadBtn.style.opacity = '1';
+            downloadBtn.style.cursor = 'pointer';
+            downloadBtn.style.background = '#3b82f6';
+            downloadBtn.style.borderColor = '#3b82f6';
+            downloadBtn.textContent = '📥 DOWNLOAD';
+          }, 2000);
+        }
+      };
+      buttonGroup.appendChild(downloadBtn);
+
       // Print Now button
       const printBtn = document.createElement('button');
       printBtn.textContent = '🖨️ PRINT NOW';
