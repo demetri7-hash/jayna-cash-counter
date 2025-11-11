@@ -2302,20 +2302,43 @@
     const nextUser = prepCountingState.teamNames[nextUserIndex];
 
     try {
+      const newTimestamp = new Date().toISOString();
+
       // Update item in database
       const { error } = await supabase
         .from('inventory_items')
         .update({
           counted_by: nextUser.name,
-          counted_at: new Date().toISOString()
+          counted_at: newTimestamp
         })
         .eq('id', itemId);
 
       if (error) throw error;
 
+      // CRITICAL: Also update the prep_count_log to give credit to the correct person
+      // Find the most recent log entry for this item and update it
+      const { data: logEntries, error: logFetchError } = await supabase
+        .from('prep_count_log')
+        .select('id')
+        .eq('item_id', itemId)
+        .order('counted_at', { ascending: false })
+        .limit(1);
+
+      if (!logFetchError && logEntries && logEntries.length > 0) {
+        const logId = logEntries[0].id;
+        await supabase
+          .from('prep_count_log')
+          .update({
+            counted_by: nextUser.name,
+            counted_at: newTimestamp
+          })
+          .eq('id', logId);
+        console.log(`✅ Updated prep_count_log for leaderboard: ${nextUser.name}`);
+      }
+
       // Update local state
       item.countedBy = nextUser.name;
-      item.countedAt = new Date().toISOString();
+      item.countedAt = newTimestamp;
 
       // Set this as active user
       setActivePrepCounter(nextUserIndex);
