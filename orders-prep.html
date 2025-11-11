@@ -4034,6 +4034,13 @@ async function renderOrdersTab() {
       const bulkActions = document.createElement('div');
       bulkActions.style.cssText = 'display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;';
 
+      // PHOTO button for OCR invoice scanning
+      const photoBtn = document.createElement('button');
+      photoBtn.textContent = '📸 PHOTO';
+      photoBtn.style.cssText = 'flex: 1; padding: 14px; background: #0094D6; color: white; border: 2px solid #0094D6; font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer; text-transform: uppercase;';
+      photoBtn.onclick = () => openPhotoScanForCheckIn(orderId);
+      bulkActions.appendChild(photoBtn);
+
       // Auto-fill all button
       const autoFillBtn = document.createElement('button');
       autoFillBtn.textContent = 'AUTO-FILL: ALL RECEIVED AS ORDERED';
@@ -4078,6 +4085,552 @@ async function renderOrdersTab() {
       hideLoading();
       console.error('Error loading pending order:', error);
       showMessage('Failed to load order: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Open photo upload/camera for invoice OCR scanning
+   */
+  function openPhotoScanForCheckIn(orderId) {
+    // Create hidden file input
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*,application/pdf';
+    fileInput.capture = 'environment'; // Open camera on mobile
+    fileInput.style.display = 'none';
+
+    fileInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      await processCheckInPhoto(file, orderId);
+      document.body.removeChild(fileInput);
+    };
+
+    document.body.appendChild(fileInput);
+    fileInput.click();
+  }
+
+  /**
+   * Process photo with OCR and extract invoice items
+   */
+  async function processCheckInPhoto(file, orderId) {
+    showLoading('Processing Photo', 'Extracting text from invoice...');
+
+    try {
+      let ocrText = '';
+
+      // Check if PDF
+      const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+      if (isPDF) {
+        // Handle PDF (use existing PDF logic)
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const scale = 2.0;
+          const viewport = page.getViewport({ scale });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext('2d');
+
+          await page.render({ canvasContext: ctx, viewport }).promise;
+
+          const result = await Tesseract.recognize(canvas, 'eng', {
+            tessedit_pageseg_mode: '4',
+            preserve_interword_spaces: '1'
+          });
+
+          ocrText += result.data.text + '\n\n';
+        }
+      } else {
+        // Handle image
+        const result = await Tesseract.recognize(file, 'eng', {
+          tessedit_pageseg_mode: '4',
+          preserve_interword_spaces: '1'
+        });
+
+        ocrText = result.data.text;
+      }
+
+      hideLoading();
+
+      // Parse OCR text to extract items
+      const ocrItems = parseInvoiceTextForItems(ocrText);
+
+      if (ocrItems.length === 0) {
+        showMessage('No items found in invoice photo. Try taking a clearer photo or enter manually.', 'warning');
+        return;
+      }
+
+      // Show matching modal
+      showOCRMatchingModal(ocrItems, orderId);
+
+    } catch (error) {
+      hideLoading();
+      console.error('OCR processing error:', error);
+      showMessage('Failed to process photo: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Parse OCR text to extract invoice items with quantities and prices
+   */
+  function parseInvoiceTextForItems(text) {
+    const items = [];
+    const lines = text.split('\n');
+
+    // Pattern: look for lines with item name, optional quantity, and price
+    // Examples: "Tomatoes 10 lb $45.00" or "Chicken Breast $125.50" or "Eggs 12 doz @ 3.50 = 42.00"
+    const patterns = [
+      // Pattern 1: Item Qty Unit $Price or Item Qty Unit Price
+      /^(.+?)\s+(\d+(?:\.\d+)?)\s*(lb|lbs|oz|kg|g|case|ea|each|doz|dozen|pc|pcs|gal|qt|pt|ct|box|bag)?\s*[x@]?\s*\$?(\d+\.\d{2})/i,
+      // Pattern 2: Item $Price (no quantity)
+      /^(.+?)\s+\$(\d+\.\d{2})$/,
+      // Pattern 3: Item Qty @ Price = Total
+      /^(.+?)\s+(\d+(?:\.\d+)?)\s*[x@]\s*\$?(\d+\.\d{2})\s*=\s*\$?(\d+\.\d{2})/i
+    ];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.length < 3) continue;
+
+      // Try each pattern
+      for (const pattern of patterns) {
+        const match = trimmed.match(pattern);
+        if (match) {
+          let itemName, quantity, unit, price;
+
+          if (pattern === patterns[0]) {
+            // Pattern 1: Item Qty Unit Price
+            itemName = match[1].trim();
+            quantity = parseFloat(match[2]) || null;
+            unit = match[3] ? match[3].toLowerCase() : '';
+            price = parseFloat(match[4]);
+          } else if (pattern === patterns[1]) {
+            // Pattern 2: Item $Price
+            itemName = match[1].trim();
+            quantity = null;
+            unit = '';
+            price = parseFloat(match[2]);
+          } else if (pattern === patterns[2]) {
+            // Pattern 3: Item Qty @ Price = Total
+            itemName = match[1].trim();
+            quantity = parseFloat(match[2]) || null;
+            unit = '';
+            price = parseFloat(match[3]); // Unit price, not total
+          }
+
+          // Validate
+          if (itemName && price > 0) {
+            items.push({
+              name: itemName,
+              quantity: quantity,
+              unit: unit,
+              price: price,
+              rawLine: trimmed
+            });
+          }
+
+          break; // Found a match, move to next line
+        }
+      }
+    }
+
+    return items;
+  }
+
+  /**
+   * Show OCR matching modal with side-by-side comparison
+   */
+  function showOCRMatchingModal(ocrItems, orderId) {
+    const pendingOrder = orderingSystemState.currentCheckInOrder;
+    if (!pendingOrder) return;
+
+    const pendingItems = pendingOrder.pending_order_items;
+
+    // Create modal overlay
+    const modal = document.createElement('div');
+    modal.id = 'ocrMatchingModal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 10000; overflow-y: auto; padding: 20px;';
+
+    // Modal content
+    const content = document.createElement('div');
+    content.style.cssText = 'background: white; max-width: 1400px; margin: 0 auto; border: 3px solid var(--gray-700);';
+
+    // Header
+    const header = document.createElement('div');
+    header.style.cssText = 'background: #0094D6; color: white; padding: 20px; border-bottom: 3px solid #0081C6;';
+    const title = document.createElement('h3');
+    title.textContent = `📸 MATCH INVOICE ITEMS - ${pendingOrder.vendor}`;
+    title.style.cssText = 'margin: 0 0 8px 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+    header.appendChild(title);
+    const subtitle = document.createElement('p');
+    subtitle.textContent = 'Click items from the invoice (left) to match them with your pending order (right). Unmatched items will be added as new lines.';
+    subtitle.style.cssText = 'margin: 0; font-size: 13px; opacity: 0.9;';
+    header.appendChild(subtitle);
+    content.appendChild(header);
+
+    // Body with side-by-side layout
+    const body = document.createElement('div');
+    body.style.cssText = 'padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;';
+
+    // LEFT SIDE: OCR Items
+    const leftPanel = document.createElement('div');
+    leftPanel.style.cssText = 'border: 2px solid #0094D6; background: #E3F4FC;';
+
+    const leftHeader = document.createElement('div');
+    leftHeader.style.cssText = 'background: #0094D6; color: white; padding: 12px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+    leftHeader.textContent = `📄 INVOICE ITEMS (${ocrItems.length})`;
+    leftPanel.appendChild(leftHeader);
+
+    const leftList = document.createElement('div');
+    leftList.id = 'ocrItemsList';
+    leftList.style.cssText = 'padding: 12px;';
+
+    ocrItems.forEach((ocrItem, index) => {
+      const card = document.createElement('div');
+      card.id = `ocrItem${index}`;
+      card.className = 'ocr-item-card';
+      card.style.cssText = 'background: white; border: 2px solid var(--gray-300); padding: 12px; margin-bottom: 10px; cursor: pointer; transition: all 0.15s ease;';
+      card.dataset.index = index;
+      card.dataset.matched = 'false';
+
+      const itemName = document.createElement('div');
+      itemName.textContent = ocrItem.name;
+      itemName.style.cssText = 'font-weight: 600; font-size: 13px; color: var(--gray-900); margin-bottom: 4px;';
+      card.appendChild(itemName);
+
+      const itemDetails = document.createElement('div');
+      itemDetails.style.cssText = 'font-size: 11px; color: var(--gray-600); display: flex; gap: 12px; flex-wrap: wrap;';
+
+      if (ocrItem.quantity) {
+        const qty = document.createElement('span');
+        qty.textContent = `QTY: ${ocrItem.quantity}${ocrItem.unit ? ' ' + ocrItem.unit : ''}`;
+        itemDetails.appendChild(qty);
+      }
+
+      const price = document.createElement('span');
+      price.textContent = `PRICE: $${ocrItem.price.toFixed(2)}`;
+      price.style.cssText = 'font-weight: 700; color: #059669;';
+      itemDetails.appendChild(price);
+
+      card.appendChild(itemDetails);
+
+      // Click to select
+      card.onclick = () => selectOCRItem(index);
+
+      leftList.appendChild(card);
+    });
+
+    leftPanel.appendChild(leftList);
+    body.appendChild(leftPanel);
+
+    // RIGHT SIDE: Pending Order Items
+    const rightPanel = document.createElement('div');
+    rightPanel.style.cssText = 'border: 2px solid #f59e0b; background: #fffbeb;';
+
+    const rightHeader = document.createElement('div');
+    rightHeader.style.cssText = 'background: #f59e0b; color: #78350f; padding: 12px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;';
+    rightHeader.textContent = `📦 PENDING ORDER (${pendingItems.length})`;
+    rightPanel.appendChild(rightHeader);
+
+    const rightList = document.createElement('div');
+    rightList.id = 'pendingItemsList';
+    rightList.style.cssText = 'padding: 12px;';
+
+    pendingItems.forEach((pendingItem, index) => {
+      const card = document.createElement('div');
+      card.id = `pendingItem${pendingItem.id}`;
+      card.className = 'pending-item-card';
+      card.style.cssText = 'background: white; border: 2px solid var(--gray-300); padding: 12px; margin-bottom: 10px; transition: all 0.15s ease;';
+      card.dataset.itemId = pendingItem.id;
+      card.dataset.matched = 'false';
+
+      const itemName = document.createElement('div');
+      itemName.textContent = pendingItem.item_name;
+      itemName.style.cssText = 'font-weight: 600; font-size: 13px; color: var(--gray-900); margin-bottom: 4px;';
+      card.appendChild(itemName);
+
+      const itemDetails = document.createElement('div');
+      itemDetails.style.cssText = 'font-size: 11px; color: var(--gray-600);';
+      itemDetails.innerHTML = `ORDERED: ${pendingItem.quantity_ordered} ${pendingItem.unit || ''}`;
+      card.appendChild(itemDetails);
+
+      const matchStatus = document.createElement('div');
+      matchStatus.id = `matchStatus${pendingItem.id}`;
+      matchStatus.style.cssText = 'margin-top: 8px; padding: 6px; background: var(--gray-100); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-600); display: none;';
+      matchStatus.textContent = 'Not matched yet';
+      card.appendChild(matchStatus);
+
+      rightList.appendChild(card);
+    });
+
+    rightPanel.appendChild(rightList);
+    body.appendChild(rightPanel);
+
+    content.appendChild(body);
+
+    // Footer with instructions and action buttons
+    const footer = document.createElement('div');
+    footer.style.cssText = 'padding: 20px; background: var(--gray-100); border-top: 2px solid var(--gray-300);';
+
+    const instructions = document.createElement('div');
+    instructions.id = 'matchingInstructions';
+    instructions.style.cssText = 'background: #dbeafe; border: 2px solid #1e40af; padding: 12px; margin-bottom: 16px; font-size: 13px; color: #1e3a8a;';
+    instructions.innerHTML = '<strong>STEP 1:</strong> Click an item from the invoice (left) to select it, then click the matching item from your pending order (right) to link them.';
+    footer.appendChild(instructions);
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display: flex; gap: 12px;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.style.cssText = 'flex: 1; padding: 14px; background: var(--gray-300); color: var(--gray-700); border: 2px solid var(--gray-400); font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer; text-transform: uppercase;';
+    cancelBtn.onclick = () => document.body.removeChild(modal);
+    actions.appendChild(cancelBtn);
+
+    const applyBtn = document.createElement('button');
+    applyBtn.textContent = 'APPLY MATCHES';
+    applyBtn.style.cssText = 'flex: 2; padding: 14px; background: #059669; color: white; border: 2px solid #059669; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer; text-transform: uppercase;';
+    applyBtn.onclick = () => applyAllOCRMatches(orderId, modal);
+    actions.appendChild(applyBtn);
+
+    footer.appendChild(actions);
+    content.appendChild(footer);
+
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+
+    // State for matching
+    orderingSystemState.ocrMatchingState = {
+      selectedOCRIndex: null,
+      matches: {}, // ocrIndex -> pendingItemId
+      ocrItems: ocrItems,
+      pendingItems: pendingItems
+    };
+  }
+
+  /**
+   * Select an OCR item (step 1 of matching)
+   */
+  function selectOCRItem(ocrIndex) {
+    const state = orderingSystemState.ocrMatchingState;
+    if (!state) return;
+
+    // Deselect previously selected OCR item
+    if (state.selectedOCRIndex !== null) {
+      const prevCard = document.getElementById(`ocrItem${state.selectedOCRIndex}`);
+      if (prevCard) {
+        prevCard.style.borderColor = 'var(--gray-300)';
+        prevCard.style.background = 'white';
+      }
+    }
+
+    // Select new OCR item
+    state.selectedOCRIndex = ocrIndex;
+    const card = document.getElementById(`ocrItem${ocrIndex}`);
+    if (card) {
+      card.style.borderColor = '#0094D6';
+      card.style.background = '#dbeafe';
+    }
+
+    // Update instructions
+    const instructions = document.getElementById('matchingInstructions');
+    if (instructions) {
+      const ocrItem = state.ocrItems[ocrIndex];
+      instructions.innerHTML = `<strong>STEP 2:</strong> Now click the matching item from your pending order (right) to link "<strong>${ocrItem.name}</strong>" with it.`;
+    }
+
+    // Enable clicking on pending items
+    document.querySelectorAll('.pending-item-card').forEach(card => {
+      card.style.cursor = 'pointer';
+      card.onclick = () => matchOCRToPending(parseInt(card.dataset.itemId));
+    });
+  }
+
+  /**
+   * Match selected OCR item to a pending item (step 2 of matching)
+   */
+  function matchOCRToPending(pendingItemId) {
+    const state = orderingSystemState.ocrMatchingState;
+    if (!state || state.selectedOCRIndex === null) return;
+
+    const ocrIndex = state.selectedOCRIndex;
+    const ocrItem = state.ocrItems[ocrIndex];
+
+    // Save match
+    state.matches[ocrIndex] = pendingItemId;
+
+    // Update OCR card (mark as matched)
+    const ocrCard = document.getElementById(`ocrItem${ocrIndex}`);
+    if (ocrCard) {
+      ocrCard.style.borderColor = '#059669';
+      ocrCard.style.background = '#d1fae5';
+      ocrCard.dataset.matched = 'true';
+      ocrCard.onclick = null;
+      ocrCard.style.cursor = 'default';
+
+      const matchedBadge = document.createElement('div');
+      matchedBadge.style.cssText = 'margin-top: 8px; padding: 4px 8px; background: #059669; color: white; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; display: inline-block;';
+      matchedBadge.textContent = '✓ MATCHED';
+      ocrCard.appendChild(matchedBadge);
+    }
+
+    // Update pending card (mark as matched)
+    const pendingCard = document.getElementById(`pendingItem${pendingItemId}`);
+    if (pendingCard) {
+      pendingCard.style.borderColor = '#059669';
+      pendingCard.style.background = '#d1fae5';
+      pendingCard.dataset.matched = 'true';
+      pendingCard.onclick = null;
+      pendingCard.style.cursor = 'default';
+
+      const matchStatus = document.getElementById(`matchStatus${pendingItemId}`);
+      if (matchStatus) {
+        matchStatus.style.display = 'block';
+        matchStatus.style.background = '#d1fae5';
+        matchStatus.style.color = '#065f46';
+        matchStatus.innerHTML = `✓ Matched to: <strong>${ocrItem.name}</strong><br>Price: $${ocrItem.price.toFixed(2)}${ocrItem.quantity ? ` | Qty: ${ocrItem.quantity}` : ''}`;
+      }
+    }
+
+    // Reset selection
+    state.selectedOCRIndex = null;
+
+    // Update instructions
+    const instructions = document.getElementById('matchingInstructions');
+    if (instructions) {
+      const unmatchedOCR = state.ocrItems.filter((_, i) => !state.matches[i]).length;
+      instructions.innerHTML = `<strong>Match saved!</strong> ${unmatchedOCR} invoice items remaining. Click another invoice item to continue matching, or click APPLY MATCHES to update your order.`;
+    }
+  }
+
+  /**
+   * Apply all OCR matches to the pending order
+   */
+  async function applyAllOCRMatches(orderId, modal) {
+    const state = orderingSystemState.ocrMatchingState;
+    if (!state) return;
+
+    showLoading('Applying Matches', 'Updating order with invoice data...');
+
+    try {
+      const updates = [];
+      const newItems = [];
+      const priceChanges = [];
+
+      // Process matched items
+      Object.keys(state.matches).forEach(ocrIndex => {
+        const pendingItemId = state.matches[ocrIndex];
+        const ocrItem = state.ocrItems[ocrIndex];
+        const pendingItem = state.pendingItems.find(p => p.id === pendingItemId);
+
+        if (pendingItem) {
+          // Check if price is different
+          const currentPrice = orderingSystemState.checkInItems[pendingItemId]?.price;
+          if (currentPrice && Math.abs(currentPrice - ocrItem.price) > 0.01) {
+            priceChanges.push({
+              itemName: pendingItem.item_name,
+              oldPrice: currentPrice,
+              newPrice: ocrItem.price
+            });
+          }
+
+          // Update check-in state
+          orderingSystemState.checkInItems[pendingItemId].price = ocrItem.price;
+          if (ocrItem.quantity) {
+            orderingSystemState.checkInItems[pendingItemId].received = ocrItem.quantity;
+          }
+        }
+      });
+
+      // Process unmatched OCR items (add as new lines)
+      state.ocrItems.forEach((ocrItem, index) => {
+        if (!state.matches[index]) {
+          newItems.push(ocrItem);
+        }
+      });
+
+      // Mark unmatched pending items as "not found"
+      state.pendingItems.forEach(pendingItem => {
+        const isMatched = Object.values(state.matches).includes(pendingItem.id);
+        if (!isMatched) {
+          // Mark as not found in notes
+          if (orderingSystemState.checkInItems[pendingItem.id]) {
+            const currentNotes = orderingSystemState.checkInItems[pendingItem.id].notes || '';
+            orderingSystemState.checkInItems[pendingItem.id].notes = currentNotes ? `${currentNotes} | NOT ON INVOICE` : 'NOT ON INVOICE';
+          }
+        }
+      });
+
+      hideLoading();
+      document.body.removeChild(modal);
+
+      // Update the UI with new values
+      Object.keys(orderingSystemState.checkInItems).forEach(itemId => {
+        const item = orderingSystemState.checkInItems[itemId];
+
+        // Update price input
+        const priceInput = document.getElementById(`price${itemId}`);
+        if (priceInput && item.price) {
+          priceInput.value = formatCurrencyInput(item.price);
+          priceInput.style.borderColor = '#059669';
+          priceInput.style.background = '#d1fae5';
+        }
+
+        // Update received quantity
+        const receivedInput = document.getElementById(`receivedQty${itemId}`);
+        if (receivedInput && item.received) {
+          receivedInput.value = item.received;
+          receivedInput.style.borderColor = 'var(--gray-300)';
+          receivedInput.style.background = 'white';
+        }
+
+        // Update notes
+        const notesInput = document.getElementById(`notes${itemId}`);
+        if (notesInput && item.notes) {
+          notesInput.value = item.notes;
+          if (item.notes.includes('NOT ON INVOICE')) {
+            notesInput.style.borderColor = '#f59e0b';
+            notesInput.style.background = '#fffbeb';
+          }
+        }
+      });
+
+      // Show summary
+      let summaryMsg = `✓ Applied ${Object.keys(state.matches).length} matches from invoice!\n\n`;
+
+      if (priceChanges.length > 0) {
+        summaryMsg += `<strong>Price Updates:</strong>\n`;
+        priceChanges.forEach(change => {
+          summaryMsg += `• ${change.itemName}: $${change.oldPrice.toFixed(2)} → $${change.newPrice.toFixed(2)}\n`;
+        });
+        summaryMsg += '\n';
+      }
+
+      if (newItems.length > 0) {
+        summaryMsg += `<strong>${newItems.length} unmatched items</strong> from invoice. Add them manually if needed.\n\n`;
+      }
+
+      const unmatchedPending = state.pendingItems.filter(p => !Object.values(state.matches).includes(p.id)).length;
+      if (unmatchedPending > 0) {
+        summaryMsg += `<strong>${unmatchedPending} pending items</strong> were not found on invoice (marked in notes).`;
+      }
+
+      showMessage(summaryMsg, 'success');
+
+      // Scroll to check-in view
+      document.getElementById('pendingOrderCheckInView').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    } catch (error) {
+      hideLoading();
+      console.error('Error applying OCR matches:', error);
+      showMessage('Failed to apply matches: ' + error.message, 'error');
     }
   }
 
