@@ -234,7 +234,7 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
 
   // Column centers (2 columns)
   const COL_1_X = 154; // Left column center (adjusted 14pt right from 140)
-  const COL_2_X = 458; // Right column center (adjusted 14pt right from 444)
+  const COL_2_X = 452; // Right column center (adjusted 6pt left from 458)
 
   // Row centers (3 rows)
   const ROW_1_Y = 144; // Top row center
@@ -288,6 +288,10 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       const heartX = centerX + (gyroTextWidth / 2) + 4; // 4pt spacing after text
       const heartY = centerY - 67 - 3; // Align with text baseline
       drawBlueHeart(doc, heartX, heartY, 5);
+
+      // Website and phone (ingredient labels only, same style as tagline)
+      doc.text('www.jaynagyro.com', centerX, centerY - 58, { align: 'center' });
+      doc.text('(916) 898-2708', centerX, centerY - 49, { align: 'center' });
 
       // Item name (big, center, BOLD ALL CAPS)
       doc.setFont('helvetica', 'bold');
