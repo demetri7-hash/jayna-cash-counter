@@ -233,8 +233,8 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
   const LABEL_RADIUS = 108;
 
   // Column centers (2 columns)
-  const COL_1_X = 140; // Left column center (moved left by 1cm)
-  const COL_2_X = 444; // Right column center
+  const COL_1_X = 154; // Left column center (adjusted 14pt right from 140)
+  const COL_2_X = 458; // Right column center (adjusted 14pt right from 444)
 
   // Row centers (3 rows)
   const ROW_1_Y = 144; // Top row center
