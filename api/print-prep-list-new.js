@@ -466,8 +466,9 @@ function generatePrepListPDF(prep, order, lineItems) {
   }
 
   doc.text(`${orderLabel} #${orderNum}`, 40, yPos);
+  yPos += 14;
   doc.setFont('helvetica', 'normal');
-  doc.text(`${order.customer_name || 'Customer'}`, 140, yPos);
+  doc.text(`${order.customer_name || 'Customer'}`, 40, yPos);
   yPos += 14;
 
   if (order.delivery_date && order.delivery_time) {

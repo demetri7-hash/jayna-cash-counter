@@ -233,7 +233,7 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
   const LABEL_RADIUS = 108;
 
   // Column centers (2 columns)
-  const COL_1_X = 168; // Left column center
+  const COL_1_X = 140; // Left column center (moved left by 1cm)
   const COL_2_X = 444; // Right column center
 
   // Row centers (3 rows)
@@ -270,10 +270,7 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
     const centerX = pos.x;
     const centerY = pos.y;
 
-    // Draw circle outline for alignment (very light gray)
-    doc.setDrawColor(230, 230, 230);
-    doc.setLineWidth(0.5);
-    doc.circle(centerX, centerY, LABEL_RADIUS, 'S');
+    // Circle outline removed per user request - no border needed
 
     if (isIngredient) {
       // ========== INGREDIENT LABEL ==========
