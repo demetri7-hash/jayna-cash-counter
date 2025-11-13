@@ -182,29 +182,25 @@ async function generateOrderReceiptPDF(order, lineItems) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
   doc.setCharSpace(0);
 
-  // DESIGN SYSTEM: Color palette (grayscale + Jayna blue)
+  // DESIGN SYSTEM: Color palette (grayscale only, no color blocks)
   const black = [0, 0, 0];
   const darkGray = [60, 60, 60];
-  const gray = [120, 120, 120];
+  const gray = [127, 127, 127]; // 50% gray for borders/lines
   const lightGray = [200, 200, 200];
-  const jaynaBlue = [30, 64, 175]; // #1E40AF
 
-  // NARROW MARGINS: 30pt left/right (was 40pt), 25pt top
+  // NARROW MARGINS: 30pt left/right, 25pt top
   const margin = { left: 30, right: 30, top: 25 };
   const pageWidth = 612; // Letter width
   const contentWidth = pageWidth - margin.left - margin.right;
 
   let y = margin.top;
 
-  // ===== HEADER: JAYNA GYRO (Jayna blue bar with white text) =====
-  doc.setFillColor(...jaynaBlue);
-  doc.rect(0, y, pageWidth, 22, 'F');
-  doc.setFontSize(13);
+  // ===== HEADER: JAYNA GYRO (simple black text, no color bar) =====
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text('JAYNA GYRO CATERING', margin.left, y + 16);
   doc.setTextColor(...black);
-  y += 22;
+  doc.text('JAYNA GYRO CATERING', margin.left, y);
+  y += 16;
 
   // ===== ORDER NUMBER & STATUS (tight, black text) =====
   y += 8;
@@ -233,22 +229,22 @@ async function generateOrderReceiptPDF(order, lineItems) {
   doc.setTextColor(...black);
   y += 9;
 
-  // Thin separator line
-  doc.setDrawColor(...lightGray);
-  doc.setLineWidth(0.5);
+  // Gray separator line (2pt, 50% gray)
+  doc.setDrawColor(...gray);
+  doc.setLineWidth(2);
   doc.line(margin.left, y, pageWidth - margin.right, y);
-  y += 7;
+  y += 12;
 
   // ===== DELIVERY/PICKUP INFO (no box, just clean text) =====
   const isPickup = !order.delivery_address;
 
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
   doc.text(isPickup ? 'PICKUP INFORMATION' : 'DELIVERY INFORMATION', margin.left, y);
-  y += 10;
+  y += 14;
 
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...darkGray);
 
@@ -260,75 +256,102 @@ async function generateOrderReceiptPDF(order, lineItems) {
     doc.text(`${isPickup ? 'PICKUP' : 'DUE'}:`, margin.left, y);
     doc.setFont('helvetica', 'normal');
     doc.text(`${dateStr} at ${timeStr}`, margin.left + 55, y);
-    y += 9;
+    y += 12;
 
-    // LEAVE JAYNA AT (delivery only, Jayna blue highlight)
+    // LEAVE JAYNA AT (delivery only, MUCH BIGGER AND BOLDER!)
     if (!isPickup) {
       const dueTime = new Date(order.delivery_time);
       const leaveTime = new Date(dueTime.getTime() - 25 * 60000);
       const leaveTimeStr = new Intl.DateTimeFormat('en-US', {
         hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles'
       }).format(leaveTime);
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...jaynaBlue);
-      doc.text(`LEAVE JAYNA AT: ${leaveTimeStr}`, margin.left, y);
       doc.setTextColor(...black);
-      y += 9;
+      doc.text(`LEAVE JAYNA AT: ${leaveTimeStr}`, margin.left, y);
+      y += 16;
     }
   }
 
   if (order.customer_name) {
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...black);
     doc.text('CUSTOMER:', margin.left, y);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...darkGray);
     doc.text(order.customer_name, margin.left + 55, y);
-    y += 9;
+    y += 12;
   }
 
   if (order.customer_phone) {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...black);
     doc.text('PHONE:', margin.left, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...darkGray);
     doc.text(formatPhoneNumber(order.customer_phone), margin.left + 55, y);
-    y += 9;
+    y += 12;
   }
 
   if (order.customer_email) {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...black);
     doc.text('EMAIL:', margin.left, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...darkGray);
     doc.text(order.customer_email, margin.left + 55, y);
-    y += 9;
+    y += 12;
   }
 
   if (order.delivery_address) {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...black);
     doc.text('ADDRESS:', margin.left, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...darkGray);
     const addressLines = doc.splitTextToSize(order.delivery_address, contentWidth - 55);
     addressLines.forEach((line, idx) => {
       doc.text(line, margin.left + (idx === 0 ? 55 : 0), y);
-      if (idx < addressLines.length - 1) y += 8;
+      if (idx < addressLines.length - 1) y += 10;
     });
-    y += 9;
+    y += 12;
   }
 
   if (order.headcount) {
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...black);
     doc.text('HEADCOUNT:', margin.left, y);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...darkGray);
     doc.text(`${order.headcount} guests`, margin.left + 55, y);
-    y += 9;
+    y += 12;
   }
 
   if (order.utensils_required !== null && order.utensils_required !== undefined) {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...black);
     doc.text('UTENSILS:', margin.left, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...darkGray);
     const utensilText = order.utensils_required
       ? (order.utensils_quantity || order.headcount ? `${order.utensils_quantity || order.headcount} sets` : 'Yes')
       : 'No';
     doc.text(utensilText, margin.left + 55, y);
-    y += 9;
+    y += 12;
   }
 
-  // Thin separator line
-  y += 3;
-  doc.setDrawColor(...lightGray);
+  // Gray separator line (2pt, 50% gray)
+  y += 4;
+  doc.setDrawColor(...gray);
+  doc.setLineWidth(2);
   doc.line(margin.left, y, pageWidth - margin.right, y);
-  y += 7;
+  y += 12;
 
   // ===== ORDER ITEMS TABLE (compact, grayscale, no thick borders) =====
   doc.setFontSize(9);
@@ -376,19 +399,19 @@ async function generateOrderReceiptPDF(order, lineItems) {
       startY: y,
       theme: 'plain',
       styles: {
-        fontSize: 7,
-        cellPadding: { top: 2, right: 3, bottom: 2, left: 0 },
-        lineColor: [220, 220, 220],
-        lineWidth: 0.3,
+        fontSize: 8,
+        cellPadding: { top: 3, right: 4, bottom: 3, left: 0 },
+        lineColor: [127, 127, 127], // 50% gray
+        lineWidth: 1,
         textColor: [0, 0, 0]
       },
       headStyles: {
-        fillColor: [240, 240, 240],
+        fillColor: [245, 245, 245],
         textColor: [0, 0, 0],
         fontStyle: 'bold',
-        fontSize: 7,
+        fontSize: 8,
         halign: 'left',
-        cellPadding: { top: 4, right: 3, bottom: 4, left: 0 }
+        cellPadding: { top: 5, right: 4, bottom: 5, left: 0 }
       },
       columnStyles: {
         0: { cellWidth: contentWidth - 100 },
@@ -397,63 +420,63 @@ async function generateOrderReceiptPDF(order, lineItems) {
       },
       margin: { left: margin.left, right: margin.right },
       didDrawPage: (data) => {
-        // Add subtle border around table
+        // Add gray border around table (2pt)
         const tableHeight = data.cursor.y - data.settings.startY;
-        doc.setDrawColor(...lightGray);
-        doc.setLineWidth(0.5);
+        doc.setDrawColor(127, 127, 127); // 50% gray
+        doc.setLineWidth(2);
         doc.rect(margin.left, data.settings.startY, contentWidth, tableHeight);
       }
     });
 
-    y = doc.lastAutoTable.finalY + 6;
+    y = doc.lastAutoTable.finalY + 10;
   }
 
-  // ===== FINANCIAL BREAKDOWN (compact, right-aligned) =====
+  // ===== FINANCIAL BREAKDOWN (better spacing, right-aligned) =====
   if (order.subtotal !== null && order.subtotal !== undefined) {
-    y += 3;
-    doc.setFontSize(7);
+    y += 6;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
 
     const rightX = pageWidth - margin.right;
 
     if (order.subtotal) {
-      doc.text('Subtotal:', rightX - 65, y, { align: 'left' });
+      doc.text('Subtotal:', rightX - 70, y, { align: 'left' });
       doc.text(`$${parseFloat(order.subtotal || 0).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 8;
+      y += 10;
     }
 
     if (order.delivery_fee && parseFloat(order.delivery_fee) > 0) {
-      doc.text('Delivery Fee:', rightX - 65, y, { align: 'left' });
+      doc.text('Delivery Fee:', rightX - 70, y, { align: 'left' });
       doc.text(`$${parseFloat(order.delivery_fee).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 8;
+      y += 10;
     }
 
     if (order.tax !== null && order.tax !== undefined) {
-      doc.text('Tax:', rightX - 65, y, { align: 'left' });
+      doc.text('Tax:', rightX - 70, y, { align: 'left' });
       doc.text(`$${parseFloat(order.tax || 0).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 8;
+      y += 10;
     }
 
     if (order.tip && parseFloat(order.tip) > 0) {
-      doc.text('Tip:', rightX - 65, y, { align: 'left' });
+      doc.text('Tip:', rightX - 70, y, { align: 'left' });
       doc.text(`$${parseFloat(order.tip).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 8;
+      y += 10;
     }
 
-    y += 3;
+    y += 6;
   }
 
-  // ===== ORDER TOTAL (Jayna blue bar, white text) =====
-  doc.setFillColor(...jaynaBlue);
-  doc.rect(margin.left, y, contentWidth, 18, 'F');
-  doc.setFontSize(10);
+  // ===== ORDER TOTAL (gray border box, black text) =====
+  doc.setDrawColor(...gray);
+  doc.setLineWidth(2);
+  doc.rect(margin.left, y, contentWidth, 20);
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text('ORDER TOTAL:', margin.left + 4, y + 12);
-  doc.text(`$${parseFloat(order.total_amount || 0).toFixed(2)}`, pageWidth - margin.right - 4, y + 12, { align: 'right' });
   doc.setTextColor(...black);
-  y += 20;
+  doc.text('ORDER TOTAL:', margin.left + 4, y + 14);
+  doc.text(`$${parseFloat(order.total_amount || 0).toFixed(2)}`, pageWidth - margin.right - 4, y + 14, { align: 'right' });
+  y += 24;
 
   // ===== SPECIAL NOTES (compact, minimal styling) =====
   if (order.delivery_notes && y < 730) {
