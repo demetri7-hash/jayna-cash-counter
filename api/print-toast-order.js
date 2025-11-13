@@ -198,16 +198,16 @@ async function generateOrderReceiptPDF(order, lineItems) {
 
   // ===== HEADER: JAYNA GYRO (Jayna blue bar with white text) =====
   doc.setFillColor(...jaynaBlue);
-  doc.rect(0, y, pageWidth, 28, 'F');
-  doc.setFontSize(16);
+  doc.rect(0, y, pageWidth, 22, 'F');
+  doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  doc.text('JAYNA GYRO CATERING', margin.left, y + 19);
+  doc.text('JAYNA GYRO CATERING', margin.left, y + 16);
   doc.setTextColor(...black);
-  y += 28;
+  y += 22;
 
   // ===== ORDER NUMBER & STATUS (tight, black text) =====
-  y += 12;
+  y += 8;
   let orderNum, orderLabel;
   if (order.source_system === 'EZCATER') {
     orderNum = order.order_number || 'N/A';
@@ -217,13 +217,13 @@ async function generateOrderReceiptPDF(order, lineItems) {
     orderLabel = 'TOAST ORDER';
   }
 
-  doc.setFontSize(14);
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text(`${orderLabel} #${orderNum}`, margin.left, y);
-  y += 14;
+  y += 12;
 
   // Status line (compact)
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...darkGray);
   let statusLine = `STATUS: ${(order.status || 'CONFIRMED').toUpperCase()}`;
@@ -231,24 +231,24 @@ async function generateOrderReceiptPDF(order, lineItems) {
   if (order.check_number) statusLine += ` | CHECK #${order.check_number}`;
   doc.text(statusLine, margin.left, y);
   doc.setTextColor(...black);
-  y += 12;
+  y += 9;
 
   // Thin separator line
   doc.setDrawColor(...lightGray);
   doc.setLineWidth(0.5);
   doc.line(margin.left, y, pageWidth - margin.right, y);
-  y += 10;
+  y += 7;
 
   // ===== DELIVERY/PICKUP INFO (no box, just clean text) =====
   const isPickup = !order.delivery_address;
 
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
   doc.text(isPickup ? 'PICKUP INFORMATION' : 'DELIVERY INFORMATION', margin.left, y);
-  y += 12;
+  y += 10;
 
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...darkGray);
 
@@ -259,8 +259,8 @@ async function generateOrderReceiptPDF(order, lineItems) {
     doc.setTextColor(...black);
     doc.text(`${isPickup ? 'PICKUP' : 'DUE'}:`, margin.left, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${dateStr} at ${timeStr}`, margin.left + 60, y);
-    y += 11;
+    doc.text(`${dateStr} at ${timeStr}`, margin.left + 55, y);
+    y += 9;
 
     // LEAVE JAYNA AT (delivery only, Jayna blue highlight)
     if (!isPickup) {
@@ -273,7 +273,7 @@ async function generateOrderReceiptPDF(order, lineItems) {
       doc.setTextColor(...jaynaBlue);
       doc.text(`LEAVE JAYNA AT: ${leaveTimeStr}`, margin.left, y);
       doc.setTextColor(...black);
-      y += 11;
+      y += 9;
     }
   }
 
@@ -281,38 +281,38 @@ async function generateOrderReceiptPDF(order, lineItems) {
     doc.setFont('helvetica', 'bold');
     doc.text('CUSTOMER:', margin.left, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(order.customer_name, margin.left + 60, y);
-    y += 11;
+    doc.text(order.customer_name, margin.left + 55, y);
+    y += 9;
   }
 
   if (order.customer_phone) {
     doc.text('PHONE:', margin.left, y);
-    doc.text(formatPhoneNumber(order.customer_phone), margin.left + 60, y);
-    y += 11;
+    doc.text(formatPhoneNumber(order.customer_phone), margin.left + 55, y);
+    y += 9;
   }
 
   if (order.customer_email) {
     doc.text('EMAIL:', margin.left, y);
-    doc.text(order.customer_email, margin.left + 60, y);
-    y += 11;
+    doc.text(order.customer_email, margin.left + 55, y);
+    y += 9;
   }
 
   if (order.delivery_address) {
     doc.text('ADDRESS:', margin.left, y);
-    const addressLines = doc.splitTextToSize(order.delivery_address, contentWidth - 60);
+    const addressLines = doc.splitTextToSize(order.delivery_address, contentWidth - 55);
     addressLines.forEach((line, idx) => {
-      doc.text(line, margin.left + (idx === 0 ? 60 : 0), y);
-      if (idx < addressLines.length - 1) y += 10;
+      doc.text(line, margin.left + (idx === 0 ? 55 : 0), y);
+      if (idx < addressLines.length - 1) y += 8;
     });
-    y += 11;
+    y += 9;
   }
 
   if (order.headcount) {
     doc.setFont('helvetica', 'bold');
     doc.text('HEADCOUNT:', margin.left, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${order.headcount} guests`, margin.left + 60, y);
-    y += 11;
+    doc.text(`${order.headcount} guests`, margin.left + 55, y);
+    y += 9;
   }
 
   if (order.utensils_required !== null && order.utensils_required !== undefined) {
@@ -320,22 +320,22 @@ async function generateOrderReceiptPDF(order, lineItems) {
     const utensilText = order.utensils_required
       ? (order.utensils_quantity || order.headcount ? `${order.utensils_quantity || order.headcount} sets` : 'Yes')
       : 'No';
-    doc.text(utensilText, margin.left + 60, y);
-    y += 11;
+    doc.text(utensilText, margin.left + 55, y);
+    y += 9;
   }
 
   // Thin separator line
-  y += 4;
+  y += 3;
   doc.setDrawColor(...lightGray);
   doc.line(margin.left, y, pageWidth - margin.right, y);
-  y += 10;
+  y += 7;
 
   // ===== ORDER ITEMS TABLE (compact, grayscale, no thick borders) =====
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
   doc.text('ORDER ITEMS', margin.left, y);
-  y += 8;
+  y += 7;
 
   if (lineItems.length === 0) {
     doc.setFontSize(9);
@@ -376,8 +376,8 @@ async function generateOrderReceiptPDF(order, lineItems) {
       startY: y,
       theme: 'plain',
       styles: {
-        fontSize: 8,
-        cellPadding: { top: 3, right: 4, bottom: 3, left: 0 },
+        fontSize: 7,
+        cellPadding: { top: 2, right: 3, bottom: 2, left: 0 },
         lineColor: [220, 220, 220],
         lineWidth: 0.3,
         textColor: [0, 0, 0]
@@ -386,9 +386,9 @@ async function generateOrderReceiptPDF(order, lineItems) {
         fillColor: [240, 240, 240],
         textColor: [0, 0, 0],
         fontStyle: 'bold',
-        fontSize: 8,
+        fontSize: 7,
         halign: 'left',
-        cellPadding: { top: 5, right: 4, bottom: 5, left: 0 }
+        cellPadding: { top: 4, right: 3, bottom: 4, left: 0 }
       },
       columnStyles: {
         0: { cellWidth: contentWidth - 100 },
@@ -405,83 +405,82 @@ async function generateOrderReceiptPDF(order, lineItems) {
       }
     });
 
-    y = doc.lastAutoTable.finalY + 8;
+    y = doc.lastAutoTable.finalY + 6;
   }
 
   // ===== FINANCIAL BREAKDOWN (compact, right-aligned) =====
   if (order.subtotal !== null && order.subtotal !== undefined) {
-    y += 4;
-    doc.setFontSize(8);
+    y += 3;
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
 
     const rightX = pageWidth - margin.right;
 
     if (order.subtotal) {
-      doc.text('Subtotal:', rightX - 70, y, { align: 'left' });
+      doc.text('Subtotal:', rightX - 65, y, { align: 'left' });
       doc.text(`$${parseFloat(order.subtotal || 0).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 10;
+      y += 8;
     }
 
     if (order.delivery_fee && parseFloat(order.delivery_fee) > 0) {
-      doc.text('Delivery Fee:', rightX - 70, y, { align: 'left' });
+      doc.text('Delivery Fee:', rightX - 65, y, { align: 'left' });
       doc.text(`$${parseFloat(order.delivery_fee).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 10;
+      y += 8;
     }
 
     if (order.tax !== null && order.tax !== undefined) {
-      doc.text('Tax:', rightX - 70, y, { align: 'left' });
+      doc.text('Tax:', rightX - 65, y, { align: 'left' });
       doc.text(`$${parseFloat(order.tax || 0).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 10;
+      y += 8;
     }
 
     if (order.tip && parseFloat(order.tip) > 0) {
-      doc.text('Tip:', rightX - 70, y, { align: 'left' });
+      doc.text('Tip:', rightX - 65, y, { align: 'left' });
       doc.text(`$${parseFloat(order.tip).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 10;
+      y += 8;
     }
 
-    y += 4;
+    y += 3;
   }
 
   // ===== ORDER TOTAL (Jayna blue bar, white text) =====
   doc.setFillColor(...jaynaBlue);
-  doc.rect(margin.left, y, contentWidth, 20, 'F');
-  doc.setFontSize(11);
+  doc.rect(margin.left, y, contentWidth, 18, 'F');
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  doc.text('ORDER TOTAL:', margin.left + 4, y + 14);
-  doc.text(`$${parseFloat(order.total_amount || 0).toFixed(2)}`, pageWidth - margin.right - 4, y + 14, { align: 'right' });
+  doc.text('ORDER TOTAL:', margin.left + 4, y + 12);
+  doc.text(`$${parseFloat(order.total_amount || 0).toFixed(2)}`, pageWidth - margin.right - 4, y + 12, { align: 'right' });
   doc.setTextColor(...black);
-  y += 24;
+  y += 20;
 
   // ===== SPECIAL NOTES (compact, minimal styling) =====
-  if (order.delivery_notes) {
-    y += 8;
-    doc.setFontSize(9);
+  if (order.delivery_notes && y < 730) {
+    y += 6;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.text('SPECIAL NOTES:', margin.left, y);
-    y += 11;
+    y += 9;
 
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
     const notesLines = doc.splitTextToSize(order.delivery_notes, contentWidth);
     notesLines.forEach((line, idx) => {
-      if (idx < 4 && y < 750) {
+      if (idx < 5 && y < 755) {
         doc.text(line, margin.left, y);
-        y += 10;
+        y += 8;
       }
     });
     doc.setTextColor(...black);
-    y += 4;
   }
 
-  // ===== FOOTER (minimal, gray) =====
-  doc.setFontSize(7);
+  // ===== FOOTER (minimal, gray) - ensure no overlap =====
+  doc.setFontSize(6);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...gray);
-  doc.text(`Generated: ${formatPacificDateTime(new Date())} PST`, margin.left, 772);
+  doc.text(`Generated: ${formatPacificDateTime(new Date())} PST`, margin.left, 774);
 
   return doc.output('datauristring').split(',')[1];
 }

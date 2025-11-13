@@ -429,21 +429,26 @@ function formatPanCount(halfPanCount) {
 }
 
 /**
- * Generate prep list PDF - Modern, clean design
- * All caps, grayscale with blue accents, checkboxes, handwriting space
+ * Generate prep list PDF - REDESIGNED
+ * Clean, modern, tight, APTOS-style design with grayscale + Jayna blue
  */
 function generatePrepListPDF(prep, order, lineItems) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-
-  // Set normal character spacing (no extra spacing)
   doc.setCharSpace(0);
 
-  // Simple grayscale colors (no blue!)
+  // DESIGN SYSTEM: Color palette (grayscale + Jayna blue)
   const black = [0, 0, 0];
-  const darkGray = [75, 75, 75];
+  const darkGray = [60, 60, 60];
+  const gray = [120, 120, 120];
   const lightGray = [200, 200, 200];
+  const jaynaBlue = [30, 64, 175]; // #1E40AF
 
-  let yPos = 40;
+  // NARROW MARGINS: 30pt (was 40pt)
+  const margin = 30;
+  const pageWidth = 612;
+  const contentWidth = pageWidth - (margin * 2);
+
+  let y = 25; // Top margin
 
   // ===== HEADER - Simple black text =====
   doc.setFontSize(20);

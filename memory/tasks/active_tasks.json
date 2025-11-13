@@ -1,6 +1,98 @@
 {
   "tasks": [
     {
+      "id": "task_20251110_004",
+      "title": "Build TipShare FOH Tip-Out Calculator for Tarla Grill",
+      "description": "Complete multi-page web application for automating FOH tip-out calculations with Supabase database integration - independent from main Jayna Gyro app",
+      "status": "completed",
+      "priority": "high",
+      "created": "2025-11-10T23:30:00Z",
+      "completed": "2025-11-11T00:45:00Z",
+      "related_files": [
+        "tarla-tip-app/index.html",
+        "tarla-tip-app/roster.html",
+        "tarla-tip-app/history.html",
+        "tarla-tip-app/supabase-client.js",
+        "tarla-tip-app/schema.sql",
+        "tarla-tip-app/README.md"
+      ],
+      "dependencies": [],
+      "notes": [
+        "INDEPENDENT APPLICATION: Completely separate from Jayna Gyro system in /tarla-tip-app folder",
+        "DATABASE: 3 Supabase tables (Tarla_Employees, Tarla_Shifts, Tarla_Shift_Entries)",
+        "BUSINESS LOGIC: 3-role tip-out system (Servers contribute, Support Staff receive, Bartenders independent)",
+        "MAIN CALCULATOR (index.html): Enter daily sales/tips, auto-calculate payouts, save to database",
+        "ROSTER MANAGEMENT (roster.html): CRUD operations for employees (Server, Bartender, Support Staff)",
+        "HISTORY (history.html): View all past shift reports with detailed payouts",
+        "CALCULATIONS: Support Pool = Sum(Server Net Sales × Server %), divided equally among Support Staff",
+        "Server Payout: CC Tips - (Net Sales × Server %)",
+        "Support Staff Payout: Support Pool / Number of Support Staff",
+        "Bartender Payout: CC Tips - (Net Sales × Bartender %)",
+        "TECHNOLOGY: Tailwind CSS, Supabase.js CDN, pure vanilla JavaScript",
+        "DEPLOYMENT: Live at jayna-cash-counter.vercel.app/tarla-tip-app/",
+        "Supabase URL: https://gaawtbqpnnbbnsyswqwv.supabase.co",
+        "FEATURES: Print-optimized reports, mobile responsive, historical data persistence",
+        "USER FLOW: 1) Add employees in roster, 2) Calculate shift report, 3) View/print history",
+        "Sample employees included in schema for testing",
+        "All database tables verified and operational"
+      ]
+    },
+    {
+      "id": "task_20251110_003",
+      "title": "Fix Leaderboard Name Sync When Changing Prep Item User",
+      "description": "Update prep_count_log table when user clicks name to reassign prep item - ensures leaderboard shows correct person",
+      "status": "completed",
+      "priority": "high",
+      "created": "2025-11-10T23:00:00Z",
+      "completed": "2025-11-10T23:15:00Z",
+      "related_files": [
+        "orders-prep.html"
+      ],
+      "dependencies": [],
+      "notes": [
+        "BUG: When clicking name to change who counted prep item, only inventory_items updated, not prep_count_log",
+        "RESULT: Leaderboard showed original person instead of reassigned person",
+        "FIX: changePrepItemUser() now updates BOTH tables",
+        "Updates inventory_items.counted_by (existing behavior)",
+        "ALSO updates prep_count_log.counted_by (NEW - fixes leaderboard)",
+        "Finds most recent log entry for item and updates it",
+        "Both tables stay in sync → leaderboard accurate",
+        "Location: orders-prep.html lines 2318-2337",
+        "Deployed to production: commit 03f0932"
+      ]
+    },
+    {
+      "id": "task_20251110_002",
+      "title": "Fix Multiple Database Issues in Orders & Prep System",
+      "description": "Fixed price_history missing columns, invoices table column mismatch, and MANAGE tab password authentication",
+      "status": "completed",
+      "priority": "high",
+      "created": "2025-11-10T22:00:00Z",
+      "completed": "2025-11-10T23:00:00Z",
+      "related_files": [
+        "orders-prep.html",
+        "database/migrations/add_source_columns_to_price_history.sql",
+        "api/migrate-price-history.js"
+      ],
+      "dependencies": [],
+      "notes": [
+        "ISSUE 1: Price history tracking error - 'source' column not found (PGRST204)",
+        "Created SQL migration: add_source_columns_to_price_history.sql",
+        "Added columns: source (TEXT), source_id (BIGINT), updated_at (TIMESTAMP)",
+        "Created API endpoint: api/migrate-price-history.js for automated migration",
+        "ISSUE 2: Invoice learning system error - wrong column name",
+        "Code used 'vendor_name' but actual column is 'vendor' in invoices table",
+        "Fixed: orders-prep.html line 16552 (vendor_name → vendor)",
+        "ISSUE 3: MANAGE tab password not accepting JaynaGyro2025!",
+        "Missing password parameter in requirePasswordFor() function call",
+        "Fixed: orders-prep.html line 3151 - added 'JaynaGyro2025!' as 3rd parameter",
+        "All three issues resolved and deployed: commits 9624c75, e56c6a8, bf107cb",
+        "Price tracking now working correctly during pending order check-in",
+        "Invoice learning system saves matched items for future auto-detection",
+        "MANAGE tab now accepts master password correctly"
+      ]
+    },
+    {
       "id": "task_20251110_001",
       "title": "Implement 3-Inch Round Label Printing for Catering Orders",
       "description": "Complete PDF generation system for 3\" round labels (6 per page: 2 columns x 3 rows) with confirmation popup and dual print/download options",
