@@ -288,15 +288,18 @@ export default async function handler(req, res) {
       // CRITICAL: Must convert to Pacific time before extracting date!
       let deliveryDate = null;
       if (order.promisedDate) {
-        // Parse promisedDate and convert to Pacific timezone to get correct date
+        // Parse promisedDate as UTC
         const promisedUTC = new Date(order.promisedDate);
-        // Convert to Pacific timezone
-        const promisedPacific = new Date(promisedUTC.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-        // Extract date in YYYY-MM-DD format
-        const year = promisedPacific.getFullYear();
-        const month = String(promisedPacific.getMonth() + 1).padStart(2, '0');
-        const day = String(promisedPacific.getDate()).padStart(2, '0');
-        deliveryDate = `${year}-${month}-${day}`;
+
+        // Use Intl.DateTimeFormat to convert directly to Pacific timezone YYYY-MM-DD
+        // This ensures we get the correct date in Pacific time without server timezone issues
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+        deliveryDate = formatter.format(promisedUTC); // Returns "YYYY-MM-DD"
 
         console.log(`📅 Date conversion: UTC=${order.promisedDate} → Pacific=${deliveryDate}`);
       } else {
