@@ -376,11 +376,11 @@ function calculateProteinPans(byoItems) {
     let containerType = '';
 
     // Pan calculation logic:
-    // <5 = brown bowls
+    // <5 = brown bowl (singular in breakdown, pluralized in summary if needed)
     // 6-20 = 1 half pan
     // 21+ = calculate half pans, combine 2 half pans into full pans
     if (qty < 5) {
-      containerType = 'brown bowls';
+      containerType = 'brown bowl';
     } else if (qty <= 20) {
       containerType = '1 half pan';
     } else {
@@ -426,6 +426,80 @@ function formatPanCount(halfPanCount) {
   } else {
     return `1 half pan`;
   }
+}
+
+/**
+ * Helper: Render text with bold segments and real checkbox
+ * Parses text with **bold** markers and renders accordingly
+ * Replaces "[ ]" with an actual checkbox
+ * Example: "[ ] 4x Chicken (**brown bowl**) - **1 tong**"
+ */
+function renderTextWithBold(doc, text, x, y, drawCheckbox = true) {
+  // Draw checkbox if text starts with [ ]
+  let textToRender = text;
+  let startX = x;
+
+  if (drawCheckbox && text.startsWith('[ ] ')) {
+    // Draw checkbox (8pt square)
+    const checkboxSize = 8;
+    const checkboxY = y - 7; // Align checkbox vertically with text
+    doc.setDrawColor(100, 100, 100); // Dark gray
+    doc.setLineWidth(0.5);
+    doc.rect(x, checkboxY, checkboxSize, checkboxSize, 'S');
+
+    // Move start position after checkbox
+    startX = x + checkboxSize + 4; // 4pt spacing after checkbox
+    textToRender = text.substring(4); // Remove "[ ] " from text
+  }
+
+  // Split text by **bold** markers
+  const segments = [];
+  let remainingText = textToRender;
+  let match;
+  const boldRegex = /\*\*(.*?)\*\*/g;
+  let lastIndex = 0;
+
+  while ((match = boldRegex.exec(remainingText)) !== null) {
+    // Add normal text before bold
+    if (match.index > lastIndex) {
+      segments.push({
+        text: remainingText.substring(lastIndex, match.index),
+        bold: false
+      });
+    }
+    // Add bold text
+    segments.push({
+      text: match[1],
+      bold: true
+    });
+    lastIndex = boldRegex.lastIndex;
+  }
+
+  // Add remaining normal text
+  if (lastIndex < remainingText.length) {
+    segments.push({
+      text: remainingText.substring(lastIndex),
+      bold: false
+    });
+  }
+
+  // Render segments
+  let currentX = startX;
+  const originalFont = doc.internal.getFont().fontName;
+  const originalStyle = doc.internal.getFont().fontStyle;
+
+  segments.forEach(segment => {
+    if (segment.bold) {
+      doc.setFont('helvetica', 'bold');
+    } else {
+      doc.setFont(originalFont, originalStyle);
+    }
+    doc.text(segment.text, currentX, y);
+    currentX += doc.getTextWidth(segment.text);
+  });
+
+  // Restore original font
+  doc.setFont(originalFont, originalStyle);
 }
 
 /**
@@ -933,7 +1007,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     // === PROTEINS (ALWAYS AT TOP) ===
     const proteinPans = calculateProteinPans(prep.byoGyros.items || []);
     proteinPans.forEach(protein => {
-      doc.text(`[ ] ${protein.qty}x ${protein.name} (${protein.container}) - ${protein.equipment}`, margin + 10, y);
+      renderTextWithBold(doc, `[ ] ${protein.qty}x ${protein.name} (**${protein.container}**) - **${protein.equipment}**`, margin + 10, y);
       y += ss(10);
     });
 
@@ -942,10 +1016,10 @@ function generatePrepListPDF(prep, order, lineItems) {
       y += ss(4);
     }
 
-    doc.text(`[ ] ${sets}x 16oz Tzatziki (no dill) - 1 small spoon`, margin + 10, y); y += ss(10);
-    doc.text(`[ ] ${sets}x 16oz Spicy Aioli - 1 small spoon`, margin + 10, y); y += ss(10);
-    doc.text(`[ ] ${sets}x 16oz Lemon Vinaigrette - 1 small spoon`, margin + 10, y); y += ss(10);
-    doc.text(`[ ] ${formatPanCount(sets)} Mixed Greens - 1 tong`, margin + 10, y); y += ss(10);
+    renderTextWithBold(doc, `[ ] ${sets}x **16oz** Tzatziki (no dill) - **1 small spoon**`, margin + 10, y); y += ss(10);
+    renderTextWithBold(doc, `[ ] ${sets}x **16oz** Spicy Aioli - **1 small spoon**`, margin + 10, y); y += ss(10);
+    renderTextWithBold(doc, `[ ] ${sets}x **16oz** Lemon Vinaigrette - **1 small spoon**`, margin + 10, y); y += ss(10);
+    renderTextWithBold(doc, `[ ] **${formatPanCount(sets)}** Mixed Greens - **1 tong**`, margin + 10, y); y += ss(10);
 
     // DICED TOMATO LOGIC: 30 portions per half pan
     let tomatoContainer = '';
@@ -959,7 +1033,7 @@ function generatePrepListPDF(prep, order, lineItems) {
       const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 30);
       tomatoContainer = formatPanCount(tomatoHalfPans);
     }
-    doc.text(`[ ] ${prep.byoGyros.total} portions Diced Tomatoes (${tomatoContainer}) - 1 large spoon`, margin + 10, y); y += ss(10);
+    renderTextWithBold(doc, `[ ] ${prep.byoGyros.total} portions Diced Tomatoes (**${tomatoContainer}**) - **1 large spoon**`, margin + 10, y); y += ss(10);
 
     // SLICED RED ONION LOGIC: 50 portions per half pan
     let onionContainer = '';
@@ -973,7 +1047,7 @@ function generatePrepListPDF(prep, order, lineItems) {
       const onionHalfPans = Math.ceil(prep.byoGyros.total / 50);
       onionContainer = formatPanCount(onionHalfPans);
     }
-    doc.text(`[ ] ${prep.byoGyros.total} portions Sliced Red Onion (${onionContainer}) - 1 tong`, margin + 10, y); y += ss(10);
+    renderTextWithBold(doc, `[ ] ${prep.byoGyros.total} portions Sliced Red Onion (**${onionContainer}**) - **1 tong**`, margin + 10, y); y += ss(10);
 
     // PEPPERONCINI LOGIC: 100 portions per half pan
     let pepperonciniContainer = '';
@@ -994,12 +1068,12 @@ function generatePrepListPDF(prep, order, lineItems) {
         pepperonciniContainer = `${pepperFullPans} full pan${pepperFullPans > 1 ? 's' : ''}`;
       }
     }
-    doc.text(`[ ] ${prep.byoGyros.total} whole Pepperoncini (${pepperonciniContainer}) - 1 tong`, margin + 10, y); y += ss(10);
+    renderTextWithBold(doc, `[ ] ${prep.byoGyros.total} whole Pepperoncini (**${pepperonciniContainer}**) - **1 tong**`, margin + 10, y); y += ss(10);
 
     // PITA LOGIC: 25 whole pita fit in one FULL pan
     const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
     const pitaFullPans = Math.ceil(pitasNeeded / 25);
-    doc.text(`[ ] ${pitasNeeded} whole Grilled Pita (${pitaFullPans} full pan${pitaFullPans > 1 ? 's' : ''}) - 1 tong`, margin + 10, y); y += ss(14);
+    renderTextWithBold(doc, `[ ] ${pitasNeeded} whole Grilled Pita (**${pitaFullPans} full pan${pitaFullPans > 1 ? 's' : ''}**) - **1 tong**`, margin + 10, y); y += ss(14);
   }
 
   // SALADS
@@ -1030,9 +1104,9 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.salads.forEach(salad => {
       const halfPans = salad.qty < 4 ? salad.qty : salad.qty * 2;
-      doc.text(`[ ] ${salad.qty}x ${toTitleCase(salad.name)} (${formatPanCount(halfPans)}) - 1 tong`, margin + 10, y); y += ss(9);
+      renderTextWithBold(doc, `[ ] ${salad.qty}x ${toTitleCase(salad.name)} (**${formatPanCount(halfPans)}**) - **1 tong**`, margin + 10, y); y += ss(9);
       doc.setTextColor(...darkGray);
-      doc.text(`    - ${salad.qty}x 16oz Lemon Vin - 1 small spoon`, margin + 16, y);
+      renderTextWithBold(doc, `    - ${salad.qty}x **16oz** Lemon Vin - **1 small spoon**`, margin + 16, y);
       doc.setTextColor(...black);
       y += ss(11);
     });
@@ -1069,7 +1143,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     prep.dips.forEach(dip => {
-      doc.text(`[ ] ${dip.qty}x 16oz ${toTitleCase(dip.name)} (garnish) - 1 small spoon`, margin + 10, y); y += ss(9);
+      renderTextWithBold(doc, `[ ] ${dip.qty}x **16oz** ${toTitleCase(dip.name)} (garnish) - **1 small spoon**`, margin + 10, y); y += ss(9);
 
       const hasVeggies = dip.modifiers.some(m => m.name && (m.name.includes('VEGGIES') || m.name.includes('VEGGIE')));
       const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
@@ -1078,11 +1152,11 @@ function generatePrepListPDF(prep, order, lineItems) {
 
       doc.setTextColor(...darkGray);
       if (hasVeggies) {
-        doc.text(`    - ${dip.qty * 24} carrots + ${dip.qty * 24} celery (brown bowls) - 2 tongs total`, margin + 16, y); y += ss(9);
+        renderTextWithBold(doc, `    - ${dip.qty * 24} carrots + ${dip.qty * 24} celery (**brown bowl**) - **2 tongs total**`, margin + 16, y); y += ss(9);
       }
       if (hasPita) {
         const regularPitaHalfPans = dip.qty; // 1 half pan per dip (6 pitas sliced)
-        doc.text(`    - ${dip.qty * 6} pitas sliced 8 pieces (${formatPanCount(regularPitaHalfPans)}) - 1 tong`, margin + 16, y); y += ss(9);
+        renderTextWithBold(doc, `    - ${dip.qty * 6} pitas sliced 8 pieces (**${formatPanCount(regularPitaHalfPans)}**) - **1 tong**`, margin + 16, y); y += ss(9);
       }
       if (hasGFPita && gfPitaMod) {
         // GF pita is an ADDON - only prep exactly what customer paid for (no defaults!)
@@ -1100,10 +1174,10 @@ function generatePrepListPDF(prep, order, lineItems) {
 
         if (gfQty && gfQty > 0) {
           const gfPitaHalfPans = Math.ceil(gfQty / 6);
-          doc.text(`    - ${gfQty} GF pitas sliced 8 pieces (${formatPanCount(gfPitaHalfPans)}) - 1 tong`, margin + 16, y); y += ss(9);
+          renderTextWithBold(doc, `    - ${gfQty} GF pitas sliced 8 pieces (**${formatPanCount(gfPitaHalfPans)}**) - **1 tong**`, margin + 16, y); y += ss(9);
         } else {
           // Parsing failed - show manual entry needed
-          doc.text(`    - GF Pitas (CHECK ORDER FOR QUANTITY) - 1 tong`, margin + 16, y); y += ss(9);
+          renderTextWithBold(doc, `    - GF Pitas (CHECK ORDER FOR QUANTITY) - **1 tong**`, margin + 16, y); y += ss(9);
         }
       }
       doc.setTextColor(...black);
@@ -1133,10 +1207,10 @@ function generatePrepListPDF(prep, order, lineItems) {
     prep.greekFries.forEach(fries => {
       // Greek fries: 1 half pan if qty < 2, or 2 half pans per order if >= 2
       const friesHalfPans = fries.qty < 2 ? fries.qty : fries.qty * 2;
-      doc.text(`[ ] ${fries.qty}x ${toTitleCase(fries.name)} - 1 tong`, margin + 10, y); y += ss(9);
+      renderTextWithBold(doc, `[ ] ${fries.qty}x ${toTitleCase(fries.name)} - **1 tong**`, margin + 10, y); y += ss(9);
       doc.setTextColor(...darkGray);
-      doc.text(`    - ${formatPanCount(friesHalfPans)} fries + 16oz Aioli + 16oz Tzatziki + 16oz Feta`, margin + 16, y); y += ss(9);
-      doc.text(`    - 3 small spoons (Aioli, Tzatziki, Feta)`, margin + 16, y);
+      renderTextWithBold(doc, `    - **${formatPanCount(friesHalfPans)}** fries + **16oz** Aioli + **16oz** Tzatziki + **16oz** Feta`, margin + 16, y); y += ss(9);
+      renderTextWithBold(doc, `    - **3 small spoons** (Aioli, Tzatziki, Feta)`, margin + 16, y);
       doc.setTextColor(...black);
       y += ss(10);
     });
@@ -1163,9 +1237,9 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.dolmas.forEach(dolma => {
       if (y < 720) {
-        doc.text(`[ ] ${dolma.qty}x ${toTitleCase(dolma.name)} (1/2 pan or round tray + lemon wedges) - 1 tong`, margin + 10, y); y += ss(9);
+        renderTextWithBold(doc, `[ ] ${dolma.qty}x ${toTitleCase(dolma.name)} (**1/2 pan or round tray** + lemon wedges) - **1 tong**`, margin + 10, y); y += ss(9);
         doc.setTextColor(...darkGray);
-        doc.text(`    - ${dolma.qty}x 16oz Tzatziki (dill stripe) - 1 small spoon`, margin + 16, y);
+        renderTextWithBold(doc, `    - ${dolma.qty}x **16oz** Tzatziki (dill stripe) - **1 small spoon**`, margin + 16, y, false);
         doc.setTextColor(...black);
         y += ss(10);
       }
@@ -1193,9 +1267,9 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.spanakopita.forEach(span => {
       if (y < 720) {
-        doc.text(`[ ] ${span.qty}x ${toTitleCase(span.name)} (round tray on arugula or 1/2/full pan) - 1 tong`, margin + 10, y); y += ss(9);
+        renderTextWithBold(doc, `[ ] ${span.qty}x ${toTitleCase(span.name)} (**round tray** on arugula or **1/2/full pan**) - **1 tong**`, margin + 10, y); y += ss(9);
         doc.setTextColor(...darkGray);
-        doc.text(`    - ${span.qty}x 16oz Tzatziki (dill stripe) - 1 small spoon`, margin + 16, y);
+        renderTextWithBold(doc, `    - ${span.qty}x **16oz** Tzatziki (dill stripe) - **1 small spoon**`, margin + 16, y, false);
         doc.setTextColor(...black);
         y += ss(10);
       }
@@ -1225,7 +1299,7 @@ function generatePrepListPDF(prep, order, lineItems) {
       if (y < 720) {
         const sideName = (side.name || '');
         const isRice = sideName.toUpperCase().includes('RICE');
-        doc.text(`[ ] ${side.qty}x ${toTitleCase(sideName)} - 1 tong${isRice ? ' + 1 large serving spoon' : ''}`, margin + 10, y); y += ss(12);
+        renderTextWithBold(doc, `[ ] ${side.qty}x ${toTitleCase(sideName)} - **1 tong**${isRice ? ' **+ 1 large serving spoon**' : ''}`, margin + 10, y); y += ss(12);
       }
     });
     y += ss(6);
@@ -1251,7 +1325,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.desserts.forEach(dessert => {
       if (y < 720) {
-        doc.text(`[ ] ${dessert.qty}x ${toTitleCase(dessert.name)} - 1 tong`, margin + 10, y); y += ss(12);
+        renderTextWithBold(doc, `[ ] ${dessert.qty}x ${toTitleCase(dessert.name)} - **1 tong**`, margin + 10, y); y += ss(12);
       }
     });
     y += ss(6);
@@ -1277,7 +1351,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFont('helvetica', 'normal');
     prep.pinwheels.forEach(pinwheel => {
       if (y < 720) {
-        doc.text(`[ ] ${pinwheel.qty}x ${toTitleCase(pinwheel.name)} - 1 tong`, margin + 10, y); y += ss(12);
+        renderTextWithBold(doc, `[ ] ${pinwheel.qty}x ${toTitleCase(pinwheel.name)} - **1 tong**`, margin + 10, y); y += ss(12);
       }
     });
     y += ss(6);
@@ -1310,7 +1384,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setTextColor(...black);
     prep.unmapped.forEach(item => {
       if (y < 720) {
-        doc.text(`[ ] ${item.qty}x ${toTitleCase(item.name)}`, margin + 10, y);
+        renderTextWithBold(doc, `[ ] ${item.qty}x ${toTitleCase(item.name)}`, margin + 10, y);
         y += ss(12);
       }
     });
@@ -1340,19 +1414,19 @@ function generatePrepListPDF(prep, order, lineItems) {
 
   // HANDWRITTEN NOTES SECTION
   if (y < 720) {
-    y += ss(6);
+    y += ss(16); // More spacing before PREP NOTES
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
     doc.text('PREP NOTES:', margin, y);
-    y += ss(6);
+    y += ss(14); // More spacing after header
 
     for (let i = 0; i < 3; i++) {
       if (y < 750) {
         doc.setDrawColor(...lightGray);
         doc.setLineWidth(0.5);
         doc.line(margin, y, pageWidth - margin, y);
-        y += ss(14);
+        y += ss(20); // More spacing between lines (was 14)
       }
     }
   }
