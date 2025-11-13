@@ -646,7 +646,36 @@ function generatePrepListPDF(prep, order, lineItems) {
     halfPans += sets; // mixed greens
     smallSpoons += 3; // tzatziki (no dill), spicy aioli, lemon vinaigrette
     largeServingSpoons += 1; // diced tomatoes
-    let byoTongs = 5; // greens, tomatoes, onions, pepperoncini, pitas
+    let byoTongs = 4; // greens, onions, pepperoncini, pitas (tomatoes use large spoon, NOT tong)
+
+    // COUNT PROTEIN CONTAINERS AND TONGS
+    const proteinPans = calculateProteinPans(prep.byoGyros.items || []);
+    proteinPans.forEach(protein => {
+      // Count containers for each protein type
+      const containerStr = protein.container.toLowerCase();
+      if (containerStr.includes('brown bowls')) {
+        brownBowls += 1; // Each protein type using brown bowls counts as 1
+      } else if (containerStr.includes('half pan')) {
+        // Extract number of half pans (e.g., "1 half pan" or "2 half pans")
+        const halfPanMatch = containerStr.match(/(\d+)\s*half\s*pan/);
+        if (halfPanMatch) {
+          halfPans += parseInt(halfPanMatch[1]);
+        }
+      } else if (containerStr.includes('full pan')) {
+        // Extract number of full pans
+        const fullPanMatch = containerStr.match(/(\d+)\s*full\s*pan/);
+        if (fullPanMatch) {
+          fullPans += parseInt(fullPanMatch[1]);
+        }
+      }
+
+      // Count utensils for each protein type
+      if (protein.equipment.includes('tong')) {
+        byoTongs += 1; // Each protein gets its own tong
+      } else if (protein.equipment.includes('large serving spoon')) {
+        largeServingSpoons += 1; // Roasted chickpeas use large spoon
+      }
+    });
 
     // DICED TOMATO LOGIC: 30 portions per half pan
     let tomatoUsesBrownBowl = false;
@@ -822,11 +851,11 @@ function generatePrepListPDF(prep, order, lineItems) {
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
 
-  // Combine full pans and half pans
-  const totalHalfPanEquivalent = (fullPans * 2) + halfPans;
-
+  // DO NOT auto-convert half pans to full pans - only combine when SAME ITEM
+  // Show full pans and half pans separately
   let containerParts = [];
-  if (totalHalfPanEquivalent > 0) containerParts.push(formatPanCount(totalHalfPanEquivalent));
+  if (fullPans > 0) containerParts.push(`${fullPans} full pan${fullPans > 1 ? 's' : ''}`);
+  if (halfPans > 0) containerParts.push(`${halfPans} half pan${halfPans > 1 ? 's' : ''}`);
   if (roundTrays > 0) containerParts.push(`${roundTrays}x Round Trays`);
   if (deliContainers > 0) containerParts.push(`${deliContainers}x 16oz Deli`);
   if (deli32ozContainers > 0) containerParts.push(`${deli32ozContainers}x 32oz Deli`);
