@@ -223,7 +223,8 @@ function calculatePrepList(lineItems, order) {
     spanakopita: [],
     sides: [],
     desserts: [],
-    pinwheels: []
+    pinwheels: [],
+    unmapped: [] // Items that don't fit into any category (drinks, special items, etc.)
   };
 
   lineItems.forEach(item => {
@@ -284,7 +285,7 @@ function calculatePrepList(lineItems, order) {
       prep.spanakopita.push({ name: item.item_name, qty, modifiers });
     }
     // SIDES (everything else)
-    else if (itemName.includes('GREEK FRIES') || itemName.includes('CHICKPEA') || itemName.includes('GRILLED PITA') || itemName.includes('VEGETABLE STICKS') || itemName.includes('MARINATED OLIVES')) {
+    else if (itemName.includes('GREEK FRIES') || itemName.includes('CHICKPEA') || itemName.includes('GRILLED PITA') || itemName.includes('VEGETABLE STICKS') || itemName.includes('MARINATED OLIVES') || itemName.includes('RICE')) {
       prep.sides.push({ name: item.item_name, qty, modifiers });
     }
     // DESSERTS
@@ -294,6 +295,10 @@ function calculatePrepList(lineItems, order) {
     // PINWHEELS
     else if (itemName.includes('PINWHEEL')) {
       prep.pinwheels.push({ name: item.item_name, qty });
+    }
+    // UNMAPPED ITEMS (drinks, special items, etc. - anything not categorized above)
+    else {
+      prep.unmapped.push({ name: item.item_name, qty, modifiers });
     }
   });
 
@@ -307,6 +312,7 @@ function calculatePrepList(lineItems, order) {
   prep.sides = consolidateItems(prep.sides);
   prep.desserts = consolidateItems(prep.desserts);
   prep.pinwheels = consolidateItems(prep.pinwheels);
+  prep.unmapped = consolidateItems(prep.unmapped);
 
   return prep;
 }
@@ -1158,6 +1164,40 @@ function generatePrepListPDF(prep, order, lineItems) {
     prep.pinwheels.forEach(pinwheel => {
       if (yPos < 720) {
         doc.text(`[ ] ${pinwheel.qty}x ${toTitleCase(pinwheel.name)} - 1 tong`, 50, yPos); yPos += 12;
+      }
+    });
+    yPos += 6;
+  }
+
+  // UNMAPPED ITEMS (items not in standard prep categories - drinks, special items, etc.)
+  if (prep.unmapped && prep.unmapped.length > 0 && yPos < 680) {
+    const unmappedBoxHeight = 40 + (prep.unmapped.length * 13);
+    doc.setFillColor(254, 242, 242); // Light red background
+    doc.rect(40, yPos, 532, unmappedBoxHeight, 'F');
+    doc.setDrawColor(220, 38, 38); // Red border
+    doc.setLineWidth(2);
+    doc.rect(40, yPos, 532, unmappedBoxHeight, 'S');
+
+    yPos += 18;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(185, 28, 28); // Dark red text
+    doc.text('OTHER ITEMS (NOT IN STANDARD PREP)', 50, yPos);
+    yPos += 13;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...darkGray);
+    doc.text('The following items were ordered but don\'t fall into standard prep categories. Please prepare as specified:', 50, yPos);
+    yPos += 13;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...black);
+    prep.unmapped.forEach(item => {
+      if (yPos < 720) {
+        doc.text(`[ ] ${item.qty}x ${toTitleCase(item.name)}`, 50, yPos);
+        yPos += 12;
       }
     });
     yPos += 6;
