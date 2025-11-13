@@ -448,17 +448,17 @@ function generatePrepListPDF(prep, order, lineItems) {
   const pageWidth = 612;
   const contentWidth = pageWidth - (margin * 2);
 
-  let y = 25; // Top margin
+  let y = 20; // Top margin (was 25)
 
   // ===== HEADER - Simple black text =====
-  doc.setFontSize(20);
+  doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
-  doc.text('PREP LIST', 40, yPos);
-  yPos += 25;
+  doc.text('PREP LIST', margin, y);
+  y += 14;
 
   // ===== ORDER INFO - No box, just text =====
-  doc.setFontSize(11);
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
 
@@ -476,54 +476,55 @@ function generatePrepListPDF(prep, order, lineItems) {
     orderLabel = 'TOAST CHECK';
   }
 
-  doc.text(`${orderLabel} #${orderNum}`, 40, yPos);
-  yPos += 14;
+  doc.text(`${orderLabel} #${orderNum}`, margin, y);
+  y += 11;
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${order.customer_name || 'Customer'}`, 40, yPos);
-  yPos += 14;
+  doc.text(`${order.customer_name || 'Customer'}`, margin, y);
+  y += 11;
 
   if (order.delivery_date && order.delivery_time) {
     doc.setFont('helvetica', 'bold');
-    doc.text(order.delivery_address ? 'DELIVERY:' : 'PICKUP:', 40, yPos);
+    doc.text(order.delivery_address ? 'DELIVERY:' : 'PICKUP:', margin, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${formatPacificDateShort(order.delivery_date)} at ${formatPacificTime(order.delivery_time)}`, 110, yPos);
-    yPos += 14;
+    doc.text(`${formatPacificDateShort(order.delivery_date)} at ${formatPacificTime(order.delivery_time)}`, margin + 65, y);
+    y += 11;
 
     // Add delivery address if available
     if (order.delivery_address) {
       doc.setFont('helvetica', 'bold');
-      doc.text('ADDRESS:', 40, yPos);
+      doc.text('ADDRESS:', margin, y);
       doc.setFont('helvetica', 'normal');
       const addressLines = doc.splitTextToSize(order.delivery_address, 450);
       addressLines.forEach((line, idx) => {
         if (idx === 0) {
-          doc.text(line, 110, yPos);
+          doc.text(line, margin + 65, y);
         } else {
-          yPos += 12;
-          doc.text(line, 110, yPos);
+          y += 10;
+          doc.text(line, margin + 65, y);
         }
       });
-      yPos += 14;
+      y += 11;
     }
   }
 
   if (order.headcount) {
     doc.setFont('helvetica', 'bold');
-    doc.text('HEADCOUNT: ', 40, yPos);
+    doc.text('HEADCOUNT: ', margin, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${order.headcount} guests`, 115, yPos);
-    yPos += 14;
+    doc.text(`${order.headcount} guests`, margin + 70, y);
+    y += 11;
   }
 
   // ===== ORDER MUST BE READY AT - Highlighted in yellow/orange =====
   if (order.delivery_time) {
-    yPos += 6;
-    const readyByBoxHeight = 30;
+    y += 4;
+    const readyByBoxHeight = 24;
     doc.setFillColor(255, 243, 205); // Soft orange/yellow highlight
-    doc.rect(40, yPos, 532, readyByBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, readyByBoxHeight, 'F');
     doc.setDrawColor(255, 153, 0); // Orange border
-    doc.setLineWidth(2);
-    doc.rect(40, yPos, 532, readyByBoxHeight, 'S');
+    doc.setLineWidth(1.5);
+    doc.rect(margin, y, contentWidth, readyByBoxHeight, 'S');
 
     // Calculate ready time (40 minutes before delivery)
     const deliveryTime = new Date(order.delivery_time);
@@ -535,20 +536,20 @@ function generatePrepListPDF(prep, order, lineItems) {
       timeZone: 'America/Los_Angeles'
     }).format(readyByTime);
 
-    yPos += 20;
-    doc.setFontSize(13);
+    y += 16;
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(180, 80, 0); // Dark orange text
-    doc.text(`ORDER MUST BE READY AT EXACTLY: ${readyByStr}`, 50, yPos);
+    doc.text(`ORDER MUST BE READY AT EXACTLY: ${readyByStr}`, margin + 10, y);
     doc.setTextColor(...black);
-    yPos += 16;
+    y += 12;
   }
 
   // Add simple line separator
   doc.setDrawColor(...lightGray);
-  doc.setLineWidth(1);
-  doc.line(40, yPos, 572, yPos);
-  yPos += 20;
+  doc.setLineWidth(0.5);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 12;
 
   // Containers summary
   let halfPans = 0, fullPans = 0, deliContainers = 0, deli32ozContainers = 0, brownBowls = 0, roundTrays = 0, tongs = 0;
@@ -720,21 +721,21 @@ function generatePrepListPDF(prep, order, lineItems) {
   }
 
   // ===== CONTAINERS NEEDED - Gray box =====
-  const containerBoxHeight = 45;
-  doc.setFillColor(245, 245, 245);
-  doc.rect(40, yPos, 532, containerBoxHeight, 'F');
+  const containerBoxHeight = 36;
+  doc.setFillColor(248, 248, 248);
+  doc.rect(margin, y, contentWidth, containerBoxHeight, 'F');
   doc.setDrawColor(...lightGray);
-  doc.setLineWidth(1);
-  doc.rect(40, yPos, 532, containerBoxHeight, 'S');
+  doc.setLineWidth(0.5);
+  doc.rect(margin, y, contentWidth, containerBoxHeight, 'S');
 
-  yPos += 18;
-  doc.setFontSize(11);
+  y += 14;
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
-  doc.text('CONTAINERS NEEDED', 50, yPos);
-  yPos += 16;
+  doc.text('CONTAINERS NEEDED', margin + 10, y);
+  y += 12;
 
-  doc.setFontSize(10);
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
 
   // Combine full pans and half pans
@@ -742,36 +743,36 @@ function generatePrepListPDF(prep, order, lineItems) {
 
   let containerParts = [];
   if (totalHalfPanEquivalent > 0) containerParts.push(formatPanCount(totalHalfPanEquivalent));
-  if (roundTrays > 0) containerParts.push(`${roundTrays}x Round Trays with Dome Lids`);
-  if (deliContainers > 0) containerParts.push(`${deliContainers}x 16oz Deli Containers`);
-  if (deli32ozContainers > 0) containerParts.push(`${deli32ozContainers}x 32oz Deli Containers`);
-  if (brownBowls > 0) containerParts.push(`${brownBowls}x Brown Jayna Bowls`);
-  doc.text(`* ${containerParts.join('  *  ')}`, 50, yPos);
-  yPos += 18;
+  if (roundTrays > 0) containerParts.push(`${roundTrays}x Round Trays`);
+  if (deliContainers > 0) containerParts.push(`${deliContainers}x 16oz Deli`);
+  if (deli32ozContainers > 0) containerParts.push(`${deli32ozContainers}x 32oz Deli`);
+  if (brownBowls > 0) containerParts.push(`${brownBowls}x Brown Bowls`);
+  doc.text(`* ${containerParts.join('  *  ')}`, margin + 10, y);
+  y += 14;
 
   // ===== UTENSILS TO PACK - Gray box =====
-  const utensilBoxHeight = 45;
-  doc.setFillColor(245, 245, 245);
-  doc.rect(40, yPos, 532, utensilBoxHeight, 'F');
+  const utensilBoxHeight = 36;
+  doc.setFillColor(248, 248, 248);
+  doc.rect(margin, y, contentWidth, utensilBoxHeight, 'F');
   doc.setDrawColor(...lightGray);
-  doc.setLineWidth(1);
-  doc.rect(40, yPos, 532, utensilBoxHeight, 'S');
+  doc.setLineWidth(0.5);
+  doc.rect(margin, y, contentWidth, utensilBoxHeight, 'S');
 
-  yPos += 18;
-  doc.setFontSize(11);
+  y += 14;
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
-  doc.text('UTENSILS TO PACK', 50, yPos);
-  yPos += 16;
+  doc.text('UTENSILS TO PACK', margin + 10, y);
+  y += 12;
 
-  doc.setFontSize(10);
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   let utensilParts = [];
   if (tongs > 0) utensilParts.push(`${tongs}x Tongs`);
-  if (largeServingSpoons > 0) utensilParts.push(`${largeServingSpoons}x Large Serving Spoons`);
+  if (largeServingSpoons > 0) utensilParts.push(`${largeServingSpoons}x Large Spoons`);
   if (smallSpoons > 0) utensilParts.push(`${smallSpoons}x Small Spoons`);
-  doc.text(`* ${utensilParts.join('  *  ')}`, 50, yPos);
-  yPos += 22;
+  doc.text(`* ${utensilParts.join('  *  ')}`, margin + 10, y);
+  y += 14;
 
   // BYO GYRO PITAS (Beef & Lamb, Chicken, Roasted Chickpeas, Falafel)
   if (prep.byoGyros.total > 0) {
@@ -779,100 +780,96 @@ function generatePrepListPDF(prep, order, lineItems) {
 
     // Calculate box height dynamically
     const proteinLines = prep.byoGyros.items?.length || 0;
-    const byoBoxHeight = 60 + (proteinLines * 12) + 145; // Header + proteins + prep items
+    const byoBoxHeight = 48 + (proteinLines * 10) + 120; // Tighter: Header + proteins + prep items
     doc.setFillColor(250, 250, 250);
-    doc.rect(40, yPos, 532, byoBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, byoBoxHeight, 'F');
     doc.setDrawColor(...lightGray);
-    doc.setLineWidth(1);
-    doc.rect(40, yPos, 532, byoBoxHeight, 'S');
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, byoBoxHeight, 'S');
 
-    yPos += 18;
-    doc.setFontSize(12);
+    y += 14;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text(`BYO GYRO PITAS (${prep.byoGyros.total} TOTAL PORTIONS)`, 50, yPos);
-    yPos += 16;
+    doc.text(`BYO GYRO PITAS (${prep.byoGyros.total} TOTAL PORTIONS)`, margin + 10, y);
+    y += 10;
 
     // PROTEIN BREAKDOWN - Show each BYO gyro type
     if (prep.byoGyros.items && prep.byoGyros.items.length > 0) {
-      doc.setFontSize(10);
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.text('PROTEIN BREAKDOWN:', 50, yPos);
-      yPos += 13;
+      doc.text('PROTEIN BREAKDOWN:', margin + 10, y);
+      y += 10;
 
       doc.setFont('helvetica', 'normal');
       prep.byoGyros.items.forEach(item => {
-        doc.text(`* ${item.qty}x ${toTitleCase(item.name)}`, 50, yPos);
-        yPos += 12;
+        doc.text(`* ${item.qty}x ${toTitleCase(item.name)}`, margin + 10, y);
+        y += 10;
       });
-      yPos += 6;
+      y += 5;
     }
 
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.text('PREP ITEMS:', 50, yPos);
-    yPos += 13;
+    doc.text('PREP ITEMS:', margin + 10, y);
+    y += 10;
 
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
 
     // === PROTEINS (ALWAYS AT TOP) ===
     const proteinPans = calculateProteinPans(prep.byoGyros.items || []);
     proteinPans.forEach(protein => {
-      doc.text(`[ ] ${protein.qty}x ${protein.name} (${protein.container}) - ${protein.equipment}`, 50, yPos);
-      yPos += 12;
+      doc.text(`[ ] ${protein.qty}x ${protein.name} (${protein.container}) - ${protein.equipment}`, margin + 10, y);
+      y += 10;
     });
 
     // Add spacing after proteins if they exist
     if (proteinPans.length > 0) {
-      yPos += 6;
+      y += 4;
     }
 
-    doc.text(`[ ] ${sets}x 16oz Tzatziki (no dill) - 1 small spoon`, 50, yPos); yPos += 12;
-    doc.text(`[ ] ${sets}x 16oz Spicy Aioli - 1 small spoon`, 50, yPos); yPos += 12;
-    doc.text(`[ ] ${sets}x 16oz Lemon Vinaigrette - 1 small spoon`, 50, yPos); yPos += 12;
-    doc.text(`[ ] ${formatPanCount(sets)} Mixed Greens - 1 tong`, 50, yPos); yPos += 12;
+    doc.text(`[ ] ${sets}x 16oz Tzatziki (no dill) - 1 small spoon`, margin + 10, y); y += 10;
+    doc.text(`[ ] ${sets}x 16oz Spicy Aioli - 1 small spoon`, margin + 10, y); y += 10;
+    doc.text(`[ ] ${sets}x 16oz Lemon Vinaigrette - 1 small spoon`, margin + 10, y); y += 10;
+    doc.text(`[ ] ${formatPanCount(sets)} Mixed Greens - 1 tong`, margin + 10, y); y += 10;
 
     // DICED TOMATO LOGIC: 30 portions per half pan
-    // Below 10: 16oz deli container
-    // 10-20: Brown Jayna bowl
-    // 21+: Calculate half pans (30 portions per half pan)
     let tomatoContainer = '';
     let tomatoUsesBrownBowlDisplay = false;
     if (prep.byoGyros.total < 10) {
-      tomatoContainer = '16oz deli container';
+      tomatoContainer = '16oz deli';
     } else if (prep.byoGyros.total <= 20) {
-      tomatoContainer = 'brown Jayna bowl';
-      tomatoUsesBrownBowlDisplay = true; // Flag for coordinated display logic
+      tomatoContainer = 'brown bowl';
+      tomatoUsesBrownBowlDisplay = true;
     } else {
       const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 30);
       tomatoContainer = formatPanCount(tomatoHalfPans);
     }
-    doc.text(`[ ] ${prep.byoGyros.total} portions Diced Tomatoes (${tomatoContainer}) - 1 large serving spoon`, 50, yPos); yPos += 12;
+    doc.text(`[ ] ${prep.byoGyros.total} portions Diced Tomatoes (${tomatoContainer}) - 1 large spoon`, margin + 10, y); y += 10;
 
     // SLICED RED ONION LOGIC: 50 portions per half pan
-    // COORDINATED LOGIC: If tomatoes use brown bowl, onions must also use brown bowl
     let onionContainer = '';
     if (tomatoUsesBrownBowlDisplay) {
-      onionContainer = 'brown Jayna bowl';
+      onionContainer = 'brown bowl';
     } else if (prep.byoGyros.total < 20) {
-      onionContainer = '16oz deli container';
+      onionContainer = '16oz deli';
     } else if (prep.byoGyros.total <= 45) {
-      onionContainer = 'brown Jayna bowl';
+      onionContainer = 'brown bowl';
     } else {
       const onionHalfPans = Math.ceil(prep.byoGyros.total / 50);
       onionContainer = formatPanCount(onionHalfPans);
     }
-    doc.text(`[ ] ${prep.byoGyros.total} portions Sliced Red Onion (${onionContainer}) - 1 tong`, 50, yPos); yPos += 12;
+    doc.text(`[ ] ${prep.byoGyros.total} portions Sliced Red Onion (${onionContainer}) - 1 tong`, margin + 10, y); y += 10;
 
     // PEPPERONCINI LOGIC: 100 portions per half pan
-    // COORDINATED LOGIC: If tomatoes use brown bowl, pepperoncini must also use brown bowl
     let pepperonciniContainer = '';
     if (tomatoUsesBrownBowlDisplay) {
-      pepperonciniContainer = 'brown Jayna bowl';
+      pepperonciniContainer = 'brown bowl';
     } else if (prep.byoGyros.total < 10) {
-      pepperonciniContainer = '16oz deli container';
+      pepperonciniContainer = '16oz deli';
     } else if (prep.byoGyros.total <= 20) {
-      pepperonciniContainer = '32oz deli container';
+      pepperonciniContainer = '32oz deli';
     } else if (prep.byoGyros.total < 100) {
       pepperonciniContainer = '1 half pan';
     } else {
@@ -884,54 +881,53 @@ function generatePrepListPDF(prep, order, lineItems) {
         pepperonciniContainer = `${pepperFullPans} full pan${pepperFullPans > 1 ? 's' : ''}`;
       }
     }
-    doc.text(`[ ] ${prep.byoGyros.total} whole Pepperoncini (${pepperonciniContainer}) - 1 tong`, 50, yPos); yPos += 12;
+    doc.text(`[ ] ${prep.byoGyros.total} whole Pepperoncini (${pepperonciniContainer}) - 1 tong`, margin + 10, y); y += 10;
 
     // PITA LOGIC: 25 whole pita fit in one FULL pan
     const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
     const pitaFullPans = Math.ceil(pitasNeeded / 25);
-    doc.text(`[ ] ${pitasNeeded} whole Grilled Pita (${pitaFullPans} full pan${pitaFullPans > 1 ? 's' : ''}) - 1 tong`, 50, yPos); yPos += 18;
+    doc.text(`[ ] ${pitasNeeded} whole Grilled Pita (${pitaFullPans} full pan${pitaFullPans > 1 ? 's' : ''}) - 1 tong`, margin + 10, y); y += 14;
   }
 
   // SALADS
   if (prep.salads.length > 0) {
-    const saladBoxHeight = 60 + (prep.salads.length * 26);
+    const saladBoxHeight = 48 + (prep.salads.length * 21);
     doc.setFillColor(250, 250, 250);
-    doc.rect(40, yPos, 532, saladBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, saladBoxHeight, 'F');
     doc.setDrawColor(...lightGray);
-    doc.setLineWidth(1);
-    doc.rect(40, yPos, 532, saladBoxHeight, 'S');
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, saladBoxHeight, 'S');
 
-    yPos += 18;
-    doc.setFontSize(12);
+    y += 14;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text('SALADS', 50, yPos);
-    yPos += 15;
+    doc.text('SALADS', margin + 10, y);
+    y += 12;
 
     // Note about large serving spoons
-    doc.setFontSize(9);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(...darkGray);
-    doc.text('(2 large serving spoons total for all salads)', 50, yPos);
+    doc.text('(2 large spoons total for all salads)', margin + 10, y);
     doc.setTextColor(...black);
-    yPos += 13;
+    y += 10;
 
-    doc.setFontSize(10);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
     prep.salads.forEach(salad => {
-      // Calculate pan count: 1/2 pan each if < 4, or 2 half pans per salad if >= 4
       const halfPans = salad.qty < 4 ? salad.qty : salad.qty * 2;
-      doc.text(`[ ] ${salad.qty}x ${toTitleCase(salad.name)} (${formatPanCount(halfPans)}) - 1 tong`, 50, yPos); yPos += 11;
+      doc.text(`[ ] ${salad.qty}x ${toTitleCase(salad.name)} (${formatPanCount(halfPans)}) - 1 tong`, margin + 10, y); y += 9;
       doc.setTextColor(...darkGray);
-      doc.text(`    - ${salad.qty}x 16oz Lemon Vinaigrette - 1 small spoon`, 56, yPos);
+      doc.text(`    - ${salad.qty}x 16oz Lemon Vin - 1 small spoon`, margin + 16, y);
       doc.setTextColor(...black);
-      yPos += 13;
+      y += 11;
     });
-    yPos += 6;
+    y += 5;
   }
 
   // DIPS
-  if (prep.dips.length > 0 && yPos < 700) {
+  if (prep.dips.length > 0 && y < 700) {
     // Calculate dynamic height
     let dipLinesCount = 0;
     prep.dips.forEach(dip => {
@@ -945,22 +941,22 @@ function generatePrepListPDF(prep, order, lineItems) {
     });
     const dipBoxHeight = 40 + (dipLinesCount * 12);
     doc.setFillColor(250, 250, 250);
-    doc.rect(40, yPos, 532, dipBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, dipBoxHeight, 'F');
     doc.setDrawColor(...lightGray);
-    doc.setLineWidth(1);
-    doc.rect(40, yPos, 532, dipBoxHeight, 'S');
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, dipBoxHeight, 'S');
 
-    yPos += 18;
-    doc.setFontSize(12);
+    y += 14;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text('DIPS', 50, yPos);
-    yPos += 15;
+    doc.text('DIPS', margin + 10, y);
+    y += 12;
 
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     prep.dips.forEach(dip => {
-      doc.text(`[ ] ${dip.qty}x 16oz ${toTitleCase(dip.name)} (garnish) - 1 small spoon`, 50, yPos); yPos += 11;
+      doc.text(`[ ] ${dip.qty}x 16oz ${toTitleCase(dip.name)} (garnish) - 1 small spoon`, margin + 10, y); y += 9;
 
       const hasVeggies = dip.modifiers.some(m => m.name && (m.name.includes('VEGGIES') || m.name.includes('VEGGIE')));
       const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
@@ -969,11 +965,11 @@ function generatePrepListPDF(prep, order, lineItems) {
 
       doc.setTextColor(...darkGray);
       if (hasVeggies) {
-        doc.text(`    - ${dip.qty * 24} carrots + ${dip.qty * 24} celery (brown bowls) - 2 tongs total`, 56, yPos); yPos += 11;
+        doc.text(`    - ${dip.qty * 24} carrots + ${dip.qty * 24} celery (brown bowls) - 2 tongs total`, margin + 16, y); y += 9;
       }
       if (hasPita) {
         const regularPitaHalfPans = dip.qty; // 1 half pan per dip (6 pitas sliced)
-        doc.text(`    - ${dip.qty * 6} pitas sliced 8 pieces (${formatPanCount(regularPitaHalfPans)}) - 1 tong`, 56, yPos); yPos += 11;
+        doc.text(`    - ${dip.qty * 6} pitas sliced 8 pieces (${formatPanCount(regularPitaHalfPans)}) - 1 tong`, margin + 16, y); y += 9;
       }
       if (hasGFPita && gfPitaMod) {
         // GF pita is an ADDON - only prep exactly what customer paid for (no defaults!)
@@ -991,270 +987,268 @@ function generatePrepListPDF(prep, order, lineItems) {
 
         if (gfQty && gfQty > 0) {
           const gfPitaHalfPans = Math.ceil(gfQty / 6);
-          doc.text(`    - ${gfQty} GF pitas sliced 8 pieces (${formatPanCount(gfPitaHalfPans)}) - 1 tong`, 56, yPos); yPos += 11;
+          doc.text(`    - ${gfQty} GF pitas sliced 8 pieces (${formatPanCount(gfPitaHalfPans)}) - 1 tong`, margin + 16, y); y += 9;
         } else {
           // Parsing failed - show manual entry needed
-          doc.text(`    - GF Pitas (CHECK ORDER FOR QUANTITY) - 1 tong`, 56, yPos); yPos += 11;
+          doc.text(`    - GF Pitas (CHECK ORDER FOR QUANTITY) - 1 tong`, margin + 16, y); y += 9;
         }
       }
       doc.setTextColor(...black);
-      yPos += 2;
+      y += 2;
     });
-    yPos += 6;
+    y += 6;
   }
 
   // GREEK FRIES BAR
-  if (prep.greekFries.length > 0 && yPos < 700) {
+  if (prep.greekFries.length > 0 && y < 700) {
     const friesBoxHeight = 40 + (prep.greekFries.length * 26);
     doc.setFillColor(250, 250, 250);
-    doc.rect(40, yPos, 532, friesBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, friesBoxHeight, 'F');
     doc.setDrawColor(...lightGray);
-    doc.setLineWidth(1);
-    doc.rect(40, yPos, 532, friesBoxHeight, 'S');
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, friesBoxHeight, 'S');
 
-    yPos += 18;
-    doc.setFontSize(12);
+    y += 14;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text('GREEK FRIES BAR', 50, yPos);
-    yPos += 15;
+    doc.text('GREEK FRIES BAR', margin + 10, y);
+    y += 12;
 
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     prep.greekFries.forEach(fries => {
       // Greek fries: 1 half pan if qty < 2, or 2 half pans per order if >= 2
       const friesHalfPans = fries.qty < 2 ? fries.qty : fries.qty * 2;
-      doc.text(`[ ] ${fries.qty}x ${toTitleCase(fries.name)} - 1 tong`, 50, yPos); yPos += 11;
+      doc.text(`[ ] ${fries.qty}x ${toTitleCase(fries.name)} - 1 tong`, margin + 10, y); y += 9;
       doc.setTextColor(...darkGray);
-      doc.text(`    - ${formatPanCount(friesHalfPans)} fries + 16oz Aioli + 16oz Tzatziki + 16oz Feta`, 56, yPos); yPos += 11;
-      doc.text(`    - 3 small spoons (Aioli, Tzatziki, Feta)`, 56, yPos);
+      doc.text(`    - ${formatPanCount(friesHalfPans)} fries + 16oz Aioli + 16oz Tzatziki + 16oz Feta`, margin + 16, y); y += 9;
+      doc.text(`    - 3 small spoons (Aioli, Tzatziki, Feta)`, margin + 16, y);
       doc.setTextColor(...black);
-      yPos += 13;
+      y += 10;
     });
-    yPos += 6;
+    y += 6;
   }
 
   // DOLMAS
-  if (prep.dolmas.length > 0 && yPos < 700) {
+  if (prep.dolmas.length > 0 && y < 700) {
     const dolmasBoxHeight = 40 + (prep.dolmas.length * 24);
     doc.setFillColor(250, 250, 250);
-    doc.rect(40, yPos, 532, dolmasBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, dolmasBoxHeight, 'F');
     doc.setDrawColor(...lightGray);
-    doc.setLineWidth(1);
-    doc.rect(40, yPos, 532, dolmasBoxHeight, 'S');
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, dolmasBoxHeight, 'S');
 
-    yPos += 18;
-    doc.setFontSize(12);
+    y += 14;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text('DOLMAS', 50, yPos);
-    yPos += 15;
+    doc.text('DOLMAS', margin + 10, y);
+    y += 12;
 
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     prep.dolmas.forEach(dolma => {
-      if (yPos < 720) {
-        doc.text(`[ ] ${dolma.qty}x ${toTitleCase(dolma.name)} (1/2 pan or round tray + lemon wedges) - 1 tong`, 50, yPos); yPos += 11;
+      if (y < 720) {
+        doc.text(`[ ] ${dolma.qty}x ${toTitleCase(dolma.name)} (1/2 pan or round tray + lemon wedges) - 1 tong`, margin + 10, y); y += 9;
         doc.setTextColor(...darkGray);
-        doc.text(`    - ${dolma.qty}x 16oz Tzatziki (dill stripe) - 1 small spoon`, 56, yPos);
+        doc.text(`    - ${dolma.qty}x 16oz Tzatziki (dill stripe) - 1 small spoon`, margin + 16, y);
         doc.setTextColor(...black);
-        yPos += 13;
+        y += 10;
       }
     });
-    yPos += 6;
+    y += 6;
   }
 
   // SPANAKOPITA
-  if (prep.spanakopita.length > 0 && yPos < 700) {
+  if (prep.spanakopita.length > 0 && y < 700) {
     const spanBoxHeight = 40 + (prep.spanakopita.length * 24);
     doc.setFillColor(250, 250, 250);
-    doc.rect(40, yPos, 532, spanBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, spanBoxHeight, 'F');
     doc.setDrawColor(...lightGray);
-    doc.setLineWidth(1);
-    doc.rect(40, yPos, 532, spanBoxHeight, 'S');
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, spanBoxHeight, 'S');
 
-    yPos += 18;
-    doc.setFontSize(12);
+    y += 14;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text('SPANAKOPITA', 50, yPos);
-    yPos += 15;
+    doc.text('SPANAKOPITA', margin + 10, y);
+    y += 12;
 
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     prep.spanakopita.forEach(span => {
-      if (yPos < 720) {
-        doc.text(`[ ] ${span.qty}x ${toTitleCase(span.name)} (round tray on arugula or 1/2/full pan) - 1 tong`, 50, yPos); yPos += 11;
+      if (y < 720) {
+        doc.text(`[ ] ${span.qty}x ${toTitleCase(span.name)} (round tray on arugula or 1/2/full pan) - 1 tong`, margin + 10, y); y += 9;
         doc.setTextColor(...darkGray);
-        doc.text(`    - ${span.qty}x 16oz Tzatziki (dill stripe) - 1 small spoon`, 56, yPos);
+        doc.text(`    - ${span.qty}x 16oz Tzatziki (dill stripe) - 1 small spoon`, margin + 16, y);
         doc.setTextColor(...black);
-        yPos += 13;
+        y += 10;
       }
     });
-    yPos += 6;
+    y += 6;
   }
 
   // SIDES
-  if (prep.sides.length > 0 && yPos < 700) {
+  if (prep.sides.length > 0 && y < 700) {
     const sidesBoxHeight = 40 + (prep.sides.length * 13);
     doc.setFillColor(250, 250, 250);
-    doc.rect(40, yPos, 532, sidesBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, sidesBoxHeight, 'F');
     doc.setDrawColor(...lightGray);
-    doc.setLineWidth(1);
-    doc.rect(40, yPos, 532, sidesBoxHeight, 'S');
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, sidesBoxHeight, 'S');
 
-    yPos += 18;
-    doc.setFontSize(12);
+    y += 14;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text('SIDES', 50, yPos);
-    yPos += 15;
+    doc.text('SIDES', margin + 10, y);
+    y += 12;
 
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     prep.sides.forEach(side => {
-      if (yPos < 720) {
+      if (y < 720) {
         const sideName = (side.name || '');
         const isRice = sideName.toUpperCase().includes('RICE');
-        doc.text(`[ ] ${side.qty}x ${toTitleCase(sideName)} - 1 tong${isRice ? ' + 1 large serving spoon' : ''}`, 50, yPos); yPos += 12;
+        doc.text(`[ ] ${side.qty}x ${toTitleCase(sideName)} - 1 tong${isRice ? ' + 1 large serving spoon' : ''}`, margin + 10, y); y += 12;
       }
     });
-    yPos += 6;
+    y += 6;
   }
 
   // DESSERTS
-  if (prep.desserts.length > 0 && yPos < 700) {
+  if (prep.desserts.length > 0 && y < 700) {
     const dessertsBoxHeight = 40 + (prep.desserts.length * 13);
     doc.setFillColor(250, 250, 250);
-    doc.rect(40, yPos, 532, dessertsBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, dessertsBoxHeight, 'F');
     doc.setDrawColor(...lightGray);
-    doc.setLineWidth(1);
-    doc.rect(40, yPos, 532, dessertsBoxHeight, 'S');
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, dessertsBoxHeight, 'S');
 
-    yPos += 18;
-    doc.setFontSize(12);
+    y += 14;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text('DESSERTS', 50, yPos);
-    yPos += 15;
+    doc.text('DESSERTS', margin + 10, y);
+    y += 12;
 
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     prep.desserts.forEach(dessert => {
-      if (yPos < 720) {
-        doc.text(`[ ] ${dessert.qty}x ${toTitleCase(dessert.name)} - 1 tong`, 50, yPos); yPos += 12;
+      if (y < 720) {
+        doc.text(`[ ] ${dessert.qty}x ${toTitleCase(dessert.name)} - 1 tong`, margin + 10, y); y += 12;
       }
     });
-    yPos += 6;
+    y += 6;
   }
 
   // PINWHEELS
-  if (prep.pinwheels.length > 0 && yPos < 700) {
+  if (prep.pinwheels.length > 0 && y < 700) {
     const pinwheelsBoxHeight = 40 + (prep.pinwheels.length * 13);
     doc.setFillColor(250, 250, 250);
-    doc.rect(40, yPos, 532, pinwheelsBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, pinwheelsBoxHeight, 'F');
     doc.setDrawColor(...lightGray);
-    doc.setLineWidth(1);
-    doc.rect(40, yPos, 532, pinwheelsBoxHeight, 'S');
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, pinwheelsBoxHeight, 'S');
 
-    yPos += 18;
-    doc.setFontSize(12);
+    y += 14;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text('PINWHEELS', 50, yPos);
-    yPos += 15;
+    doc.text('PINWHEELS', margin + 10, y);
+    y += 12;
 
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     prep.pinwheels.forEach(pinwheel => {
-      if (yPos < 720) {
-        doc.text(`[ ] ${pinwheel.qty}x ${toTitleCase(pinwheel.name)} - 1 tong`, 50, yPos); yPos += 12;
+      if (y < 720) {
+        doc.text(`[ ] ${pinwheel.qty}x ${toTitleCase(pinwheel.name)} - 1 tong`, margin + 10, y); y += 12;
       }
     });
-    yPos += 6;
+    y += 6;
   }
 
   // UNMAPPED ITEMS (items not in standard prep categories - drinks, special items, etc.)
-  if (prep.unmapped && prep.unmapped.length > 0 && yPos < 680) {
+  if (prep.unmapped && prep.unmapped.length > 0 && y < 680) {
     const unmappedBoxHeight = 40 + (prep.unmapped.length * 13);
     doc.setFillColor(254, 242, 242); // Light red background
-    doc.rect(40, yPos, 532, unmappedBoxHeight, 'F');
+    doc.rect(margin, y, contentWidth, unmappedBoxHeight, 'F');
     doc.setDrawColor(220, 38, 38); // Red border
     doc.setLineWidth(2);
-    doc.rect(40, yPos, 532, unmappedBoxHeight, 'S');
+    doc.rect(margin, y, contentWidth, unmappedBoxHeight, 'S');
 
-    yPos += 18;
-    doc.setFontSize(12);
+    y += 14;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(185, 28, 28); // Dark red text
-    doc.text('OTHER ITEMS (NOT IN STANDARD PREP)', 50, yPos);
-    yPos += 13;
+    doc.text('OTHER ITEMS (NOT IN STANDARD PREP)', margin + 10, y);
+    y += 10;
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(...darkGray);
-    doc.text('The following items were ordered but don\'t fall into standard prep categories. Please prepare as specified:', 50, yPos);
-    yPos += 13;
+    doc.text('The following items were ordered but don\'t fall into standard prep categories. Please prepare as specified:', margin + 10, y);
+    y += 10;
 
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...black);
     prep.unmapped.forEach(item => {
-      if (yPos < 720) {
-        doc.text(`[ ] ${item.qty}x ${toTitleCase(item.name)}`, 50, yPos);
-        yPos += 12;
+      if (y < 720) {
+        doc.text(`[ ] ${item.qty}x ${toTitleCase(item.name)}`, margin + 10, y);
+        y += 12;
       }
     });
-    yPos += 6;
+    y += 6;
   }
 
   // SPECIAL NOTES
-  if (order.delivery_notes && yPos < 680) {
-    yPos += 25;  // Extra spacing before special notes section
-    doc.setFontSize(12);
+  if (order.delivery_notes && y < 700) {
+    y += 12;
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text('SPECIAL NOTES:', 40, yPos);
-    yPos += 14;
+    doc.text('SPECIAL NOTES:', margin, y);
+    y += 10;
 
-    // Simple notes text without background box
-    const noteLines = doc.splitTextToSize(order.delivery_notes, 520);
-    doc.setFontSize(11);
+    const noteLines = doc.splitTextToSize(order.delivery_notes, contentWidth);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     noteLines.forEach((line, idx) => {
-      if (idx < 5 && yPos < 750) {  // Limit to 5 lines
-        doc.text(line, 40, yPos);
-        yPos += 13;
+      if (idx < 6 && y < 760) {
+        doc.text(line, margin, y);
+        y += 9;
       }
     });
-    yPos += 10;
+    y += 6;
   }
 
   // HANDWRITTEN NOTES SECTION
-  if (yPos < 700) {
-    yPos += 8;
-    doc.setFontSize(11);
+  if (y < 720) {
+    y += 6;
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text('PREP NOTES:', 40, yPos);
-    yPos += 8;
+    doc.text('PREP NOTES:', margin, y);
+    y += 6;
 
-    // Draw lines for handwritten notes
     for (let i = 0; i < 3; i++) {
-      if (yPos < 740) {
+      if (y < 750) {
         doc.setDrawColor(...lightGray);
         doc.setLineWidth(0.5);
-        doc.line(40, yPos, 572, yPos);
-        yPos += 18;
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 14;
       }
     }
   }
 
   // Footer
-  doc.setFontSize(8);
+  doc.setFontSize(6);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...black);
-  doc.text(`Generated: ${formatPacificDateTime(new Date())} PST`, 40, 782);
+  doc.setTextColor(...gray);
+  doc.text(`Generated: ${formatPacificDateTime(new Date())} PST`, margin, 776);
 
   // Convert to base64
   return doc.output('datauristring').split(',')[1];
