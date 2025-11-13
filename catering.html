@@ -3083,6 +3083,7 @@
         sides: [],
         desserts: [],
         pinwheels: [],
+        unmapped: [], // Items that don't fit into any category
         containers: { halfPans: 0, deliContainers: 0, brownBowls: 0, tongs: 0, spoons: 0 }
       };
 
@@ -3132,7 +3133,7 @@
           prep.spanakopita.push({ name: item.item_name, qty, modifiers });
         }
         // SIDES (everything else)
-        else if (itemName.includes('GREEK FRIES') || itemName.includes('CHICKPEA') || itemName.includes('GRILLED PITA') || itemName.includes('VEGETABLE STICKS') || itemName.includes('MARINATED OLIVES')) {
+        else if (itemName.includes('GREEK FRIES') || itemName.includes('CHICKPEA') || itemName.includes('GRILLED PITA') || itemName.includes('VEGETABLE STICKS') || itemName.includes('MARINATED OLIVES') || itemName.includes('RICE')) {
           prep.sides.push({ name: item.item_name, qty, modifiers });
         }
         // DESSERTS
@@ -3142,6 +3143,10 @@
         // PINWHEELS
         else if (itemName.includes('PINWHEEL')) {
           prep.pinwheels.push({ name: item.item_name, qty });
+        }
+        // UNMAPPED ITEMS (drinks, special items, etc. - anything not categorized above)
+        else {
+          prep.unmapped.push({ name: item.item_name, qty, modifiers });
         }
       });
 
@@ -3726,6 +3731,23 @@
         prep.pinwheels.forEach(pinwheel => {
           html += `<div>☐ ${pinwheel.qty}x ${pinwheel.name} (black round 18" catering tray with clear dome lid, on bed of arugula) – 1 TONG</div>`;
           tongs += 1; // 1 tong per pinwheel type
+        });
+        html += `</div>`;
+      }
+
+      // UNMAPPED ITEMS (items that don't fall into standard prep categories - e.g., drinks, special items)
+      if (prep.unmapped && prep.unmapped.length > 0) {
+        html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: #dc2626;">OTHER ITEMS (NOT IN STANDARD PREP)</h4>`;
+        html += `<div style="margin-left: 16px; padding: 12px; background: #fef2f2; border-left: 3px solid #dc2626;">`;
+        html += `<div style="font-size: 12px; font-style: italic; color: #991b1b; margin-bottom: 8px;">The following items were ordered but don't fall into standard prep categories. Please prepare as specified:</div>`;
+        prep.unmapped.forEach(item => {
+          html += `<div style="margin-bottom: 4px;">☐ ${item.qty}x ${item.name}`;
+          if (item.modifiers && item.modifiers.length > 0) {
+            item.modifiers.forEach(mod => {
+              html += `<div style="margin-left: 20px; font-size: 11px; color: var(--gray-600);">+ ${mod.name || mod}</div>`;
+            });
+          }
+          html += `</div>`;
         });
         html += `</div>`;
       }
@@ -5007,6 +5029,13 @@
       prep.pinwheels.forEach(pinwheel => {
         labels.push({ item: getLabelName(pinwheel.name), qty: `${pinwheel.qty} portions`, pan: '', category: 'Pinwheel', orderNum, customerLastName, phoneNumber, packDate });
       });
+
+      // UNMAPPED ITEMS (drinks, special items, etc.)
+      if (prep.unmapped && prep.unmapped.length > 0) {
+        prep.unmapped.forEach(item => {
+          labels.push({ item: getLabelName(item.name), qty: `${item.qty} portions`, pan: '', category: 'Other', orderNum, customerLastName, phoneNumber, packDate });
+        });
+      }
 
       // SORT LABELS ALPHABETICALLY BY ITEM NAME
       // This groups all labels for the same item together for batch printing
