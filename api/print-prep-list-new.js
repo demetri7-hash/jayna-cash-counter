@@ -613,7 +613,27 @@ function generatePrepListPDF(prep, order, lineItems) {
   doc.setFontSize(sf(16));
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
-  doc.text('PREP LIST', margin, y);
+
+  // Extract last name from customer name
+  const customerName = order.customer_name || 'Customer';
+  const nameParts = customerName.trim().split(' ');
+  const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].toUpperCase() : customerName.toUpperCase();
+
+  // Format date as DD/MM
+  let dateStr = '';
+  if (order.delivery_date) {
+    const [year, month, day] = order.delivery_date.split('-').map(Number);
+    dateStr = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`;
+  }
+
+  // Build title: "LASTNAME - DD/MM - PREP LIST"
+  const titleParts = [];
+  if (lastName) titleParts.push(lastName);
+  if (dateStr) titleParts.push(dateStr);
+  titleParts.push('PREP LIST');
+  const title = titleParts.join(' - ');
+
+  doc.text(title, margin, y);
   y += ss(16);
 
   // ===== ORDER INFO =====
