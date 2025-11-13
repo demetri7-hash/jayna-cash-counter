@@ -1830,10 +1830,63 @@
         });
       }
 
+      // FILTER: Remove orders that are more than 1 hour past their delivery time
+      // Get current time in Pacific timezone (milliseconds since epoch)
+      const nowUTC = new Date();
+
+      const filteredOrders = (orders || []).filter(order => {
+        // Keep orders without delivery_time (shouldn't happen, but safe fallback)
+        if (!order.delivery_time) {
+          return true;
+        }
+
+        try {
+          // Parse delivery_time (ISO format from Toast API)
+          const deliveryTimeUTC = new Date(order.delivery_time);
+
+          // Calculate time difference in milliseconds
+          // NOTE: Both dates are in UTC, so comparison is accurate regardless of timezone
+          const timeDiff = nowUTC.getTime() - deliveryTimeUTC.getTime();
+          const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+
+          // Keep order if it's NOT more than 1 hour past delivery time
+          const shouldKeep = timeDiff <= oneHour;
+
+          if (!shouldKeep) {
+            // Format times in Pacific for logging
+            const deliveryTimePacific = deliveryTimeUTC.toLocaleString('en-US', {
+              timeZone: 'America/Los_Angeles',
+              month: 'numeric',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            });
+            const nowPacific = nowUTC.toLocaleString('en-US', {
+              timeZone: 'America/Los_Angeles',
+              month: 'numeric',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            });
+            console.log(`⏰ Filtering out order ${order.order_number}: Delivery was at ${deliveryTimePacific} Pacific, now is ${nowPacific} Pacific, ${Math.round(timeDiff / 60000)} minutes past`);
+          }
+
+          return shouldKeep;
+        } catch (error) {
+          console.error(`Error parsing delivery_time for order ${order.order_number}:`, error);
+          // Keep order if we can't parse the time
+          return true;
+        }
+      });
+
+      console.log(`⏰ Filtered ${orders?.length || 0} orders down to ${filteredOrders.length} (removed ${(orders?.length || 0) - filteredOrders.length} orders past 1-hour window)`);
+
       // Group orders by date
       const ordersByDate = {};
-      if (orders && orders.length > 0) {
-        orders.forEach(order => {
+      if (filteredOrders && filteredOrders.length > 0) {
+        filteredOrders.forEach(order => {
           const date = order.delivery_date;
           if (!ordersByDate[date]) {
             ordersByDate[date] = [];
