@@ -1857,6 +1857,9 @@
         });
       }
 
+      console.log(`📅 DEBUG - Orders grouped by date:`, ordersByDate);
+      console.log(`📅 DEBUG - Order dates found:`, Object.keys(ordersByDate));
+
       // Generate next 7 days (including today) in Pacific timezone
       const next7Days = [];
       for (let i = 0; i < 7; i++) {
@@ -1864,13 +1867,25 @@
         next7Days.push(dateStr);
       }
 
+      console.log(`📅 DEBUG - Next 7 days to display:`, next7Days);
+      console.log(`📅 DEBUG - Today should be:`, getPacificToday());
+
       // Find orders beyond day 7 (sorted by date)
       const allOrderDates = Object.keys(ordersByDate).sort();
       const day7Date = next7Days[6]; // Last of the 7 days
       const ordersBeyond7Days = allOrderDates.filter(date => date > day7Date);
 
+      console.log(`📅 DEBUG - Orders beyond day 7:`, ordersBeyond7Days);
+
       // Combine: first 7 days + any additional dates beyond day 7
       const datesToDisplay = [...next7Days, ...ordersBeyond7Days];
+
+      console.log(`📅 DEBUG - Final dates to display:`, datesToDisplay);
+      console.log(`📅 DEBUG - Number of orders per date:`);
+      datesToDisplay.forEach(date => {
+        const count = ordersByDate[date] ? ordersByDate[date].length : 0;
+        console.log(`     ${date}: ${count} order(s)`);
+      });
 
       // Build HTML
       let html = '';
