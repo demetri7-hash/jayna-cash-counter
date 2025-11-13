@@ -195,15 +195,14 @@ async function generateOrderReceiptPDF(order, lineItems) {
 
   let y = margin.top;
 
-  // ===== HEADER: JAYNA GYRO (simple black text, no color bar) =====
-  doc.setFontSize(14);
+  // ===== HEADER: JAYNA GYRO (modern, readable) =====
+  doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
   doc.text('JAYNA GYRO CATERING', margin.left, y);
-  y += 16;
+  y += 24; // 8pt grid: 24pt spacing
 
-  // ===== ORDER NUMBER & STATUS (tight, black text) =====
-  y += 8;
+  // ===== ORDER NUMBER & STATUS (well-spaced) =====
   let orderNum, orderLabel;
   if (order.source_system === 'EZCATER') {
     orderNum = order.order_number || 'N/A';
@@ -213,13 +212,13 @@ async function generateOrderReceiptPDF(order, lineItems) {
     orderLabel = 'TOAST ORDER';
   }
 
-  doc.setFontSize(12);
+  doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.text(`${orderLabel} #${orderNum}`, margin.left, y);
-  y += 12;
+  y += 16; // 8pt grid: 16pt spacing
 
-  // Status line (compact)
-  doc.setFontSize(7);
+  // Status line (readable size)
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...darkGray);
   let statusLine = `STATUS: ${(order.status || 'CONFIRMED').toUpperCase()}`;
@@ -227,24 +226,24 @@ async function generateOrderReceiptPDF(order, lineItems) {
   if (order.check_number) statusLine += ` | CHECK #${order.check_number}`;
   doc.text(statusLine, margin.left, y);
   doc.setTextColor(...black);
-  y += 9;
+  y += 16; // 8pt grid: 16pt spacing
 
   // Gray separator line (2pt, 50% gray)
   doc.setDrawColor(...gray);
   doc.setLineWidth(2);
   doc.line(margin.left, y, pageWidth - margin.right, y);
-  y += 12;
+  y += 16; // 8pt grid: 16pt spacing
 
-  // ===== DELIVERY/PICKUP INFO (no box, just clean text) =====
+  // ===== DELIVERY/PICKUP INFO (generous spacing) =====
   const isPickup = !order.delivery_address;
 
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
   doc.text(isPickup ? 'PICKUP INFORMATION' : 'DELIVERY INFORMATION', margin.left, y);
-  y += 14;
+  y += 16; // 8pt grid
 
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...darkGray);
 
@@ -256,84 +255,85 @@ async function generateOrderReceiptPDF(order, lineItems) {
     doc.text(`${isPickup ? 'PICKUP' : 'DUE'}:`, margin.left, y);
     doc.setFont('helvetica', 'normal');
     doc.text(`${dateStr} at ${timeStr}`, margin.left + 55, y);
-    y += 12;
+    y += 16; // 8pt grid: generous spacing
 
-    // LEAVE JAYNA AT (delivery only, MUCH BIGGER AND BOLDER!)
+    // LEAVE JAYNA AT (delivery only, PROMINENT!)
     if (!isPickup) {
       const dueTime = new Date(order.delivery_time);
       const leaveTime = new Date(dueTime.getTime() - 25 * 60000);
       const leaveTimeStr = new Intl.DateTimeFormat('en-US', {
         hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles'
       }).format(leaveTime);
-      doc.setFontSize(14);
+      y += 4; // Small extra space before critical info
+      doc.setFontSize(16); // Large, prominent
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...black);
       doc.text(`LEAVE JAYNA AT: ${leaveTimeStr}`, margin.left, y);
-      y += 16;
+      y += 24; // 8pt grid: extra spacing after important info
     }
   }
 
   if (order.customer_name) {
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
     doc.text('CUSTOMER:', margin.left, y);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
-    doc.text(order.customer_name, margin.left + 55, y);
-    y += 12;
+    doc.text(order.customer_name, margin.left + 75, y);
+    y += 16; // 8pt grid
   }
 
   if (order.customer_phone) {
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
     doc.text('PHONE:', margin.left, y);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
-    doc.text(formatPhoneNumber(order.customer_phone), margin.left + 55, y);
-    y += 12;
+    doc.text(formatPhoneNumber(order.customer_phone), margin.left + 75, y);
+    y += 16; // 8pt grid
   }
 
   if (order.customer_email) {
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
     doc.text('EMAIL:', margin.left, y);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
-    doc.text(order.customer_email, margin.left + 55, y);
-    y += 12;
+    doc.text(order.customer_email, margin.left + 75, y);
+    y += 16; // 8pt grid
   }
 
   if (order.delivery_address) {
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
     doc.text('ADDRESS:', margin.left, y);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
-    const addressLines = doc.splitTextToSize(order.delivery_address, contentWidth - 55);
+    const addressLines = doc.splitTextToSize(order.delivery_address, contentWidth - 75);
     addressLines.forEach((line, idx) => {
-      doc.text(line, margin.left + (idx === 0 ? 55 : 0), y);
-      if (idx < addressLines.length - 1) y += 10;
+      doc.text(line, margin.left + (idx === 0 ? 75 : 0), y);
+      if (idx < addressLines.length - 1) y += 14;
     });
-    y += 12;
+    y += 16; // 8pt grid
   }
 
   if (order.headcount) {
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
     doc.text('HEADCOUNT:', margin.left, y);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
-    doc.text(`${order.headcount} guests`, margin.left + 55, y);
-    y += 12;
+    doc.text(`${order.headcount} guests`, margin.left + 75, y);
+    y += 16; // 8pt grid
   }
 
   if (order.utensils_required !== null && order.utensils_required !== undefined) {
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
     doc.text('UTENSILS:', margin.left, y);
@@ -342,23 +342,23 @@ async function generateOrderReceiptPDF(order, lineItems) {
     const utensilText = order.utensils_required
       ? (order.utensils_quantity || order.headcount ? `${order.utensils_quantity || order.headcount} sets` : 'Yes')
       : 'No';
-    doc.text(utensilText, margin.left + 55, y);
-    y += 12;
+    doc.text(utensilText, margin.left + 75, y);
+    y += 16; // 8pt grid
   }
 
   // Gray separator line (2pt, 50% gray)
-  y += 4;
+  y += 8; // Extra spacing before separator
   doc.setDrawColor(...gray);
   doc.setLineWidth(2);
   doc.line(margin.left, y, pageWidth - margin.right, y);
-  y += 12;
+  y += 16; // 8pt grid
 
-  // ===== ORDER ITEMS TABLE (compact, grayscale, no thick borders) =====
-  doc.setFontSize(9);
+  // ===== ORDER ITEMS TABLE (well-spaced, easy to read) =====
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
   doc.text('ORDER ITEMS', margin.left, y);
-  y += 7;
+  y += 16; // 8pt grid
 
   if (lineItems.length === 0) {
     doc.setFontSize(9);
@@ -399,19 +399,19 @@ async function generateOrderReceiptPDF(order, lineItems) {
       startY: y,
       theme: 'plain',
       styles: {
-        fontSize: 8,
-        cellPadding: { top: 3, right: 4, bottom: 3, left: 0 },
+        fontSize: 9,  // Readable size
+        cellPadding: { top: 6, right: 8, bottom: 6, left: 8 }, // Generous padding (8pt grid)
         lineColor: [127, 127, 127], // 50% gray
-        lineWidth: 1,
+        lineWidth: 0.5,
         textColor: [0, 0, 0]
       },
       headStyles: {
-        fillColor: [245, 245, 245],
+        fillColor: [248, 248, 248],
         textColor: [0, 0, 0],
         fontStyle: 'bold',
-        fontSize: 8,
+        fontSize: 9,
         halign: 'left',
-        cellPadding: { top: 5, right: 4, bottom: 5, left: 0 }
+        cellPadding: { top: 8, right: 8, bottom: 8, left: 8 } // Even more generous header padding
       },
       columnStyles: {
         0: { cellWidth: contentWidth - 100 },
@@ -428,13 +428,13 @@ async function generateOrderReceiptPDF(order, lineItems) {
       }
     });
 
-    y = doc.lastAutoTable.finalY + 10;
+    y = doc.lastAutoTable.finalY + 16; // 8pt grid spacing
   }
 
-  // ===== FINANCIAL BREAKDOWN (better spacing, right-aligned) =====
+  // ===== FINANCIAL BREAKDOWN (generous spacing, easy to read) =====
   if (order.subtotal !== null && order.subtotal !== undefined) {
-    y += 6;
-    doc.setFontSize(8);
+    y += 8; // 8pt grid
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
 
@@ -443,67 +443,68 @@ async function generateOrderReceiptPDF(order, lineItems) {
     if (order.subtotal) {
       doc.text('Subtotal:', rightX - 70, y, { align: 'left' });
       doc.text(`$${parseFloat(order.subtotal || 0).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 10;
+      y += 14; // More breathing room
     }
 
     if (order.delivery_fee && parseFloat(order.delivery_fee) > 0) {
       doc.text('Delivery Fee:', rightX - 70, y, { align: 'left' });
       doc.text(`$${parseFloat(order.delivery_fee).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 10;
+      y += 14;
     }
 
     if (order.tax !== null && order.tax !== undefined) {
       doc.text('Tax:', rightX - 70, y, { align: 'left' });
       doc.text(`$${parseFloat(order.tax || 0).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 10;
+      y += 14;
     }
 
     if (order.tip && parseFloat(order.tip) > 0) {
       doc.text('Tip:', rightX - 70, y, { align: 'left' });
       doc.text(`$${parseFloat(order.tip).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 10;
+      y += 14;
     }
 
-    y += 6;
+    y += 8; // 8pt grid
   }
 
-  // ===== ORDER TOTAL (gray border box, black text) =====
+  // ===== ORDER TOTAL (gray border box, well-spaced) =====
   doc.setDrawColor(...gray);
   doc.setLineWidth(2);
-  doc.rect(margin.left, y, contentWidth, 20);
-  doc.setFontSize(11);
+  doc.rect(margin.left, y, contentWidth, 28); // Taller box for better padding
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
-  doc.text('ORDER TOTAL:', margin.left + 4, y + 14);
-  doc.text(`$${parseFloat(order.total_amount || 0).toFixed(2)}`, pageWidth - margin.right - 4, y + 14, { align: 'right' });
-  y += 24;
+  doc.text('ORDER TOTAL:', margin.left + 8, y + 18); // Centered vertically
+  doc.text(`$${parseFloat(order.total_amount || 0).toFixed(2)}`, pageWidth - margin.right - 8, y + 18, { align: 'right' });
+  y += 32; // 8pt grid
 
-  // ===== SPECIAL NOTES (compact, minimal styling) =====
-  if (order.delivery_notes && y < 730) {
-    y += 6;
-    doc.setFontSize(8);
+  // ===== SPECIAL NOTES (well-spaced) =====
+  if (order.delivery_notes && y < 700) {
+    y += 16; // 8pt grid
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...black);
     doc.text('SPECIAL NOTES:', margin.left, y);
-    y += 9;
+    y += 14;
 
-    doc.setFontSize(7);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
     const notesLines = doc.splitTextToSize(order.delivery_notes, contentWidth);
     notesLines.forEach((line, idx) => {
-      if (idx < 5 && y < 755) {
+      if (idx < 4 && y < 745) {
         doc.text(line, margin.left, y);
-        y += 8;
+        y += 12; // Good line spacing
       }
     });
     doc.setTextColor(...black);
   }
 
   // ===== FOOTER (minimal, gray) - ensure no overlap =====
-  doc.setFontSize(6);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...gray);
-  doc.text(`Generated: ${formatPacificDateTime(new Date())} PST`, margin.left, 774);
+  doc.text(`Generated: ${formatPacificDateTime(new Date())} PST`, margin.left, 770);
 
   return doc.output('datauristring').split(',')[1];
 }
