@@ -2318,10 +2318,16 @@
         console.log('📸 Loading catering orders and photos...');
         showLoading('LOADING ORDERS', 'Loading catering orders and photos...');
 
+        // Calculate date range (today + 90 days) in Pacific timezone - MATCHES BETA TAB
+        const startDateStr = getPacificToday();
+        const endDateStr = getPacificDatePlusDays(90);
+
+        console.log(`📅 ORDERS Tab - Fetching range: ${startDateStr} to ${endDateStr}`);
+
         // Fetch BOTH uploaded photos AND Toast synced orders
         const [photosResponse, ordersResponse] = await Promise.all([
           fetch('/api/catering-photos-get?archived=false'),
-          fetch('/api/get-catering-orders') // Defaults to today + 14 days
+          fetch(`/api/get-catering-orders?startDate=${startDateStr}&endDate=${endDateStr}`) // Now fetches 90 days like BETA tab
         ]);
 
         const photosData = await photosResponse.json();
