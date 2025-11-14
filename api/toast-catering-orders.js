@@ -352,7 +352,9 @@ export default async function handler(req, res) {
 
           // Check number and payment status (from first check)
           if (!checkNumber) {
-            checkNumber = check.displayNumber || check.checkNumber || null;
+            // Use check displayNumber, but if it's just a single digit (1, 2, 3), use order GUID instead for meaningful display
+            const checkDisplayNum = check.displayNumber || check.checkNumber || null;
+            checkNumber = (checkDisplayNum && checkDisplayNum.length > 1) ? checkDisplayNum : (order.guid?.substring(0, 8) || checkDisplayNum);
             paymentStatus = check.paymentStatus || null; // "OPEN", "PAID", "CLOSED"
             paidDate = check.paidDate || (check.payments && check.payments[0]?.paidDate) || null;
           }
@@ -374,8 +376,8 @@ export default async function handler(req, res) {
       return {
         // Order IDs
         toast_order_id: order.guid,
-        // CRITICAL: Use displayNumber for UI display (Toast GUID will be replaced by sequential_order_number in DB)
-        order_number: order.displayNumber || order.guid?.substring(0, 8) || null,
+        // CRITICAL: Use GUID (shortened) as order number for unique display
+        order_number: order.guid?.substring(0, 8) || order.displayNumber || null,
 
         // Customer info (from check.customer)
         customer_name: customerName,
