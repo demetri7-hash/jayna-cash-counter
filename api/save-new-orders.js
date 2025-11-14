@@ -11,6 +11,20 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
+// Generate random food emoji
+function generateRandomOrderEmoji() {
+  const emojis = [
+    '🍕', '🍔', '🌮', '🌯', '🍗', '🍖', '🥗', '🍝', '🍜', '🍲',
+    '🍱', '🍛', '🍣', '🍤', '🥘', '🥙', '🥪', '🌭', '🍟', '🥓',
+    '🥩', '🍳', '🥞', '🧇', '🧆', '🥟', '🍢', '🍡', '🍧', '🍨',
+    '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿',
+    '🧃', '🧉', '🥤', '☕', '🍵', '🫖', '🍾', '🥂', '🍻', '🍺',
+    '🍇', '🍈', '🍉', '🍊', '🍋', '🍌', '🍍', '🥭', '🍎', '🍏',
+    '🍐', '🍑', '🍒', '🍓', '🫐', '🥝', '🍅', '🫒', '🥥', '🥑'
+  ];
+  return emojis[Math.floor(Math.random() * emojis.length)];
+}
+
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -56,6 +70,7 @@ export default async function handler(req, res) {
       business_date: order.business_date,
       status: order.status,
       order_data: order.order_data,
+      order_emoji: generateRandomOrderEmoji(), // Random persistent emoji
       last_synced_at: new Date().toISOString()
     }));
 

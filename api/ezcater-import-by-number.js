@@ -5,6 +5,20 @@
 
 import { createClient } from '@supabase/supabase-js';
 
+// Generate random food emoji
+function generateRandomOrderEmoji() {
+  const emojis = [
+    '🍕', '🍔', '🌮', '🌯', '🍗', '🍖', '🥗', '🍝', '🍜', '🍲',
+    '🍱', '🍛', '🍣', '🍤', '🥘', '🥙', '🥪', '🌭', '🍟', '🥓',
+    '🥩', '🍳', '🥞', '🧇', '🧆', '🥟', '🍢', '🍡', '🍧', '🍨',
+    '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿',
+    '🧃', '🧉', '🥤', '☕', '🍵', '🫖', '🍾', '🥂', '🍻', '🍺',
+    '🍇', '🍈', '🍉', '🍊', '🍋', '🍌', '🍍', '🥭', '🍎', '🍏',
+    '🍐', '🍑', '🍒', '🍓', '🫐', '🥝', '🍅', '🫒', '🥥', '🥑'
+  ];
+  return emojis[Math.floor(Math.random() * emojis.length)];
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -125,6 +139,7 @@ export default async function handler(req, res) {
         business_date: parsedOrder.delivery_date ? parseInt(parsedOrder.delivery_date.replace(/-/g, '')) : null,
         status: parsedOrder.status.toUpperCase(),
         order_data: orderData,
+        order_emoji: generateRandomOrderEmoji(), // Random persistent emoji
         last_synced_at: new Date().toISOString()
       }, {
         onConflict: 'source_system,external_order_id'

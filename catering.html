@@ -1940,11 +1940,19 @@
         ? '<span style="background: var(--primary-blue); color: white; padding: 2px 6px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; margin-left: 8px;">TOAST</span>'
         : '<span style="background: var(--warning); color: white; padding: 2px 6px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; margin-left: 8px;">EZCATER</span>';
 
+      // Determine real order number: Toast uses check_number, EZCater uses order_number
+      const realOrderNumber = sourceSystem === 'TOAST'
+        ? (order.check_number || order.order_number || 'N/A')
+        : (order.order_number || 'N/A');
+
+      // Random emoji for each order (persisted in database)
+      const orderEmoji = order.order_emoji || '🍽️'; // Default fork/knife/plate emoji
+
       return `
         <div class="order-card" onclick="viewOrderDetails('${order.toast_order_id || order.db_id}')">
           <div class="order-header">
             <div>
-              <div class="order-number">Order #${order.order_number}${sourceSystemBadge}</div>
+              <div class="order-number">${orderEmoji} ${realOrderNumber}${sourceSystemBadge}</div>
               <div class="order-source">${order.delivery_address ? 'DELIVERY' : 'PICK UP'}</div>
             </div>
             <div class="order-status ${statusClass}">${statusLabel}</div>
@@ -2368,10 +2376,11 @@
             brightness: 100,
             contrast: 100,
             has_image: false, // Toast orders don't have images
-            toast_order_number: order.order_number,
+            toast_order_number: order.check_number || order.order_number, // Use real check number
             toast_headcount: order.headcount,
             toast_total: order.total,
-            toast_status: order.status
+            toast_status: order.status,
+            order_emoji: order.order_emoji || '🍽️' // Random persistent emoji
           }));
 
           console.log(`✅ Loaded ${toastOrders.length} Toast orders`);
@@ -2535,8 +2544,8 @@
                 <!-- No Image Placeholder (CLICKABLE to view order details) -->
                 <div onclick="viewToastOrderDetails(${photo.db_id})" style="width: 100%; height: 300px; background: white; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid var(--gray-300); cursor: pointer; transition: background 0.15s ease;">
                   <div style="text-align: center; padding: 20px;">
-                    <div style="font-size: 48px; margin-bottom: 12px;">📋</div>
-                    <div style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ORDER ${photo.toast_order_number || 'N/A'}</div>
+                    <div style="font-size: 48px; margin-bottom: 12px;">${photo.order_emoji || '🍽️'}</div>
+                    <div style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">${photo.toast_order_number || 'N/A'}</div>
                     ${photo.toast_total ? `<div style="font-size: 18px; font-weight: 700; color: var(--primary-blue); margin-top: 8px;">$${photo.toast_total.toFixed(2)}</div>` : ''}
                     <div style="font-size: 11px; font-weight: 600; color: var(--primary-blue); margin-top: 12px; text-transform: uppercase; letter-spacing: 0.5px;">CLICK TO VIEW FULL ORDER</div>
                   </div>
