@@ -352,9 +352,8 @@ export default async function handler(req, res) {
 
           // Check number and payment status (from first check)
           if (!checkNumber) {
-            // Use check displayNumber, but if it's just a single digit (1, 2, 3), use order GUID instead for meaningful display
-            const checkDisplayNum = check.displayNumber || check.checkNumber || null;
-            checkNumber = (checkDisplayNum && checkDisplayNum.length > 1) ? checkDisplayNum : (order.guid?.substring(0, 8) || checkDisplayNum);
+            // Use check displayNumber (Toast shows this as "Check #1", "Check #2", etc.)
+            checkNumber = check.displayNumber || check.checkNumber || '1';
             paymentStatus = check.paymentStatus || null; // "OPEN", "PAID", "CLOSED"
             paidDate = check.paidDate || (check.payments && check.payments[0]?.paidDate) || null;
           }
@@ -372,12 +371,13 @@ export default async function handler(req, res) {
       }
 
       console.log(`💰 Order ${order.guid?.substring(0, 8)}: Total=$${total.toFixed(2)}, Subtotal=$${subtotal.toFixed(2)}, Tax=$${tax.toFixed(2)}, Tip=$${tip.toFixed(2)}, Delivery=$${deliveryFee.toFixed(2)}`);
+      console.log(`🔢 Order Number Fields: displayNumber="${order.displayNumber}", entityId="${order.entityId}", GUID="${order.guid?.substring(0, 8)}", checkNumber="${checkNumber}"`);
 
       return {
         // Order IDs
         toast_order_id: order.guid,
-        // CRITICAL: Use GUID (shortened) as order number for unique display
-        order_number: order.guid?.substring(0, 8) || order.displayNumber || null,
+        // CRITICAL: Use Toast displayNumber FIRST (e.g., "000108"), fallback to GUID for uniqueness
+        order_number: order.displayNumber || order.entityId || order.guid?.substring(0, 8) || null,
 
         // Customer info (from check.customer)
         customer_name: customerName,
