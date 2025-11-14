@@ -439,41 +439,42 @@ async function generateOrderReceiptPDF(order, lineItems) {
     doc.setTextColor(...darkGray);
 
     const rightX = pageWidth - margin.right;
+    const labelX = rightX - 90; // Increased space for longer labels like "Service Charge:"
 
     if (order.subtotal) {
-      doc.text('Subtotal:', rightX - 70, y, { align: 'left' });
+      doc.text('Subtotal:', labelX, y, { align: 'left' });
       doc.text(`$${parseFloat(order.subtotal || 0).toFixed(2)}`, rightX, y, { align: 'right' });
       y += 14; // More breathing room
     }
 
     if (order.delivery_fee && parseFloat(order.delivery_fee) > 0) {
-      doc.text('Delivery Fee:', rightX - 70, y, { align: 'left' });
+      doc.text('Delivery Fee:', labelX, y, { align: 'left' });
       doc.text(`$${parseFloat(order.delivery_fee).toFixed(2)}`, rightX, y, { align: 'right' });
       y += 14;
     }
 
     if (order.service_charge_amount && parseFloat(order.service_charge_amount) > 0) {
-      doc.text('Service Charge:', rightX - 70, y, { align: 'left' });
+      doc.text('Service Charge:', labelX, y, { align: 'left' });
       doc.text(`$${parseFloat(order.service_charge_amount).toFixed(2)}`, rightX, y, { align: 'right' });
       y += 14;
     }
 
     if (order.discount_amount && parseFloat(order.discount_amount) > 0) {
       doc.setTextColor(220, 38, 38); // Red color for discount
-      doc.text('Discount:', rightX - 70, y, { align: 'left' });
+      doc.text('Discount:', labelX, y, { align: 'left' });
       doc.text(`-$${parseFloat(order.discount_amount).toFixed(2)}`, rightX, y, { align: 'right' });
       doc.setTextColor(...darkGray); // Reset to dark gray
       y += 14;
     }
 
     if (order.tax !== null && order.tax !== undefined) {
-      doc.text('Tax:', rightX - 70, y, { align: 'left' });
+      doc.text('Tax:', labelX, y, { align: 'left' });
       doc.text(`$${parseFloat(order.tax || 0).toFixed(2)}`, rightX, y, { align: 'right' });
       y += 14;
     }
 
     if (order.tip && parseFloat(order.tip) > 0) {
-      doc.text('Tip:', rightX - 70, y, { align: 'left' });
+      doc.text('Tip:', labelX, y, { align: 'left' });
       doc.text(`$${parseFloat(order.tip).toFixed(2)}`, rightX, y, { align: 'right' });
       y += 14;
     }
