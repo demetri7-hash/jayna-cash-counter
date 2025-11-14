@@ -363,7 +363,7 @@ function calculateProteinPans(byoItems) {
     // Aggregate protein quantities
     if (proteinKey) {
       if (!proteins[proteinKey]) {
-        proteins[proteinKey] = { name: proteinName, qty: 0, equipment };
+        proteins[proteinKey] = { name: proteinName, qty: 0, equipment, proteinKey };
       }
       proteins[proteinKey].qty += qty;
     }
@@ -375,26 +375,51 @@ function calculateProteinPans(byoItems) {
     const qty = protein.qty;
     let containerType = '';
 
-    // Pan calculation logic:
-    // <5 = brown bowl (singular in breakdown, pluralized in summary if needed)
-    // 6-20 = 1 half pan
-    // 21+ = calculate half pans, combine 2 half pans into full pans
-    if (qty < 5) {
-      containerType = 'brown bowl';
-    } else if (qty <= 20) {
-      containerType = '1 half pan';
-    } else {
-      // Calculate half pans needed (10 portions per half pan for proteins)
-      const halfPansNeeded = Math.ceil(qty / 10);
-      const fullPans = Math.floor(halfPansNeeded / 2);
-      const remainingHalfPans = halfPansNeeded % 2;
-
-      if (fullPans > 0 && remainingHalfPans > 0) {
-        containerType = `${fullPans} full pan${fullPans > 1 ? 's' : ''} + 1 half pan`;
-      } else if (fullPans > 0) {
-        containerType = `${fullPans} full pan${fullPans > 1 ? 's' : ''}`;
-      } else {
+    // FALAFEL SPECIFIC LOGIC: 1 in brown bowl, 8 per half pan, 16 per full pan
+    if (protein.proteinKey === 'FALAFEL') {
+      if (qty === 1) {
+        containerType = 'brown bowl';
+      } else if (qty <= 8) {
         containerType = '1 half pan';
+      } else {
+        // Calculate full pans (16 portions per full pan)
+        const fullPans = Math.floor(qty / 16);
+        const remainder = qty % 16;
+
+        if (remainder === 0) {
+          containerType = `${fullPans} full pan${fullPans > 1 ? 's' : ''}`;
+        } else if (remainder === 1) {
+          containerType = `${fullPans} full pan${fullPans > 1 ? 's' : ''} + brown bowl`;
+        } else if (remainder <= 8) {
+          containerType = `${fullPans} full pan${fullPans > 1 ? 's' : ''} + 1 half pan`;
+        } else {
+          // Remainder 9-15: Add another half pan (will be 2 half pans total for remainder)
+          const remainderHalfPans = Math.ceil(remainder / 8);
+          containerType = `${fullPans} full pan${fullPans > 1 ? 's' : ''} + ${remainderHalfPans} half pan${remainderHalfPans > 1 ? 's' : ''}`;
+        }
+      }
+    } else {
+      // Pan calculation logic for other proteins:
+      // <5 = brown bowl (singular in breakdown, pluralized in summary if needed)
+      // 6-20 = 1 half pan
+      // 21+ = calculate half pans, combine 2 half pans into full pans
+      if (qty < 5) {
+        containerType = 'brown bowl';
+      } else if (qty <= 20) {
+        containerType = '1 half pan';
+      } else {
+        // Calculate half pans needed (10 portions per half pan for proteins)
+        const halfPansNeeded = Math.ceil(qty / 10);
+        const fullPans = Math.floor(halfPansNeeded / 2);
+        const remainingHalfPans = halfPansNeeded % 2;
+
+        if (fullPans > 0 && remainingHalfPans > 0) {
+          containerType = `${fullPans} full pan${fullPans > 1 ? 's' : ''} + 1 half pan`;
+        } else if (fullPans > 0) {
+          containerType = `${fullPans} full pan${fullPans > 1 ? 's' : ''}`;
+        } else {
+          containerType = '1 half pan';
+        }
       }
     }
 
@@ -992,6 +1017,69 @@ function generatePrepListPDF(prep, order, lineItems) {
   if (smallSpoons > 0) utensilParts.push(`${smallSpoons}x Small Spoons`);
   doc.text(`* ${utensilParts.join('  *  ')}`, margin + 10, y);
   y += ss(14);
+
+  // ===== CONTAINER LABELS TO PRINT - Gray box =====
+  // Calculate pita label quantities
+  let wholePitaLabels = 0;
+  let slicedPitaLabels = 0;
+  let slicedGFPitaLabels = 0;
+
+  // Whole pita from BYO
+  if (prep.byoGyros.total > 0) {
+    const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
+    wholePitaLabels = Math.ceil(pitasNeeded / 25); // 1 label per full pan
+  }
+
+  // Sliced pita from dips
+  if (prep.dips.length > 0) {
+    prep.dips.forEach(dip => {
+      const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
+      const gfPitaMod = dip.modifiers.find(m => m.name && m.name.includes('GLUTEN FREE PITA'));
+
+      if (hasPita) {
+        slicedPitaLabels += dip.qty; // 1 half pan per dip = 1 label
+      }
+      if (gfPitaMod) {
+        let gfQty = gfPitaMod.gfPitaQty;
+        if (!gfQty && gfPitaMod.name) {
+          const priceMatch = gfPitaMod.name.match(/\$(\d+(?:\.\d+)?)/);
+          if (priceMatch) {
+            const totalPrice = parseFloat(priceMatch[1]);
+            gfQty = Math.round(totalPrice / 2);
+          }
+        }
+        if (gfQty && gfQty > 0) {
+          slicedGFPitaLabels += Math.ceil(gfQty / 6); // 1 label per half pan (6 pitas)
+        }
+      }
+    });
+  }
+
+  // Only show labels section if there are pitas
+  if (wholePitaLabels > 0 || slicedPitaLabels > 0 || slicedGFPitaLabels > 0) {
+    const labelBoxHeight = 36;
+    doc.setFillColor(248, 248, 248);
+    doc.rect(margin, y, contentWidth, labelBoxHeight, 'F');
+    doc.setDrawColor(...lightGray);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, labelBoxHeight, 'S');
+
+    y += ss(14);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...black);
+    doc.text('CONTAINER LABELS TO PRINT', margin + 10, y);
+    y += ss(12);
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    let labelParts = [];
+    if (wholePitaLabels > 0) labelParts.push(`${wholePitaLabels}x WHOLE PITA`);
+    if (slicedPitaLabels > 0) labelParts.push(`${slicedPitaLabels}x SLICED PITA`);
+    if (slicedGFPitaLabels > 0) labelParts.push(`${slicedGFPitaLabels}x SLICED GF PITA`);
+    doc.text(`* ${labelParts.join('  *  ')}`, margin + 10, y);
+    y += ss(14);
+  }
 
   // BYO GYRO PITAS (Beef & Lamb, Chicken, Roasted Chickpeas, Falafel)
   if (prep.byoGyros.total > 0) {
