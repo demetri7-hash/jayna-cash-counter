@@ -79,6 +79,7 @@ export default async function handler(req, res) {
     const formattedOrders = orders.map(order => ({
       toast_order_id: order.external_order_id,
       order_number: order.order_number,
+      order_emoji: order.order_emoji, // Random persistent emoji
       customer_name: order.customer_name,
       customer_email: order.customer_email,
       customer_phone: order.customer_phone,
