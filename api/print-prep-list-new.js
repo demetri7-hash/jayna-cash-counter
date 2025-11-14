@@ -1018,69 +1018,6 @@ function generatePrepListPDF(prep, order, lineItems) {
   doc.text(`* ${utensilParts.join('  *  ')}`, margin + 10, y);
   y += ss(14);
 
-  // ===== CONTAINER LABELS TO PRINT - Gray box =====
-  // Calculate pita label quantities
-  let wholePitaLabels = 0;
-  let slicedPitaLabels = 0;
-  let slicedGFPitaLabels = 0;
-
-  // Whole pita from BYO
-  if (prep.byoGyros.total > 0) {
-    const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
-    wholePitaLabels = Math.ceil(pitasNeeded / 25); // 1 label per full pan
-  }
-
-  // Sliced pita from dips
-  if (prep.dips.length > 0) {
-    prep.dips.forEach(dip => {
-      const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
-      const gfPitaMod = dip.modifiers.find(m => m.name && m.name.includes('GLUTEN FREE PITA'));
-
-      if (hasPita) {
-        slicedPitaLabels += dip.qty; // 1 half pan per dip = 1 label
-      }
-      if (gfPitaMod) {
-        let gfQty = gfPitaMod.gfPitaQty;
-        if (!gfQty && gfPitaMod.name) {
-          const priceMatch = gfPitaMod.name.match(/\$(\d+(?:\.\d+)?)/);
-          if (priceMatch) {
-            const totalPrice = parseFloat(priceMatch[1]);
-            gfQty = Math.round(totalPrice / 2);
-          }
-        }
-        if (gfQty && gfQty > 0) {
-          slicedGFPitaLabels += Math.ceil(gfQty / 6); // 1 label per half pan (6 pitas)
-        }
-      }
-    });
-  }
-
-  // Only show labels section if there are pitas
-  if (wholePitaLabels > 0 || slicedPitaLabels > 0 || slicedGFPitaLabels > 0) {
-    const labelBoxHeight = 36;
-    doc.setFillColor(248, 248, 248);
-    doc.rect(margin, y, contentWidth, labelBoxHeight, 'F');
-    doc.setDrawColor(...lightGray);
-    doc.setLineWidth(0.5);
-    doc.rect(margin, y, contentWidth, labelBoxHeight, 'S');
-
-    y += ss(14);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...black);
-    doc.text('CONTAINER LABELS TO PRINT', margin + 10, y);
-    y += ss(12);
-
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    let labelParts = [];
-    if (wholePitaLabels > 0) labelParts.push(`${wholePitaLabels}x WHOLE PITA`);
-    if (slicedPitaLabels > 0) labelParts.push(`${slicedPitaLabels}x SLICED PITA`);
-    if (slicedGFPitaLabels > 0) labelParts.push(`${slicedGFPitaLabels}x SLICED GF PITA`);
-    doc.text(`* ${labelParts.join('  *  ')}`, margin + 10, y);
-    y += ss(14);
-  }
-
   // BYO GYRO PITAS (Beef & Lamb, Chicken, Roasted Chickpeas, Falafel)
   if (prep.byoGyros.total > 0) {
     const sets = Math.ceil(prep.byoGyros.total / 15);

@@ -823,8 +823,60 @@ function generateLabelsFromPrep(prep, order) {
       });
     }
 
-    // GRILLED PITA - Add similar logic if needed
-    // For now, skipping as it's complex in the original
+    // WHOLE PITA (from BYO gyros)
+    const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
+    const pitaFullPans = Math.ceil(pitasNeeded / 25); // 25 whole pita per full pan
+    for (let i = 1; i <= pitaFullPans; i++) {
+      labels.push({
+        item: 'WHOLE PITA',
+        qty: pitaFullPans > 1 ? `FULL PAN - ${i} OF ${pitaFullPans}` : `FULL PAN - 1 OF 1`
+      });
+    }
+  }
+
+  // SLICED PITA (from dips)
+  if (prep.dips.length > 0) {
+    let slicedPitaCount = 0;
+    let slicedGFPitaCount = 0;
+
+    prep.dips.forEach(dip => {
+      const hasPita = dip.modifiers.some(m => m.name && m.name.includes('PITA') && !m.name.includes('GLUTEN FREE'));
+      const gfPitaMod = dip.modifiers.find(m => m.name && m.name.includes('GLUTEN FREE PITA'));
+
+      if (hasPita) {
+        slicedPitaCount += dip.qty; // 1 half pan per dip = 1 label
+      }
+      if (gfPitaMod) {
+        // Try to parse GF pita quantity from modifier
+        let gfQty = 0;
+        if (gfPitaMod.name) {
+          const priceMatch = gfPitaMod.name.match(/\$(\d+(?:\.\d+)?)/);
+          if (priceMatch) {
+            const totalPrice = parseFloat(priceMatch[1]);
+            gfQty = Math.round(totalPrice / 2); // $2 per GF pita
+          }
+        }
+        if (gfQty > 0) {
+          slicedGFPitaCount += Math.ceil(gfQty / 6); // 6 pitas per half pan
+        }
+      }
+    });
+
+    // Generate SLICED PITA labels
+    for (let i = 1; i <= slicedPitaCount; i++) {
+      labels.push({
+        item: 'SLICED PITA',
+        qty: slicedPitaCount > 1 ? `HALF PAN - ${i} OF ${slicedPitaCount}` : `HALF PAN - 1 OF 1`
+      });
+    }
+
+    // Generate SLICED GF PITA labels
+    for (let i = 1; i <= slicedGFPitaCount; i++) {
+      labels.push({
+        item: 'SLICED GF PITA',
+        qty: slicedGFPitaCount > 1 ? `HALF PAN - ${i} OF ${slicedGFPitaCount}` : `HALF PAN - 1 OF 1`
+      });
+    }
   }
 
   // SALADS
