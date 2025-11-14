@@ -452,6 +452,20 @@ async function generateOrderReceiptPDF(order, lineItems) {
       y += 14;
     }
 
+    if (order.service_charge_amount && parseFloat(order.service_charge_amount) > 0) {
+      doc.text('Service Charge:', rightX - 70, y, { align: 'left' });
+      doc.text(`$${parseFloat(order.service_charge_amount).toFixed(2)}`, rightX, y, { align: 'right' });
+      y += 14;
+    }
+
+    if (order.discount_amount && parseFloat(order.discount_amount) > 0) {
+      doc.setTextColor(220, 38, 38); // Red color for discount
+      doc.text('Discount:', rightX - 70, y, { align: 'left' });
+      doc.text(`-$${parseFloat(order.discount_amount).toFixed(2)}`, rightX, y, { align: 'right' });
+      doc.setTextColor(...darkGray); // Reset to dark gray
+      y += 14;
+    }
+
     if (order.tax !== null && order.tax !== undefined) {
       doc.text('Tax:', rightX - 70, y, { align: 'left' });
       doc.text(`$${parseFloat(order.tax || 0).toFixed(2)}`, rightX, y, { align: 'right' });

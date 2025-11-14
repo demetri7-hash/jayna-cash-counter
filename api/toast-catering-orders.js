@@ -334,6 +334,8 @@ export default async function handler(req, res) {
       let paymentStatus = null;
       let paidDate = null;
       let deliveryFee = 0;
+      let discountAmount = 0;
+      let serviceChargeAmount = 0;
 
       if (order.checks && Array.isArray(order.checks)) {
         // Process all checks (usually just 1 for catering orders)
@@ -367,10 +369,24 @@ export default async function handler(req, res) {
               }
             }
           }
+
+          // Extract discounts (Toast stores in appliedDiscounts array)
+          if (check.appliedDiscounts && Array.isArray(check.appliedDiscounts)) {
+            for (const discount of check.appliedDiscounts) {
+              discountAmount += (discount.discountAmount || 0);
+            }
+          }
+
+          // Extract service charges (Toast stores in appliedServiceCharges array)
+          if (check.appliedServiceCharges && Array.isArray(check.appliedServiceCharges)) {
+            for (const serviceCharge of check.appliedServiceCharges) {
+              serviceChargeAmount += (serviceCharge.chargeAmount || 0);
+            }
+          }
         }
       }
 
-      console.log(`💰 Order ${order.guid?.substring(0, 8)}: Total=$${total.toFixed(2)}, Subtotal=$${subtotal.toFixed(2)}, Tax=$${tax.toFixed(2)}, Tip=$${tip.toFixed(2)}, Delivery=$${deliveryFee.toFixed(2)}`);
+      console.log(`💰 Order ${order.guid?.substring(0, 8)}: Total=$${total.toFixed(2)}, Subtotal=$${subtotal.toFixed(2)}, Tax=$${tax.toFixed(2)}, Tip=$${tip.toFixed(2)}, Delivery=$${deliveryFee.toFixed(2)}, Discount=$${discountAmount.toFixed(2)}, Service Charge=$${serviceChargeAmount.toFixed(2)}`);
       console.log(`🔢 Order Number Fields: displayNumber="${order.displayNumber}", entityId="${order.entityId}", GUID="${order.guid?.substring(0, 8)}", checkNumber="${checkNumber}"`);
 
       return {
@@ -405,6 +421,8 @@ export default async function handler(req, res) {
         tax: tax,
         tip: tip,
         delivery_fee: deliveryFee,
+        discount_amount: discountAmount,
+        service_charge_amount: serviceChargeAmount,
         utensils_required: true, // Default true for catering orders
         created_in_toast_at: order.createdDate || order.openedDate || null,
 
@@ -450,6 +468,8 @@ export default async function handler(req, res) {
       tax: order.tax,
       tip: order.tip,
       delivery_fee: order.delivery_fee,
+      discount_amount: order.discount_amount,
+      service_charge_amount: order.service_charge_amount,
       utensils_required: order.utensils_required,
       created_in_toast_at: order.created_in_toast_at,
       // Data

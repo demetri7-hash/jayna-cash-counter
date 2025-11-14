@@ -93,6 +93,16 @@ export default async function handler(req, res) {
       headcount: order.headcount,
       total: order.total_amount,
       status: order.status,
+      // BEO Financial Breakdown
+      subtotal: order.subtotal,
+      tax: order.tax,
+      tip: order.tip,
+      delivery_fee: order.delivery_fee,
+      discount_amount: order.discount_amount,
+      service_charge_amount: order.service_charge_amount,
+      check_number: order.check_number,
+      payment_status: order.payment_status,
+      paid_date: order.paid_date,
       order_data: order.order_data,
       last_synced_at: order.last_synced_at,
       db_id: order.id // Database ID for editing
