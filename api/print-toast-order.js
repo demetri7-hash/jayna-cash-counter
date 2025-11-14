@@ -195,11 +195,43 @@ async function generateOrderReceiptPDF(order, lineItems) {
 
   let y = margin.top;
 
-  // ===== HEADER: JAYNA GYRO (modern, readable) =====
+  // ===== HEADER TITLE: LASTNAME - WEDNESDAY 12/03 - ORDER SHEET =====
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...black);
-  doc.text('JAYNA GYRO CATERING', margin.left, y);
+
+  // Extract last name from customer name
+  const customerName = order.customer_name || 'Customer';
+  const nameParts = customerName.trim().split(' ');
+  const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].toUpperCase() : customerName.toUpperCase();
+
+  // Format date with day of week: "WEDNESDAY 12/03"
+  let dateStr = '';
+  if (order.delivery_date) {
+    const [year, month, day] = order.delivery_date.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+
+    // Get full day name (WEDNESDAY)
+    const dayName = new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      timeZone: 'America/Los_Angeles'
+    }).format(date).toUpperCase();
+
+    // Format as DD/MM
+    const dayNum = String(day).padStart(2, '0');
+    const monthNum = String(month).padStart(2, '0');
+
+    dateStr = `${dayName} ${dayNum}/${monthNum}`;
+  }
+
+  // Build title: "LASTNAME - WEDNESDAY 12/03 - ORDER SHEET"
+  const titleParts = [];
+  if (lastName) titleParts.push(lastName);
+  if (dateStr) titleParts.push(dateStr);
+  titleParts.push('ORDER SHEET');
+  const title = titleParts.join(' - ');
+
+  doc.text(title, margin.left, y);
   y += 24; // 8pt grid: 24pt spacing
 
   // ===== ORDER NUMBER & STATUS (well-spaced) =====

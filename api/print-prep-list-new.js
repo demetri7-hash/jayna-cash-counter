@@ -619,14 +619,26 @@ function generatePrepListPDF(prep, order, lineItems) {
   const nameParts = customerName.trim().split(' ');
   const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].toUpperCase() : customerName.toUpperCase();
 
-  // Format date as DD/MM
+  // Format date with day of week: "WEDNESDAY 12/03"
   let dateStr = '';
   if (order.delivery_date) {
     const [year, month, day] = order.delivery_date.split('-').map(Number);
-    dateStr = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`;
+    const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+
+    // Get full day name (WEDNESDAY)
+    const dayName = new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      timeZone: 'America/Los_Angeles'
+    }).format(date).toUpperCase();
+
+    // Format as DD/MM
+    const dayNum = String(day).padStart(2, '0');
+    const monthNum = String(month).padStart(2, '0');
+
+    dateStr = `${dayName} ${dayNum}/${monthNum}`;
   }
 
-  // Build title: "LASTNAME - DD/MM - PREP LIST"
+  // Build title: "LASTNAME - WEDNESDAY 12/03 - PREP LIST"
   const titleParts = [];
   if (lastName) titleParts.push(lastName);
   if (dateStr) titleParts.push(dateStr);
