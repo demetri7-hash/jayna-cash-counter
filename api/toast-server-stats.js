@@ -1,11 +1,16 @@
 /**
  * Toast Server Stats API
- * Fetches today's orders and breaks down stats by server
+ * Fetches today's CLOCKED-IN employees and their sales stats
+ *
+ * NEW APPROACH:
+ * 1. Fetch time entries to see who ACTUALLY WORKED today
+ * 2. Get their names from Toast employees API
+ * 3. Match their orders and calculate stats
  *
  * Returns:
  * - All-day stats: net sales, tips, tip %, combos sold
  * - Hourly breakdown for each metric
- * - Per-server stats
+ * - Per-server stats (ONLY for employees who clocked in today)
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -53,13 +58,72 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json'
     };
 
-    // STEP 1: Initialize Supabase
+    // STEP 1: Fetch time entries to get who ACTUALLY WORKED today
+    console.log('⏰ Fetching time entries for employees who worked today...');
+
+    const { startDate, endDate } = getPacificTimeRange(targetDate);
+    const timeEntriesUrl = `${TOAST_CONFIG.baseUrl}/labor/v1/timeEntries?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+
+    const timeEntriesResponse = await fetch(timeEntriesUrl, { method: 'GET', headers });
+
+    if (!timeEntriesResponse.ok) {
+      throw new Error(`Time entries API failed: ${timeEntriesResponse.status}`);
+    }
+
+    const timeEntries = await timeEntriesResponse.json();
+    console.log(`✅ Found ${timeEntries.length} time entries (clocked-in employees)`);
+
+    // Extract unique employee GUIDs from time entries
+    const employeeGuidsSet = new Set();
+    timeEntries.forEach(entry => {
+      const guid = entry.employeeReference?.guid;
+      if (guid) employeeGuidsSet.add(guid);
+    });
+
+    const employeeGuids = Array.from(employeeGuidsSet);
+    console.log(`👥 Found ${employeeGuids.length} unique employees who worked today`);
+
+    // STEP 2: Fetch employee names from DATABASE (for those who worked)
+    console.log('📋 Fetching employee names from database...');
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_KEY
     );
 
-    // STEP 2: Fetch ALL orders for the business date with pagination
+    const { data: employeeData, error: employeesError } = await supabase
+      .from('employees')
+      .select('toast_guid, first_name, last_name')
+      .in('toast_guid', employeeGuids);
+
+    if (employeesError) {
+      console.error('Failed to fetch employees from database:', employeesError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch employee names',
+        details: employeesError.message
+      });
+    }
+
+    console.log(`✅ Found ${employeeData?.length || 0} employee names in database`);
+
+    // Create employee name map
+    const employeeNames = new Map();
+    if (employeeData) {
+      employeeData.forEach(emp => {
+        employeeNames.set(emp.toast_guid, `${emp.first_name} ${emp.last_name}`.trim());
+      });
+    }
+
+    // DEBUG: Show employee mapping
+    if (employeeNames.size > 0) {
+      const firstThree = Array.from(employeeNames.entries()).slice(0, 3);
+      console.log('👤 First 3 employees who worked:', firstThree);
+    } else {
+      console.warn('⚠️ WARNING: No employee names found in database!');
+    }
+
+    // STEP 3: Fetch ALL orders for the business date with pagination
+    console.log('📦 Fetching orders...');
     let allOrders = [];
     let page = 1;
     let hasMore = true;
@@ -87,66 +151,7 @@ export default async function handler(req, res) {
 
     console.log(`✅ Total orders fetched: ${allOrders.length}`);
 
-    // STEP 3: Collect unique server GUIDs from ALL orders (EXACT PATTERN FROM toast-employee-performance.js)
-    const serverGuids = new Set();
-
-    for (const order of allOrders) {
-      const isOrderVoided = order.voided === true ||
-                           order.guestOrderStatus === 'VOIDED' ||
-                           order.paymentStatus === 'VOIDED';
-      const isOrderDeleted = order.deleted === true;
-
-      if (isOrderVoided || isOrderDeleted) continue;
-
-      if (order.checks && Array.isArray(order.checks)) {
-        for (const check of order.checks) {
-          if (check.voided === true || check.deleted === true) continue;
-
-          const serverGuid = check.server?.guid;
-          if (serverGuid) {
-            serverGuids.add(serverGuid);
-          }
-        }
-      }
-    }
-
-    const serverGuidsArray = Array.from(serverGuids);
-    console.log(`👥 Found ${serverGuidsArray.length} unique server GUIDs in orders`);
-
-    // STEP 4: Fetch employee names from database for ONLY those GUIDs (EXACT PATTERN)
-    console.log('Fetching employee names from database...');
-    const { data: employeeData, error: employeesError } = await supabase
-      .from('employees')
-      .select('toast_guid, first_name, last_name')
-      .in('toast_guid', serverGuidsArray);
-
-    if (employeesError) {
-      console.error('Failed to fetch employees from database:', employeesError);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to fetch employees from database',
-        details: employeesError.message
-      });
-    }
-
-    console.log(`✅ Found ${employeeData?.length || 0} employees in database`);
-
-    // Create employee name map (EXACT PATTERN FROM toast-employee-performance.js)
-    const employeeNames = new Map();
-    if (employeeData) {
-      employeeData.forEach(emp => {
-        employeeNames.set(emp.toast_guid, `${emp.first_name} ${emp.last_name}`.trim());
-      });
-    }
-
-    // DEBUG: Show what we got
-    console.log(`📋 Employee map size: ${employeeNames.size}`);
-    if (employeeNames.size > 0) {
-      const firstThree = Array.from(employeeNames.entries()).slice(0, 3);
-      console.log('👤 First 3 employees:', firstThree);
-    }
-
-    // STEP 5: Process orders and group by server
+    // STEP 4: Process orders and group by server
     const serverStats = {};
     const hourlyStats = {}; // Track stats by hour
     let totalNetSales = 0;
@@ -267,7 +272,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // STEP 6: Calculate tip percentages
+    // STEP 5: Calculate tip percentages
     Object.values(serverStats).forEach(server => {
       if (server.netSales > 0) {
         server.tipPercent = (server.tips / server.netSales) * 100;
@@ -288,7 +293,7 @@ export default async function handler(req, res) {
       }
     });
 
-    // STEP 7: Sort servers by different metrics for leaderboards
+    // STEP 6: Sort servers by different metrics for leaderboards
     const serverArray = Object.values(serverStats);
 
     const topByNetSales = [...serverArray].sort((a, b) => b.netSales - a.netSales);
@@ -296,7 +301,7 @@ export default async function handler(req, res) {
     const topByTipPercent = [...serverArray].sort((a, b) => b.tipPercent - a.tipPercent);
     const topByCombos = [...serverArray].sort((a, b) => b.combosSold - a.combosSold);
 
-    // STEP 8: Sort hourly stats
+    // STEP 7: Sort hourly stats
     const hourlyArray = Object.values(hourlyStats).sort((a, b) => {
       return a.hour.localeCompare(b.hour);
     });
@@ -343,4 +348,33 @@ export default async function handler(req, res) {
       error: error.message
     });
   }
+}
+
+/**
+ * Get Pacific Time date range (5am today to now)
+ * Copied from toast-employee-performance.js
+ */
+function getPacificTimeRange(targetDate) {
+  // Parse the target date (YYYY-MM-DD format)
+  const dateParts = targetDate.split('-');
+  const year = parseInt(dateParts[0]);
+  const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed
+  const day = parseInt(dateParts[2]);
+
+  // Create Pacific time date at 5am
+  const pacificDate = new Date();
+  const pacificTimeString = pacificDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
+  const nowPacific = new Date(pacificTimeString);
+
+  // Set to 5am on target date
+  const startOfDay = new Date(year, month, day, 5, 0, 0, 0);
+
+  // End is now (or end of day if querying past date)
+  const endOfDay = new Date(year, month, day, 23, 59, 59, 999);
+  const endTime = nowPacific > endOfDay ? endOfDay : nowPacific;
+
+  return {
+    startDate: startOfDay.toISOString(),
+    endDate: endTime.toISOString()
+  };
 }
