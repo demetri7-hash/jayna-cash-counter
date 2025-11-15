@@ -1,19 +1,17 @@
 /**
  * Toast Server Stats API
- * Fetches today's CLOCKED-IN employees and their sales stats
+ * Fetches ALL employees from Toast API and matches to orders
  *
- * NEW APPROACH:
- * 1. Fetch time entries to see who ACTUALLY WORKED today
- * 2. Get their names from Toast employees API
- * 3. Match their orders and calculate stats
+ * FINAL APPROACH:
+ * 1. Fetch time entries (for reference - who worked today)
+ * 2. Fetch ALL employees from Toast API (CRITICAL - direct GUID match!)
+ * 3. Match orders to employees by GUID
  *
  * Returns:
  * - All-day stats: net sales, tips, tip %, combos sold
  * - Hourly breakdown for each metric
- * - Per-server stats (ONLY for employees who clocked in today)
+ * - Per-server stats with REAL NAMES from Toast API
  */
-
-import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -83,43 +81,36 @@ export default async function handler(req, res) {
     const employeeGuids = Array.from(employeeGuidsSet);
     console.log(`👥 Found ${employeeGuids.length} unique employees who worked today`);
 
-    // STEP 2: Fetch employee names from DATABASE (for those who worked)
-    console.log('📋 Fetching employee names from database...');
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_KEY
-    );
+    // STEP 2: Fetch ALL EMPLOYEES from TOAST API (not database!)
+    console.log('👥 Fetching ALL employees from Toast API...');
+    const employeesUrl = `${TOAST_CONFIG.baseUrl}/labor/v1/employees?restaurantGuid=${TOAST_CONFIG.restaurantGuid}`;
 
-    const { data: employeeData, error: employeesError } = await supabase
-      .from('employees')
-      .select('toast_guid, first_name, last_name')
-      .in('toast_guid', employeeGuids);
+    const employeesResponse = await fetch(employeesUrl, { method: 'GET', headers });
 
-    if (employeesError) {
-      console.error('Failed to fetch employees from database:', employeesError);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to fetch employee names',
-        details: employeesError.message
-      });
+    if (!employeesResponse.ok) {
+      throw new Error(`Employees API failed: ${employeesResponse.status}`);
     }
 
-    console.log(`✅ Found ${employeeData?.length || 0} employee names in database`);
+    const allToastEmployees = await employeesResponse.json();
+    console.log(`✅ Fetched ${allToastEmployees.length} employees from Toast API`);
 
-    // Create employee name map
+    // Create employee name map from Toast API data
     const employeeNames = new Map();
-    if (employeeData) {
-      employeeData.forEach(emp => {
-        employeeNames.set(emp.toast_guid, `${emp.first_name} ${emp.last_name}`.trim());
-      });
-    }
+    allToastEmployees.forEach(emp => {
+      const fullName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+      if (fullName && emp.guid) {
+        employeeNames.set(emp.guid, fullName);
+      }
+    });
 
-    // DEBUG: Show employee mapping
+    console.log(`📋 Employee map created with ${employeeNames.size} employees`);
+
+    // DEBUG: Show first few employees
     if (employeeNames.size > 0) {
       const firstThree = Array.from(employeeNames.entries()).slice(0, 3);
-      console.log('👤 First 3 employees who worked:', firstThree);
+      console.log('👤 First 3 employees from Toast API:', firstThree);
     } else {
-      console.warn('⚠️ WARNING: No employee names found in database!');
+      console.warn('⚠️ WARNING: No employee names found from Toast API!');
     }
 
     // STEP 3: Fetch ALL orders for the business date with pagination
