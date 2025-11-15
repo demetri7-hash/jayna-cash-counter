@@ -526,10 +526,17 @@
         loadingOverlay.style.display = 'flex';
         statsSummary.style.display = 'none';
 
-        // Get today's date
-        const today = new Date().toISOString().split('T')[0];
+        // Get TODAY in Pacific time (NOT UTC!) - EXACT PATTERN FROM EXISTING CODE
+        const todayPacific = new Date().toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+        const [month, day, year] = todayPacific.split(', ')[0].split('/');
+        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
-        console.log('📊 Fetching server stats...');
+        console.log('📊 Fetching server stats for Pacific date:', today);
 
         // STEP 1: Authenticate with Toast API (EXACT PATTERN FROM EXISTING CODE)
         const authResponse = await fetch('/api/toast-auth', {

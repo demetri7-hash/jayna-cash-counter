@@ -115,6 +115,19 @@ export default async function handler(req, res) {
     console.log(`✅ Total orders fetched: ${allOrders.length}`);
     console.log(`👥 Employee map has ${Object.keys(employeeMap).length} employees`);
 
+    // DEBUG: Show first 3 employee GUIDs from map
+    const empGuids = Object.keys(employeeMap).slice(0, 3);
+    console.log('👤 First 3 employee GUIDs in map:', empGuids);
+    empGuids.forEach(guid => {
+      console.log(`  - ${guid}: ${employeeMap[guid].firstName} ${employeeMap[guid].lastName}`);
+    });
+
+    // DEBUG: Show first check's server GUID
+    if (allOrders.length > 0 && allOrders[0].checks?.[0]?.server?.guid) {
+      console.log('🔍 First check server GUID:', allOrders[0].checks[0].server.guid);
+      console.log('🔍 Does it exist in map?', !!employeeMap[allOrders[0].checks[0].server.guid]);
+    }
+
     // STEP 3: Process orders and group by server
     const serverStats = {};
     const hourlyStats = {}; // Track stats by hour
