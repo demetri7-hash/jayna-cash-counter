@@ -502,9 +502,6 @@
   </div>
 
   <script>
-    // Toast API Auth
-    const TOAST_TOKEN = localStorage.getItem('toastAccessToken');
-
     // Tab Switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -534,8 +531,26 @@
 
         console.log('📊 Fetching server stats...');
 
-        // Call Toast Server Stats API
-        const response = await fetch(`/api/toast-server-stats?date=${today}&token=${TOAST_TOKEN}`);
+        // STEP 1: Authenticate with Toast API (EXACT PATTERN FROM EXISTING CODE)
+        const authResponse = await fetch('/api/toast-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!authResponse.ok) {
+          throw new Error('Toast authentication failed');
+        }
+
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) {
+          throw new Error('Toast authentication failed - no access token');
+        }
+
+        const token = authData.data.accessToken;
+        console.log('✅ Toast authenticated');
+
+        // STEP 2: Call Toast Server Stats API with token
+        const response = await fetch(`/api/toast-server-stats?date=${today}&token=${encodeURIComponent(token)}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch stats: ${response.status}`);
@@ -736,21 +751,7 @@
 
     // Auto-load on page load
     document.addEventListener('DOMContentLoaded', () => {
-      if (!TOAST_TOKEN) {
-        // Show error state instead of alert (sandboxed iframe doesn't allow alerts)
-        document.getElementById('loadingOverlay').style.display = 'none';
-        document.querySelectorAll('[id^="leaderboard-"]').forEach(el => {
-          el.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-icon">🔐</div>
-              <div class="empty-title">Toast Login Required</div>
-              <div class="empty-message">Please log in to Toast on the main page first, then return here.</div>
-            </div>
-          `;
-        });
-        return;
-      }
-
+      // Load stats immediately (Toast auth happens automatically in loadServerStats)
       loadServerStats();
 
       // Auto-refresh every 2 minutes
