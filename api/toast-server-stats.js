@@ -105,6 +105,19 @@ export default async function handler(req, res) {
 
     console.log(`✅ Total orders fetched: ${allOrders.length}`);
 
+    // DEBUG: Log first order's check structure to see what we're working with
+    if (allOrders.length > 0 && allOrders[0].checks && allOrders[0].checks.length > 0) {
+      console.log('📋 DEBUG - First check structure:', JSON.stringify(allOrders[0].checks[0], null, 2));
+      console.log('📋 DEBUG - check.server object:', allOrders[0].checks[0].server);
+    }
+
+    // DEBUG: Log employee map
+    console.log(`👥 DEBUG - Employee map has ${Object.keys(employeeMap).length} employees`);
+    if (Object.keys(employeeMap).length > 0) {
+      const firstEmpGuid = Object.keys(employeeMap)[0];
+      console.log(`👤 DEBUG - Sample employee:`, employeeMap[firstEmpGuid]);
+    }
+
     // STEP 2: Process orders and group by server
     const serverStats = {};
     const hourlyStats = {}; // Track stats by hour
@@ -129,6 +142,13 @@ export default async function handler(req, res) {
 
           // Get server name from check using employee map lookup
           const serverGuid = check.server?.guid;
+
+          // DEBUG: Log server lookup for first few checks
+          if (serverStats && Object.keys(serverStats).length < 3) {
+            console.log(`🔍 DEBUG - Check server object:`, check.server);
+            console.log(`🔍 DEBUG - Server GUID:`, serverGuid);
+            console.log(`🔍 DEBUG - Employee lookup result:`, employeeMap[serverGuid]);
+          }
 
           let serverName = 'Unassigned';
           if (serverGuid && employeeMap[serverGuid]) {
