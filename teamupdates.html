@@ -7,12 +7,19 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-    /* Jayna Brand Design - Sky Blue & Grayscale */
+    /* Jayna Brand Design - Bright, Fun, Competitive! */
     :root {
       --primary-blue: #00A8E1;
       --secondary-blue: #0094D6;
       --light-blue: #E3F4FC;
       --accent-blue: #0081C6;
+      --gold: #FFD700;
+      --silver: #C0C0C0;
+      --bronze: #CD7F32;
+      --green: #00C853;
+      --orange: #FF6B35;
+      --purple: #9B59B6;
+      --pink: #E91E63;
       --gray-900: #212121;
       --gray-700: #424242;
       --gray-600: #616161;
@@ -24,178 +31,247 @@
       --warning: #FFB300;
       --error: #D32F2F;
       --white: #FFFFFF;
-      --blue-bg: #dbeafe;
-      --blue-text: #1e40af;
-      --success-bg: #d1fae5;
-      --success-text: #065f46;
-      --success-border: #059669;
-      --warning-bg: #fef3c7;
-      --warning-text: #92400e;
-      --warning-border: #f59e0b;
-      --error-bg: #fee2e2;
-      --error-text: #991b1b;
-      --error-border: #dc2626;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       font-family: 'Aptos', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: var(--white);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
       padding: 0;
       overflow-x: hidden;
       overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      background: var(--white);
-      border-radius: 0;
-      overflow: visible;
-      box-shadow: none;
-      min-height: auto;
-      max-height: none;
-    }
-    .content {
-      padding: 12px;
-      max-height: none;
-      overflow: visible;
     }
 
-    h2 {
-      font-size: 18px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--gray-900);
-      margin-bottom: 16px;
-      text-align: center;
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      min-height: 100vh;
+    }
+
+    .content {
+      padding: 20px;
     }
 
     .header {
-      background: var(--white);
-      color: var(--gray-900);
+      background: linear-gradient(135deg, var(--primary-blue) 0%, var(--accent-blue) 100%);
+      color: white;
       text-align: center;
-      padding: 12px;
-      border-radius: 0;
-      border-bottom: 1px solid var(--gray-300);
-    }
-
-    .header img {
-      width: 576px;
-      height: 155px;
-      margin-bottom: 4px;
+      padding: 30px 20px;
     }
 
     .header h1 {
-      margin-bottom: 4px;
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
+      font-size: 32px;
+      font-weight: 900;
       text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
     }
 
     .header p {
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
+      font-size: 14px;
+      opacity: 0.95;
+      font-weight: 600;
     }
 
-    .menu-btn {
-      text-decoration: none;
-      padding: 16px 12px;
-      border: 2px solid var(--gray-700);
-      border-radius: 0;
-      background: var(--gray-700);
-      font-size: 11px;
-      font-weight: 700;
-      color: white;
-      cursor: pointer;
-      text-align: center;
-      min-height: 50px;
+    /* Loading Spinner */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255,255,255,0.95);
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      text-transform: uppercase;
-      letter-spacing: 1.2px;
-      transition: all 0.15s ease;
+      z-index: 10000;
     }
 
-    .menu-btn.primary {
-      border: 2px solid var(--gray-300);
-      background: var(--gray-100);
-      color: var(--gray-900);
-    }
-
-    .menu-btn:hover {
-      opacity: 0.9;
-    }
-
-    /* Leaderboard Styles */
-    .leaderboard-section {
-      background: var(--white);
-      border: 2px solid var(--gray-300);
-      padding: 20px;
+    .spinner {
+      border: 8px solid var(--gray-300);
+      border-top: 8px solid var(--primary-blue);
+      border-radius: 50%;
+      width: 80px;
+      height: 80px;
+      animation: spin 1s linear infinite;
       margin-bottom: 20px;
     }
 
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gray-700);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Stats Summary */
+    .stats-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: transform 0.2s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 900;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.9;
+    }
+
+    /* Tab Navigation */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 3px solid var(--gray-300);
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      padding: 14px 20px;
+      background: white;
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      color: var(--gray-600);
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--primary-blue);
+    }
+
+    .tab-btn.active {
+      color: var(--primary-blue);
+      border-bottom-color: var(--primary-blue);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Leaderboard */
     .leaderboard-item {
       display: grid;
-      grid-template-columns: 50px 1fr 80px;
-      gap: 12px;
-      padding: 16px;
+      grid-template-columns: 60px 1fr 100px;
+      gap: 16px;
+      padding: 20px;
       margin-bottom: 12px;
       align-items: center;
-      border: 2px solid var(--gray-300);
+      border-radius: 12px;
       background: white;
-      transition: all 0.15s ease;
+      border: 3px solid var(--gray-300);
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .leaderboard-item::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--primary-blue), var(--accent-blue));
+      opacity: 0;
+      transition: opacity 0.2s ease;
     }
 
     .leaderboard-item:hover {
-      border-color: var(--primary-blue);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      transform: translateX(8px);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+    }
+
+    .leaderboard-item:hover::before {
+      opacity: 1;
     }
 
     .leaderboard-item.rank-1 {
       background: linear-gradient(135deg, #FFD700 0%, #FFF9E6 100%);
-      border-color: #FFD700;
-      border-width: 3px;
+      border-color: var(--gold);
+      border-width: 4px;
+      box-shadow: 0 8px 16px rgba(255, 215, 0, 0.3);
     }
 
     .leaderboard-item.rank-2 {
       background: linear-gradient(135deg, #C0C0C0 0%, #F5F5F5 100%);
-      border-color: #C0C0C0;
+      border-color: var(--silver);
+      border-width: 4px;
     }
 
     .leaderboard-item.rank-3 {
       background: linear-gradient(135deg, #CD7F32 0%, #FFF5E6 100%);
-      border-color: #CD7F32;
+      border-color: var(--bronze);
+      border-width: 4px;
     }
 
     .rank-badge {
-      font-size: 32px;
+      font-size: 42px;
       text-align: center;
-      font-weight: 700;
+      font-weight: 900;
+      line-height: 1;
     }
 
     .player-info {
       display: flex;
       flex-direction: column;
+      gap: 4px;
     }
 
     .player-name {
-      font-size: 16px;
-      font-weight: 700;
+      font-size: 20px;
+      font-weight: 900;
       color: var(--gray-900);
-      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .player-stats {
-      font-size: 11px;
+      font-size: 12px;
       color: var(--gray-600);
-      font-weight: 500;
+      font-weight: 600;
     }
 
     .score {
@@ -203,354 +279,472 @@
     }
 
     .score-number {
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--primary-blue);
-    }
-
-    .score-label {
-      font-size: 9px;
-      text-transform: uppercase;
-      color: var(--gray-600);
-      letter-spacing: 0.5px;
-      margin-top: 2px;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 40px;
-      color: var(--gray-600);
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--gray-600);
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    .stat-card {
-      background: var(--gray-100);
-      border: 2px solid var(--gray-300);
-      padding: 16px;
-      text-align: center;
-    }
-
-    .stat-value {
       font-size: 32px;
-      font-weight: 700;
-      color: var(--gray-900);
+      font-weight: 900;
+      color: var(--primary-blue);
+      line-height: 1;
       margin-bottom: 4px;
     }
 
-    .stat-label {
+    .score-label {
       font-size: 10px;
-      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
       color: var(--gray-600);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    /* Hourly Breakdown */
+    .hourly-chart {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      border: 3px solid var(--gray-300);
+      margin-bottom: 16px;
+    }
+
+    .hourly-bar {
+      display: grid;
+      grid-template-columns: 60px 1fr 100px;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--gray-100);
+      transition: all 0.2s ease;
+    }
+
+    .hourly-bar:hover {
+      background: var(--light-blue);
+      transform: translateX(4px);
+    }
+
+    .hour-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gray-700);
+    }
+
+    .bar-container {
+      height: 24px;
+      background: var(--gray-300);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary-blue), var(--accent-blue));
+      border-radius: 12px;
+      transition: width 0.5s ease;
+    }
+
+    .bar-value {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gray-900);
+      text-align: right;
+    }
+
+    /* Section Headers */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid var(--gray-300);
+    }
+
+    .section-icon {
+      font-size: 32px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--gray-900);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--gray-600);
+    }
+
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+
+    .empty-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .empty-message {
+      font-size: 14px;
+    }
+
+    /* Refresh Button */
+    .refresh-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary-blue), var(--accent-blue));
+      color: white;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      transition: all 0.2s ease;
+      z-index: 1000;
+    }
+
+    .refresh-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    }
+
+    .refresh-btn:active {
+      transform: scale(0.95);
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- App Header (Injected by app-header.js) -->
-    <div id="appHeader"></div>
+    <!-- Header -->
+    <div class="header">
+      <h1>🏆 TEAM LEADERBOARD 🏆</h1>
+      <p>Today's Server Performance • Live Stats</p>
+    </div>
 
-    <!-- Leaderboard Content -->
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="spinner"></div>
+      <div class="loading-text">Loading Today's Stats...</div>
+    </div>
+
+    <!-- Content -->
     <div class="content">
-      <h2>🏆 TEAM LEADERBOARD 🏆</h2>
+      <!-- Stats Summary -->
+      <div id="statsSummary" class="stats-summary" style="display: none;"></div>
 
-      <div style="text-align: center; margin-bottom: 16px; font-size: 12px; color: var(--gray-600); font-weight: 600;">
-        Today's Top Performers • Tasks + Prep Counts
+      <!-- Tab Navigation -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="sales">💰 Net Sales</button>
+        <button class="tab-btn" data-tab="tips">💵 Tips</button>
+        <button class="tab-btn" data-tab="tippercent">📊 Tip %</button>
+        <button class="tab-btn" data-tab="combos">🍔 Combos</button>
+        <button class="tab-btn" data-tab="hourly">⏰ Hourly</button>
       </div>
 
-      <!-- Stats Grid -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value" id="totalTasksToday">0</div>
-          <div class="stat-label">Total Points</div>
+      <!-- Tab Content: Net Sales Leaderboard -->
+      <div id="tab-sales" class="tab-content active">
+        <div class="section-header">
+          <span class="section-icon">💰</span>
+          <span class="section-title">Net Sales Leaders</span>
         </div>
-        <div class="stat-card">
-          <div class="stat-value" id="activePlayersToday">0</div>
-          <div class="stat-label">Active Team Members</div>
-        </div>
+        <div id="leaderboard-sales"></div>
       </div>
 
-      <!-- Leaderboard List -->
-      <div class="leaderboard-section">
-        <div id="leaderboardContainer">
-          <div class="loading">Loading leaderboard...</div>
+      <!-- Tab Content: Tips Leaderboard -->
+      <div id="tab-tips" class="tab-content">
+        <div class="section-header">
+          <span class="section-icon">💵</span>
+          <span class="section-title">Tip Leaders</span>
         </div>
+        <div id="leaderboard-tips"></div>
       </div>
 
-      <div style="text-align: center; font-size: 10px; color: var(--gray-500); margin-top: 20px;">
-        Updates every 30 seconds • FOH Tasks + Prep Counts (1 point each)
+      <!-- Tab Content: Tip % Leaderboard -->
+      <div id="tab-tippercent" class="tab-content">
+        <div class="section-header">
+          <span class="section-icon">📊</span>
+          <span class="section-title">Highest Tip %</span>
+        </div>
+        <div id="leaderboard-tippercent"></div>
+      </div>
+
+      <!-- Tab Content: Combos Leaderboard -->
+      <div id="tab-combos" class="tab-content">
+        <div class="section-header">
+          <span class="section-icon">🍔</span>
+          <span class="section-title">Combo Champions</span>
+        </div>
+        <div id="leaderboard-combos"></div>
+      </div>
+
+      <!-- Tab Content: Hourly Breakdown -->
+      <div id="tab-hourly" class="tab-content">
+        <div class="section-header">
+          <span class="section-icon">⏰</span>
+          <span class="section-title">Hourly Breakdown</span>
+        </div>
+        <div id="hourly-breakdown"></div>
       </div>
     </div>
+
+    <!-- Refresh Button -->
+    <button class="refresh-btn" onclick="loadServerStats()" title="Refresh Stats">🔄</button>
   </div>
 
   <script>
-    // Access scheduling page - redirects directly
-    function accessScheduling() {
-      window.location.href = 'scheduling.html';
-    }
+    // Toast API Auth
+    const TOAST_TOKEN = localStorage.getItem('toastAccessToken');
 
-    const supabase = (() => {
-      if (window._teamupdatesSupabaseClient) {
-        return window._teamupdatesSupabaseClient;
-      }
-      window._teamupdatesSupabaseClient = window.supabase.createClient(
-        'https://gaawtbqpnnbbnsyswqwv.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg',
-        { db: { schema: 'public' }, auth: { persistSession: false } }
-      );
-      return window._teamupdatesSupabaseClient;
-    })();
+    // Tab Switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
 
-    // ==================== LIVE STATS ====================
-    // NOTE: Live stats (Tips/HR, Top Leader) now provided by app-header.js
-    // ==================== END LIVE STATS ====================
+        // Update active button
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
 
-    // ==================== LEADERBOARD ====================
+        // Update active content
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`tab-${tab}`).classList.add('active');
+      });
+    });
 
-    async function loadLeaderboard() {
+    // Load Server Stats
+    async function loadServerStats() {
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      const statsSummary = document.getElementById('statsSummary');
+
       try {
-        // Get Pacific time start/end of today (STARTING AT 5AM, NOT MIDNIGHT)
-        const nowPacific = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-        const currentHour = nowPacific.getHours();
+        loadingOverlay.style.display = 'flex';
+        statsSummary.style.display = 'none';
 
-        // If it's before 5 AM, we're still in "yesterday's" shift
-        const todayStart = new Date(nowPacific);
-        if (currentHour < 5) {
-          // Use yesterday at 5 AM
-          todayStart.setDate(todayStart.getDate() - 1);
-          todayStart.setHours(5, 0, 0, 0);
-        } else {
-          // Use today at 5 AM
-          todayStart.setHours(5, 0, 0, 0);
+        // Get today's date
+        const today = new Date().toISOString().split('T')[0];
+
+        console.log('📊 Fetching server stats...');
+
+        // Call Toast Server Stats API
+        const response = await fetch(`/api/toast-server-stats?date=${today}&token=${TOAST_TOKEN}`);
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch stats: ${response.status}`);
         }
 
-        // End time is tomorrow at 4:59:59 AM (covers the full shift)
-        const todayEnd = new Date(todayStart);
-        todayEnd.setDate(todayEnd.getDate() + 1);
-        todayEnd.setHours(4, 59, 59, 999);
+        const data = await response.json();
 
-        const startISO = todayStart.toISOString();
-        const endISO = todayEnd.toISOString();
-
-        console.log('🏆 Fetching teamupdates leaderboard for range:', startISO, 'to', endISO);
-
-        // Fetch all completed FOH checklist tasks for today
-        const { data: tasks, error: tasksError } = await supabase
-          .from('foh_checklist_tasks')
-          .select('completed_by, completed_at, is_completed')
-          .eq('is_completed', true)
-          .gte('completed_at', startISO)
-          .lte('completed_at', endISO);
-
-        if (tasksError) {
-          console.error('Error loading tasks:', tasksError);
+        if (!data.success) {
+          throw new Error(data.error || 'Unknown error');
         }
 
-        console.log(`📋 Found ${tasks?.length || 0} completed FOH tasks`);
+        console.log('✅ Server stats loaded:', data);
 
-        // Fetch all prep count actions today
-        const { data: prepCounts, error: prepError } = await supabase
-          .from('prep_count_log')
-          .select('counted_by, counted_at')
-          .gte('counted_at', startISO)
-          .lte('counted_at', endISO);
+        // Render stats summary
+        renderStatsSummary(data.overall);
 
-        console.log(`📦 Found ${prepCounts?.length || 0} prep count actions`);
+        // Render leaderboards
+        renderLeaderboard('sales', data.leaderboards.byNetSales);
+        renderLeaderboard('tips', data.leaderboards.byTips);
+        renderLeaderboard('tippercent', data.leaderboards.byTipPercent);
+        renderLeaderboard('combos', data.leaderboards.byCombos);
 
-        if (prepError) {
-          console.error('Error loading prep counts:', prepError);
-        }
+        // Render hourly breakdown
+        renderHourlyBreakdown(data.hourly);
 
-        // If both queries failed or no data at all, show empty state
-        if ((!tasks || tasks.length === 0) && (!prepCounts || prepCounts.length === 0)) {
-          showEmptyState();
-          return;
-        }
-
-        // Count tasks and prep counts by person
-        const leaderboard = {};
-
-        // Add FOH checklist tasks (1 point each)
-        if (tasks && tasks.length > 0) {
-          tasks.forEach(task => {
-            const name = task.completed_by || 'Unknown';
-            if (!leaderboard[name]) {
-              leaderboard[name] = {
-                name: name,
-                taskCount: 0,
-                prepCount: 0,
-                totalPoints: 0,
-                lastCompleted: null
-              };
-            }
-            leaderboard[name].taskCount++;
-            leaderboard[name].totalPoints++;
-
-            // Track most recent completion
-            const completedAt = new Date(task.completed_at);
-            if (!leaderboard[name].lastCompleted || completedAt > leaderboard[name].lastCompleted) {
-              leaderboard[name].lastCompleted = completedAt;
-            }
-          });
-        }
-
-        // Add prep counts (1 point per prep item counted)
-        if (prepCounts && prepCounts.length > 0) {
-          prepCounts.forEach(prep => {
-            const name = prep.counted_by || 'Unknown';
-            if (!leaderboard[name]) {
-              leaderboard[name] = {
-                name: name,
-                taskCount: 0,
-                prepCount: 0,
-                totalPoints: 0,
-                lastCompleted: null
-              };
-            }
-            leaderboard[name].prepCount++;
-            leaderboard[name].totalPoints++;
-
-            // Track most recent activity
-            const countedAt = new Date(prep.counted_at);
-            if (!leaderboard[name].lastCompleted || countedAt > leaderboard[name].lastCompleted) {
-              leaderboard[name].lastCompleted = countedAt;
-            }
-          });
-        }
-
-        // Convert to array and sort by total points
-        const sortedLeaderboard = Object.values(leaderboard)
-          .sort((a, b) => {
-            if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
-            // Tie-breaker: most recent completion wins
-            return b.lastCompleted - a.lastCompleted;
-          });
-
-        // Log full leaderboard breakdown for debugging
-        console.log('📊 Full teamupdates leaderboard breakdown:');
-        sortedLeaderboard.forEach((player, index) => {
-          console.log(`  ${index + 1}. ${player.name}: ${player.totalPoints} points (${player.taskCount} tasks + ${player.prepCount} prep)`);
-        });
-
-        // Update stats
-        const totalTasks = tasks ? tasks.length : 0;
-        const totalPrep = prepCounts ? prepCounts.length : 0;
-        const totalPoints = totalTasks + totalPrep;
-
-        document.getElementById('totalTasksToday').textContent = totalPoints;
-        document.getElementById('activePlayersToday').textContent = sortedLeaderboard.length;
-
-        // Render leaderboard
-        renderLeaderboard(sortedLeaderboard);
+        // Show content
+        loadingOverlay.style.display = 'none';
+        statsSummary.style.display = 'grid';
 
       } catch (error) {
-        console.error('Error loading leaderboard:', error);
-        showEmptyState();
+        console.error('❌ Error loading server stats:', error);
+        loadingOverlay.style.display = 'none';
+
+        // Show error state
+        document.querySelectorAll('[id^="leaderboard-"]').forEach(el => {
+          el.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">⚠️</div>
+              <div class="empty-title">Failed to Load Stats</div>
+              <div class="empty-message">${error.message}</div>
+            </div>
+          `;
+        });
       }
     }
 
-    function renderLeaderboard(leaderboard) {
-      const container = document.getElementById('leaderboardContainer');
+    // Render Stats Summary
+    function renderStatsSummary(overall) {
+      const container = document.getElementById('statsSummary');
 
-      if (leaderboard.length === 0) {
-        showEmptyState();
+      const stats = [
+        { label: 'Total Sales', value: `$${overall.netSales.toFixed(0)}`, emoji: '💰' },
+        { label: 'Total Tips', value: `$${overall.tips.toFixed(0)}`, emoji: '💵' },
+        { label: 'Avg Tip %', value: `${overall.tipPercent.toFixed(1)}%`, emoji: '📊' },
+        { label: 'Combos Sold', value: overall.combosSold, emoji: '🍔' },
+        { label: 'Servers', value: overall.serversWorking, emoji: '👥' }
+      ];
+
+      container.innerHTML = stats.map(stat => `
+        <div class="stat-card">
+          <div class="stat-value">${stat.emoji} ${stat.value}</div>
+          <div class="stat-label">${stat.label}</div>
+        </div>
+      `).join('');
+    }
+
+    // Render Leaderboard
+    function renderLeaderboard(type, servers) {
+      const container = document.getElementById(`leaderboard-${type}`);
+
+      if (!servers || servers.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <div class="empty-title">No Data Yet</div>
+            <div class="empty-message">Server stats will appear here once orders are placed today.</div>
+          </div>
+        `;
         return;
       }
 
       const rankEmojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
-      const motivationalEmojis = ['⭐', '🌟', '✨', '💪', '🚀', '🔥', '💯', '👏'];
+      const motivationalEmojis = ['⭐', '🌟', '✨', '💪', '🚀', '🔥', '💯', '👏', '🎯', '⚡'];
 
-      let html = '';
-
-      leaderboard.forEach((player, index) => {
+      container.innerHTML = servers.map((server, index) => {
         const rank = index + 1;
         const rankClass = rank <= 3 ? `rank-${rank}` : '';
         const rankDisplay = rankEmojis[index] || `#${rank}`;
-
-        // Get a random motivational emoji for non-top-3
         const randomEmoji = rank > 3 ? motivationalEmojis[Math.floor(Math.random() * motivationalEmojis.length)] : '';
 
-        // Format last completed time
-        const timeSince = getTimeSince(player.lastCompleted);
+        let primaryValue, secondaryStats;
 
-        // Build stats breakdown
-        const statsBreakdown = [];
-        if (player.taskCount > 0) {
-          statsBreakdown.push(`${player.taskCount} task${player.taskCount !== 1 ? 's' : ''}`);
+        switch(type) {
+          case 'sales':
+            primaryValue = `$${server.netSales.toFixed(0)}`;
+            secondaryStats = `${server.transactions} transactions • ${server.tips > 0 ? '$' + server.tips.toFixed(0) + ' tips' : 'No tips'}`;
+            break;
+          case 'tips':
+            primaryValue = `$${server.tips.toFixed(0)}`;
+            secondaryStats = `${server.tipPercent.toFixed(1)}% tip rate • $${server.netSales.toFixed(0)} sales`;
+            break;
+          case 'tippercent':
+            primaryValue = `${server.tipPercent.toFixed(1)}%`;
+            secondaryStats = `$${server.tips.toFixed(0)} tips • $${server.netSales.toFixed(0)} sales`;
+            break;
+          case 'combos':
+            primaryValue = server.combosSold;
+            secondaryStats = `$${server.netSales.toFixed(0)} sales • ${server.transactions} transactions`;
+            break;
         }
-        if (player.prepCount > 0) {
-          statsBreakdown.push(`${player.prepCount} prep`);
-        }
-        const statsText = statsBreakdown.length > 0 ? statsBreakdown.join(' • ') : 'No activity';
 
-        html += `
+        return `
           <div class="leaderboard-item ${rankClass}">
             <div class="rank-badge">${rankDisplay}</div>
             <div class="player-info">
-              <div class="player-name">${player.name} ${rank > 3 ? randomEmoji : ''}</div>
-              <div class="player-stats">${statsText} • ${timeSince}</div>
+              <div class="player-name">${server.name} ${rank > 3 ? randomEmoji : ''}</div>
+              <div class="player-stats">${secondaryStats}</div>
             </div>
             <div class="score">
-              <div class="score-number">${player.totalPoints}</div>
-              <div class="score-label">POINTS</div>
+              <div class="score-number">${primaryValue}</div>
+              <div class="score-label">${type === 'tippercent' ? 'TIP %' : type.toUpperCase()}</div>
             </div>
           </div>
         `;
-      });
-
-      container.innerHTML = html;
+      }).join('');
     }
 
-    function getTimeSince(date) {
-      const now = new Date();
-      const diffMs = now - date;
-      const diffMin = Math.floor(diffMs / (1000 * 60));
+    // Render Hourly Breakdown
+    function renderHourlyBreakdown(hourly) {
+      const container = document.getElementById('hourly-breakdown');
 
-      if (diffMin < 1) return 'Just now';
-      if (diffMin === 1) return '1 min ago';
-      if (diffMin < 60) return `${diffMin} mins ago`;
+      if (!hourly || hourly.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">⏰</div>
+            <div class="empty-title">No Hourly Data Yet</div>
+            <div class="empty-message">Hourly breakdown will appear here once orders are placed.</div>
+          </div>
+        `;
+        return;
+      }
 
-      const diffHour = Math.floor(diffMin / 60);
-      if (diffHour === 1) return '1 hour ago';
-      if (diffHour < 24) return `${diffHour} hours ago`;
+      // Find max values for scaling bars
+      const maxSales = Math.max(...hourly.map(h => h.netSales));
+      const maxTips = Math.max(...hourly.map(h => h.tips));
 
-      return 'Today';
-    }
-
-    function showEmptyState() {
-      const container = document.getElementById('leaderboardContainer');
       container.innerHTML = `
-        <div class="empty-state">
-          <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
-          <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">No activity yet today</div>
-          <div style="font-size: 12px; color: var(--gray-500);">Complete FOH tasks or count prep items to earn points!</div>
+        <div class="hourly-chart">
+          <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 700; color: var(--gray-900);">💰 Sales by Hour</h3>
+          ${hourly.map(hour => {
+            const salesPercent = maxSales > 0 ? (hour.netSales / maxSales) * 100 : 0;
+            return `
+              <div class="hourly-bar">
+                <div class="hour-label">${hour.hour}</div>
+                <div class="bar-container">
+                  <div class="bar-fill" style="width: ${salesPercent}%"></div>
+                </div>
+                <div class="bar-value">$${hour.netSales.toFixed(0)}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <div class="hourly-chart">
+          <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 700; color: var(--gray-900);">💵 Tips by Hour</h3>
+          ${hourly.map(hour => {
+            const tipsPercent = maxTips > 0 ? (hour.tips / maxTips) * 100 : 0;
+            return `
+              <div class="hourly-bar">
+                <div class="hour-label">${hour.hour}</div>
+                <div class="bar-container">
+                  <div class="bar-fill" style="width: ${tipsPercent}%"></div>
+                </div>
+                <div class="bar-value">$${hour.tips.toFixed(0)}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <div class="hourly-chart">
+          <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 700; color: var(--gray-900);">📊 Tip % by Hour</h3>
+          ${hourly.map(hour => {
+            const tipPercent = hour.tipPercent || 0;
+            const barPercent = tipPercent > 30 ? 100 : (tipPercent / 30) * 100; // Scale to 30% max
+            return `
+              <div class="hourly-bar">
+                <div class="hour-label">${hour.hour}</div>
+                <div class="bar-container">
+                  <div class="bar-fill" style="width: ${barPercent}%"></div>
+                </div>
+                <div class="bar-value">${tipPercent.toFixed(1)}%</div>
+              </div>
+            `;
+          }).join('')}
         </div>
       `;
-      document.getElementById('totalTasksToday').textContent = '0';
-      document.getElementById('activePlayersToday').textContent = '0';
     }
 
-    // ==================== INITIALIZATION ====================
+    // Auto-load on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!TOAST_TOKEN) {
+        alert('Please log in to Toast first!');
+        window.location.href = 'index.html';
+        return;
+      }
 
-    document.addEventListener('DOMContentLoaded', async () => {
-      await loadLeaderboard();
-      // Auto-refresh leaderboard every 30 seconds
-      setInterval(loadLeaderboard, 30 * 1000);
+      loadServerStats();
+
+      // Auto-refresh every 2 minutes
+      setInterval(loadServerStats, 2 * 60 * 1000);
     });
   </script>
-<script src="./app-header.js"></script>
+  <script src="./app-header.js"></script>
 </body>
 </html>
