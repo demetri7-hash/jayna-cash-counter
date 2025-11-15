@@ -51,7 +51,33 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json'
     };
 
-    // STEP 1: Fetch ALL orders for the business date with pagination
+    // STEP 1: Fetch ALL employees (to get server names) - EXACT PATTERN FROM toast-clocked-in.js
+    const employeesUrl = `${TOAST_CONFIG.baseUrl}/labor/v1/employees`;
+    console.log('Fetching employees list...');
+
+    const employeesResponse = await fetch(employeesUrl, {
+      method: 'GET',
+      headers
+    });
+
+    if (!employeesResponse.ok) {
+      console.error(`Failed to fetch employees: ${employeesResponse.status}`);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch employees from Toast'
+      });
+    }
+
+    const employees = await employeesResponse.json();
+    console.log(`✅ Found ${employees.length} employees`);
+
+    // Create employee map by GUID for fast lookup
+    const employeeMap = {};
+    employees.forEach(emp => {
+      employeeMap[emp.guid] = emp;
+    });
+
+    // STEP 2: Fetch ALL orders for the business date with pagination
     let allOrders = [];
     let page = 1;
     let hasMore = true;
@@ -101,13 +127,16 @@ export default async function handler(req, res) {
           // Skip voided/deleted checks
           if (check.voided === true || check.deleted === true) continue;
 
-          // Get server name from check
-          const serverGuid = check.server?.guid || 'Unknown';
-          const serverFirstName = check.server?.firstName || '';
-          const serverLastName = check.server?.lastName || '';
-          const serverName = serverFirstName && serverLastName
-            ? `${serverFirstName} ${serverLastName}`
-            : serverFirstName || serverLastName || 'Unassigned';
+          // Get server name from check using employee map lookup
+          const serverGuid = check.server?.guid;
+
+          let serverName = 'Unassigned';
+          if (serverGuid && employeeMap[serverGuid]) {
+            const employee = employeeMap[serverGuid];
+            const firstName = employee.firstName || '';
+            const lastName = employee.lastName || '';
+            serverName = `${firstName} ${lastName}`.trim() || 'Unassigned';
+          }
 
           // Initialize server stats if needed
           if (!serverStats[serverName]) {
