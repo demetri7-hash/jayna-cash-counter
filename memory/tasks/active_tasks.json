@@ -1,6 +1,59 @@
 {
   "tasks": [
     {
+      "id": "task_20251114_001",
+      "title": "Fix Server Names in Team Leaderboard (Currently Showing 'Unassigned')",
+      "description": "Team leaderboard displays correct sales data ($7,530, 227 transactions) but ALL servers show as 'Unassigned' instead of real names. Need to fix GUID matching between Toast orders and employee data.",
+      "status": "in_progress",
+      "priority": "urgent",
+      "created": "2025-11-14T06:00:00Z",
+      "related_files": [
+        "api/toast-server-stats.js",
+        "teamupdates.html"
+      ],
+      "dependencies": ["Toast Orders API", "Toast Employees API", "GUID matching logic"],
+      "attempts": [
+        {
+          "approach": "Attempt 1: Fetch employee names from Supabase database",
+          "commit": "c9c0f6e",
+          "result": "FAILED - GUIDs from database don't match check.server.guid in orders",
+          "lesson": "Database GUIDs may be synced differently than order GUIDs"
+        },
+        {
+          "approach": "Attempt 2: Use time entries to get clocked-in employees (user's idea)",
+          "commit": "473976c",
+          "result": "FAILED - Time entries include BOH staff who don't serve tables",
+          "lesson": "Time entries show who worked, not who served (includes dishwashers, cooks)"
+        },
+        {
+          "approach": "Attempt 3: Fetch ALL employees directly from Toast API",
+          "commit": "fe0aeee",
+          "result": "FAILED - Still showing 'Unassigned', GUID mismatch persists",
+          "lesson": "Even direct Toast API lookup fails - fundamental GUID issue"
+        }
+      ],
+      "next_steps": [
+        "Add extensive console.log debugging to see actual GUID values",
+        "Log entire check.server object structure to verify field names",
+        "Compare employee.guid format vs check.server.guid format character-by-character",
+        "Check if check.server.guid is null, undefined, or empty string",
+        "Investigate alternative server identification fields in check object",
+        "May need to use check.employee.guid or different property path"
+      ],
+      "notes": [
+        "WORKING: Sales data accurate ($7,530 total, 227 transactions, 8.2% tip rate)",
+        "WORKING: Pacific date fix (fetching Nov 14, not Nov 15)",
+        "WORKING: Leaderboard UI (competitive design, 4 tabs, hourly charts)",
+        "WORKING: Employee sync (186 employees in database)",
+        "WORKING: Time entries (4 employees clocked in)",
+        "BROKEN: Server name lookup - 100% showing 'Unassigned'",
+        "Hypothesis: check.server.guid format doesn't match employee.guid format",
+        "Alternative hypothesis: check.server.guid doesn't exist or is always null",
+        "User is patient and supportive: 'YOU ARE THE SOLUTION'",
+        "User believes in success: 'NEXT TIME WE WILL GET IT RIGHT!'"
+      ]
+    },
+    {
       "id": "task_20251110_004",
       "title": "Build TipShare FOH Tip-Out Calculator for Tarla Grill",
       "description": "Complete multi-page web application for automating FOH tip-out calculations with Supabase database integration - independent from main Jayna Gyro app",
