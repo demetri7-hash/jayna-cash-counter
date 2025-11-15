@@ -8,6 +8,8 @@
  * - Per-server stats
  */
 
+import { createClient } from '@supabase/supabase-js';
+
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -51,31 +53,38 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json'
     };
 
-    // STEP 1: Fetch ALL employees (to get server names) - EXACT PATTERN FROM toast-clocked-in.js
-    const employeesUrl = `${TOAST_CONFIG.baseUrl}/labor/v1/employees`;
-    console.log('Fetching employees list...');
+    // STEP 1: Fetch ALL employees from SUPABASE (EXACT PATTERN FROM toast-employee-performance.js)
+    console.log('Fetching employees from database...');
 
-    const employeesResponse = await fetch(employeesUrl, {
-      method: 'GET',
-      headers
-    });
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_KEY
+    );
 
-    if (!employeesResponse.ok) {
-      console.error(`Failed to fetch employees: ${employeesResponse.status}`);
+    const { data: employees, error: employeesError } = await supabase
+      .from('employees')
+      .select('toast_guid, first_name, last_name');
+
+    if (employeesError) {
+      console.error('Failed to fetch employees from database:', employeesError);
       return res.status(500).json({
         success: false,
-        error: 'Failed to fetch employees from Toast'
+        error: 'Failed to fetch employees from database'
       });
     }
 
-    const employees = await employeesResponse.json();
-    console.log(`✅ Found ${employees.length} employees`);
+    console.log(`✅ Found ${employees?.length || 0} employees in database`);
 
-    // Create employee map by GUID for fast lookup
+    // Create employee map by toast_guid for fast lookup
     const employeeMap = {};
-    employees.forEach(emp => {
-      employeeMap[emp.guid] = emp;
-    });
+    if (employees) {
+      employees.forEach(emp => {
+        employeeMap[emp.toast_guid] = {
+          firstName: emp.first_name,
+          lastName: emp.last_name
+        };
+      });
+    }
 
     // STEP 2: Fetch ALL orders for the business date with pagination
     let allOrders = [];
@@ -104,21 +113,9 @@ export default async function handler(req, res) {
     }
 
     console.log(`✅ Total orders fetched: ${allOrders.length}`);
+    console.log(`👥 Employee map has ${Object.keys(employeeMap).length} employees`);
 
-    // DEBUG: Log first order's check structure to see what we're working with
-    if (allOrders.length > 0 && allOrders[0].checks && allOrders[0].checks.length > 0) {
-      console.log('📋 DEBUG - First check structure:', JSON.stringify(allOrders[0].checks[0], null, 2));
-      console.log('📋 DEBUG - check.server object:', allOrders[0].checks[0].server);
-    }
-
-    // DEBUG: Log employee map
-    console.log(`👥 DEBUG - Employee map has ${Object.keys(employeeMap).length} employees`);
-    if (Object.keys(employeeMap).length > 0) {
-      const firstEmpGuid = Object.keys(employeeMap)[0];
-      console.log(`👤 DEBUG - Sample employee:`, employeeMap[firstEmpGuid]);
-    }
-
-    // STEP 2: Process orders and group by server
+    // STEP 3: Process orders and group by server
     const serverStats = {};
     const hourlyStats = {}; // Track stats by hour
     let totalNetSales = 0;
@@ -140,22 +137,13 @@ export default async function handler(req, res) {
           // Skip voided/deleted checks
           if (check.voided === true || check.deleted === true) continue;
 
-          // Get server name from check using employee map lookup
+          // Get server name from check using employee map lookup (from Supabase)
           const serverGuid = check.server?.guid;
-
-          // DEBUG: Log server lookup for first few checks
-          if (serverStats && Object.keys(serverStats).length < 3) {
-            console.log(`🔍 DEBUG - Check server object:`, check.server);
-            console.log(`🔍 DEBUG - Server GUID:`, serverGuid);
-            console.log(`🔍 DEBUG - Employee lookup result:`, employeeMap[serverGuid]);
-          }
 
           let serverName = 'Unassigned';
           if (serverGuid && employeeMap[serverGuid]) {
             const employee = employeeMap[serverGuid];
-            const firstName = employee.firstName || '';
-            const lastName = employee.lastName || '';
-            serverName = `${firstName} ${lastName}`.trim() || 'Unassigned';
+            serverName = `${employee.firstName} ${employee.lastName}`.trim() || 'Unassigned';
           }
 
           // Initialize server stats if needed
