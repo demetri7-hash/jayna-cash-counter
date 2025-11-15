@@ -53,38 +53,11 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json'
     };
 
-    // STEP 1: Fetch ALL employees from SUPABASE (EXACT PATTERN FROM toast-employee-performance.js)
-    console.log('Fetching employees from database...');
-
+    // STEP 1: Initialize Supabase
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_KEY
     );
-
-    const { data: employees, error: employeesError } = await supabase
-      .from('employees')
-      .select('toast_guid, first_name, last_name');
-
-    if (employeesError) {
-      console.error('Failed to fetch employees from database:', employeesError);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to fetch employees from database'
-      });
-    }
-
-    console.log(`✅ Found ${employees?.length || 0} employees in database`);
-
-    // Create employee map by toast_guid for fast lookup
-    const employeeMap = {};
-    if (employees) {
-      employees.forEach(emp => {
-        employeeMap[emp.toast_guid] = {
-          firstName: emp.first_name,
-          lastName: emp.last_name
-        };
-      });
-    }
 
     // STEP 2: Fetch ALL orders for the business date with pagination
     let allOrders = [];
@@ -113,22 +86,67 @@ export default async function handler(req, res) {
     }
 
     console.log(`✅ Total orders fetched: ${allOrders.length}`);
-    console.log(`👥 Employee map has ${Object.keys(employeeMap).length} employees`);
 
-    // DEBUG: Show first 3 employee GUIDs from map
-    const empGuids = Object.keys(employeeMap).slice(0, 3);
-    console.log('👤 First 3 employee GUIDs in map:', empGuids);
-    empGuids.forEach(guid => {
-      console.log(`  - ${guid}: ${employeeMap[guid].firstName} ${employeeMap[guid].lastName}`);
-    });
+    // STEP 3: Collect unique server GUIDs from ALL orders (EXACT PATTERN FROM toast-employee-performance.js)
+    const serverGuids = new Set();
 
-    // DEBUG: Show first check's server GUID
-    if (allOrders.length > 0 && allOrders[0].checks?.[0]?.server?.guid) {
-      console.log('🔍 First check server GUID:', allOrders[0].checks[0].server.guid);
-      console.log('🔍 Does it exist in map?', !!employeeMap[allOrders[0].checks[0].server.guid]);
+    for (const order of allOrders) {
+      const isOrderVoided = order.voided === true ||
+                           order.guestOrderStatus === 'VOIDED' ||
+                           order.paymentStatus === 'VOIDED';
+      const isOrderDeleted = order.deleted === true;
+
+      if (isOrderVoided || isOrderDeleted) continue;
+
+      if (order.checks && Array.isArray(order.checks)) {
+        for (const check of order.checks) {
+          if (check.voided === true || check.deleted === true) continue;
+
+          const serverGuid = check.server?.guid;
+          if (serverGuid) {
+            serverGuids.add(serverGuid);
+          }
+        }
+      }
     }
 
-    // STEP 3: Process orders and group by server
+    const serverGuidsArray = Array.from(serverGuids);
+    console.log(`👥 Found ${serverGuidsArray.length} unique server GUIDs in orders`);
+
+    // STEP 4: Fetch employee names from database for ONLY those GUIDs (EXACT PATTERN)
+    console.log('Fetching employee names from database...');
+    const { data: employeeData, error: employeesError } = await supabase
+      .from('employees')
+      .select('toast_guid, first_name, last_name')
+      .in('toast_guid', serverGuidsArray);
+
+    if (employeesError) {
+      console.error('Failed to fetch employees from database:', employeesError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch employees from database',
+        details: employeesError.message
+      });
+    }
+
+    console.log(`✅ Found ${employeeData?.length || 0} employees in database`);
+
+    // Create employee name map (EXACT PATTERN FROM toast-employee-performance.js)
+    const employeeNames = new Map();
+    if (employeeData) {
+      employeeData.forEach(emp => {
+        employeeNames.set(emp.toast_guid, `${emp.first_name} ${emp.last_name}`.trim());
+      });
+    }
+
+    // DEBUG: Show what we got
+    console.log(`📋 Employee map size: ${employeeNames.size}`);
+    if (employeeNames.size > 0) {
+      const firstThree = Array.from(employeeNames.entries()).slice(0, 3);
+      console.log('👤 First 3 employees:', firstThree);
+    }
+
+    // STEP 5: Process orders and group by server
     const serverStats = {};
     const hourlyStats = {}; // Track stats by hour
     let totalNetSales = 0;
@@ -150,13 +168,12 @@ export default async function handler(req, res) {
           // Skip voided/deleted checks
           if (check.voided === true || check.deleted === true) continue;
 
-          // Get server name from check using employee map lookup (from Supabase)
+          // Get server name from check using employee map lookup (EXACT PATTERN FROM toast-employee-performance.js)
           const serverGuid = check.server?.guid;
 
           let serverName = 'Unassigned';
-          if (serverGuid && employeeMap[serverGuid]) {
-            const employee = employeeMap[serverGuid];
-            serverName = `${employee.firstName} ${employee.lastName}`.trim() || 'Unassigned';
+          if (serverGuid) {
+            serverName = employeeNames.get(serverGuid) || 'Unassigned';
           }
 
           // Initialize server stats if needed
@@ -250,7 +267,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // STEP 3: Calculate tip percentages
+    // STEP 6: Calculate tip percentages
     Object.values(serverStats).forEach(server => {
       if (server.netSales > 0) {
         server.tipPercent = (server.tips / server.netSales) * 100;
@@ -271,7 +288,7 @@ export default async function handler(req, res) {
       }
     });
 
-    // STEP 4: Sort servers by different metrics for leaderboards
+    // STEP 7: Sort servers by different metrics for leaderboards
     const serverArray = Object.values(serverStats);
 
     const topByNetSales = [...serverArray].sort((a, b) => b.netSales - a.netSales);
@@ -279,7 +296,7 @@ export default async function handler(req, res) {
     const topByTipPercent = [...serverArray].sort((a, b) => b.tipPercent - a.tipPercent);
     const topByCombos = [...serverArray].sort((a, b) => b.combosSold - a.combosSold);
 
-    // STEP 5: Sort hourly stats
+    // STEP 8: Sort hourly stats
     const hourlyArray = Object.values(hourlyStats).sort((a, b) => {
       return a.hour.localeCompare(b.hour);
     });
