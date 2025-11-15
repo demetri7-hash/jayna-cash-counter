@@ -422,6 +422,9 @@
 </head>
 <body>
   <div class="container">
+    <!-- App Header (Injected by app-header.js) -->
+    <div id="appHeader"></div>
+
     <!-- Header -->
     <div class="header">
       <h1>🏆 TEAM LEADERBOARD 🏆</h1>
@@ -734,8 +737,17 @@
     // Auto-load on page load
     document.addEventListener('DOMContentLoaded', () => {
       if (!TOAST_TOKEN) {
-        alert('Please log in to Toast first!');
-        window.location.href = 'index.html';
+        // Show error state instead of alert (sandboxed iframe doesn't allow alerts)
+        document.getElementById('loadingOverlay').style.display = 'none';
+        document.querySelectorAll('[id^="leaderboard-"]').forEach(el => {
+          el.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">🔐</div>
+              <div class="empty-title">Toast Login Required</div>
+              <div class="empty-message">Please log in to Toast on the main page first, then return here.</div>
+            </div>
+          `;
+        });
         return;
       }
 
