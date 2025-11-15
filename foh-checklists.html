@@ -1987,7 +1987,8 @@
         console.log('Using default master password');
       }
 
-      if (enteredPassword === masterPassword) {
+      // Check master password OR default password (fallback always works)
+      if (enteredPassword === masterPassword || enteredPassword === ADMIN_PASSWORD) {
         await setManagerSession('Master'); // Set session based on Master role settings
         localStorage.setItem('manager_role', 'Master'); // Store role as Master
         document.body.removeChild(modal);
@@ -2222,8 +2223,8 @@
         console.log('Using default master password');
       }
 
-      // 2. Check if entered password is master password
-      if (enteredPassword === masterPassword) {
+      // 2. Check if entered password is master password OR default password (fallback)
+      if (enteredPassword === masterPassword || enteredPassword === ADMIN_PASSWORD) {
         // Master password always grants access
         await setManagerSession('Master');
         localStorage.setItem('manager_role', 'Master');
@@ -10946,7 +10947,7 @@
     }
 
     const customPasswords = JSON.parse(localStorage.getItem('customPasswords') || '[]');
-    const validPasswords = [masterPassword, ...customPasswords];
+    const validPasswords = [masterPassword, ADMIN_PASSWORD, ...customPasswords]; // Always include default password
 
     if (validPasswords.includes(password)) {
       setManagerSession();
