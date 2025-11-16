@@ -1299,17 +1299,26 @@
       } catch (error) {
         console.error('Error loading past orders:', error);
         hideLoading();
-        document.getElementById('pastOrdersContent').innerHTML = `
-          <div class="error-message">
-            ❌ Error loading past orders: ${error.message}
-          </div>
-        `;
+        const container = document.getElementById('pastOrdersContent');
+        if (container) {
+          container.innerHTML = `
+            <div class="error-message">
+              ❌ Error loading past orders: ${error.message}
+            </div>
+          `;
+        }
       }
     }
 
     // IDENTICAL rendering to ORDERS tab, just uses pastOrdersContent container
     function renderPastOrders() {
       const gallery = document.getElementById('pastOrdersContent');
+
+      if (!gallery) {
+        console.error('pastOrdersContent element not found in DOM');
+        hideLoading();
+        return;
+      }
 
       if (allPastPhotos.length === 0) {
         gallery.innerHTML = `
