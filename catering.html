@@ -1214,167 +1214,257 @@
     }
 
     // ============================================
-    // LOAD PAST ORDERS FROM DATABASE (365 DAYS BACK)
+    // LOAD PAST ORDERS (IDENTICAL TO ORDERS TAB, DIFFERENT DATE RANGE)
     // ============================================
-    async function loadPastOrders(showLoadingSpinner = true) {
-      const container = document.getElementById('pastOrdersContent');
+    let allPastPhotos = [];
 
+    async function loadPastOrders() {
       try {
-        if (showLoadingSpinner) {
-          showLoading('LOADING PAST ORDERS', 'Loading past 365 days of catering orders...');
+        console.log('📸 Loading PAST catering orders and photos...');
+        showLoading('LOADING PAST ORDERS', 'Loading past 365 days of catering orders...');
+
+        // Calculate date range (365 days ago to TODAY - includes today!) in Pacific timezone
+        const startDateStr = getPacificDatePlusDays(-365);
+        const endDateStr = getPacificToday();
+
+        console.log(`📅 PAST Tab - Fetching range: ${startDateStr} to ${endDateStr}`);
+
+        // Fetch BOTH uploaded photos AND Toast synced orders (SAME AS ORDERS TAB)
+        const [photosResponse, ordersResponse] = await Promise.all([
+          fetch('/api/catering-photos-get?archived=false'),
+          fetch(`/api/get-catering-orders?startDate=${startDateStr}&endDate=${endDateStr}`)
+        ]);
+
+        const photosData = await photosResponse.json();
+        const ordersData = await ordersResponse.json();
+
+        if (!photosData.success) {
+          throw new Error(photosData.error || 'Failed to load photos');
         }
 
-        // Calculate date range (365 days ago to today) in Pacific timezone
-        const endDateStr = getPacificToday();
-        const startDateStr = getPacificDatePlusDays(-365);
+        // Get uploaded photos (with images)
+        const uploadedPhotos = (photosData.data || [])
+          .filter(photo => !photo.archived)
+          .map(photo => ({
+            ...photo,
+            source_type: 'UPLOADED',
+            has_image: true
+          }));
 
-        console.log(`📋 Fetching PAST orders from database (Pacific time): ${startDateStr} to ${endDateStr}`);
+        console.log(`✅ Loaded ${uploadedPhotos.length} uploaded photos (PAST)`);
 
-        // Call database API
-        const response = await fetch(`/api/get-catering-orders?startDate=${startDateStr}&endDate=${endDateStr}`, {
-          method: 'GET'
+        // Get Toast synced orders (without images)
+        let toastOrders = [];
+        if (ordersData.success && ordersData.data && ordersData.data.orders) {
+          toastOrders = ordersData.data.orders.map(order => ({
+            id: `toast_${order.db_id}`,
+            db_id: order.db_id,
+            source_type: order.source || 'TOAST',
+            order_due_date: order.delivery_date,
+            time_due: order.delivery_time ? formatPacificTime24(order.delivery_time) : null,
+            order_type: order.delivery_address ? 'DELIVERY' : 'PICKUP',
+            leave_jayna_at: null,
+            guest_name: order.customer_name,
+            phone_number: order.customer_phone,
+            email: order.customer_email,
+            delivery_address: order.delivery_address,
+            special_notes: order.delivery_notes,
+            actual_order: null,
+            brightness: 100,
+            contrast: 100,
+            has_image: false,
+            toast_order_number: order.check_number || order.order_number,
+            toast_headcount: order.headcount,
+            toast_total: order.total,
+            toast_status: order.status,
+            order_emoji: order.order_emoji || '🍽️'
+          }));
+
+          console.log(`✅ Loaded ${toastOrders.length} Toast orders (PAST)`);
+        }
+
+        // Merge uploaded photos and Toast orders
+        allPastPhotos = [...uploadedPhotos, ...toastOrders];
+
+        // Sort by order_due_date DESCENDING (most recent first for PAST tab)
+        allPastPhotos.sort((a, b) => {
+          const dateA = a.order_due_date || '0000-00-00';
+          const dateB = b.order_due_date || '0000-00-00';
+          return dateB.localeCompare(dateA); // REVERSED for descending order
         });
 
-        const data = await response.json();
+        console.log(`📦 Total PAST orders: ${allPastPhotos.length} (${uploadedPhotos.length} with photos, ${toastOrders.length} from Toast)`);
 
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch past orders from database');
-        }
-
-        console.log(`✅ Found ${data.data.totalOrders} past orders in database`);
-
-        // Display past orders (sorted by date descending - most recent first)
-        displayPastOrders(data.data.orders || [], showLoadingSpinner);
-
+        renderPastOrders();
       } catch (error) {
         console.error('Error loading past orders:', error);
-        if (showLoadingSpinner) {
-          hideLoading();
-        }
-        if (container) {
-          container.innerHTML = `
-            <div class="error-message">
-              ❌ Error loading past orders from database: ${error.message}
-              <br><br>
-              Please try again.
-            </div>
-            <button class="refresh-btn" onclick="loadPastOrders()">🔄 TRY AGAIN</button>
-          `;
-        }
+        hideLoading();
+        document.getElementById('pastOrdersContent').innerHTML = `
+          <div class="error-message">
+            ❌ Error loading past orders: ${error.message}
+          </div>
+        `;
       }
     }
 
-    // ============================================
-    // DISPLAY PAST ORDERS (GROUPED BY DATE, DESCENDING)
-    // ============================================
-    function displayPastOrders(orders, showLoadingSpinner = true) {
-      const container = document.getElementById('pastOrdersContent');
+    // IDENTICAL rendering to ORDERS tab, just uses pastOrdersContent container
+    function renderPastOrders() {
+      const gallery = document.getElementById('pastOrdersContent');
 
-      if (showLoadingSpinner) {
-        hideLoading();
-      }
-
-      if (!orders || orders.length === 0) {
-        container.innerHTML = `
+      if (allPastPhotos.length === 0) {
+        gallery.innerHTML = `
           <div class="empty-state">
-            <div class="empty-icon">📦</div>
-            <div class="empty-title">No Past Orders</div>
-            <div class="empty-message">No catering orders found in the past 365 days.</div>
+            <div class="empty-title">NO PAST ORDERS</div>
+            <div class="empty-message">No catering orders found in the past 365 days</div>
           </div>
         `;
+        hideLoading();
         return;
       }
 
-      // Group orders by date
-      const ordersByDate = {};
-      orders.forEach(order => {
-        const date = order.delivery_date;
-        if (!ordersByDate[date]) {
-          ordersByDate[date] = [];
+      // Group photos by order_due_date (SAME AS ORDERS TAB)
+      const photosByDate = {};
+      allPastPhotos.forEach(photo => {
+        const date = photo.order_due_date || 'NO DATE';
+        if (!photosByDate[date]) {
+          photosByDate[date] = [];
         }
-        ordersByDate[date].push(order);
+        photosByDate[date].push(photo);
       });
 
-      // Sort dates in DESCENDING order (most recent first)
-      const sortedDates = Object.keys(ordersByDate).sort((a, b) => b.localeCompare(a));
+      // Sort dates (DESCENDING for PAST - most recent first)
+      const sortedDates = Object.keys(photosByDate).sort((a, b) => {
+        if (a === 'NO DATE') return 1;
+        if (b === 'NO DATE') return -1;
+        return new Date(b) - new Date(a); // REVERSED for PAST
+      });
 
-      let html = `<div style="margin-bottom: 20px; font-size: 14px; font-weight: 600; color: var(--gray-700);">
-        Showing ${orders.length} orders from the past 365 days
-      </div>`;
-
-      sortedDates.forEach(dateStr => {
-        const dayOrders = ordersByDate[dateStr];
-
-        // Format date header
-        const dateObj = new Date(dateStr + 'T12:00:00');
-        const formattedDate = dateObj.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
+      // Build HTML grouped by date (SAME AS ORDERS TAB, but no edit controls)
+      let html = '';
+      sortedDates.forEach(date => {
+        const photos = photosByDate[date];
+        const dateLabel = formatPhotoDateLabel(date);
 
         html += `
-          <div style="background: var(--gray-100); border: 2px solid var(--gray-300); padding: 12px 16px; margin-bottom: 16px;">
-            <div style="font-size: 16px; font-weight: 700; color: var(--gray-900); margin-bottom: 12px;">
-              ${formattedDate} (${dayOrders.length} order${dayOrders.length !== 1 ? 's' : ''})
-            </div>
-
-            <div style="display: grid; gap: 12px;">
+          <div class="photo-date-group">
+            <div class="photo-date-header">${dateLabel}</div>
+            <div class="photo-thumbnails-grid">
         `;
 
-        // Sort orders by time for this date
-        dayOrders.sort((a, b) => (a.delivery_time || '').localeCompare(b.delivery_time || ''));
+        photos.forEach((photo, localIndex) => {
+          const globalIndex = allPastPhotos.indexOf(photo);
+          const brightness = photo.brightness || 100;
+          const contrast = photo.contrast || 100;
+          const filterStyle = `filter: brightness(${brightness}%) contrast(${contrast}%);`;
 
-        dayOrders.forEach(order => {
-          const timeStr = order.delivery_time ? formatPacificTime(order.delivery_time) : 'No time';
-          const orderType = order.order_type || 'PICKUP';
-          const orderTypeColor = orderType === 'DELIVERY' ? 'var(--warning-text)' : 'var(--blue-text)';
-          const orderTypeBg = orderType === 'DELIVERY' ? 'var(--warning-bg)' : 'var(--blue-bg)';
+          const timeDue = formatTimeDisplay(photo.time_due);
+          const leaveJaynaAt = photo.order_type === 'DELIVERY' ? formatTimeDisplay(photo.leave_jayna_at) : null;
 
-          html += `
-            <div onclick="viewToastOrder('${order.order_number}')" style="
-              background: white;
-              border: 2px solid var(--gray-300);
-              padding: 16px;
-              cursor: pointer;
-              transition: all 0.15s ease;
-              display: grid;
-              grid-template-columns: auto 1fr auto;
-              gap: 16px;
-              align-items: center;
-            " onmouseover="this.style.borderColor='var(--primary-blue)'; this.style.transform='translateX(4px)';"
-               onmouseout="this.style.borderColor='var(--gray-300)'; this.style.transform='translateX(0)';">
+          // Render differently based on whether it has an image or not
+          if (photo.has_image) {
+            // PHOTO CARD (with image) - NO EDIT CONTROLS FOR PAST
+            html += `
+              <div class="photo-item" data-id="${photo.id}" data-index="${globalIndex}">
+                <!-- Image (click to expand) -->
+                <img src="${photo.image_url}"
+                     alt="Catering Order"
+                     class="photo-img"
+                     id="photo-img-${photo.id}"
+                     loading="lazy"
+                     width="400"
+                     height="500"
+                     style="${filterStyle} cursor: pointer;"
+                     onclick="openLightbox('${photo.image_url}', ${brightness}, ${contrast})">
 
-              <!-- Order Type Badge -->
-              <div style="
-                padding: 8px 12px;
-                background: ${orderTypeBg};
-                color: ${orderTypeColor};
-                font-size: 11px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                border-radius: 0;
-                white-space: nowrap;
-              ">
-                ${orderType === 'DELIVERY' ? '🚗 DELIVERY' : '📦 PICKUP'}
-              </div>
-
-              <!-- Order Info -->
-              <div>
-                <div style="font-size: 16px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px;">
-                  ${order.customer_name || 'Unknown Customer'}
-                </div>
-                <div style="font-size: 13px; color: var(--gray-600);">
-                  Order #${order.order_number} • ${timeStr}
+                <!-- Order Metadata -->
+                <div class="photo-metadata">
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">TYPE:</span>
+                    <span class="photo-metadata-value">${photo.order_type || 'N/A'}</span>
+                  </div>
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">TIME DUE:</span>
+                    <span class="photo-metadata-value">${timeDue}</span>
+                  </div>
+                  ${leaveJaynaAt ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">LEAVE AT:</span>
+                    <span class="photo-metadata-value">${leaveJaynaAt}</span>
+                  </div>
+                  ` : ''}
                 </div>
               </div>
+            `;
+          } else {
+            // TOAST ORDER CARD (no image) - SAME AS ORDERS TAB
+            html += `
+              <div class="photo-item" data-id="${photo.id}" data-index="${globalIndex}" style="background: var(--gray-100); border: 3px solid var(--primary-blue);">
+                <!-- Toast Badge -->
+                <div style="position: absolute; top: 12px; left: 12px; background: var(--primary-blue); color: white; padding: 6px 12px; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; z-index: 5;">
+                  ${photo.source_type}
+                </div>
 
-              <!-- View Arrow -->
-              <div style="font-size: 20px; color: var(--gray-400);">→</div>
-            </div>
-          `;
+                <!-- No Image Placeholder (CLICKABLE to view order details) -->
+                <div onclick="viewToastOrderDetails(${photo.db_id})" style="width: 100%; height: 300px; background: white; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid var(--gray-300); cursor: pointer; transition: background 0.15s ease;">
+                  <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 12px;">${photo.order_emoji || '🍽️'}</div>
+                    <div style="font-size: 13px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">${photo.toast_order_number || 'N/A'}</div>
+                    ${photo.toast_total ? `<div style="font-size: 18px; font-weight: 700; color: var(--primary-blue); margin-top: 8px;">$${photo.toast_total.toFixed(2)}</div>` : ''}
+                    <div style="font-size: 11px; font-weight: 600; color: var(--primary-blue); margin-top: 12px; text-transform: uppercase; letter-spacing: 0.5px;">CLICK TO VIEW FULL ORDER</div>
+                  </div>
+                </div>
+
+                <!-- Order Metadata -->
+                <div class="photo-metadata">
+                  ${photo.guest_name ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">CUSTOMER:</span>
+                    <span class="photo-metadata-value">${photo.guest_name}</span>
+                  </div>
+                  ` : ''}
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">TYPE:</span>
+                    <span class="photo-metadata-value">${photo.order_type || 'N/A'}</span>
+                  </div>
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">TIME DUE:</span>
+                    <span class="photo-metadata-value">${timeDue}</span>
+                  </div>
+                  ${photo.toast_headcount ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">HEADCOUNT:</span>
+                    <span class="photo-metadata-value">${photo.toast_headcount} guests</span>
+                  </div>
+                  ` : ''}
+                  ${photo.phone_number ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">PHONE:</span>
+                    <span class="photo-metadata-value">${photo.phone_number}</span>
+                  </div>
+                  ` : ''}
+                  ${photo.delivery_address ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">ADDRESS:</span>
+                    <span class="photo-metadata-value">${photo.delivery_address}</span>
+                  </div>
+                  ` : ''}
+                  ${photo.special_notes ? `
+                  <div class="photo-metadata-row">
+                    <span class="photo-metadata-label">NOTES:</span>
+                    <span class="photo-metadata-value">${photo.special_notes}</span>
+                  </div>
+                  ` : ''}
+                </div>
+
+                <!-- Status Badge (bottom) -->
+                <div style="padding: 12px; background: var(--success-bg); border-top: 2px solid var(--success-border); text-align: center;">
+                  <span style="font-size: 11px; font-weight: 700; color: var(--success-text); text-transform: uppercase; letter-spacing: 0.8px;">
+                    ${photo.toast_status || 'CONFIRMED'} FROM ${photo.source_type === 'ezCater' ? 'EZCATER' : 'TOAST'}
+                  </span>
+                </div>
+              </div>
+            `;
+          }
         });
 
         html += `
@@ -1383,7 +1473,8 @@
         `;
       });
 
-      container.innerHTML = html;
+      gallery.innerHTML = html;
+      hideLoading();
     }
 
     // ============================================
