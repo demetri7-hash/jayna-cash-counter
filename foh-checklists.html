@@ -1861,6 +1861,8 @@
   // Password requirement - Using inline modal instead of prompt() (blocked in sandboxed iframe)
   // Now with persistent 60-minute session support
   function requirePasswordFor(featureName, callback) {
+    console.log('🔐 requirePasswordFor called for:', featureName);
+
     // Check if manager session is still valid
     if (isManagerSessionValid()) {
       const remainingMinutes = getRemainingSessionMinutes();
@@ -1868,6 +1870,8 @@
       callback();
       return;
     }
+
+    console.log('📝 Creating password modal...');
     // Create password modal overlay
     const modal = document.createElement('div');
     modal.id = 'passwordModal';
@@ -1956,16 +1960,24 @@
 
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
+    console.log('✅ Password modal added to DOM');
 
     const passwordInput = document.getElementById('passwordInput');
     const submitBtn = document.getElementById('passwordSubmitBtn');
     const cancelBtn = document.getElementById('passwordCancelBtn');
+
+    console.log('📋 Modal elements:', {
+      passwordInput: !!passwordInput,
+      submitBtn: !!submitBtn,
+      cancelBtn: !!cancelBtn
+    });
 
     // Focus password input
     setTimeout(() => passwordInput.focus(), 100);
 
     // Handle submit - Check against master password AND database
     const handleSubmit = async () => {
+      console.log('✅ handleSubmit function called');
       const enteredPassword = passwordInput.value;
 
       // DEBUG: Log what we're checking
@@ -2062,13 +2074,18 @@
 
     // Handle cancel
     const handleCancel = () => {
+      console.log('❌ Password modal cancelled');
       document.body.removeChild(modal);
     };
 
-    submitBtn.onclick = handleSubmit;
+    submitBtn.onclick = () => {
+      console.log('🔘 Submit button clicked');
+      handleSubmit();
+    };
     cancelBtn.onclick = handleCancel;
     passwordInput.onkeypress = (e) => {
       if (e.key === 'Enter') {
+        console.log('⏎ Enter key pressed');
         handleSubmit();
       }
     };
