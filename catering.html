@@ -1701,11 +1701,26 @@
           }
 
           try {
-            // business_date is already in YYYY-MM-DD format
-            const [year, month, day] = createdField.split('-').map(Number);
+            let year, month, day;
+
+            // business_date is a NUMBER in YYYYMMDD format (e.g., 20251104)
+            if (typeof createdField === 'number') {
+              const dateStr = createdField.toString(); // "20251104"
+              year = parseInt(dateStr.substring(0, 4));  // 2025
+              month = parseInt(dateStr.substring(4, 6)); // 11
+              day = parseInt(dateStr.substring(6, 8));   // 04
+            } else {
+              // Fallback: delivery_date is a string "YYYY-MM-DD"
+              [year, month, day] = createdField.split('-').map(Number);
+            }
+
             const dateObj = new Date(year, month - 1, day);
             const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
             analytics.ordersByCreatedDayOfWeek[dayOfWeek] = (analytics.ordersByCreatedDayOfWeek[dayOfWeek] || 0) + 1;
+
+            if (orderCounter === 1) {
+              console.log(`   → Parsed to: ${dayOfWeek}, ${month}/${day}/${year}`);
+            }
           } catch (error) {
             console.error('Error parsing business_date:', createdField, error);
           }
