@@ -76,14 +76,14 @@
       font-weight: 600;
     }
 
-    /* Loading Spinner */
+    /* Loading Overlay - Pulsing Logo */
     .loading-overlay {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(255,255,255,0.95);
+      background: rgba(0, 0, 0, 0.9);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -91,27 +91,33 @@
       z-index: 10000;
     }
 
-    .spinner {
-      border: 8px solid var(--gray-300);
-      border-top: 8px solid var(--primary-blue);
-      border-radius: 50%;
-      width: 80px;
-      height: 80px;
-      animation: spin 1s linear infinite;
-      margin-bottom: 20px;
+    @keyframes pulseRing {
+      0% {
+        transform: scale(0.5);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(1.5);
+        opacity: 0;
+      }
     }
 
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    @keyframes logoFloat {
+      0%, 100% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-10px);
+      }
     }
 
-    .loading-text {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--gray-700);
-      text-transform: uppercase;
-      letter-spacing: 1px;
+    @keyframes logoGlow {
+      0%, 100% {
+        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+      }
+      50% {
+        filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.6));
+      }
     }
 
     /* Stats Summary */
@@ -433,8 +439,44 @@
 
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay">
-      <div class="spinner"></div>
-      <div class="loading-text">Loading Today's Stats...</div>
+      <div style="text-align: center;">
+        <div style="position: relative; width: 150px; height: 150px; margin: 0 auto;">
+          <!-- Animated glowing rings -->
+          <div style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            animation: pulseRing 2s ease-out infinite;
+          "></div>
+          <div style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: pulseRing 2s ease-out infinite 0.5s;
+          "></div>
+          <!-- Main logo -->
+          <img src="jayna-logo-loading.png" alt="Jayna Logo" style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            animation: logoFloat 3s ease-in-out infinite, logoGlow 2s ease-in-out infinite;
+          ">
+        </div>
+      </div>
     </div>
 
     <!-- Content -->
