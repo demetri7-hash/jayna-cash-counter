@@ -2004,140 +2004,162 @@
     document.body.appendChild(modal);
     console.log('✅ Password modal added to DOM');
 
-    const passwordInput = document.getElementById('passwordInput');
-    const submitBtn = document.getElementById('passwordSubmitBtn');
-    const cancelBtn = document.getElementById('passwordCancelBtn');
+    // Use setTimeout to ensure DOM is fully rendered before getting elements
+    setTimeout(() => {
+      const passwordInput = document.getElementById('passwordInput');
+      const submitBtn = document.getElementById('passwordSubmitBtn');
+      const cancelBtn = document.getElementById('passwordCancelBtn');
 
-    console.log('📋 Modal elements:', {
-      passwordInput: !!passwordInput,
-      submitBtn: !!submitBtn,
-      cancelBtn: !!cancelBtn
-    });
+      console.log('📋 Modal elements after DOM render:', {
+        passwordInput: passwordInput,
+        submitBtn: submitBtn,
+        cancelBtn: cancelBtn,
+        passwordInputExists: !!passwordInput,
+        submitBtnExists: !!submitBtn,
+        cancelBtnExists: !!cancelBtn
+      });
 
-    // Focus password input
-    setTimeout(() => passwordInput.focus(), 100);
-
-    // Handle submit - Check against master password AND database
-    const handleSubmit = async () => {
-      console.log('✅ handleSubmit function called');
-      const enteredPassword = passwordInput.value;
-
-      // DEBUG: Log what we're checking
-      console.log('🔍 Password validation debug:');
-      console.log('  Entered password:', enteredPassword);
-      console.log('  ADMIN_PASSWORD:', ADMIN_PASSWORD);
-      console.log('  Match with ADMIN_PASSWORD:', enteredPassword === ADMIN_PASSWORD);
-
-      // Get master password from Supabase (cloud-based)
-      let masterPassword = ADMIN_PASSWORD;
-      try {
-        const { data: masterPwdData } = await supabase
-          .from('manager_passwords')
-          .select('*')
-          .eq('username', 'SYSTEM_MASTER_PASSWORD')
-          .eq('is_active', true)
-          .limit(1)
-          .single();
-
-        if (masterPwdData && masterPwdData.full_name) {
-          masterPassword = masterPwdData.full_name;
-          console.log('  Master password from DB:', masterPassword);
-        }
-      } catch (error) {
-        // No custom master password set, use default
-        console.log('  Using default master password (no DB override)');
-      }
-
-      console.log('  Final master password:', masterPassword);
-      console.log('  Match with master:', enteredPassword === masterPassword);
-
-      // Check master password OR default password (fallback always works)
-      if (enteredPassword === masterPassword || enteredPassword === ADMIN_PASSWORD) {
-        await setManagerSession('Master'); // Set session based on Master role settings
-        localStorage.setItem('manager_role', 'Master'); // Store role as Master
-        document.body.removeChild(modal);
-        showMessage('✅ Master session active - Full Access', 'success');
-        callback();
+      if (!submitBtn) {
+        console.error('❌ CRITICAL: Submit button not found!');
         return;
       }
 
-      // Check against database passwords
-      try {
-        const passwordHash = simpleHash(enteredPassword);
+      console.log('✅ All modal elements found, attaching event listeners...');
 
-        const { data: passwords, error } = await supabase
-          .from('manager_passwords')
-          .select('*')
-          .eq('password_hash', passwordHash)
-          .eq('is_active', true)
-          .limit(1);
+      // Focus password input
+      if (passwordInput) passwordInput.focus();
 
-        if (error) {
-          console.error('Error checking password:', error);
-          // Fall through to incorrect password message
+      // Handle submit - Check against master password AND database
+      const handleSubmit = async () => {
+        console.log('✅ handleSubmit function called');
+        const enteredPassword = passwordInput.value;
+
+        // DEBUG: Log what we're checking
+        console.log('🔍 Password validation debug:');
+        console.log('  Entered password:', enteredPassword);
+        console.log('  ADMIN_PASSWORD:', ADMIN_PASSWORD);
+        console.log('  Match with ADMIN_PASSWORD:', enteredPassword === ADMIN_PASSWORD);
+
+        // Get master password from Supabase (cloud-based)
+        let masterPassword = ADMIN_PASSWORD;
+        try {
+          const { data: masterPwdData } = await supabase
+            .from('manager_passwords')
+            .select('*')
+            .eq('username', 'SYSTEM_MASTER_PASSWORD')
+            .eq('is_active', true)
+            .limit(1)
+            .single();
+
+          if (masterPwdData && masterPwdData.full_name) {
+            masterPassword = masterPwdData.full_name;
+            console.log('  Master password from DB:', masterPassword);
+          }
+        } catch (error) {
+          // No custom master password set, use default
+          console.log('  Using default master password (no DB override)');
         }
 
-        if (passwords && passwords.length > 0) {
-          // Valid password found in database
-          const user = passwords[0];
-          const userRole = user.role || 'Manager'; // Default to Manager if no role set
+        console.log('  Final master password:', masterPassword);
+        console.log('  Match with master:', enteredPassword === masterPassword);
 
-          await setManagerSession(userRole); // Set session based on user's role settings
-          localStorage.setItem('manager_role', userRole); // Store user's role
-          localStorage.setItem('manager_username', user.username); // Store username
-
+        // Check master password OR default password (fallback always works)
+        if (enteredPassword === masterPassword || enteredPassword === ADMIN_PASSWORD) {
+          await setManagerSession('Master'); // Set session based on Master role settings
+          localStorage.setItem('manager_role', 'Master'); // Store role as Master
           document.body.removeChild(modal);
-
-          const roleEmoji = {
-            'Master': '🔴',
-            'Admin': '🟠',
-            'Manager': '🟡',
-            'Editor': '🟢'
-          }[userRole] || '🔵';
-
-          showMessage(`✅ ${roleEmoji} ${userRole} session active - ${user.username}`, 'success');
-
+          showMessage('✅ Master session active - Full Access', 'success');
           callback();
           return;
         }
 
-        // No match found
-        showMessage('Incorrect password!', 'error');
-        passwordInput.value = '';
-        passwordInput.focus();
+        // Check against database passwords
+        try {
+          const passwordHash = simpleHash(enteredPassword);
 
-      } catch (error) {
-        console.error('Error verifying password:', error);
-        showMessage('Error verifying password!', 'error');
-        passwordInput.value = '';
-        passwordInput.focus();
-      }
-    };
+          const { data: passwords, error } = await supabase
+            .from('manager_passwords')
+            .select('*')
+            .eq('password_hash', passwordHash)
+            .eq('is_active', true)
+            .limit(1);
 
-    // Handle cancel
-    const handleCancel = () => {
-      console.log('❌ Password modal cancelled');
-      document.body.removeChild(modal);
-    };
+          if (error) {
+            console.error('Error checking password:', error);
+            // Fall through to incorrect password message
+          }
 
-    submitBtn.onclick = () => {
-      console.log('🔘 Submit button clicked');
-      handleSubmit();
-    };
-    cancelBtn.onclick = handleCancel;
-    passwordInput.onkeypress = (e) => {
-      if (e.key === 'Enter') {
-        console.log('⏎ Enter key pressed');
+          if (passwords && passwords.length > 0) {
+            // Valid password found in database
+            const user = passwords[0];
+            const userRole = user.role || 'Manager'; // Default to Manager if no role set
+
+            await setManagerSession(userRole); // Set session based on user's role settings
+            localStorage.setItem('manager_role', userRole); // Store user's role
+            localStorage.setItem('manager_username', user.username); // Store username
+
+            document.body.removeChild(modal);
+
+            const roleEmoji = {
+              'Master': '🔴',
+              'Admin': '🟠',
+              'Manager': '🟡',
+              'Editor': '🟢'
+            }[userRole] || '🔵';
+
+            showMessage(`✅ ${roleEmoji} ${userRole} session active - ${user.username}`, 'success');
+
+            callback();
+            return;
+          }
+
+          // No match found
+          showMessage('Incorrect password!', 'error');
+          passwordInput.value = '';
+          passwordInput.focus();
+
+        } catch (error) {
+          console.error('Error verifying password:', error);
+          showMessage('Error verifying password!', 'error');
+          passwordInput.value = '';
+          passwordInput.focus();
+        }
+      };
+
+      // Handle cancel
+      const handleCancel = () => {
+        console.log('❌ Password modal cancelled');
+        document.body.removeChild(modal);
+      };
+
+      // Attach event listeners with explicit logging
+      console.log('🔗 Attaching onclick to submit button...');
+      submitBtn.onclick = () => {
+        console.log('🔘 Submit button clicked');
         handleSubmit();
-      }
-    };
+      };
 
-    // Click outside to close
-    modal.onclick = (e) => {
-      if (e.target === modal) {
-        handleCancel();
-      }
-    };
+      console.log('🔗 Attaching onclick to cancel button...');
+      cancelBtn.onclick = handleCancel;
+
+      console.log('🔗 Attaching onkeypress to password input...');
+      passwordInput.onkeypress = (e) => {
+        if (e.key === 'Enter') {
+          console.log('⏎ Enter key pressed');
+          handleSubmit();
+        }
+      };
+
+      // Click outside to close
+      console.log('🔗 Attaching onclick to modal overlay...');
+      modal.onclick = (e) => {
+        if (e.target === modal) {
+          handleCancel();
+        }
+      };
+
+      console.log('✅ All event listeners attached successfully!');
+    }, 100); // End of setTimeout
   }
 
   /**
