@@ -916,12 +916,46 @@
         </div>
       </div>
 
-      <!-- ANALYTICS Tab (Future Implementation) -->
+      <!-- ANALYTICS Tab -->
       <div id="analyticsTab" class="tab-content">
-        <div class="empty-state">
-          <div class="empty-icon">📊</div>
-          <div class="empty-title">Analytics Dashboard</div>
-          <div class="empty-message">Order analytics and insights coming soon!</div>
+        <!-- Date Range Controls -->
+        <div style="background: white; border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+          <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">REPORT DATE RANGE</h3>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <div>
+              <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">START DATE</label>
+              <input type="date" id="analyticsStartDate" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">END DATE</label>
+              <input type="date" id="analyticsEndDate" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="display: flex; align-items: flex-end;">
+              <button onclick="runAnalyticsReport()" style="width: 100%; padding: 14px 24px; background: var(--gray-900); border: 2px solid var(--gray-900); color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+                RUN REPORT
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Date Presets -->
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button onclick="setAnalyticsDateRange('today')" style="padding: 8px 16px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">TODAY</button>
+            <button onclick="setAnalyticsDateRange('yesterday')" style="padding: 8px 16px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">YESTERDAY</button>
+            <button onclick="setAnalyticsDateRange('last7days')" style="padding: 8px 16px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">LAST 7 DAYS</button>
+            <button onclick="setAnalyticsDateRange('last30days')" style="padding: 8px 16px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">LAST 30 DAYS</button>
+            <button onclick="setAnalyticsDateRange('thisMonth')" style="padding: 8px 16px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">THIS MONTH</button>
+            <button onclick="setAnalyticsDateRange('lastMonth')" style="padding: 8px 16px; background: var(--gray-100); border: 2px solid var(--gray-300); color: var(--gray-900); font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">LAST MONTH</button>
+          </div>
+        </div>
+
+        <!-- Analytics Results Container -->
+        <div id="analyticsResults">
+          <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <div class="empty-title">SELECT DATE RANGE</div>
+            <div class="empty-message">Choose a date range above and click "Run Report" to view analytics</div>
+          </div>
         </div>
       </div>
     </div>
@@ -1484,6 +1518,468 @@
 
       gallery.innerHTML = html;
       hideLoading();
+    }
+
+    // ============================================
+    // ANALYTICS REPORTING SYSTEM
+    // ============================================
+
+    // Set date range presets
+    function setAnalyticsDateRange(preset) {
+      const today = getPacificToday();
+      const startInput = document.getElementById('analyticsStartDate');
+      const endInput = document.getElementById('analyticsEndDate');
+
+      switch(preset) {
+        case 'today':
+          startInput.value = today;
+          endInput.value = today;
+          break;
+        case 'yesterday':
+          const yesterday = getPacificDatePlusDays(-1);
+          startInput.value = yesterday;
+          endInput.value = yesterday;
+          break;
+        case 'last7days':
+          startInput.value = getPacificDatePlusDays(-7);
+          endInput.value = today;
+          break;
+        case 'last30days':
+          startInput.value = getPacificDatePlusDays(-30);
+          endInput.value = today;
+          break;
+        case 'thisMonth':
+          const firstOfMonth = today.substring(0, 8) + '01';
+          startInput.value = firstOfMonth;
+          endInput.value = today;
+          break;
+        case 'lastMonth':
+          const lastMonthDate = new Date();
+          lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+          const lastMonthStr = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Los_Angeles',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          }).format(lastMonthDate);
+          const year = parseInt(lastMonthStr.substring(0, 4));
+          const month = parseInt(lastMonthStr.substring(5, 7));
+          const firstDay = `${year}-${String(month).padStart(2, '0')}-01`;
+          const lastDay = new Date(year, month, 0).getDate();
+          const lastDayStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+          startInput.value = firstDay;
+          endInput.value = lastDayStr;
+          break;
+      }
+
+      // Auto-run report after setting preset
+      runAnalyticsReport();
+    }
+
+    // Main analytics report function
+    async function runAnalyticsReport() {
+      const startDate = document.getElementById('analyticsStartDate').value;
+      const endDate = document.getElementById('analyticsEndDate').value;
+      const resultsContainer = document.getElementById('analyticsResults');
+
+      if (!startDate || !endDate) {
+        resultsContainer.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">⚠️</div>
+            <div class="empty-title">MISSING DATE RANGE</div>
+            <div class="empty-message">Please select both start and end dates</div>
+          </div>
+        `;
+        return;
+      }
+
+      try {
+        showLoading('GENERATING REPORT', 'Analyzing catering orders...');
+
+        console.log(`📊 Running analytics report: ${startDate} to ${endDate}`);
+
+        // Fetch orders from database (SAME API as PAST tab)
+        const ordersResponse = await fetch(`/api/get-catering-orders?startDate=${startDate}&endDate=${endDate}`);
+        const ordersData = await ordersResponse.json();
+
+        if (!ordersData.success) {
+          throw new Error(ordersData.error || 'Failed to load orders');
+        }
+
+        const orders = ordersData.data.orders || [];
+        console.log(`✅ Loaded ${orders.length} orders for analysis`);
+
+        if (orders.length === 0) {
+          resultsContainer.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">📊</div>
+              <div class="empty-title">NO ORDERS FOUND</div>
+              <div class="empty-message">No catering orders found in selected date range</div>
+            </div>
+          `;
+          hideLoading();
+          return;
+        }
+
+        // Process analytics data
+        const analytics = processAnalyticsData(orders);
+
+        // Render analytics dashboard
+        renderAnalyticsDashboard(analytics, startDate, endDate, orders);
+
+        hideLoading();
+      } catch (error) {
+        console.error('Error generating analytics report:', error);
+        hideLoading();
+        resultsContainer.innerHTML = `
+          <div class="error-message">
+            ❌ Error generating report: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    // Process raw order data into analytics
+    function processAnalyticsData(orders) {
+      const analytics = {
+        totalOrders: orders.length,
+        totalSales: 0,
+        totalTips: 0,
+        itemCounts: {}, // { itemName: { quantity: N, revenue: $X } }
+        ordersByCreatedDate: {}, // { 'YYYY-MM-DD': count }
+        ordersByDueDate: {}, // { 'YYYY-MM-DD': count }
+        ordersByDueTime: {}, // { 'HH:00': count }
+        customerOrders: {}, // { customerName: { count: N, totalSpent: $X, addresses: [] } }
+        orderTypes: {}, // { 'DELIVERY': count, 'PICKUP': count }
+        deliveryOrders: [] // For thank you cards: { date, name, address, total }
+      };
+
+      orders.forEach(order => {
+        // Total sales and tips
+        const total = parseFloat(order.total) || 0;
+        const tip = parseFloat(order.tip) || 0;
+        analytics.totalSales += total;
+        analytics.totalTips += tip;
+
+        // Items breakdown
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach(item => {
+            const itemName = item.name || 'Unknown Item';
+            const quantity = parseInt(item.quantity) || 1;
+            const price = parseFloat(item.price) || 0;
+
+            if (!analytics.itemCounts[itemName]) {
+              analytics.itemCounts[itemName] = { quantity: 0, revenue: 0 };
+            }
+            analytics.itemCounts[itemName].quantity += quantity;
+            analytics.itemCounts[itemName].revenue += (price * quantity);
+          });
+        }
+
+        // Orders by created date
+        const createdDate = order.created_at ? order.created_at.split('T')[0] : 'Unknown';
+        analytics.ordersByCreatedDate[createdDate] = (analytics.ordersByCreatedDate[createdDate] || 0) + 1;
+
+        // Orders by due date
+        const dueDate = order.delivery_date || 'Unknown';
+        analytics.ordersByDueDate[dueDate] = (analytics.ordersByDueDate[dueDate] || 0) + 1;
+
+        // Orders by due time (group by hour)
+        if (order.delivery_time) {
+          const hour = order.delivery_time.substring(0, 2); // HH from HH:MM:SS
+          const timeSlot = `${hour}:00`;
+          analytics.ordersByDueTime[timeSlot] = (analytics.ordersByDueTime[timeSlot] || 0) + 1;
+        }
+
+        // Customer analysis
+        const customerName = order.customer_name || 'Unknown Customer';
+        if (!analytics.customerOrders[customerName]) {
+          analytics.customerOrders[customerName] = { count: 0, totalSpent: 0, addresses: new Set() };
+        }
+        analytics.customerOrders[customerName].count += 1;
+        analytics.customerOrders[customerName].totalSpent += total;
+        if (order.delivery_address) {
+          analytics.customerOrders[customerName].addresses.add(order.delivery_address);
+        }
+
+        // Order types
+        const orderType = order.order_type || 'UNKNOWN';
+        analytics.orderTypes[orderType] = (analytics.orderTypes[orderType] || 0) + 1;
+
+        // Thank you card list (delivery orders with addresses)
+        if (order.delivery_address && order.customer_name) {
+          analytics.deliveryOrders.push({
+            date: order.delivery_date || order.created_at?.split('T')[0] || 'Unknown',
+            name: order.customer_name,
+            address: order.delivery_address,
+            total: total
+          });
+        }
+      });
+
+      return analytics;
+    }
+
+    // Render the complete analytics dashboard
+    function renderAnalyticsDashboard(analytics, startDate, endDate, orders) {
+      const resultsContainer = document.getElementById('analyticsResults');
+
+      let html = '';
+
+      // KEY METRICS CARDS
+      html += `
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
+          <div style="background: white; border: 2px solid var(--gray-300); padding: 20px; text-align: center;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">TOTAL ORDERS</div>
+            <div style="font-size: 32px; font-weight: 700; color: var(--gray-900);">${analytics.totalOrders}</div>
+          </div>
+          <div style="background: white; border: 2px solid var(--gray-300); padding: 20px; text-align: center;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">TOTAL SALES</div>
+            <div style="font-size: 32px; font-weight: 700; color: #059669;">$${analytics.totalSales.toFixed(2)}</div>
+          </div>
+          <div style="background: white; border: 2px solid var(--gray-300); padding: 20px; text-align: center;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">TOTAL TIPS</div>
+            <div style="font-size: 32px; font-weight: 700; color: var(--primary-blue);">$${analytics.totalTips.toFixed(2)}</div>
+          </div>
+          <div style="background: white; border: 2px solid var(--gray-300); padding: 20px; text-align: center;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">AVG ORDER VALUE</div>
+            <div style="font-size: 32px; font-weight: 700; color: var(--gray-700);">$${(analytics.totalSales / analytics.totalOrders).toFixed(2)}</div>
+          </div>
+        </div>
+      `;
+
+      // ITEMS BREAKDOWN TABLE
+      const sortedItems = Object.entries(analytics.itemCounts)
+        .sort((a, b) => b[1].quantity - a[1].quantity);
+
+      if (sortedItems.length > 0) {
+        html += `
+          <div style="background: white; border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+            <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">ITEMS ORDERED (SORTED BY QUANTITY)</h3>
+            <div style="overflow-x: auto; border: 2px solid var(--gray-300);">
+              <table style="width: 100%; border-collapse: collapse; background: white;">
+                <thead>
+                  <tr style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
+                    <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ITEM NAME</th>
+                    <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">QUANTITY</th>
+                    <th style="padding: 12px; text-align: right; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">REVENUE</th>
+                  </tr>
+                </thead>
+                <tbody>
+        `;
+
+        sortedItems.forEach(([itemName, data]) => {
+          html += `
+            <tr style="border-bottom: 1px solid var(--gray-200);">
+              <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${itemName}</td>
+              <td style="padding: 12px; text-align: center; font-size: 13px; font-weight: 600; color: var(--gray-900);">${data.quantity}</td>
+              <td style="padding: 12px; text-align: right; font-size: 13px; font-weight: 600; color: #059669;">$${data.revenue.toFixed(2)}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      // BUSIEST DAYS ANALYSIS (Orders Created & Orders Due)
+      html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">`;
+
+      // Busiest days - orders created
+      const sortedCreatedDates = Object.entries(analytics.ordersByCreatedDate)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      html += `
+        <div style="background: white; border: 2px solid var(--gray-300); padding: 20px;">
+          <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">BUSIEST DAYS (ORDERS CREATED)</h3>
+          <div style="overflow-x: auto; border: 2px solid var(--gray-300);">
+            <table style="width: 100%; border-collapse: collapse; background: white;">
+              <thead>
+                <tr style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
+                  <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">DATE</th>
+                  <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ORDERS</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      sortedCreatedDates.forEach(([date, count]) => {
+        html += `
+          <tr style="border-bottom: 1px solid var(--gray-200);">
+            <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${date}</td>
+            <td style="padding: 12px; text-align: center; font-size: 13px; font-weight: 600; color: var(--gray-900);">${count}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      // Busiest days - orders due
+      const sortedDueDates = Object.entries(analytics.ordersByDueDate)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      html += `
+        <div style="background: white; border: 2px solid var(--gray-300); padding: 20px;">
+          <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">BUSIEST DAYS (ORDERS DUE)</h3>
+          <div style="overflow-x: auto; border: 2px solid var(--gray-300);">
+            <table style="width: 100%; border-collapse: collapse; background: white;">
+              <thead>
+                <tr style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
+                  <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">DATE</th>
+                  <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ORDERS</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      sortedDueDates.forEach(([date, count]) => {
+        html += `
+          <tr style="border-bottom: 1px solid var(--gray-200);">
+            <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${date}</td>
+            <td style="padding: 12px; text-align: center; font-size: 13px; font-weight: 600; color: var(--gray-900);">${count}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      html += `</div>`; // Close grid
+
+      // BUSIEST TIMES (Orders Due)
+      const sortedTimes = Object.entries(analytics.ordersByDueTime)
+        .sort((a, b) => b[1] - a[1]);
+
+      if (sortedTimes.length > 0) {
+        html += `
+          <div style="background: white; border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+            <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">BUSIEST TIMES (ORDERS DUE)</h3>
+            <div style="overflow-x: auto; border: 2px solid var(--gray-300);">
+              <table style="width: 100%; border-collapse: collapse; background: white;">
+                <thead>
+                  <tr style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
+                    <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">TIME SLOT</th>
+                    <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ORDERS</th>
+                  </tr>
+                </thead>
+                <tbody>
+        `;
+
+        sortedTimes.forEach(([time, count]) => {
+          html += `
+            <tr style="border-bottom: 1px solid var(--gray-200);">
+              <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${time}</td>
+              <td style="padding: 12px; text-align: center; font-size: 13px; font-weight: 600; color: var(--gray-900);">${count}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      // TOP REPEAT CUSTOMERS
+      const sortedCustomers = Object.entries(analytics.customerOrders)
+        .map(([name, data]) => ({
+          name,
+          count: data.count,
+          totalSpent: data.totalSpent,
+          addresses: Array.from(data.addresses)
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
+
+      if (sortedCustomers.length > 0) {
+        html += `
+          <div style="background: white; border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+            <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">TOP REPEAT CUSTOMERS</h3>
+            <div style="overflow-x: auto; border: 2px solid var(--gray-300);">
+              <table style="width: 100%; border-collapse: collapse; background: white;">
+                <thead>
+                  <tr style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
+                    <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">CUSTOMER NAME</th>
+                    <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ORDERS</th>
+                    <th style="padding: 12px; text-align: right; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">TOTAL SPENT</th>
+                  </tr>
+                </thead>
+                <tbody>
+        `;
+
+        sortedCustomers.forEach(customer => {
+          html += `
+            <tr style="border-bottom: 1px solid var(--gray-200);">
+              <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${customer.name}</td>
+              <td style="padding: 12px; text-align: center; font-size: 13px; font-weight: 600; color: var(--gray-900);">${customer.count}</td>
+              <td style="padding: 12px; text-align: right; font-size: 13px; font-weight: 600; color: #059669;">$${customer.totalSpent.toFixed(2)}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      // THANK YOU CARD LIST (3 columns: Date, Name, Address)
+      const sortedDeliveries = analytics.deliveryOrders.sort((a, b) => a.date.localeCompare(b.date));
+
+      if (sortedDeliveries.length > 0) {
+        html += `
+          <div style="background: white; border: 2px solid var(--gray-300); padding: 20px; margin-bottom: 20px;">
+            <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; color: var(--gray-900); text-transform: uppercase; letter-spacing: 1px;">THANK YOU CARD LIST (DELIVERY ORDERS)</h3>
+            <div style="overflow-x: auto; border: 2px solid var(--gray-300);">
+              <table style="width: 100%; border-collapse: collapse; background: white;">
+                <thead>
+                  <tr style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
+                    <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">DATE</th>
+                    <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">CUSTOMER NAME</th>
+                    <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ADDRESS</th>
+                  </tr>
+                </thead>
+                <tbody>
+        `;
+
+        sortedDeliveries.forEach(order => {
+          html += `
+            <tr style="border-bottom: 1px solid var(--gray-200);">
+              <td style="padding: 12px; font-size: 13px; color: var(--gray-700); white-space: nowrap;">${order.date}</td>
+              <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${order.name}</td>
+              <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${order.address}</td>
+            </tr>
+          `;
+        });
+
+        html += `
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      resultsContainer.innerHTML = html;
     }
 
     // ============================================
