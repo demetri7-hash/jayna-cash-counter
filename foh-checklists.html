@@ -1968,6 +1968,12 @@
     const handleSubmit = async () => {
       const enteredPassword = passwordInput.value;
 
+      // DEBUG: Log what we're checking
+      console.log('🔍 Password validation debug:');
+      console.log('  Entered password:', enteredPassword);
+      console.log('  ADMIN_PASSWORD:', ADMIN_PASSWORD);
+      console.log('  Match with ADMIN_PASSWORD:', enteredPassword === ADMIN_PASSWORD);
+
       // Get master password from Supabase (cloud-based)
       let masterPassword = ADMIN_PASSWORD;
       try {
@@ -1981,11 +1987,15 @@
 
         if (masterPwdData && masterPwdData.full_name) {
           masterPassword = masterPwdData.full_name;
+          console.log('  Master password from DB:', masterPassword);
         }
       } catch (error) {
         // No custom master password set, use default
-        console.log('Using default master password');
+        console.log('  Using default master password (no DB override)');
       }
+
+      console.log('  Final master password:', masterPassword);
+      console.log('  Match with master:', enteredPassword === masterPassword);
 
       // Check master password OR default password (fallback always works)
       if (enteredPassword === masterPassword || enteredPassword === ADMIN_PASSWORD) {
