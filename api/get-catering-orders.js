@@ -90,6 +90,7 @@ export default async function handler(req, res) {
       source: order.source_type,
       source_system: order.source_system, // 'TOAST' or 'EZCATER'
       business_date: order.business_date,
+      created_in_toast_at: order.created_in_toast_at, // Order creation timestamp
       headcount: order.headcount,
       total: order.total_amount,
       status: order.status,

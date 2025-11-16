@@ -1690,42 +1690,37 @@
           });
         }
 
-        // Orders by created day of week
-        // Use business_date as proxy for "when order was created"
-        // (created_in_toast_at not available in /api/get-catering-orders response)
-        const createdField = order.business_date || order.delivery_date;
-
-        if (createdField) {
+        // Orders by created day of week (when customer PLACED the order)
+        if (order.created_in_toast_at) {
           if (orderCounter === 1) {
-            console.log(`✅ Using business_date for "Orders Created": ${createdField}`);
+            console.log(`✅ Using created_in_toast_at for "Orders Created": ${order.created_in_toast_at}`);
           }
 
           try {
-            let year, month, day;
+            // created_in_toast_at is ISO 8601: "2025-11-11T14:58:00+00:00"
+            // Convert to Pacific timezone to get the day of week
+            const createdDate = new Date(order.created_in_toast_at);
+            const dayOfWeek = createdDate.toLocaleDateString('en-US', {
+              timeZone: 'America/Los_Angeles',
+              weekday: 'long'
+            });
 
-            // business_date is a NUMBER in YYYYMMDD format (e.g., 20251104)
-            if (typeof createdField === 'number') {
-              const dateStr = createdField.toString(); // "20251104"
-              year = parseInt(dateStr.substring(0, 4));  // 2025
-              month = parseInt(dateStr.substring(4, 6)); // 11
-              day = parseInt(dateStr.substring(6, 8));   // 04
-            } else {
-              // Fallback: delivery_date is a string "YYYY-MM-DD"
-              [year, month, day] = createdField.split('-').map(Number);
-            }
-
-            const dateObj = new Date(year, month - 1, day);
-            const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
             analytics.ordersByCreatedDayOfWeek[dayOfWeek] = (analytics.ordersByCreatedDayOfWeek[dayOfWeek] || 0) + 1;
 
             if (orderCounter === 1) {
-              console.log(`   → Parsed to: ${dayOfWeek}, ${month}/${day}/${year}`);
+              const dateStr = createdDate.toLocaleDateString('en-US', {
+                timeZone: 'America/Los_Angeles',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+              });
+              console.log(`   → Created on: ${dayOfWeek}, ${dateStr}`);
             }
           } catch (error) {
-            console.error('Error parsing business_date:', createdField, error);
+            console.error('Error parsing created_in_toast_at:', order.created_in_toast_at, error);
           }
         } else if (orderCounter === 1) {
-          console.warn('⚠️ NO business_date field found in order');
+          console.warn('⚠️ NO created_in_toast_at field found in order');
         }
 
         // Orders by due day of week
