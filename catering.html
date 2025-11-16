@@ -1251,14 +1251,16 @@
         if (showLoadingSpinner) {
           hideLoading();
         }
-        container.innerHTML = `
-          <div class="error-message">
-            ❌ Error loading past orders from database: ${error.message}
-            <br><br>
-            Please try again.
-          </div>
-          <button class="refresh-btn" onclick="loadPastOrders()">🔄 TRY AGAIN</button>
-        `;
+        if (container) {
+          container.innerHTML = `
+            <div class="error-message">
+              ❌ Error loading past orders from database: ${error.message}
+              <br><br>
+              Please try again.
+            </div>
+            <button class="refresh-btn" onclick="loadPastOrders()">🔄 TRY AGAIN</button>
+          `;
+        }
       }
     }
 
@@ -1325,7 +1327,7 @@
         dayOrders.sort((a, b) => (a.delivery_time || '').localeCompare(b.delivery_time || ''));
 
         dayOrders.forEach(order => {
-          const timeStr = order.delivery_time ? formatTime12Hour(order.delivery_time) : 'No time';
+          const timeStr = order.delivery_time ? formatPacificTime(order.delivery_time) : 'No time';
           const orderType = order.order_type || 'PICKUP';
           const orderTypeColor = orderType === 'DELIVERY' ? 'var(--warning-text)' : 'var(--blue-text)';
           const orderTypeBg = orderType === 'DELIVERY' ? 'var(--warning-bg)' : 'var(--blue-bg)';
