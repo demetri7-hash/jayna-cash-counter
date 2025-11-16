@@ -1658,6 +1658,17 @@
       orders.forEach(order => {
         orderCounter++;
 
+        // DEBUG: Log first order's fields to see what creation date fields exist
+        if (orderCounter === 1) {
+          console.log('🔍 First order fields:', {
+            created_at: order.created_at,
+            created_in_toast_at: order.created_in_toast_at,
+            delivery_date: order.delivery_date,
+            delivery_time: order.delivery_time,
+            allKeys: Object.keys(order)
+          });
+        }
+
         // Total sales and tips
         const total = parseFloat(order.total) || 0;
         const tip = parseFloat(order.tip) || 0;
@@ -1679,13 +1690,25 @@
           });
         }
 
-        // Orders by created day of week
-        if (order.created_in_toast_at) {
-          const createdDate = order.created_in_toast_at.split('T')[0];
-          const [year, month, day] = createdDate.split('-').map(Number);
-          const dateObj = new Date(year, month - 1, day);
-          const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-          analytics.ordersByCreatedDayOfWeek[dayOfWeek] = (analytics.ordersByCreatedDayOfWeek[dayOfWeek] || 0) + 1;
+        // Orders by created day of week - try multiple possible field names
+        const createdField = order.created_in_toast_at || order.created_at || order.created_date || order.order_date;
+
+        if (createdField) {
+          if (orderCounter === 1) {
+            console.log(`✅ Using creation date field: ${createdField}`);
+          }
+
+          try {
+            const createdDate = createdField.split('T')[0].split(' ')[0]; // Handle both ISO and SQL formats
+            const [year, month, day] = createdDate.split('-').map(Number);
+            const dateObj = new Date(year, month - 1, day);
+            const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+            analytics.ordersByCreatedDayOfWeek[dayOfWeek] = (analytics.ordersByCreatedDayOfWeek[dayOfWeek] || 0) + 1;
+          } catch (error) {
+            console.error('Error parsing created date:', createdField, error);
+          }
+        } else if (orderCounter === 1) {
+          console.warn('⚠️ NO creation date field found in order');
         }
 
         // Orders by due day of week
