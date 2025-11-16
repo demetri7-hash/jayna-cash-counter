@@ -1646,9 +1646,9 @@
         totalSales: 0,
         totalTips: 0,
         itemCounts: {}, // { itemName: { quantity: N, revenue: $X } }
-        ordersByCreatedDate: {}, // { 'YYYY-MM-DD': count }
-        ordersByDueDate: {}, // { 'YYYY-MM-DD': count }
-        ordersByDueTime: {}, // { 'HH:00': count }
+        ordersByCreatedDayOfWeek: {}, // { 'Monday': count, 'Tuesday': count, ... }
+        ordersByDueDayOfWeek: {}, // { 'Monday': count, 'Tuesday': count, ... }
+        ordersByDueTime: {}, // { '11:00 AM': count, '12:00 PM': count, ... }
         customerOrders: {}, // { customerName: { count: N, totalSpent: $X, addresses: [] } }
         orderTypes: {}, // { 'DELIVERY': count, 'PICKUP': count }
         deliveryOrders: [] // For thank you cards: { date, name, address, total }
@@ -1676,18 +1676,34 @@
           });
         }
 
-        // Orders by created date
-        const createdDate = order.created_at ? order.created_at.split('T')[0] : 'Unknown';
-        analytics.ordersByCreatedDate[createdDate] = (analytics.ordersByCreatedDate[createdDate] || 0) + 1;
+        // Orders by created day of week
+        if (order.created_at) {
+          const createdDate = order.created_at.split('T')[0];
+          const [year, month, day] = createdDate.split('-').map(Number);
+          const dateObj = new Date(year, month - 1, day);
+          const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+          analytics.ordersByCreatedDayOfWeek[dayOfWeek] = (analytics.ordersByCreatedDayOfWeek[dayOfWeek] || 0) + 1;
+        }
 
-        // Orders by due date
-        const dueDate = order.delivery_date || 'Unknown';
-        analytics.ordersByDueDate[dueDate] = (analytics.ordersByDueDate[dueDate] || 0) + 1;
+        // Orders by due day of week
+        if (order.delivery_date) {
+          const [year, month, day] = order.delivery_date.split('-').map(Number);
+          const dateObj = new Date(year, month - 1, day);
+          const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+          analytics.ordersByDueDayOfWeek[dayOfWeek] = (analytics.ordersByDueDayOfWeek[dayOfWeek] || 0) + 1;
+        }
 
-        // Orders by due time (group by hour)
+        // Orders by due time (group by hour in 12-hour format)
         if (order.delivery_time) {
-          const hour = order.delivery_time.substring(0, 2); // HH from HH:MM:SS
-          const timeSlot = `${hour}:00`;
+          // Parse time - could be HH:MM:SS or HH:MM format
+          const timeParts = order.delivery_time.split(':');
+          const hour24 = parseInt(timeParts[0]);
+
+          // Convert to 12-hour format
+          const hour12 = hour24 === 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24);
+          const ampm = hour24 >= 12 ? 'PM' : 'AM';
+          const timeSlot = `${hour12}:00 ${ampm}`;
+
           analytics.ordersByDueTime[timeSlot] = (analytics.ordersByDueTime[timeSlot] || 0) + 1;
         }
 
@@ -1789,10 +1805,18 @@
       // BUSIEST DAYS ANALYSIS (Orders Created & Orders Due)
       html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">`;
 
-      // Busiest days - orders created
-      const sortedCreatedDates = Object.entries(analytics.ordersByCreatedDate)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
+      // Helper to sort days of week (Sunday-Saturday)
+      const dayOrder = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+      const sortByDayOfWeek = (entries) => {
+        return entries.sort((a, b) => {
+          const orderA = dayOrder[a[0]] !== undefined ? dayOrder[a[0]] : 999;
+          const orderB = dayOrder[b[0]] !== undefined ? dayOrder[b[0]] : 999;
+          return orderA - orderB;
+        });
+      };
+
+      // Busiest days - orders created (by day of week)
+      const sortedCreatedDays = sortByDayOfWeek(Object.entries(analytics.ordersByCreatedDayOfWeek));
 
       html += `
         <div style="background: white; border: 2px solid var(--gray-300); padding: 20px;">
@@ -1801,17 +1825,17 @@
             <table style="width: 100%; border-collapse: collapse; background: white;">
               <thead>
                 <tr style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
-                  <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">DATE</th>
+                  <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">DAY OF WEEK</th>
                   <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ORDERS</th>
                 </tr>
               </thead>
               <tbody>
       `;
 
-      sortedCreatedDates.forEach(([date, count]) => {
+      sortedCreatedDays.forEach(([day, count]) => {
         html += `
           <tr style="border-bottom: 1px solid var(--gray-200);">
-            <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${date}</td>
+            <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${day}</td>
             <td style="padding: 12px; text-align: center; font-size: 13px; font-weight: 600; color: var(--gray-900);">${count}</td>
           </tr>
         `;
@@ -1824,10 +1848,8 @@
         </div>
       `;
 
-      // Busiest days - orders due
-      const sortedDueDates = Object.entries(analytics.ordersByDueDate)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
+      // Busiest days - orders due (by day of week)
+      const sortedDueDays = sortByDayOfWeek(Object.entries(analytics.ordersByDueDayOfWeek));
 
       html += `
         <div style="background: white; border: 2px solid var(--gray-300); padding: 20px;">
@@ -1836,17 +1858,17 @@
             <table style="width: 100%; border-collapse: collapse; background: white;">
               <thead>
                 <tr style="background: var(--gray-100); border-bottom: 2px solid var(--gray-300);">
-                  <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">DATE</th>
+                  <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">DAY OF WEEK</th>
                   <th style="padding: 12px; text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px;">ORDERS</th>
                 </tr>
               </thead>
               <tbody>
       `;
 
-      sortedDueDates.forEach(([date, count]) => {
+      sortedDueDays.forEach(([day, count]) => {
         html += `
           <tr style="border-bottom: 1px solid var(--gray-200);">
-            <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${date}</td>
+            <td style="padding: 12px; font-size: 13px; color: var(--gray-700);">${day}</td>
             <td style="padding: 12px; text-align: center; font-size: 13px; font-weight: 600; color: var(--gray-900);">${count}</td>
           </tr>
         `;
@@ -1861,9 +1883,18 @@
 
       html += `</div>`; // Close grid
 
-      // BUSIEST TIMES (Orders Due)
+      // BUSIEST TIMES (Orders Due) - Sort chronologically
       const sortedTimes = Object.entries(analytics.ordersByDueTime)
-        .sort((a, b) => b[1] - a[1]);
+        .sort((a, b) => {
+          // Parse time strings like "11:00 AM" or "8:00 PM"
+          const parseTime = (timeStr) => {
+            const [time, ampm] = timeStr.split(' ');
+            const hour = parseInt(time.split(':')[0]);
+            const hour24 = ampm === 'PM' ? (hour === 12 ? 12 : hour + 12) : (hour === 12 ? 0 : hour);
+            return hour24;
+          };
+          return parseTime(a[0]) - parseTime(b[0]);
+        });
 
       if (sortedTimes.length > 0) {
         html += `
