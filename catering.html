@@ -1695,16 +1695,33 @@
 
         // Orders by due time (group by hour in 12-hour format)
         if (order.delivery_time) {
-          // Parse time - could be HH:MM:SS or HH:MM format
-          const timeParts = order.delivery_time.split(':');
-          const hour24 = parseInt(timeParts[0]);
+          try {
+            // Parse time - handle multiple formats
+            let timeStr = order.delivery_time.toString().trim();
 
-          // Convert to 12-hour format
-          const hour12 = hour24 === 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24);
-          const ampm = hour24 >= 12 ? 'PM' : 'AM';
-          const timeSlot = `${hour12}:00 ${ampm}`;
+            // If it's a full timestamp (YYYY-MM-DD HH:MM:SS), extract just time part
+            if (timeStr.includes(' ')) {
+              timeStr = timeStr.split(' ')[1]; // Get "HH:MM:SS" part
+            }
 
-          analytics.ordersByDueTime[timeSlot] = (analytics.ordersByDueTime[timeSlot] || 0) + 1;
+            // Now parse HH:MM:SS or HH:MM
+            const timeParts = timeStr.split(':');
+            const hour24 = parseInt(timeParts[0]);
+
+            // Validate hour is in valid range
+            if (hour24 >= 0 && hour24 <= 23) {
+              // Convert to 12-hour format
+              const hour12 = hour24 === 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24);
+              const ampm = hour24 >= 12 ? 'PM' : 'AM';
+              const timeSlot = `${hour12}:00 ${ampm}`;
+
+              analytics.ordersByDueTime[timeSlot] = (analytics.ordersByDueTime[timeSlot] || 0) + 1;
+            } else {
+              console.warn('Invalid hour in delivery_time:', order.delivery_time);
+            }
+          } catch (error) {
+            console.warn('Error parsing delivery_time:', order.delivery_time, error);
+          }
         }
 
         // Customer analysis
