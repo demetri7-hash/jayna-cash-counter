@@ -1690,25 +1690,27 @@
           });
         }
 
-        // Orders by created day of week - try multiple possible field names
-        const createdField = order.created_in_toast_at || order.created_at || order.created_date || order.order_date;
+        // Orders by created day of week
+        // Use business_date as proxy for "when order was created"
+        // (created_in_toast_at not available in /api/get-catering-orders response)
+        const createdField = order.business_date || order.delivery_date;
 
         if (createdField) {
           if (orderCounter === 1) {
-            console.log(`✅ Using creation date field: ${createdField}`);
+            console.log(`✅ Using business_date for "Orders Created": ${createdField}`);
           }
 
           try {
-            const createdDate = createdField.split('T')[0].split(' ')[0]; // Handle both ISO and SQL formats
-            const [year, month, day] = createdDate.split('-').map(Number);
+            // business_date is already in YYYY-MM-DD format
+            const [year, month, day] = createdField.split('-').map(Number);
             const dateObj = new Date(year, month - 1, day);
             const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
             analytics.ordersByCreatedDayOfWeek[dayOfWeek] = (analytics.ordersByCreatedDayOfWeek[dayOfWeek] || 0) + 1;
           } catch (error) {
-            console.error('Error parsing created date:', createdField, error);
+            console.error('Error parsing business_date:', createdField, error);
           }
         } else if (orderCounter === 1) {
-          console.warn('⚠️ NO creation date field found in order');
+          console.warn('⚠️ NO business_date field found in order');
         }
 
         // Orders by due day of week
