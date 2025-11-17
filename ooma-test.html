@@ -146,6 +146,32 @@
         }, null, 2);
         logDiv.appendChild(logEntry);
 
+        // Extract phone number from ?q= parameter
+        const phoneNumber = params.get('q');
+
+        if (phoneNumber) {
+            // Send to caller ID API to queue for Toast
+            fetch('/api/ooma-caller-id?number=' + encodeURIComponent(phoneNumber), {
+                method: 'GET'
+            })
+            .then(response => response.json())
+            .then(data => {
+                const successDiv = document.createElement('div');
+                successDiv.className = 'label';
+                successDiv.style.color = '#00ff00';
+                successDiv.textContent = '✅ Phone number sent to Toast queue: ' + phoneNumber;
+                logDiv.appendChild(successDiv);
+                console.log('Caller ID queued:', data);
+            })
+            .catch(err => {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'label';
+                errorDiv.style.color = '#ff0000';
+                errorDiv.textContent = '❌ Failed to queue caller ID: ' + err.message;
+                logDiv.appendChild(errorDiv);
+            });
+        }
+
         // Also send to API for server-side logging
         fetch('/api/ooma-logger', {
             method: 'POST',
@@ -157,6 +183,7 @@
                 search: window.location.search,
                 hash: window.location.hash,
                 params: Object.fromEntries(params),
+                phoneNumber: phoneNumber,
                 referrer: document.referrer,
                 userAgent: navigator.userAgent
             })
