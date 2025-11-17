@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ooma Caller ID Test Page</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #00ff00;
+            border-bottom: 2px solid #00ff00;
+            padding-bottom: 10px;
+        }
+        .section {
+            background: #2a2a2a;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .label {
+            color: #ffff00;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .data {
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #00ff00;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .timestamp {
+            color: #888;
+            font-size: 12px;
+        }
+        #log {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 OOMA CALLER ID TEST PAGE</h1>
+
+    <div class="section">
+        <h2>📊 PAGE LOADED SUCCESSFULLY</h2>
+        <div class="timestamp">Loaded at: <span id="loadTime"></span></div>
+    </div>
+
+    <div class="section">
+        <h2>🔍 DATA RECEIVED FROM OOMA:</h2>
+
+        <div class="label">Current URL:</div>
+        <div class="data" id="currentUrl"></div>
+
+        <div class="label">Query Parameters:</div>
+        <div class="data" id="queryParams"></div>
+
+        <div class="label">URL Path:</div>
+        <div class="data" id="urlPath"></div>
+
+        <div class="label">Hash Fragment:</div>
+        <div class="data" id="hashFragment"></div>
+
+        <div class="label">Referrer:</div>
+        <div class="data" id="referrer"></div>
+
+        <div class="label">User Agent:</div>
+        <div class="data" id="userAgent"></div>
+    </div>
+
+    <div class="section">
+        <h2>📝 REQUEST LOG:</h2>
+        <div id="log"></div>
+    </div>
+
+    <div class="section">
+        <h2>💡 INSTRUCTIONS:</h2>
+        <div class="data">
+1. Use this URL in Ooma Desktop App:
+   https://jayna-cash-counter.vercel.app/ooma-test.html
+
+2. Or try variations like:
+   https://jayna-cash-counter.vercel.app/ooma-test.html/PHONE_NUMBER
+   https://jayna-cash-counter.vercel.app/ooma-test.html#PHONE_NUMBER
+
+3. Make a test call and see what appears above!
+
+4. Take a screenshot and share with Claude to build proper integration.
+        </div>
+    </div>
+
+    <script>
+        // Log page load time
+        document.getElementById('loadTime').textContent = new Date().toLocaleString();
+
+        // Capture current URL
+        document.getElementById('currentUrl').textContent = window.location.href;
+
+        // Parse query parameters
+        const params = new URLSearchParams(window.location.search);
+        let paramsText = '';
+        if (params.toString()) {
+            params.forEach((value, key) => {
+                paramsText += `${key} = ${value}\n`;
+            });
+        } else {
+            paramsText = 'No query parameters found';
+        }
+        document.getElementById('queryParams').textContent = paramsText;
+
+        // Show URL path
+        document.getElementById('urlPath').textContent = window.location.pathname || '/';
+
+        // Show hash fragment
+        document.getElementById('hashFragment').textContent = window.location.hash || 'None';
+
+        // Show referrer
+        document.getElementById('referrer').textContent = document.referrer || 'None';
+
+        // Show user agent
+        document.getElementById('userAgent').textContent = navigator.userAgent;
+
+        // Log all data
+        const logDiv = document.getElementById('log');
+        const logEntry = document.createElement('div');
+        logEntry.className = 'data';
+        logEntry.textContent = JSON.stringify({
+            timestamp: new Date().toISOString(),
+            url: window.location.href,
+            pathname: window.location.pathname,
+            search: window.location.search,
+            hash: window.location.hash,
+            params: Object.fromEntries(params),
+            referrer: document.referrer
+        }, null, 2);
+        logDiv.appendChild(logEntry);
+
+        // Also send to API for server-side logging
+        fetch('/api/ooma-logger', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                timestamp: new Date().toISOString(),
+                url: window.location.href,
+                pathname: window.location.pathname,
+                search: window.location.search,
+                hash: window.location.hash,
+                params: Object.fromEntries(params),
+                referrer: document.referrer,
+                userAgent: navigator.userAgent
+            })
+        }).catch(err => console.log('Logging failed:', err));
+
+        // Check for POST data (if sent via form)
+        if (window.performance && window.performance.navigation.type === 1) {
+            const postNote = document.createElement('div');
+            postNote.className = 'label';
+            postNote.textContent = '⚠️ Page was POST-refreshed (POST data not accessible via JS)';
+            logDiv.appendChild(postNote);
+        }
+    </script>
+</body>
+</html>
