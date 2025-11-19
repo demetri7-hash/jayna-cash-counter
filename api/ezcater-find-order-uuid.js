@@ -1,6 +1,7 @@
 /**
- * Find EZCater Order UUID from ezManage order number
- * Checks failed events for the order
+ * EZCater Failed Webhook Events Checker
+ * Lists failed webhook delivery attempts in the last 7 days
+ * Updated October 2025 to use correct GraphQL schema fields
  */
 
 export default async function handler(req, res) {
@@ -27,15 +28,21 @@ export default async function handler(req, res) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 7);
 
+    // Updated query with correct field names from schema introspection (Nov 2025)
+    // ExternalEvent fields: entityId, entityType, key, subscriberName, timestamp, externalEventsNotificationAttempts
     const query = `
       query GetFailedEvents($datetimeRange: DatetimeRangeInput!, $parentId: ID!, $parentType: Parent!) {
         failedEvents(datetimeRange: $datetimeRange, parentId: $parentId, parentType: $parentType) {
-          eventEntity
-          eventKey
-          eventId
-          orderId
-          createdAt
-          lastAttemptAt
+          entityId
+          entityType
+          key
+          subscriberName
+          timestamp
+          externalEventsNotificationAttempts {
+            attemptedAt
+            responseCode
+            responseBody
+          }
         }
       }
     `;
@@ -76,14 +83,33 @@ export default async function handler(req, res) {
 
     console.log(`📊 Found ${failedEvents.length} failed webhook events`);
 
+    // Process events for better readability
+    const processedEvents = failedEvents.map(event => ({
+      order_uuid: event.entityId,
+      event_type: event.key,
+      entity_type: event.entityType,
+      subscriber: event.subscriberName,
+      timestamp: event.timestamp,
+      attempts: event.externalEventsNotificationAttempts?.map(attempt => ({
+        attempted_at: attempt.attemptedAt,
+        response_code: attempt.responseCode,
+        response_body: attempt.responseBody
+      })) || [],
+      last_error: event.externalEventsNotificationAttempts?.[0]?.responseBody || 'Unknown'
+    }));
+
     return res.status(200).json({
       success: true,
       totalFailedEvents: failedEvents.length,
-      failedEvents: failedEvents,
+      failedEvents: processedEvents,
+      rawEvents: failedEvents,
       dateRange: {
         start: startDate.toISOString(),
         end: endDate.toISOString()
       },
+      note: failedEvents.length === 0
+        ? '✅ No failed webhook events in the last 7 days'
+        : `⚠️ Found ${failedEvents.length} failed webhook events - check order_uuid to find missing orders`,
       timestamp: new Date().toISOString()
     });
 
