@@ -62,8 +62,8 @@ export default async function handler(req, res) {
         query: query,
         variables: {
           datetimeRange: {
-            start: startDate.toISOString(),
-            end: endDate.toISOString()
+            starting: startDate.toISOString(),
+            ending: endDate.toISOString()
           },
           parentId: CATERER_UUID,
           parentType: 'Caterer'
