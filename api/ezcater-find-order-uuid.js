@@ -39,9 +39,12 @@ export default async function handler(req, res) {
           subscriberName
           timestamp
           externalEventsNotificationAttempts {
-            attemptedAt
+            number
+            startedAt
             responseCode
             responseBody
+            responseReceivedAt
+            successful
           }
         }
       }
@@ -91,11 +94,15 @@ export default async function handler(req, res) {
       subscriber: event.subscriberName,
       timestamp: event.timestamp,
       attempts: event.externalEventsNotificationAttempts?.map(attempt => ({
-        attempted_at: attempt.attemptedAt,
+        attempt_number: attempt.number,
+        started_at: attempt.startedAt,
         response_code: attempt.responseCode,
-        response_body: attempt.responseBody
+        response_body: attempt.responseBody,
+        response_received_at: attempt.responseReceivedAt,
+        successful: attempt.successful
       })) || [],
-      last_error: event.externalEventsNotificationAttempts?.[0]?.responseBody || 'Unknown'
+      last_error: event.externalEventsNotificationAttempts?.[0]?.responseBody || 'Unknown',
+      last_response_code: event.externalEventsNotificationAttempts?.[0]?.responseCode || null
     }));
 
     return res.status(200).json({
