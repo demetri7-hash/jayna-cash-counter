@@ -75,7 +75,9 @@ export default async function handler(req, res) {
     console.log('📋 Subscription-related fields found:', subscriptionFields.map(f => f.name));
 
     // Try to find the most likely subscription listing field
+    // NOTE: 'subscribers' is the actual ezCater field for listing webhook subscriptions
     const possibleFields = [
+      'subscribers',  // This is the actual ezCater field!
       'eventNotificationSubscriptions',
       'subscriptions',
       'webhookSubscriptions',
@@ -106,19 +108,42 @@ export default async function handler(req, res) {
     console.log(`✅ Using subscription field: ${subscriptionFieldName}`);
 
     // STEP 2: Query subscriptions using the discovered field name
-    const subscriptionsQuery = `
-      query ListSubscriptions {
-        ${subscriptionFieldName} {
-          nodes {
+    // Different queries for different field types
+    let subscriptionsQuery;
+
+    if (subscriptionFieldName === 'subscribers') {
+      // The 'subscribers' field has a different schema
+      subscriptionsQuery = `
+        query ListSubscribers {
+          subscribers {
             id
-            eventTypes
-            url
-            active
-            createdAt
+            name
+            webhookUrl
+            subscriptions {
+              eventEntity
+              eventKey
+              parentEntity
+              parentId
+            }
           }
         }
-      }
-    `;
+      `;
+    } else {
+      // Generic subscription query with nodes pattern
+      subscriptionsQuery = `
+        query ListSubscriptions {
+          ${subscriptionFieldName} {
+            nodes {
+              id
+              eventTypes
+              url
+              active
+              createdAt
+            }
+          }
+        }
+      `;
+    }
 
     const subscriptionsResponse = await fetch(apiUrl, {
       method: 'POST',
@@ -141,6 +166,68 @@ export default async function handler(req, res) {
       });
     }
 
+    const webhookUrl = 'https://jayna-cash-counter.vercel.app/api/ezcater-webhook';
+    const CATERER_UUID = 'c78c7e31-fe7c-40eb-8490-3468c99b1b68';
+
+    // Handle different response formats
+    if (subscriptionFieldName === 'subscribers') {
+      // Process 'subscribers' response
+      const allSubscribers = subscriptionsData.data?.subscribers || [];
+      const ourSubscribers = allSubscribers.filter(sub => sub.webhookUrl === webhookUrl);
+
+      console.log(`📊 Found ${allSubscribers.length} total subscribers, ${ourSubscribers.length} with our webhook URL`);
+
+      // Collect subscriptions for our caterer
+      const ourSubscriptions = [];
+      ourSubscribers.forEach(subscriber => {
+        const catererSubscriptions = subscriber.subscriptions?.filter(s =>
+          s.parentId === CATERER_UUID && s.parentEntity === 'Caterer'
+        ) || [];
+        ourSubscriptions.push(...catererSubscriptions.map(s => ({
+          ...s,
+          subscriberId: subscriber.id,
+          subscriberName: subscriber.name
+        })));
+      });
+
+      // Check event coverage
+      const allEventKeys = ourSubscriptions.map(s => s.eventKey);
+      const requiredEvents = ['submitted', 'accepted', 'rejected', 'cancelled'];
+      const missingEvents = requiredEvents.filter(e => !allEventKeys.includes(e));
+
+      return res.json({
+        success: true,
+        field_used: subscriptionFieldName,
+        webhook_url: webhookUrl,
+        caterer_uuid: CATERER_UUID,
+        summary: {
+          total_subscribers: allSubscribers.length,
+          our_subscribers: ourSubscribers.length,
+          total_subscriptions: ourSubscriptions.length,
+          missing_events: missingEvents
+        },
+        subscribers: ourSubscribers,
+        subscriptions: ourSubscriptions,
+        coverage: {
+          submitted: allEventKeys.includes('submitted'),
+          accepted: allEventKeys.includes('accepted'),
+          rejected: allEventKeys.includes('rejected'),
+          cancelled: allEventKeys.includes('cancelled')
+        },
+        health_check: {
+          has_subscribers: ourSubscribers.length > 0,
+          has_subscriptions: ourSubscriptions.length > 0,
+          all_events_covered: missingEvents.length === 0
+        },
+        issues: [
+          ...(ourSubscribers.length === 0 ? ['❌ NO SUBSCRIBERS found with our webhook URL!'] : []),
+          ...(ourSubscriptions.length === 0 ? ['❌ NO SUBSCRIPTIONS found for our caterer!'] : []),
+          ...(missingEvents.length > 0 ? [`⚠️ Missing event types: ${missingEvents.join(', ')}`] : [])
+        ]
+      });
+    }
+
+    // Original code for other subscription field types
     const subscriptions = subscriptionsData.data?.[subscriptionFieldName]?.nodes || [];
 
     console.log(`📊 Found ${subscriptions.length} subscriptions`);
@@ -148,7 +235,6 @@ export default async function handler(req, res) {
     // Check subscription health
     const activeSubscriptions = subscriptions.filter(sub => sub.active);
     const inactiveSubscriptions = subscriptions.filter(sub => !sub.active);
-    const webhookUrl = 'https://jayna-cash-counter.vercel.app/api/ezcater-webhook';
     const wrongUrlSubscriptions = subscriptions.filter(sub => sub.url !== webhookUrl);
 
     // Check event type coverage
