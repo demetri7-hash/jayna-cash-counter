@@ -44,19 +44,21 @@ export default async function handler(req, res) {
     // LOG THE FULL PAYLOAD for debugging
     console.log('📋 Full webhook payload:', JSON.stringify(event, null, 2));
 
-    console.log('Event Type:', event.eventType || event.event_type);
-    console.log('Order ID:', event.orderId || event.order_id);
+    // ezCater webhook payload uses: entity_id (order UUID), key (event type)
+    // NOT orderId/eventType as previously assumed
+    const orderId = event.entity_id || event.orderId || event.order_id;
+    const eventType = event.key || event.eventType || event.event_type;
+
+    console.log('Event Type:', eventType);
+    console.log('Order ID:', orderId);
 
     // Validate event has required fields
-    if (!event.orderId && !event.order_id) {
+    if (!orderId) {
       return res.status(400).json({
         error: 'Invalid webhook payload',
-        details: 'Missing order ID'
+        details: 'Missing order ID (entity_id)'
       });
     }
-
-    const orderId = event.orderId || event.order_id;
-    const eventType = event.eventType || event.event_type;
 
     // Fetch full order details from EZCater API using order(id) query
     const orderDetails = await fetchOrderFromEZCater(orderId);
