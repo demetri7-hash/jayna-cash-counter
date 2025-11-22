@@ -1,6 +1,7 @@
 /**
  * Instagram Contest Vote Sync API
  * Fetches Instagram comments/tags from contest post and syncs votes to database
+ * AUTOMATIC VALIDATION: Only counts tags that match actual schools in database
  *
  * This endpoint should be called periodically (via cron job or manual trigger)
  * to sync Instagram tags with the leaderboard
@@ -29,6 +30,18 @@ export default async function handler(req, res) {
   try {
     console.log('🔄 Starting Instagram vote sync...');
 
+    // Get list of valid schools from database (for validation)
+    const { data: validSchools, error: schoolsError } = await supabase
+      .from('teacher_feast_schools')
+      .select('school_name');
+
+    if (schoolsError) {
+      throw new Error(`Error fetching schools: ${schoolsError.message}`);
+    }
+
+    const validSchoolNames = validSchools.map(s => s.school_name.toLowerCase());
+    console.log(`📋 ${validSchoolNames.length} valid schools in database`);
+
     // Get Instagram post ID from config
     const { data: configData, error: configError } = await supabase
       .from('teacher_feast_config')
@@ -50,14 +63,15 @@ export default async function handler(req, res) {
     }
 
     // Fetch Instagram comments using Instagram Basic Display API or Graph API
-    // Note: You'll need to implement this based on your Instagram API access
     const comments = await fetchInstagramComments(instagramPostId);
 
     console.log(`📥 Fetched ${comments.length} comments from Instagram`);
 
     let newVotesCount = 0;
-    let skippedVotesCount = 0;
+    let skippedDuplicates = 0;
+    let skippedInvalid = 0;
     const processedSchools = new Set();
+    const invalidTags = [];
 
     // Process each comment
     for (const comment of comments) {
@@ -65,17 +79,27 @@ export default async function handler(req, res) {
         // Extract school tags from comment
         const schoolTags = extractSchoolTags(comment.text);
 
-        for (const schoolName of schoolTags) {
+        for (const schoolTag of schoolTags) {
+          // AUTOMATIC VALIDATION: Check if school exists in database
+          const validatedSchool = validateSchoolName(schoolTag, validSchoolNames, validSchools);
+
+          if (!validatedSchool) {
+            console.log(`⚠️ Invalid school tag "${schoolTag}" from @${comment.username} - NOT COUNTED`);
+            invalidTags.push({ tag: schoolTag, username: comment.username });
+            skippedInvalid++;
+            continue; // Skip invalid school
+          }
+
           // Check if this comment has already been processed
           const { data: existingVote } = await supabase
             .from('teacher_feast_votes')
             .select('id')
             .eq('instagram_comment_id', comment.id)
-            .eq('school_name', schoolName)
+            .eq('school_name', validatedSchool)
             .single();
 
           if (existingVote) {
-            skippedVotesCount++;
+            skippedDuplicates++;
             continue; // Skip duplicate
           }
 
@@ -83,7 +107,7 @@ export default async function handler(req, res) {
           const { error: voteError } = await supabase
             .from('teacher_feast_votes')
             .insert([{
-              school_name: schoolName,
+              school_name: validatedSchool,
               vote_type: 'instagram',
               points: 1,
               instagram_username: comment.username,
@@ -92,25 +116,25 @@ export default async function handler(req, res) {
             }]);
 
           if (voteError) {
-            console.error(`❌ Error inserting vote for ${schoolName}:`, voteError);
+            console.error(`❌ Error inserting vote for ${validatedSchool}:`, voteError);
             continue;
           }
 
           // Increment school votes using RPC function
           const { error: incrementError } = await supabase
             .rpc('increment_school_votes', {
-              school_name_param: schoolName,
+              school_name_param: validatedSchool,
               points_param: 1
             });
 
           if (incrementError) {
-            console.error(`❌ Error incrementing votes for ${schoolName}:`, incrementError);
+            console.error(`❌ Error incrementing votes for ${validatedSchool}:`, incrementError);
             continue;
           }
 
           newVotesCount++;
-          processedSchools.add(schoolName);
-          console.log(`✅ Added 1 vote for ${schoolName} from @${comment.username}`);
+          processedSchools.add(validatedSchool);
+          console.log(`✅ Added 1 vote for ${validatedSchool} from @${comment.username}`);
         }
       } catch (error) {
         console.error(`❌ Error processing comment ${comment.id}:`, error);
@@ -125,8 +149,10 @@ export default async function handler(req, res) {
       stats: {
         total_comments_processed: comments.length,
         new_votes_added: newVotesCount,
-        duplicate_votes_skipped: skippedVotesCount,
-        schools_updated: Array.from(processedSchools)
+        duplicate_votes_skipped: skippedDuplicates,
+        invalid_tags_skipped: skippedInvalid,
+        schools_updated: Array.from(processedSchools),
+        invalid_tags_sample: invalidTags.slice(0, 10) // Show first 10 invalid tags
       }
     });
 
@@ -185,14 +211,56 @@ async function fetchCommentsViaGraphAPI(postId) {
 }
 
 /**
+ * Validate school name against database
+ * Uses fuzzy matching to handle variations
+ *
+ * @param {string} taggedName - School name from Instagram tag
+ * @param {Array} validSchoolNamesLower - Array of lowercase valid school names
+ * @param {Array} validSchools - Array of school objects from database
+ * @returns {string|null} Valid school name or null if not found
+ */
+function validateSchoolName(taggedName, validSchoolNamesLower, validSchools) {
+  const formatted = formatSchoolName(taggedName);
+  const formattedLower = formatted.toLowerCase();
+
+  // Exact match (case-insensitive)
+  const exactIndex = validSchoolNamesLower.indexOf(formattedLower);
+  if (exactIndex !== -1) {
+    return validSchools[exactIndex].school_name;
+  }
+
+  // Fuzzy match: Check if tag contains school name or vice versa
+  for (let i = 0; i < validSchoolNamesLower.length; i++) {
+    const schoolName = validSchoolNamesLower[i];
+
+    // Remove common words for better matching
+    const tagCleaned = formattedLower
+      .replace(/\b(high|middle|elementary|school)\b/g, '')
+      .trim();
+    const schoolCleaned = schoolName
+      .replace(/\b(high|middle|elementary|school)\b/g, '')
+      .trim();
+
+    // Match if core name is the same
+    if (tagCleaned && schoolCleaned && (
+      tagCleaned.includes(schoolCleaned) ||
+      schoolCleaned.includes(tagCleaned)
+    )) {
+      return validSchools[i].school_name;
+    }
+  }
+
+  return null; // No match found - invalid tag
+}
+
+/**
  * Extract school names from comment text
  * Looks for school tags in various formats:
  * - @SchoolName
  * - #SchoolName
- * - School Name (matched against database)
  *
  * @param {string} text - Comment text
- * @returns {Array} Array of school names
+ * @returns {Array} Array of potential school names (still need validation)
  */
 function extractSchoolTags(text) {
   const schools = [];
@@ -202,17 +270,16 @@ function extractSchoolTags(text) {
     .replace(/https?:\/\/[^\s]+/g, '')
     .replace(/[\u{1F600}-\u{1F64F}]/gu, '');
 
-  // Pattern 1: @mentions or #hashtags
+  // Pattern: @mentions or #hashtags
   const tagPattern = /[@#]([a-zA-Z0-9_\s]+)/g;
   let match;
 
   while ((match = tagPattern.exec(cleanText)) !== null) {
     const potentialSchool = match[1].trim();
-    schools.push(formatSchoolName(potentialSchool));
+    if (potentialSchool.length > 2) { // Ignore very short tags
+      schools.push(formatSchoolName(potentialSchool));
+    }
   }
-
-  // Pattern 2: Direct school name mentions (you may need to maintain a list)
-  // This could be enhanced by checking against known school names in database
 
   return [...new Set(schools)]; // Remove duplicates
 }

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jayna Gyro's Great Teacher's Feast - Vote for Your School!</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -682,14 +681,8 @@
     </div>
 
     <script>
-        // Supabase Configuration
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-        const SUPABASE_KEY = 'YOUR_SUPABASE_KEY';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
         // Contest Configuration
         const CONTEST_END_DATE = new Date('2025-12-15T23:59:59-08:00'); // PST
-        const INSTAGRAM_POST_ID = 'YOUR_INSTAGRAM_POST_ID'; // Will need to be configured
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', async () => {
@@ -731,16 +724,13 @@
                 document.getElementById('leaderboard-loading').style.display = 'block';
                 document.getElementById('leaderboard').style.display = 'none';
 
-                // Fetch schools with vote counts
-                const { data: schools, error } = await supabase
-                    .from('teacher_feast_schools')
-                    .select('*')
-                    .order('total_votes', { ascending: false })
-                    .limit(5);
+                // Fetch schools via API
+                const response = await fetch('/api/teacher-feast-leaderboard');
+                const data = await response.json();
 
-                if (error) throw error;
+                if (!data.success) throw new Error(data.error);
 
-                displayLeaderboard(schools);
+                displayLeaderboard(data.schools);
 
                 const now = new Date();
                 document.getElementById('lastUpdated').textContent = now.toLocaleString('en-US', {
@@ -797,15 +787,13 @@
         // Load School Options
         async function loadSchoolOptions() {
             try {
-                const { data: schools, error } = await supabase
-                    .from('teacher_feast_schools')
-                    .select('school_name')
-                    .order('school_name', { ascending: true });
+                const response = await fetch('/api/teacher-feast-schools');
+                const data = await response.json();
 
-                if (error) throw error;
+                if (!data.success) throw new Error(data.error);
 
                 const select = document.getElementById('schoolName');
-                schools.forEach(school => {
+                data.schools.forEach(school => {
                     const option = document.createElement('option');
                     option.value = school.school_name;
                     option.textContent = school.school_name;
@@ -841,26 +829,23 @@
                         full_name: document.getElementById('fullName').value,
                         email: document.getElementById('email').value,
                         phone: document.getElementById('phone').value,
-                        newsletter_signup: document.getElementById('newsletter').checked,
-                        points: 2, // Double points for form submission
-                        vote_type: 'form',
-                        voted_at: new Date().toISOString()
+                        newsletter_signup: document.getElementById('newsletter').checked
                     };
 
-                    // Submit vote
-                    const { data: vote, error: voteError } = await supabase
-                        .from('teacher_feast_votes')
-                        .insert([formData]);
-
-                    if (voteError) throw voteError;
-
-                    // Update school total votes
-                    const { error: updateError } = await supabase.rpc('increment_school_votes', {
-                        school_name_param: formData.school_name,
-                        points_param: 2
+                    // Submit vote via API
+                    const response = await fetch('/api/teacher-feast-vote', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
                     });
 
-                    if (updateError) throw updateError;
+                    const data = await response.json();
+
+                    if (!data.success) {
+                        throw new Error(data.error || 'Error submitting vote');
+                    }
 
                     // Show success message
                     successMsg.style.display = 'block';
@@ -874,7 +859,7 @@
 
                 } catch (error) {
                     console.error('Error submitting vote:', error);
-                    errorMsg.textContent = '❌ Error submitting vote. Please try again.';
+                    errorMsg.textContent = '❌ ' + error.message;
                     errorMsg.style.display = 'block';
                     errorMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 } finally {

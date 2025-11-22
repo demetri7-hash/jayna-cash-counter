@@ -143,19 +143,13 @@ CREATE INDEX IF NOT EXISTS idx_votes_email ON teacher_feast_votes(email);
 CREATE INDEX IF NOT EXISTS idx_votes_instagram_comment ON teacher_feast_votes(instagram_comment_id);
 CREATE INDEX IF NOT EXISTS idx_schools_total_votes ON teacher_feast_schools(total_votes DESC);
 
--- Sample schools (you can add your actual schools here)
-INSERT INTO teacher_feast_schools (school_name, total_votes) VALUES
-    ('Sacramento High School', 0),
-    ('Lincoln Elementary', 0),
-    ('Roosevelt Middle School', 0),
-    ('Washington Elementary', 0),
-    ('Jefferson High School', 0),
-    ('Madison Middle School', 0),
-    ('Monroe Elementary', 0),
-    ('Kennedy High School', 0),
-    ('Adams Elementary', 0),
-    ('Franklin Middle School', 0)
-ON CONFLICT (school_name) DO NOTHING;
+-- Add your Sacramento area schools here
+-- Example:
+-- INSERT INTO teacher_feast_schools (school_name, total_votes) VALUES
+--     ('John F. Kennedy High School', 0),
+--     ('C.K. McClatchy High School', 0),
+--     ('Sacramento High School', 0)
+-- ON CONFLICT (school_name) DO NOTHING;
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE teacher_feast_schools ENABLE ROW LEVEL SECURITY;
