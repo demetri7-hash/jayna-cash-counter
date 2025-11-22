@@ -157,6 +157,13 @@ ALTER TABLE teacher_feast_votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teacher_feast_newsletter ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teacher_feast_config ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (allows re-running script)
+DROP POLICY IF EXISTS "Allow public read access to schools" ON teacher_feast_schools;
+DROP POLICY IF EXISTS "Allow public read access to config" ON teacher_feast_config;
+DROP POLICY IF EXISTS "Allow public insert to votes" ON teacher_feast_votes;
+DROP POLICY IF EXISTS "Allow public read access to votes" ON teacher_feast_votes;
+DROP POLICY IF EXISTS "Allow public insert to newsletter" ON teacher_feast_newsletter;
+
 -- RLS Policies: Allow public read access
 CREATE POLICY "Allow public read access to schools" ON teacher_feast_schools
     FOR SELECT USING (true);
