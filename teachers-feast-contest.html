@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jayna Gyro's Great Teacher's Feast - Vote for Your School!</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header Section */
+        .header {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .logo-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .jayna-logo {
+            max-width: 200px;
+            height: auto;
+        }
+
+        .contest-logo {
+            max-width: 300px;
+            height: auto;
+        }
+
+        h1 {
+            font-size: 42px;
+            font-weight: 700;
+            color: #176F9A;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            line-height: 1.2;
+        }
+
+        .subtitle {
+            font-size: 20px;
+            color: #46B0E4;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .contest-dates {
+            background: #f0f9ff;
+            border: 3px solid #46B0E4;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+
+        .contest-dates h3 {
+            color: #176F9A;
+            font-size: 18px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .contest-dates p {
+            color: #333;
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 5px 0;
+        }
+
+        /* Countdown Timer */
+        .countdown {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .countdown-item {
+            background: #176F9A;
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .countdown-number {
+            font-size: 36px;
+            font-weight: 700;
+            display: block;
+        }
+
+        .countdown-label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 5px;
+        }
+
+        /* Leaderboard Section */
+        .leaderboard-section {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .leaderboard-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .leaderboard-header h2 {
+            font-size: 32px;
+            color: #176F9A;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 10px;
+        }
+
+        .last-updated {
+            color: #666;
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        .leaderboard {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .school-rank {
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 3px solid #46B0E4;
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .school-rank:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(70, 176, 228, 0.3);
+        }
+
+        .school-rank.rank-1 {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            border-color: #FF8C00;
+        }
+
+        .school-rank.rank-1::before {
+            content: '🏆';
+            position: absolute;
+            right: 20px;
+            font-size: 48px;
+            opacity: 0.3;
+        }
+
+        .school-rank.rank-2 {
+            background: linear-gradient(135deg, #C0C0C0 0%, #A9A9A9 100%);
+            border-color: #808080;
+        }
+
+        .school-rank.rank-3 {
+            background: linear-gradient(135deg, #CD7F32 0%, #B87333 100%);
+            border-color: #8B4513;
+        }
+
+        .rank-number {
+            font-size: 42px;
+            font-weight: 700;
+            color: #176F9A;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .rank-1 .rank-number,
+        .rank-2 .rank-number,
+        .rank-3 .rank-number {
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .school-info {
+            flex: 1;
+            margin: 0 20px;
+        }
+
+        .school-name {
+            font-size: 24px;
+            font-weight: 700;
+            color: #176F9A;
+            margin-bottom: 5px;
+        }
+
+        .rank-1 .school-name,
+        .rank-2 .school-name,
+        .rank-3 .school-name {
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .vote-count {
+            font-size: 36px;
+            font-weight: 700;
+            color: #46B0E4;
+            text-align: right;
+            min-width: 100px;
+        }
+
+        .rank-1 .vote-count,
+        .rank-2 .vote-count,
+        .rank-3 .vote-count {
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .vote-label {
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .rank-1 .vote-label,
+        .rank-2 .vote-label,
+        .rank-3 .vote-label {
+            color: rgba(255,255,255,0.9);
+        }
+
+        /* Voting Form Section */
+        .voting-section {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .voting-section h2 {
+            font-size: 32px;
+            color: #176F9A;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 10px;
+        }
+
+        .double-points-badge {
+            background: #FFD700;
+            color: #8B4513;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: inline-block;
+            margin-bottom: 20px;
+            font-size: 16px;
+            border: 3px solid #FF8C00;
+        }
+
+        .form-description {
+            text-align: center;
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .vote-form {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 700;
+            color: #176F9A;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 15px;
+            border: 3px solid #46B0E4;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #176F9A;
+            box-shadow: 0 0 0 3px rgba(70, 176, 228, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            text-transform: none;
+            font-weight: 400;
+            font-size: 14px;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(70, 176, 228, 0.4);
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(70, 176, 228, 0.6);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Contest Rules */
+        .rules-section {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .rules-section h2 {
+            font-size: 28px;
+            color: #176F9A;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 20px;
+        }
+
+        .rules-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .rules-section li {
+            padding: 15px 0;
+            border-bottom: 2px solid #e0f2fe;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .rules-section li:last-child {
+            border-bottom: none;
+        }
+
+        .rules-section li::before {
+            content: '✓';
+            color: #46B0E4;
+            font-weight: 700;
+            font-size: 20px;
+            margin-right: 10px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: white;
+            padding: 30px;
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: white;
+            text-decoration: underline;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #46B0E4;
+            font-size: 18px;
+        }
+
+        .spinner {
+            border: 4px solid #e0f2fe;
+            border-top: 4px solid #46B0E4;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Success Message */
+        .success-message {
+            background: #d1fae5;
+            border: 3px solid #059669;
+            color: #065f46;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            border: 3px solid #dc2626;
+            color: #991b1b;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 28px;
+            }
+
+            .subtitle {
+                font-size: 16px;
+            }
+
+            .contest-logo {
+                max-width: 250px;
+            }
+
+            .jayna-logo {
+                max-width: 150px;
+            }
+
+            .school-rank {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .rank-number {
+                font-size: 32px;
+                margin-bottom: 10px;
+            }
+
+            .school-info {
+                margin: 10px 0;
+            }
+
+            .vote-count {
+                text-align: center;
+            }
+
+            .header,
+            .leaderboard-section,
+            .voting-section,
+            .rules-section {
+                padding: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-container">
+                <img src="jayna-logo.png" alt="Jayna Gyro Sacramento" class="jayna-logo">
+                <img src="feed-educators-contest-logo.png" alt="Feed the Educators" class="contest-logo">
+            </div>
+
+            <h1>Jayna Gyro's Great Teacher's Feast</h1>
+            <p class="subtitle">Vote for Your Favorite School to Win a Catering Feast!</p>
+
+            <div class="contest-dates">
+                <h3>📅 Contest Timeline</h3>
+                <p><strong>Contest Period:</strong> December 1 - December 15, 2025</p>
+                <p><strong>Voting Closes:</strong> December 15, 2025 at 11:59 PM PST</p>
+                <p><strong>Winner Announced:</strong> December 16, 2025</p>
+                <p><strong>Feast Delivered:</strong> When teachers return after Winter Break (January 2026)</p>
+            </div>
+
+            <!-- Countdown Timer -->
+            <div class="countdown" id="countdown">
+                <div class="countdown-item">
+                    <span class="countdown-number" id="days">--</span>
+                    <span class="countdown-label">Days</span>
+                </div>
+                <div class="countdown-item">
+                    <span class="countdown-number" id="hours">--</span>
+                    <span class="countdown-label">Hours</span>
+                </div>
+                <div class="countdown-item">
+                    <span class="countdown-number" id="minutes">--</span>
+                    <span class="countdown-label">Minutes</span>
+                </div>
+                <div class="countdown-item">
+                    <span class="countdown-number" id="seconds">--</span>
+                    <span class="countdown-label">Seconds</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard -->
+        <div class="leaderboard-section">
+            <div class="leaderboard-header">
+                <h2>🏆 Current Rankings</h2>
+                <p class="last-updated">Last updated: <span id="lastUpdated">Loading...</span></p>
+            </div>
+
+            <div id="leaderboard-loading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading leaderboard...</p>
+            </div>
+
+            <div class="leaderboard" id="leaderboard" style="display: none;">
+                <!-- Leaderboard will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Double Points Voting Form -->
+        <div class="voting-section">
+            <h2>📲 Vote Here for Double Points!</h2>
+            <div style="text-align: center;">
+                <span class="double-points-badge">⭐ 2X POINTS ⭐</span>
+            </div>
+            <p class="form-description">
+                Cast your vote here and earn <strong>DOUBLE POINTS</strong> for your school!
+                Plus, you'll be subscribed to Jayna Gyro's newsletter for exclusive offers and updates.
+            </p>
+
+            <div class="success-message" id="successMessage">
+                ✓ Thank you! Your vote has been counted (2 points added)!
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                <!-- Error message will be populated by JavaScript -->
+            </div>
+
+            <form class="vote-form" id="voteForm">
+                <div class="form-group">
+                    <label for="schoolName">Select Your School *</label>
+                    <select id="schoolName" name="schoolName" required>
+                        <option value="">-- Choose a school --</option>
+                        <!-- Schools will be populated dynamically -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="fullName">Full Name *</label>
+                    <input type="text" id="fullName" name="fullName" required placeholder="John Doe">
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email Address *</label>
+                    <input type="email" id="email" name="email" required placeholder="john@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone Number *</label>
+                    <input type="tel" id="phone" name="phone" required placeholder="(555) 123-4567">
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="newsletter" name="newsletter" checked required>
+                    <label for="newsletter">Yes, subscribe me to Jayna Gyro's newsletter for exclusive catering offers and updates! *</label>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    Cast My Vote (2 Points)
+                </button>
+            </form>
+        </div>
+
+        <!-- Instagram Tagging Info -->
+        <div class="voting-section">
+            <h2>📸 Vote on Instagram (1 Point)</h2>
+            <p class="form-description">
+                Tag your school in our Instagram contest post to earn 1 point!
+                Visit <a href="https://instagram.com/jaynagyrosac" target="_blank" style="color: #46B0E4; font-weight: 700;">@jaynagyrosac</a>
+                and tag your school in the comments of our pinned contest post.
+            </p>
+        </div>
+
+        <!-- Contest Rules -->
+        <div class="rules-section">
+            <h2>📋 Contest Rules</h2>
+            <ul>
+                <li>Contest runs from December 1, 2025 through December 15, 2025 at 11:59 PM PST</li>
+                <li>Voting closes midnight PST on December 15, 2025</li>
+                <li>Winner will be announced on December 16, 2025</li>
+                <li>Instagram tags on our contest post = 1 point per tag</li>
+                <li>Form submissions on this page = 2 points per vote</li>
+                <li>Leaderboard updates automatically when page is refreshed</li>
+                <li>Top 5 schools will be displayed on the leaderboard</li>
+                <li>The winning school receives a catering feast for all teachers, delivered when school resumes after Winter Break (January 2026)</li>
+                <li>Feast donated and furnished by Jayna Gyro Sacramento Catering</li>
+                <li>Multiple votes allowed, but each form submission requires valid contact information</li>
+                <li>Newsletter subscription is mandatory for form votes</li>
+                <li>Jayna Gyro reserves the right to verify votes and disqualify fraudulent entries</li>
+            </ul>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Jayna Gyro Sacramento Catering</strong></p>
+            <p>Feeding the educators who feed young minds.</p>
+            <p><a href="https://jaynagyro.com" target="_blank">jaynagyro.com</a></p>
+            <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
+                © 2025 Jayna Gyro. All rights reserved.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Supabase Configuration
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_KEY = 'YOUR_SUPABASE_KEY';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Contest Configuration
+        const CONTEST_END_DATE = new Date('2025-12-15T23:59:59-08:00'); // PST
+        const INSTAGRAM_POST_ID = 'YOUR_INSTAGRAM_POST_ID'; // Will need to be configured
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadLeaderboard();
+            await loadSchoolOptions();
+            startCountdown();
+            setupFormSubmission();
+        });
+
+        // Countdown Timer
+        function startCountdown() {
+            function updateCountdown() {
+                const now = new Date();
+                const timeLeft = CONTEST_END_DATE - now;
+
+                if (timeLeft <= 0) {
+                    document.getElementById('countdown').innerHTML = '<div class="countdown-item"><span class="countdown-number">CONTEST ENDED</span></div>';
+                    return;
+                }
+
+                const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+                document.getElementById('days').textContent = String(days).padStart(2, '0');
+                document.getElementById('hours').textContent = String(hours).padStart(2, '0');
+                document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+                document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+            }
+
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+        }
+
+        // Load Leaderboard
+        async function loadLeaderboard() {
+            try {
+                document.getElementById('leaderboard-loading').style.display = 'block';
+                document.getElementById('leaderboard').style.display = 'none';
+
+                // Fetch schools with vote counts
+                const { data: schools, error } = await supabase
+                    .from('teacher_feast_schools')
+                    .select('*')
+                    .order('total_votes', { ascending: false })
+                    .limit(5);
+
+                if (error) throw error;
+
+                displayLeaderboard(schools);
+
+                const now = new Date();
+                document.getElementById('lastUpdated').textContent = now.toLocaleString('en-US', {
+                    timeZone: 'America/Los_Angeles',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                }) + ' PST';
+
+                document.getElementById('leaderboard-loading').style.display = 'none';
+                document.getElementById('leaderboard').style.display = 'flex';
+
+            } catch (error) {
+                console.error('Error loading leaderboard:', error);
+                document.getElementById('leaderboard-loading').innerHTML =
+                    '<p style="color: #dc2626;">Error loading leaderboard. Please refresh the page.</p>';
+            }
+        }
+
+        // Display Leaderboard
+        function displayLeaderboard(schools) {
+            const leaderboard = document.getElementById('leaderboard');
+            leaderboard.innerHTML = '';
+
+            if (!schools || schools.length === 0) {
+                leaderboard.innerHTML = '<p style="text-align: center; color: #666;">No votes yet. Be the first to vote!</p>';
+                return;
+            }
+
+            schools.forEach((school, index) => {
+                const rank = index + 1;
+                const rankClass = `rank-${rank}`;
+
+                const schoolCard = document.createElement('div');
+                schoolCard.className = `school-rank ${rankClass}`;
+
+                schoolCard.innerHTML = `
+                    <div class="rank-number">#${rank}</div>
+                    <div class="school-info">
+                        <div class="school-name">${school.school_name}</div>
+                    </div>
+                    <div>
+                        <div class="vote-count">${school.total_votes || 0}</div>
+                        <div class="vote-label">Votes</div>
+                    </div>
+                `;
+
+                leaderboard.appendChild(schoolCard);
+            });
+        }
+
+        // Load School Options
+        async function loadSchoolOptions() {
+            try {
+                const { data: schools, error } = await supabase
+                    .from('teacher_feast_schools')
+                    .select('school_name')
+                    .order('school_name', { ascending: true });
+
+                if (error) throw error;
+
+                const select = document.getElementById('schoolName');
+                schools.forEach(school => {
+                    const option = document.createElement('option');
+                    option.value = school.school_name;
+                    option.textContent = school.school_name;
+                    select.appendChild(option);
+                });
+
+            } catch (error) {
+                console.error('Error loading schools:', error);
+            }
+        }
+
+        // Form Submission
+        function setupFormSubmission() {
+            const form = document.getElementById('voteForm');
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const submitBtn = document.getElementById('submitBtn');
+                const successMsg = document.getElementById('successMessage');
+                const errorMsg = document.getElementById('errorMessage');
+
+                // Hide messages
+                successMsg.style.display = 'none';
+                errorMsg.style.display = 'none';
+
+                // Disable button
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Submitting...';
+
+                try {
+                    const formData = {
+                        school_name: document.getElementById('schoolName').value,
+                        full_name: document.getElementById('fullName').value,
+                        email: document.getElementById('email').value,
+                        phone: document.getElementById('phone').value,
+                        newsletter_signup: document.getElementById('newsletter').checked,
+                        points: 2, // Double points for form submission
+                        vote_type: 'form',
+                        voted_at: new Date().toISOString()
+                    };
+
+                    // Submit vote
+                    const { data: vote, error: voteError } = await supabase
+                        .from('teacher_feast_votes')
+                        .insert([formData]);
+
+                    if (voteError) throw voteError;
+
+                    // Update school total votes
+                    const { error: updateError } = await supabase.rpc('increment_school_votes', {
+                        school_name_param: formData.school_name,
+                        points_param: 2
+                    });
+
+                    if (updateError) throw updateError;
+
+                    // Show success message
+                    successMsg.style.display = 'block';
+                    form.reset();
+
+                    // Reload leaderboard
+                    await loadLeaderboard();
+
+                    // Scroll to success message
+                    successMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                } catch (error) {
+                    console.error('Error submitting vote:', error);
+                    errorMsg.textContent = '❌ Error submitting vote. Please try again.';
+                    errorMsg.style.display = 'block';
+                    errorMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Cast My Vote (2 Points)';
+                }
+            });
+        }
+
+        // Auto-refresh leaderboard every 30 seconds
+        setInterval(loadLeaderboard, 30000);
+    </script>
+</body>
+</html>
