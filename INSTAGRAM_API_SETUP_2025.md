@@ -1,7 +1,7 @@
 # Instagram Graph API Setup - Updated 2025 Guide
 
 ## ✅ What You Have
-- Instagram Business Account: **@jaynagyrosac**
+- Instagram Business Account: **@jaynagyro**
 - Instagram Profile ID: **553648130**
 
 ---
@@ -40,7 +40,7 @@ Your Instagram Business account MUST be linked to a Facebook Page:
 1. Go to your **Facebook Page** for Jayna Gyro
 2. Click **Settings** → **Instagram**
 3. Click **"Connect Account"**
-4. Log in with @jaynagyrosac credentials
+4. Log in with @jaynagyro credentials
 5. Authorize the connection
 
 **Don't have a Facebook Page?**
@@ -155,7 +155,7 @@ INSTAGRAM_BUSINESS_ACCOUNT_ID=17841XXXXXXXXX
 
 When you create the contest post:
 
-1. Create post on @jaynagyrosac
+1. Create post on @jaynagyro
 2. Pin to profile
 3. Copy post ID from URL:
    - URL: `https://instagram.com/p/ABC123xyz/`
@@ -268,6 +268,7 @@ I'll guide you through it!
 
 ---
 
-**Updated:** November 21, 2025
+**Updated:** November 22, 2025
 **API Version:** Graph API v22.0 (latest 2025)
 **Token Validity:** 60 days (must refresh)
+**Instagram Account:** @jaynagyro
