@@ -26,6 +26,22 @@ FROM information_schema.columns
 WHERE table_name = 'teacher_feast_schools'
 AND column_name = 'instagram_handles';
 
+-- Add UPDATE policy for schools table (needed for saving Instagram handles)
+DROP POLICY IF EXISTS "Allow public update to schools" ON teacher_feast_schools;
+CREATE POLICY "Allow public update to schools" ON teacher_feast_schools
+    FOR UPDATE USING (true) WITH CHECK (true);
+
+-- Add UPDATE policy for config table (needed for scraper configuration)
+DROP POLICY IF EXISTS "Allow public update to config" ON teacher_feast_config;
+CREATE POLICY "Allow public update to config" ON teacher_feast_config
+    FOR UPDATE USING (true) WITH CHECK (true);
+
+-- Verify policies are active
+SELECT schemaname, tablename, policyname, cmd
+FROM pg_policies
+WHERE tablename IN ('teacher_feast_schools', 'teacher_feast_config')
+ORDER BY tablename, cmd;
+
 -- Example: Add Instagram handles for some known schools
 -- Uncomment and update these examples with verified handles
 

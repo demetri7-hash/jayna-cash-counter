@@ -162,7 +162,9 @@ ALTER TABLE teacher_feast_config ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if they exist (allows re-running script)
 DROP POLICY IF EXISTS "Allow public read access to schools" ON teacher_feast_schools;
+DROP POLICY IF EXISTS "Allow public update to schools" ON teacher_feast_schools;
 DROP POLICY IF EXISTS "Allow public read access to config" ON teacher_feast_config;
+DROP POLICY IF EXISTS "Allow public update to config" ON teacher_feast_config;
 DROP POLICY IF EXISTS "Allow public insert to votes" ON teacher_feast_votes;
 DROP POLICY IF EXISTS "Allow public read access to votes" ON teacher_feast_votes;
 DROP POLICY IF EXISTS "Allow public insert to newsletter" ON teacher_feast_newsletter;
@@ -171,8 +173,16 @@ DROP POLICY IF EXISTS "Allow public insert to newsletter" ON teacher_feast_newsl
 CREATE POLICY "Allow public read access to schools" ON teacher_feast_schools
     FOR SELECT USING (true);
 
+-- RLS Policies: Allow public update access (for Instagram handles)
+CREATE POLICY "Allow public update to schools" ON teacher_feast_schools
+    FOR UPDATE USING (true) WITH CHECK (true);
+
 CREATE POLICY "Allow public read access to config" ON teacher_feast_config
     FOR SELECT USING (true);
+
+-- RLS Policies: Allow public update access (for scraper config)
+CREATE POLICY "Allow public update to config" ON teacher_feast_config
+    FOR UPDATE USING (true) WITH CHECK (true);
 
 -- RLS Policies: Allow public insert for votes (with validation in application)
 CREATE POLICY "Allow public insert to votes" ON teacher_feast_votes
