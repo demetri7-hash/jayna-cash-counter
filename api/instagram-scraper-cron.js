@@ -1,7 +1,7 @@
 /**
  * Instagram Comment Scraper - Vercel Cron Job
  * Runs every hour to scrape new comments from contest post
- * No authentication needed - uses scraper-instagram npm package
+ * Uses Instagram's public JSON endpoint (no auth needed, no npm packages)
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -48,32 +48,51 @@ export default async function handler(req, res) {
     console.log(`📸 Scraping comments from post: ${postShortcode}`);
     console.log(`📍 Last scraped comment ID: ${lastScrapedId || 'None (first run)'}`);
 
-    // Import scraper-instagram dynamically (only when needed)
-    const { instagram } = await import('scraper-instagram');
-    const client = new instagram();
+    // Fetch post data from Instagram's public JSON endpoint
+    const instagramUrl = `https://www.instagram.com/p/${postShortcode}/?__a=1&__d=dis`;
 
-    // Fetch comments (max 500 per run)
-    let allComments = [];
-    let pageId = null;
-    let hasMore = true;
-    let pageCount = 0;
-    const maxPages = 5; // Limit to 5 pages (100 comments each = 500 total)
-
-    while (hasMore && pageCount < maxPages) {
-      const response = await client.getPostComments(postShortcode, 100, pageId);
-
-      if (!response || !response.comments || response.comments.length === 0) {
-        hasMore = false;
-        break;
+    const response = await fetch(instagramUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'X-Requested-With': 'XMLHttpRequest'
       }
+    });
 
-      allComments = allComments.concat(response.comments);
-      pageId = response.nextPageId;
-      hasMore = !!pageId;
-      pageCount++;
+    if (!response.ok) {
+      throw new Error(`Instagram returned ${response.status}: ${response.statusText}`);
+    }
 
-      // Small delay to avoid rate limiting
-      await new Promise(r => setTimeout(r, 500));
+    const data = await response.json();
+
+    // Extract media data from Instagram response
+    const media = data?.items?.[0] || data?.graphql?.shortcode_media;
+
+    if (!media) {
+      throw new Error('Unable to parse Instagram response - media data not found');
+    }
+
+    // Extract comments from media data
+    let allComments = [];
+
+    // Try different response structures (Instagram changes format)
+    if (media.edge_media_to_parent_comment) {
+      // GraphQL format
+      allComments = media.edge_media_to_parent_comment.edges.map(edge => ({
+        id: edge.node.id,
+        text: edge.node.text,
+        username: edge.node.owner.username,
+        timestamp: edge.node.created_at
+      }));
+    } else if (media.comments) {
+      // Alternative format
+      allComments = media.comments.map(comment => ({
+        id: comment.pk || comment.id,
+        text: comment.text,
+        username: comment.user?.username || 'unknown',
+        timestamp: comment.created_at || comment.created_at_utc
+      }));
     }
 
     console.log(`📥 Fetched ${allComments.length} comments total`);
@@ -100,14 +119,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Transform to CSV format for our existing processor
-    const commentsForProcessing = newComments.map(comment => ({
-      username: comment.owner?.username || 'unknown',
-      text: comment.text || '',
-      id: comment.id,
-      timestamp: comment.created_time || new Date().toISOString()
-    }));
-
     // Get valid schools from database
     const { data: validSchools, error: schoolsError } = await supabase
       .from('teacher_feast_schools')
@@ -123,7 +134,7 @@ export default async function handler(req, res) {
     let invalidTags = 0;
     const processedSchools = new Set();
 
-    for (const comment of commentsForProcessing) {
+    for (const comment of newComments) {
       try {
         const { username, text, id, timestamp } = comment;
 
@@ -155,6 +166,10 @@ export default async function handler(req, res) {
           }
 
           // Insert vote
+          const voteTimestamp = timestamp ?
+            new Date(timestamp * 1000).toISOString() :
+            new Date().toISOString();
+
           const { error: voteError } = await supabase
             .from('teacher_feast_votes')
             .insert([{
@@ -163,7 +178,7 @@ export default async function handler(req, res) {
               points: 1,
               instagram_username: username,
               instagram_comment_id: id,
-              voted_at: timestamp
+              voted_at: voteTimestamp
             }]);
 
           if (voteError) {
