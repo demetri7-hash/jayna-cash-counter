@@ -60,7 +60,9 @@ INSERT INTO teacher_feast_config (config_key, config_value) VALUES
     ('contest_end', '2025-12-15T23:59:59-08:00'),
     ('winner_announcement', '2025-12-16T12:00:00-08:00'),
     ('instagram_post_id', 'PLACEHOLDER_POST_ID'),
-    ('instagram_account', 'jaynagyrosac')
+    ('instagram_account', 'jaynagyro'),
+    ('instagram_post_shortcode', 'PLACEHOLDER'),
+    ('last_scraped_comment_id', '')
 ON CONFLICT (config_key) DO NOTHING;
 
 -- Function: Increment school vote count
