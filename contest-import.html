@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contest CSV Import - Jayna Gyro Teacher's Feast</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #176F9A;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .upload-section {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 20px;
+        }
+
+        .upload-area {
+            border: 3px dashed #46B0E4;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f0f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #176F9A;
+            background: #e0f2fe;
+        }
+
+        .upload-area.dragging {
+            border-color: #176F9A;
+            background: #dbeafe;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: #176F9A;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            font-size: 14px;
+            color: #666;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(70, 176, 228, 0.4);
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(70, 176, 228, 0.6);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .results-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            display: none;
+            margin-bottom: 20px;
+        }
+
+        .results-section h2 {
+            color: #176F9A;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #f0f9ff;
+            border: 2px solid #46B0E4;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #176F9A;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .schools-list {
+            background: #f0f9ff;
+            border: 2px solid #46B0E4;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .schools-list h3 {
+            color: #176F9A;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .school-item {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            font-size: 14px;
+        }
+
+        .school-item:last-child {
+            border-bottom: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+
+        .spinner {
+            border: 4px solid #e0f2fe;
+            border-top: 4px solid #46B0E4;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fee2e2;
+            border: 3px solid #dc2626;
+            color: #991b1b;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .instructions {
+            background: #fff7ed;
+            border: 2px solid #fb923c;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .instructions h3 {
+            color: #ea580c;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+
+        .instructions li {
+            margin-bottom: 10px;
+        }
+
+        .instructions a {
+            color: #ea580c;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Contest Import Tool</h1>
+            <p class="subtitle">Jayna Gyro's Great Teacher's Feast - Instagram Vote Import</p>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 How to Export Comments from Instagram</h3>
+            <ol>
+                <li>Install Chrome extension: <a href="https://chromewebstore.google.com/" target="_blank">IG Exporter & Scraper</a></li>
+                <li>Go to your Instagram contest post</li>
+                <li>Click the extension icon</li>
+                <li>Select "Export Comments"</li>
+                <li>Download as CSV</li>
+                <li>Upload the CSV file below</li>
+            </ol>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="upload-section">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Drop CSV file here or click to browse</div>
+                <div class="upload-subtext">Accepts CSV files from Instagram comment exports</div>
+            </div>
+            <input type="file" id="fileInput" accept=".csv">
+            <button class="btn" id="processBtn" disabled>Process Comments</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing comments and validating schools...</p>
+        </div>
+
+        <div class="results-section" id="results">
+            <h2>✅ Import Results</h2>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalComments">0</div>
+                    <div class="stat-label">Comments Processed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="newVotes">0</div>
+                    <div class="stat-label">New Votes Added</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="duplicates">0</div>
+                    <div class="stat-label">Duplicates Skipped</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="invalidTags">0</div>
+                    <div class="stat-label">Invalid Tags</div>
+                </div>
+            </div>
+
+            <div class="schools-list" id="schoolsList">
+                <h3>📚 Schools Updated:</h3>
+                <div id="schoolsContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const errorMessage = document.getElementById('errorMessage');
+
+        let selectedFile = null;
+
+        // Upload area click
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragging');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragging');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragging');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.name.endsWith('.csv')) {
+                showError('Please select a CSV file');
+                return;
+            }
+
+            selectedFile = file;
+            uploadArea.querySelector('.upload-text').textContent = `📄 ${file.name}`;
+            processBtn.disabled = false;
+        }
+
+        // Process button
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            try {
+                processBtn.disabled = true;
+                loading.style.display = 'block';
+                results.style.display = 'none';
+                errorMessage.style.display = 'none';
+
+                // Read CSV
+                const text = await selectedFile.text();
+                const comments = parseCSV(text);
+
+                console.log(`Parsed ${comments.length} comments from CSV`);
+
+                // Send to API
+                const response = await fetch('/api/contest-csv-import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comments })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Import failed');
+                }
+
+                // Show results
+                displayResults(data.stats);
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError(error.message);
+            } finally {
+                loading.style.display = 'none';
+                processBtn.disabled = false;
+            }
+        });
+
+        function parseCSV(text) {
+            const lines = text.split('\n').filter(line => line.trim());
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+            const usernameIndex = headers.findIndex(h => h.includes('username') || h.includes('user'));
+            const textIndex = headers.findIndex(h => h.includes('text') || h.includes('comment'));
+            const idIndex = headers.findIndex(h => h.includes('id'));
+
+            const comments = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+
+                comments.push({
+                    username: values[usernameIndex] || `user_${i}`,
+                    text: values[textIndex] || '',
+                    id: values[idIndex] || `comment_${i}`
+                });
+            }
+
+            return comments;
+        }
+
+        function displayResults(stats) {
+            document.getElementById('totalComments').textContent = stats.total_comments;
+            document.getElementById('newVotes').textContent = stats.new_votes;
+            document.getElementById('duplicates').textContent = stats.duplicates_skipped;
+            document.getElementById('invalidTags').textContent = stats.invalid_tags;
+
+            const schoolsContent = document.getElementById('schoolsContent');
+            schoolsContent.innerHTML = '';
+
+            stats.schools_updated.forEach(school => {
+                const div = document.createElement('div');
+                div.className = 'school-item';
+                div.textContent = `✅ ${school}`;
+                schoolsContent.appendChild(div);
+            });
+
+            results.style.display = 'block';
+        }
+
+        function showError(message) {
+            errorMessage.textContent = `❌ Error: ${message}`;
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
