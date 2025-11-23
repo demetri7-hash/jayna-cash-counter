@@ -34,10 +34,10 @@ export default async function handler(req, res) {
 
     console.log(`📥 Processing ${comments.length} comments from CSV`);
 
-    // Get valid schools
+    // Get valid schools (including Instagram handles)
     const { data: validSchools, error: schoolsError } = await supabase
       .from('teacher_feast_schools')
-      .select('school_name');
+      .select('school_name, instagram_handles');
 
     if (schoolsError) throw schoolsError;
 
@@ -168,13 +168,28 @@ function validateSchoolName(taggedName, validSchoolNamesLower, validSchools) {
   const formatted = formatSchoolName(taggedName);
   const formattedLower = formatted.toLowerCase();
 
-  // Exact match
+  // PRIORITY 1: Check Instagram handle exact match (most accurate!)
+  for (let i = 0; i < validSchools.length; i++) {
+    const school = validSchools[i];
+    if (school.instagram_handles && Array.isArray(school.instagram_handles)) {
+      for (const handle of school.instagram_handles) {
+        const cleanHandle = handle.replace('@', '').toLowerCase();
+        const cleanTag = taggedName.replace('@', '').replace('#', '').toLowerCase();
+        if (cleanHandle === cleanTag) {
+          console.log(`✅ Instagram handle match: @${cleanTag} → ${school.school_name}`);
+          return school.school_name;
+        }
+      }
+    }
+  }
+
+  // PRIORITY 2: Exact school name match
   const exactIndex = validSchoolNamesLower.indexOf(formattedLower);
   if (exactIndex !== -1) {
     return validSchools[exactIndex].school_name;
   }
 
-  // Fuzzy match
+  // PRIORITY 3: Fuzzy match on school name
   for (let i = 0; i < validSchoolNamesLower.length; i++) {
     const schoolName = validSchoolNamesLower[i];
     const tagCleaned = formattedLower

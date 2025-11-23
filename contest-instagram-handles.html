@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Handles Manager - Teacher's Feast Contest</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #176F9A;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 10px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #176F9A;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            color: #176F9A;
+            font-size: 20px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(70, 176, 228, 0.4);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #176F9A;
+            border: 2px solid #46B0E4;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0f2fe;
+        }
+
+        th {
+            background: #f0f9ff;
+            color: #176F9A;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background: #f9fafb;
+        }
+
+        .handle-input {
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 200px;
+        }
+
+        .handle-input:focus {
+            outline: none;
+            border-color: #46B0E4;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin: 2px;
+        }
+
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #e0f2fe;
+            border-top: 4px solid #46B0E4;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-message {
+            background: #d1fae5;
+            border: 3px solid #059669;
+            color: #065f46;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .google-link {
+            color: #46B0E4;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .google-link:hover {
+            text-decoration: underline;
+        }
+
+        .handles-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            min-height: 30px;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            background: #e0f2fe;
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 12px;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📸 Instagram Handles Manager</h1>
+            <p style="color: #666; margin-top: 10px;">Add verified Instagram handles for all Sacramento schools</p>
+        </div>
+
+        <div class="success-message" id="successMessage"></div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalSchools">--</div>
+                <div class="stat-label">Total Schools</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="withHandles">--</div>
+                <div class="stat-label">With Instagram Handles</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="needingHandles">--</div>
+                <div class="stat-label">Need Instagram Handles</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="completionPercent">--</div>
+                <div class="stat-label">Completion</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Progress</h2>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar" style="width: 0%">0%</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔍 School Instagram Handles</h2>
+
+            <div class="quick-actions">
+                <button class="btn" onclick="loadSchools()">🔄 Refresh List</button>
+                <button class="btn btn-secondary" onclick="showOnlyMissing()">⚠️ Show Only Missing Handles</button>
+                <button class="btn btn-secondary" onclick="showAll()">📋 Show All Schools</button>
+            </div>
+
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="Search schools..." onkeyup="filterSchools()">
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Loading schools...</p>
+            </div>
+
+            <div id="tableContainer" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 40%;">School Name</th>
+                            <th style="width: 30%;">Instagram Handles</th>
+                            <th style="width: 15%;">Status</th>
+                            <th style="width: 15%;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schoolsTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const supabase = createClient(
+            'https://izuausuembbqxsckglmc.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6dWF1c3VlbWJicXhzY2tnbG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTEzMDQ4NjQsImV4cCI6MjAyNjg4MDg2NH0.KdPbLbupfYJo6JLf_H4fxsvAwO6CQLrVk6_b63CQRrA'
+        );
+
+        let allSchools = [];
+        let filteredSchools = [];
+        let showOnlyMissingFlag = false;
+
+        window.loadSchools = async function() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('tableContainer').style.display = 'none';
+
+            try {
+                const { data, error } = await supabase
+                    .from('teacher_feast_schools')
+                    .select('id, school_name, instagram_handles')
+                    .order('school_name');
+
+                if (error) throw error;
+
+                allSchools = data;
+                filteredSchools = data;
+
+                updateStats();
+                displaySchools(filteredSchools);
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('tableContainer').style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading schools:', error);
+                alert('Error loading schools: ' + error.message);
+                document.getElementById('loading').style.display = 'none';
+            }
+        };
+
+        function updateStats() {
+            const total = allSchools.length;
+            const withHandles = allSchools.filter(s =>
+                s.instagram_handles && s.instagram_handles.length > 0
+            ).length;
+            const needingHandles = total - withHandles;
+            const percent = total > 0 ? Math.round((withHandles / total) * 100) : 0;
+
+            document.getElementById('totalSchools').textContent = total;
+            document.getElementById('withHandles').textContent = withHandles;
+            document.getElementById('needingHandles').textContent = needingHandles;
+            document.getElementById('completionPercent').textContent = percent + '%';
+
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+        }
+
+        function displaySchools(schools) {
+            const tbody = document.getElementById('schoolsTable');
+            tbody.innerHTML = '';
+
+            schools.forEach(school => {
+                const row = document.createElement('tr');
+
+                const hasHandles = school.instagram_handles && school.instagram_handles.length > 0;
+
+                row.innerHTML = `
+                    <td><strong>${school.school_name}</strong></td>
+                    <td>
+                        <div class="handles-display" id="handles-${school.id}">
+                            ${hasHandles ? school.instagram_handles.map(h => `<span class="badge badge-success">${h}</span>`).join('') : '<span class="badge badge-warning">No handles yet</span>'}
+                        </div>
+                        <input type="text" class="handle-input" id="input-${school.id}"
+                               placeholder="@handle1, @handle2"
+                               value="${hasHandles ? school.instagram_handles.join(', ') : ''}"
+                               style="margin-top: 8px; display: block;">
+                    </td>
+                    <td>
+                        ${hasHandles ?
+                            '<span class="badge badge-success">✓ Has Handles</span>' :
+                            '<span class="badge badge-warning">⚠️ Missing</span>'}
+                    </td>
+                    <td>
+                        <button class="btn" style="font-size: 12px; padding: 8px 12px;" onclick="saveHandles('${school.id}', '${school.school_name.replace(/'/g, "\\'")}')">💾 Save</button>
+                        <a href="https://www.google.com/search?q=${encodeURIComponent(school.school_name + ' Sacramento instagram')}"
+                           target="_blank" class="google-link" style="display: block; margin-top: 5px; font-size: 12px;">🔍 Search Google</a>
+                    </td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        window.saveHandles = async function(schoolId, schoolName) {
+            const input = document.getElementById(`input-${schoolId}`);
+            const handlesText = input.value.trim();
+
+            if (!handlesText) {
+                alert('Please enter at least one Instagram handle');
+                return;
+            }
+
+            // Parse comma-separated handles
+            const handles = handlesText
+                .split(',')
+                .map(h => h.trim())
+                .filter(h => h)
+                .map(h => h.startsWith('@') ? h : '@' + h);
+
+            try {
+                const { error } = await supabase
+                    .from('teacher_feast_schools')
+                    .update({ instagram_handles: handles })
+                    .eq('id', schoolId);
+
+                if (error) throw error;
+
+                showSuccess(`✅ Saved ${handles.length} handle(s) for ${schoolName}`);
+
+                // Refresh the display
+                loadSchools();
+
+            } catch (error) {
+                console.error('Error saving handles:', error);
+                alert('Error saving handles: ' + error.message);
+            }
+        };
+
+        window.filterSchools = function() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+            let schools = showOnlyMissingFlag ?
+                allSchools.filter(s => !s.instagram_handles || s.instagram_handles.length === 0) :
+                allSchools;
+
+            if (searchTerm) {
+                schools = schools.filter(s =>
+                    s.school_name.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            filteredSchools = schools;
+            displaySchools(filteredSchools);
+        };
+
+        window.showOnlyMissing = function() {
+            showOnlyMissingFlag = true;
+            document.getElementById('searchInput').value = '';
+            filterSchools();
+        };
+
+        window.showAll = function() {
+            showOnlyMissingFlag = false;
+            document.getElementById('searchInput').value = '';
+            filterSchools();
+        };
+
+        function showSuccess(message) {
+            const el = document.getElementById('successMessage');
+            el.textContent = message;
+            el.style.display = 'block';
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 3000);
+        }
+
+        // Load schools on page load
+        loadSchools();
+    </script>
+</body>
+</html>

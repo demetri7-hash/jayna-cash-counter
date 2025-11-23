@@ -5,6 +5,7 @@
 CREATE TABLE IF NOT EXISTS teacher_feast_schools (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     school_name TEXT NOT NULL UNIQUE,
+    instagram_handles JSONB DEFAULT '[]'::jsonb,
     total_votes INTEGER DEFAULT 0,
     instagram_votes INTEGER DEFAULT 0,
     form_votes INTEGER DEFAULT 0,
