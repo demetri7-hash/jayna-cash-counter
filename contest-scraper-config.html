@@ -255,13 +255,13 @@
         <div class="error-message" id="errorMessage"></div>
 
         <div class="instructions">
-            <h3>📋 How to Get Your Instagram Post Shortcode</h3>
+            <h3>📋 How to Configure Your Contest Post</h3>
             <ol>
                 <li>Create your contest post on Instagram</li>
-                <li>Copy the post URL (looks like: <code>instagram.com/p/ABC123xyz/</code>)</li>
-                <li>The shortcode is the part after <code>/p/</code> (e.g., <code>ABC123xyz</code>)</li>
-                <li>Paste it in the field below and click "Save Configuration"</li>
-                <li>The scraper will automatically run every hour!</li>
+                <li>Copy the FULL Instagram post URL from your browser or app</li>
+                <li><strong>Paste the entire URL below</strong> - we'll automatically extract the shortcode!</li>
+                <li>Click "Save Configuration"</li>
+                <li>The scraper will automatically run every hour and count all tagged schools!</li>
             </ol>
         </div>
 
@@ -293,14 +293,28 @@
             <h2>🔧 Update Configuration</h2>
 
             <div class="form-group">
-                <label for="shortcode">Instagram Post Shortcode:</label>
-                <input type="text" id="shortcode" placeholder="e.g., C1234567890">
+                <label for="postUrl">📸 Paste Your Instagram Post URL Here:</label>
+                <input type="text" id="postUrl" placeholder="https://www.instagram.com/p/ABC123xyz/ or instagram.com/p/ABC123xyz/" oninput="extractShortcode()">
                 <div class="help-text">
-                    Get this from your Instagram post URL: instagram.com/p/<strong>SHORTCODE</strong>/
+                    <strong>Example URLs that work:</strong><br>
+                    • https://www.instagram.com/p/ABC123xyz/<br>
+                    • https://instagram.com/p/ABC123xyz/<br>
+                    • instagram.com/p/ABC123xyz/<br>
+                    • Just the shortcode: ABC123xyz
                 </div>
             </div>
 
-            <button class="btn" id="saveBtn" onclick="saveConfig()">💾 Save Configuration</button>
+            <div class="form-group" id="extractedShortcodeGroup" style="display: none;">
+                <label>✅ Extracted Shortcode (Auto-Detected):</label>
+                <div style="background: #d1fae5; border: 2px solid #059669; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
+                    <div style="font-size: 20px; font-weight: 700; color: #065f46; font-family: monospace;" id="extractedShortcode">--</div>
+                </div>
+                <div class="help-text" style="color: #065f46;">
+                    ✓ This is what will be saved to the database
+                </div>
+            </div>
+
+            <button class="btn" id="saveBtn" onclick="saveConfig()" disabled>💾 Save Configuration</button>
             <button class="btn btn-secondary" onclick="loadConfig()">🔄 Refresh</button>
         </div>
 
@@ -361,6 +375,52 @@
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
         );
 
+        let currentShortcode = '';
+
+        window.extractShortcode = function() {
+            const input = document.getElementById('postUrl').value.trim();
+
+            if (!input) {
+                document.getElementById('extractedShortcodeGroup').style.display = 'none';
+                document.getElementById('saveBtn').disabled = true;
+                currentShortcode = '';
+                return;
+            }
+
+            // Extract shortcode from various URL formats
+            let shortcode = '';
+
+            // Pattern 1: Full URL with https://www.instagram.com/p/SHORTCODE/
+            // Pattern 2: URL with https://instagram.com/p/SHORTCODE/
+            // Pattern 3: URL without https: instagram.com/p/SHORTCODE/
+            // Pattern 4: Just the shortcode
+            const patterns = [
+                /instagram\.com\/p\/([A-Za-z0-9_-]+)/,  // Matches all instagram.com/p/ formats
+                /instagram\.com\/reel\/([A-Za-z0-9_-]+)/, // Also support reels
+                /^([A-Za-z0-9_-]+)$/  // Just the shortcode alone
+            ];
+
+            for (const pattern of patterns) {
+                const match = input.match(pattern);
+                if (match) {
+                    shortcode = match[1];
+                    break;
+                }
+            }
+
+            if (shortcode) {
+                currentShortcode = shortcode;
+                document.getElementById('extractedShortcode').textContent = shortcode;
+                document.getElementById('extractedShortcodeGroup').style.display = 'block';
+                document.getElementById('saveBtn').disabled = false;
+            } else {
+                document.getElementById('extractedShortcodeGroup').style.display = 'none';
+                document.getElementById('saveBtn').disabled = true;
+                currentShortcode = '';
+                showError('❌ Could not extract shortcode from URL. Please check the format.');
+            }
+        };
+
         window.loadConfig = async function() {
             document.getElementById('loading').style.display = 'block';
             document.getElementById('configDisplay').style.display = 'none';
@@ -390,8 +450,6 @@
                 document.getElementById('scraperStatus').style.color =
                     isConfigured ? '#059669' : '#ea580c';
 
-                document.getElementById('shortcode').value = config.instagram_post_shortcode || '';
-
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('configDisplay').style.display = 'block';
 
@@ -403,10 +461,8 @@
         };
 
         window.saveConfig = async function() {
-            const shortcode = document.getElementById('shortcode').value.trim();
-
-            if (!shortcode) {
-                showError('Please enter a shortcode');
+            if (!currentShortcode) {
+                showError('Please paste an Instagram post URL first');
                 return;
             }
 
@@ -418,13 +474,22 @@
                     .from('teacher_feast_config')
                     .upsert({
                         config_key: 'instagram_post_shortcode',
-                        config_value: shortcode,
+                        config_value: currentShortcode,
                         updated_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'config_key'
                     });
 
                 if (error) throw error;
 
-                showSuccess('✅ Configuration saved! Scraper will use this shortcode on next run.');
+                showSuccess(`✅ Configuration saved! Scraper will monitor shortcode: ${currentShortcode}`);
+
+                // Clear the form
+                document.getElementById('postUrl').value = '';
+                document.getElementById('extractedShortcodeGroup').style.display = 'none';
+                currentShortcode = '';
+
+                // Reload config to show updated value
                 loadConfig();
 
             } catch (error) {
