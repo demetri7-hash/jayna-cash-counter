@@ -1499,19 +1499,35 @@
       // Show images
       if (receipt.image_urls && receipt.image_urls.length > 0) {
         html += '<div style="margin-top: 20px;"><label>ATTACHED FILES</label>';
-        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px;">';
-        receipt.image_urls.forEach(url => {
-          if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png')) {
-            html += `<a href="${url}" target="_blank"><img src="${url}" style="width: 100%;"></a>`;
-          } else {
-            const ext = url.split('.').pop().toUpperCase();
-            html += `<a href="${url}" target="_blank" style="padding: 20px; background: var(--gray-100); text-align: center; display: block; text-decoration: none; color: var(--gray-700); font-weight: 600; font-size: 12px;">VIEW ${ext}</a>`;
-          }
-        });
-        html += '</div></div>';
+        html += '<div id="existingImagesContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px;"></div></div>';
+      }
+
+      // Add file upload area in edit mode
+      if (editable) {
+        html += `
+          <div class="form-group" style="margin-top: 20px;">
+            <label>ADD NEW FILES</label>
+            <div class="file-upload-area" id="editFileUploadArea">
+              <p style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">CLICK OR DRAG FILES HERE</p>
+              <p style="font-size: 12px; color: var(--gray-500);">Images will be compressed. Documents saved as-is.</p>
+            </div>
+            <input type="file" id="editFileInput" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display: none;">
+            <div id="editFilePreviewContainer" class="file-preview-container"></div>
+          </div>
+        `;
       }
 
       content.innerHTML = html;
+
+      // Render existing images with delete buttons if editable
+      if (receipt.image_urls && receipt.image_urls.length > 0) {
+        renderExistingImages(receipt.image_urls, editable);
+      }
+
+      // Setup edit mode file upload if editable
+      if (editable) {
+        setupEditModeFileUpload();
+      }
 
       // If editable, setup category dropdown handler
       if (editable) {
@@ -1705,26 +1721,62 @@
         console.log(`Auto-created category from edit: ${newCategoryName}`);
       }
 
-      const { error } = await supabase
-        .from('amex_receipts')
-        .update({
-          vendor: vendor,
-          purchase_date: date,
-          amount: amount,
-          category: category,
-          payment_type: paymentType,
-          details: details
-        })
-        .eq('id', currentReceipt.id);
+      showStatus('Processing changes...', 'success');
 
-      if (error) {
-        showStatus('Error updating receipt: ' + error.message, 'error');
-        return;
+      // Handle image deletions and uploads
+      try {
+        // Delete marked images from storage
+        for (const imageUrl of window.editImagesToDelete || []) {
+          await deleteImageFromStorage(imageUrl);
+        }
+
+        // Upload new files
+        const newImageUrls = [];
+        for (const file of window.editUploadedFiles || []) {
+          try {
+            const fileUrl = await uploadFile(file);
+            newImageUrls.push(fileUrl);
+          } catch (error) {
+            showMessage('Error uploading file: ' + error.message, 'error');
+            return;
+          }
+        }
+
+        // Calculate final image_urls array
+        const existingUrls = currentReceipt.image_urls || [];
+        const remainingUrls = existingUrls.filter(url => !(window.editImagesToDelete || []).includes(url));
+        const finalImageUrls = [...remainingUrls, ...newImageUrls];
+
+        // Update database with all changes including images
+        const { error } = await supabase
+          .from('amex_receipts')
+          .update({
+            vendor: vendor,
+            purchase_date: date,
+            amount: amount,
+            category: category,
+            payment_type: paymentType,
+            details: details,
+            image_urls: finalImageUrls
+          })
+          .eq('id', currentReceipt.id);
+
+        if (error) {
+          showStatus('Error updating receipt: ' + error.message, 'error');
+          return;
+        }
+
+        // Clear edit state
+        window.editImagesToDelete = [];
+        window.editUploadedFiles = [];
+
+        showStatus('Receipt updated successfully', 'success');
+        closeDetailModal();
+        loadReceipts();
+
+      } catch (error) {
+        showMessage('Error saving changes: ' + error.message, 'error');
       }
-
-      showStatus('Receipt updated successfully', 'success');
-      closeDetailModal();
-      loadReceipts();
     }
 
     // Delete individual receipt
@@ -1759,6 +1811,184 @@
     function closeDetailModal() {
       document.getElementById('detailModal').classList.remove('active');
       currentReceipt = null;
+      // Clear edit mode state
+      window.editImagesToDelete = [];
+      window.editUploadedFiles = [];
+    }
+
+    // IMAGE MANAGEMENT FUNCTIONS FOR EDIT MODE
+
+    // Render existing images with delete buttons (if editable)
+    function renderExistingImages(imageUrls, editable) {
+      const container = document.getElementById('existingImagesContainer');
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      imageUrls.forEach(url => {
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position: relative; border: 2px solid var(--gray-300); padding: 8px; background: white;';
+
+        if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png')) {
+          const img = document.createElement('img');
+          img.src = url;
+          img.style.cssText = 'width: 100%; height: 100px; object-fit: cover;';
+          img.onclick = () => window.open(url, '_blank');
+          img.style.cursor = 'pointer';
+          wrapper.appendChild(img);
+        } else {
+          const ext = url.split('.').pop().toUpperCase();
+          const icon = document.createElement('a');
+          icon.href = url;
+          icon.target = '_blank';
+          icon.style.cssText = 'display: block; padding: 20px; background: var(--gray-100); text-align: center; text-decoration: none; color: var(--gray-700); font-weight: 600; font-size: 12px; height: 100px; display: flex; align-items: center; justify-content: center;';
+          icon.textContent = `VIEW ${ext}`;
+          wrapper.appendChild(icon);
+        }
+
+        // Add delete button if in edit mode
+        if (editable) {
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'file-remove-btn';
+          deleteBtn.textContent = '×';
+          deleteBtn.style.cssText = 'position: absolute; top: 4px; right: 4px; background: #dc2626; color: white; border: none; width: 24px; height: 24px; font-size: 14px; cursor: pointer; font-weight: 700;';
+          deleteBtn.onclick = () => {
+            // Mark image for deletion
+            if (!window.editImagesToDelete) window.editImagesToDelete = [];
+            window.editImagesToDelete.push(url);
+
+            // Visual feedback: fade out and remove
+            wrapper.style.transition = 'opacity 0.3s ease';
+            wrapper.style.opacity = '0.3';
+            wrapper.style.border = '2px solid #dc2626';
+
+            // Show undo option
+            const undoBtn = document.createElement('button');
+            undoBtn.textContent = 'UNDO';
+            undoBtn.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #dc2626; color: white; border: none; padding: 8px 16px; font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase;';
+            undoBtn.onclick = (e) => {
+              e.stopPropagation();
+              // Remove from delete list
+              window.editImagesToDelete = window.editImagesToDelete.filter(u => u !== url);
+              // Restore visual state
+              wrapper.style.opacity = '1';
+              wrapper.style.border = '2px solid var(--gray-300)';
+              undoBtn.remove();
+              deleteBtn.style.display = 'block';
+            };
+            wrapper.appendChild(undoBtn);
+            deleteBtn.style.display = 'none';
+          };
+          wrapper.appendChild(deleteBtn);
+        }
+
+        container.appendChild(wrapper);
+      });
+    }
+
+    // Setup file upload for edit mode
+    function setupEditModeFileUpload() {
+      const uploadArea = document.getElementById('editFileUploadArea');
+      const fileInput = document.getElementById('editFileInput');
+      const previewContainer = document.getElementById('editFilePreviewContainer');
+
+      if (!uploadArea || !fileInput || !previewContainer) return;
+
+      // Initialize state
+      window.editUploadedFiles = window.editUploadedFiles || [];
+      window.editImagesToDelete = window.editImagesToDelete || [];
+
+      uploadArea.addEventListener('click', () => fileInput.click());
+
+      uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+      });
+
+      uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+      });
+
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        handleEditFiles(e.dataTransfer.files);
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        handleEditFiles(e.target.files);
+      });
+
+      function handleEditFiles(files) {
+        Array.from(files).forEach(file => {
+          window.editUploadedFiles.push(file);
+          displayEditFilePreview(file);
+        });
+      }
+
+      function displayEditFilePreview(file) {
+        const preview = document.createElement('div');
+        preview.className = 'file-preview';
+
+        if (file.type.startsWith('image/')) {
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(file);
+          preview.appendChild(img);
+        } else {
+          const icon = document.createElement('div');
+          icon.style.cssText = 'width: 100%; height: 100px; display: flex; align-items: center; justify-content: center; background: var(--gray-100); font-size: 12px; color: var(--gray-500); font-weight: 600;';
+          icon.textContent = file.name.split('.').pop().toUpperCase();
+          preview.appendChild(icon);
+        }
+
+        const name = document.createElement('div');
+        name.className = 'file-preview-name';
+        name.textContent = file.name;
+        preview.appendChild(name);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'file-remove-btn';
+        removeBtn.textContent = '×';
+        removeBtn.onclick = () => {
+          window.editUploadedFiles = window.editUploadedFiles.filter(f => f !== file);
+          preview.remove();
+        };
+        preview.appendChild(removeBtn);
+
+        previewContainer.appendChild(preview);
+      }
+    }
+
+    // Delete image from Supabase storage
+    async function deleteImageFromStorage(imageUrl) {
+      try {
+        // Extract file path from Supabase URL
+        // Format: https://[project].supabase.co/storage/v1/object/public/[bucket]/[path]
+        const urlParts = imageUrl.split('/storage/v1/object/public/');
+        if (urlParts.length !== 2) {
+          console.error('Invalid Supabase storage URL:', imageUrl);
+          return;
+        }
+
+        const pathParts = urlParts[1].split('/');
+        const bucket = pathParts[0]; // e.g., "amex-receipt-images"
+        const filePath = pathParts.slice(1).join('/'); // Rest of the path
+
+        // Delete from storage
+        const { error } = await supabase.storage
+          .from(bucket)
+          .remove([filePath]);
+
+        if (error) {
+          console.error('Error deleting image from storage:', error);
+          // Don't throw - continue with database update even if storage delete fails
+        } else {
+          console.log(`✅ Deleted image from storage: ${filePath}`);
+        }
+      } catch (error) {
+        console.error('Error parsing image URL for deletion:', error);
+        // Don't throw - continue with database update
+      }
     }
 
     // Confirm Modal Handlers
