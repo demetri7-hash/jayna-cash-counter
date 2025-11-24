@@ -56,23 +56,49 @@ export default async function handler(req, res) {
     console.log(`📸 Scraping comments from post: ${postShortcode}`);
     console.log(`📍 Last scraped comment ID: ${lastScrapedId || 'None (first run)'}`);
 
-    // Fetch post data from Instagram's public JSON endpoint
-    const instagramUrl = `https://www.instagram.com/p/${postShortcode}/?__a=1&__d=dis`;
+    // Try multiple Instagram endpoint formats (they keep changing!)
+    const endpointsToTry = [
+      `https://www.instagram.com/p/${postShortcode}/?__a=1&__d=dis`,
+      `https://www.instagram.com/graphql/query/?query_hash=f0986789a5c5d17c2400faebf16efd0d&variables={"shortcode":"${postShortcode}"}`,
+      `https://i.instagram.com/api/v1/media/${postShortcode}/comments/`,
+      `https://www.instagram.com/p/${postShortcode}/?__a=1`
+    ];
 
-    const response = await fetch(instagramUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'X-Requested-With': 'XMLHttpRequest'
+    let data = null;
+    let lastError = null;
+
+    for (const instagramUrl of endpointsToTry) {
+      try {
+        console.log(`🔄 Trying endpoint: ${instagramUrl.substring(0, 60)}...`);
+
+        const response = await fetch(instagramUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/html',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': 'https://www.instagram.com/'
+          }
+        });
+
+        if (response.ok) {
+          data = await response.json();
+          console.log(`✅ Success with endpoint!`);
+          break;
+        } else {
+          lastError = `${response.status}: ${response.statusText}`;
+          console.log(`❌ Endpoint failed: ${lastError}`);
+        }
+      } catch (error) {
+        lastError = error.message;
+        console.log(`❌ Endpoint error: ${lastError}`);
+        continue;
       }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Instagram returned ${response.status}: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    if (!data) {
+      throw new Error(`All Instagram endpoints failed. Last error: ${lastError}. Instagram may be blocking automated requests. Please use the CSV Import method as a backup.`);
+    }
 
     // Extract media data from Instagram response
     const media = data?.items?.[0] || data?.graphql?.shortcode_media;
