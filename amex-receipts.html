@@ -320,7 +320,7 @@
 
     .list-item {
       display: grid;
-      grid-template-columns: 40px 150px 100px 100px 120px 1fr;
+      grid-template-columns: 40px 150px 100px 100px 120px 140px 1fr;
       gap: 12px;
       padding: 16px 12px;
       align-items: center;
@@ -344,7 +344,7 @@
 
     .list-header {
       display: grid;
-      grid-template-columns: 40px 150px 100px 100px 120px 1fr;
+      grid-template-columns: 40px 150px 100px 100px 120px 140px 1fr;
       gap: 12px;
       padding: 16px 12px;
       background: var(--gray-900);
@@ -599,6 +599,15 @@
             <input type="text" id="newCategory" placeholder="Enter new category" style="margin-bottom: 8px; text-transform: uppercase;">
             <button class="btn btn-secondary" onclick="addNewCategory()" style="width: 100%;">ADD CATEGORY</button>
           </div>
+        </div>
+
+        <div class="form-group">
+          <label for="paymentType">PAYMENT TYPE</label>
+          <select id="paymentType">
+            <option value="AMEX CARD 1100">AMEX CARD 1100</option>
+            <option value="CASH">CASH</option>
+            <option value="PERSONAL/REIMBURSE">PERSONAL/REIMBURSE</option>
+          </select>
         </div>
 
         <div class="form-group">
@@ -1115,6 +1124,7 @@
       const date = document.getElementById('purchaseDate').value;
       const amount = parseFloat(document.getElementById('amount').value);
       let category = document.getElementById('category').value;
+      const paymentType = document.getElementById('paymentType').value;
       const details = document.getElementById('details').value.trim();
 
       // CRITICAL FIX: If user selected ADD_NEW but typed a category name without clicking "ADD CATEGORY"
@@ -1177,6 +1187,7 @@
           purchase_date: date,
           amount: amount,
           category: category,
+          payment_type: paymentType,
           details: details,
           image_urls: imageUrls
         })
@@ -1225,6 +1236,7 @@
       setTodayDate();
       document.getElementById('amount').value = '';
       document.getElementById('category').value = '';
+      document.getElementById('paymentType').value = 'AMEX CARD 1100';
       document.getElementById('details').value = '';
       document.getElementById('filePreviewContainer').innerHTML = '';
       uploadedFiles = [];
@@ -1271,11 +1283,17 @@
           <span>DATE</span>
           <span>AMOUNT</span>
           <span>CATEGORY</span>
+          <span>PAYMENT TYPE</span>
           <span>DETAILS</span>
         </div>
       `;
 
       pageReceipts.forEach(receipt => {
+        const paymentType = receipt.payment_type || 'AMEX CARD 1100';
+        const paymentBadgeColor = paymentType === 'CASH' ? 'background: #fef3c7; color: #92400e;' :
+                                   paymentType === 'PERSONAL/REIMBURSE' ? 'background: #fee2e2; color: #991b1b;' :
+                                   'background: #dbeafe; color: #1e40af;';
+
         html += `
           <div class="list-item" onclick="viewReceipt(${receipt.id}, event)">
             <input type="checkbox" class="receipt-checkbox" data-id="${receipt.id}" onclick="event.stopPropagation(); updateButtonStates();">
@@ -1283,6 +1301,7 @@
             <span>${receipt.purchase_date}</span>
             <span>$${parseFloat(receipt.amount).toFixed(2)}</span>
             <span><span class="category-badge">${receipt.category}</span></span>
+            <span><span class="category-badge" style="${paymentBadgeColor}">${paymentType}</span></span>
             <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${receipt.details || 'N/A'}</span>
           </div>
         `;
@@ -1427,11 +1446,24 @@
             </div>
           </div>
           <div class="form-group">
+            <label>PAYMENT TYPE</label>
+            <select id="editPaymentType">
+              <option value="AMEX CARD 1100" ${(receipt.payment_type || 'AMEX CARD 1100') === 'AMEX CARD 1100' ? 'selected' : ''}>AMEX CARD 1100</option>
+              <option value="CASH" ${receipt.payment_type === 'CASH' ? 'selected' : ''}>CASH</option>
+              <option value="PERSONAL/REIMBURSE" ${receipt.payment_type === 'PERSONAL/REIMBURSE' ? 'selected' : ''}>PERSONAL/REIMBURSE</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>DETAILS</label>
             <textarea id="editDetails">${receipt.details || ''}</textarea>
           </div>
         `;
       } else {
+        const paymentType = receipt.payment_type || 'AMEX CARD 1100';
+        const paymentBadgeColor = paymentType === 'CASH' ? 'background: #fef3c7; color: #92400e;' :
+                                   paymentType === 'PERSONAL/REIMBURSE' ? 'background: #fee2e2; color: #991b1b;' :
+                                   'background: #dbeafe; color: #1e40af;';
+
         html += `
           <div style="margin-bottom: 16px;">
             <label>VENDOR / STORE NAME</label>
@@ -1448,6 +1480,10 @@
           <div style="margin-bottom: 16px;">
             <label>CATEGORY</label>
             <p style="font-size: 14px; margin-top: 4px;"><span class="category-badge">${receipt.category}</span></p>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <label>PAYMENT TYPE</label>
+            <p style="font-size: 14px; margin-top: 4px;"><span class="category-badge" style="${paymentBadgeColor}">${paymentType}</span></p>
           </div>
           <div style="margin-bottom: 16px;">
             <label>DETAILS</label>
@@ -1635,6 +1671,7 @@
       const date = document.getElementById('editDate').value;
       const amount = parseFloat(document.getElementById('editAmount').value);
       let category = document.getElementById('editCategory').value;
+      const paymentType = document.getElementById('editPaymentType').value;
       const details = document.getElementById('editDetails').value.trim();
 
       // CRITICAL FIX: Same as saveReceipt - handle ADD_NEW category
@@ -1675,6 +1712,7 @@
           purchase_date: date,
           amount: amount,
           category: category,
+          payment_type: paymentType,
           details: details
         })
         .eq('id', currentReceipt.id);

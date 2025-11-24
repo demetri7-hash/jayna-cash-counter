@@ -149,6 +149,7 @@ export default async function handler(req, res) {
 
 /**
  * Generate PDF from receipts (similar to Combined Weekly Report format)
+ * Now groups by payment type: AMEX CARD 1100, CASH, PERSONAL/REIMBURSE
  */
 async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   const doc = new jsPDF({
@@ -156,6 +157,16 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
     unit: 'in',
     format: 'letter'
   });
+
+  // Group receipts by payment type
+  const amexReceipts = receipts.filter(r => (r.payment_type || 'AMEX CARD 1100') === 'AMEX CARD 1100');
+  const cashReceipts = receipts.filter(r => r.payment_type === 'CASH');
+  const reimburseReceipts = receipts.filter(r => r.payment_type === 'PERSONAL/REIMBURSE');
+
+  // Calculate totals by payment type
+  const amexTotal = amexReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+  const cashTotal = cashReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+  const reimburseTotal = reimburseReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
 
   // Aptos-like font (use Helvetica in jsPDF)
   doc.setFont('helvetica');
@@ -214,7 +225,7 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.text(`ARCHIVED: ${archiveDateTime}`, 4.25, yPos, { align: 'center' });
   yPos += 0.35;
 
-  // Summary section (left-aligned)
+  // Summary section (left-aligned) - NOW WITH 3 PAYMENT TYPE BREAKDOWNS
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(33, 33, 33);
@@ -225,34 +236,46 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(33, 33, 33);
-  const totalEntriesLabel = doc.splitTextToSize('TOTAL ENTRIES:', 1.5);
-  doc.text(totalEntriesLabel, 0.5, yPos);
-
+  doc.text('TOTAL ENTRIES:', 0.5, yPos);
   doc.setFont('helvetica', 'normal');
   doc.text(`${receipts.length}`, 1.8, yPos);
-  yPos += 0.2;
-
-  // Total Amount (bold, 90% gray)
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(26, 26, 26); // 90% gray (darker)
-  doc.text(`TOTAL AMOUNT: $${totalAmount.toFixed(2)}`, 0.5, yPos);
-  yPos += 0.35;
-
-  // Receipts list
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(33, 33, 33);
-  doc.text('RECEIPT DETAILS', 0.5, yPos);
   yPos += 0.25;
 
-  // Calculate how many pages the receipt list will take (estimate)
+  // AMEX CARD 1100 Breakdown
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 64, 175); // Blue
+  doc.text(`AMEX CARD 1100:`, 0.7, yPos);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${amexReceipts.length} entries | $${amexTotal.toFixed(2)}`, 2.2, yPos);
+  yPos += 0.18;
+
+  // CASH Breakdown
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(146, 64, 14); // Yellow/Orange
+  doc.text(`CASH:`, 0.7, yPos);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${cashReceipts.length} entries | $${cashTotal.toFixed(2)}`, 2.2, yPos);
+  yPos += 0.18;
+
+  // PERSONAL/REIMBURSE Breakdown
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(153, 27, 27); // Red
+  doc.text(`PERSONAL/REIMBURSE:`, 0.7, yPos);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${reimburseReceipts.length} entries | $${reimburseTotal.toFixed(2)}`, 2.2, yPos);
+  yPos += 0.25;
+
+  // Grand Total Amount (bold, darker)
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(26, 26, 26);
+  doc.text(`GRAND TOTAL: $${totalAmount.toFixed(2)}`, 0.5, yPos);
+  yPos += 0.35;
+
+  // Track receipts with images and their future page numbers (calculate once for all sections)
   const receiptsPerPage = 25; // Conservative estimate
   const listPages = Math.ceil(receipts.length / receiptsPerPage);
-
-  // Calculate where image pages will start (after list pages + current page)
   const imagePageStart = doc.internal.getCurrentPageInfo().pageNumber + listPages;
 
-  // Track receipts with images and their future page numbers
   const receiptImagePages = new Map();
   let imagePageCounter = imagePageStart;
 
@@ -263,92 +286,112 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
     }
   });
 
-  // Table header
-  doc.setFillColor(66, 66, 66);
-  doc.rect(0.5, yPos - 0.05, 7.5, 0.2, 'F');
+  // Helper function to render a receipt section
+  const renderReceiptSection = (sectionReceipts, sectionTitle, sectionColor) => {
+    if (sectionReceipts.length === 0) return; // Skip empty sections
 
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text('VENDOR', 0.6, yPos + 0.08);
-  doc.text('DATE', 1.8, yPos + 0.08);
-  doc.text('AMOUNT', 2.8, yPos + 0.08);
-  doc.text('CATEGORY', 3.6, yPos + 0.08);
-  doc.text('DETAILS', 4.8, yPos + 0.08);
-  doc.text('IMAGE', 7.3, yPos + 0.08);
-
-  yPos += 0.25;
-
-  // Receipts (alternating Jayna blue background)
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(66, 66, 66);
-
-  for (const receipt of receipts) {
-    if (yPos > 9.5) {
-      doc.addPage();
-      yPos = 0.7;
-    }
-
-    // Pre-calculate wrapped text to determine row height
-    const vendorText = receipt.vendor || 'N/A';
-    const wrappedVendor = doc.splitTextToSize(vendorText, 1.0);
-    const categoryText = receipt.category || 'N/A';
-    const wrappedCategory = doc.splitTextToSize(categoryText, 0.9);
-    const detailsText = receipt.details || 'N/A';
-    const wrappedDetails = doc.splitTextToSize(detailsText, 2.3);
-
-    // Calculate max lines needed (determines row height)
-    const maxLines = Math.max(
-      Math.min(wrappedVendor.length, 2),
-      Math.min(wrappedCategory.length, 2),
-      Math.min(wrappedDetails.length, 2)
-    );
-
-    // Dynamic row height based on content (0.5" base + extra for wrapped lines)
-    const baseRowHeight = 0.5;
-    const extraHeightPerLine = 0.15;
-    const rowHeight = baseRowHeight + (maxLines > 1 ? extraHeightPerLine * (maxLines - 1) : 0);
-
-    // Alternating row background (pale Jayna blue like UI)
-    if (receipts.indexOf(receipt) % 2 === 0) {
-      doc.setFillColor(239, 246, 255); // Jayna blue pale
-      doc.rect(0.5, yPos, 7.5, rowHeight, 'F'); // Full row height background
-    }
-
-    // Vertical centering: start text at center of row
-    const textYPos = yPos + (rowHeight / 2) + 0.03; // Center text vertically + slight offset for baseline
-
-    // Vendor (with wrapping) - BOLD
+    // Section header
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(wrappedVendor.slice(0, 2), 0.6, textYPos); // Max 2 lines
+    doc.setTextColor(sectionColor[0], sectionColor[1], sectionColor[2]);
+    doc.text(sectionTitle, 0.5, yPos);
+    yPos += 0.25;
+
+    // Table header
+    doc.setFillColor(66, 66, 66);
+    doc.rect(0.5, yPos - 0.05, 7.5, 0.2, 'F');
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('VENDOR', 0.6, yPos + 0.08);
+    doc.text('DATE', 1.8, yPos + 0.08);
+    doc.text('AMOUNT', 2.8, yPos + 0.08);
+    doc.text('CATEGORY', 3.6, yPos + 0.08);
+    doc.text('DETAILS', 4.8, yPos + 0.08);
+    doc.text('IMAGE', 7.3, yPos + 0.08);
+
+    yPos += 0.25;
+
+    // Receipts (alternating Jayna blue background)
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(66, 66, 66);
 
-    // Date
-    doc.text(receipt.purchase_date, 1.8, textYPos);
+    for (const receipt of sectionReceipts) {
+      if (yPos > 9.5) {
+        doc.addPage();
+        yPos = 0.7;
+      }
 
-    // Amount
-    doc.text(`$${parseFloat(receipt.amount).toFixed(2)}`, 2.8, textYPos);
+      // Pre-calculate wrapped text to determine row height
+      const vendorText = receipt.vendor || 'N/A';
+      const wrappedVendor = doc.splitTextToSize(vendorText, 1.0);
+      const categoryText = receipt.category || 'N/A';
+      const wrappedCategory = doc.splitTextToSize(categoryText, 0.9);
+      const detailsText = receipt.details || 'N/A';
+      const wrappedDetails = doc.splitTextToSize(detailsText, 2.3);
 
-    // Category (with wrapping)
-    doc.text(wrappedCategory.slice(0, 2), 3.6, textYPos); // Max 2 lines
+      // Calculate max lines needed (determines row height)
+      const maxLines = Math.max(
+        Math.min(wrappedVendor.length, 2),
+        Math.min(wrappedCategory.length, 2),
+        Math.min(wrappedDetails.length, 2)
+      );
 
-    // Details (with wrapping)
-    doc.text(wrappedDetails.slice(0, 2), 4.8, textYPos); // Max 2 lines
+      // Dynamic row height based on content (0.5" base + extra for wrapped lines)
+      const baseRowHeight = 0.5;
+      const extraHeightPerLine = 0.15;
+      const rowHeight = baseRowHeight + (maxLines > 1 ? extraHeightPerLine * (maxLines - 1) : 0);
 
-    // Image page reference
-    if (receiptImagePages.has(receipt.id)) {
-      doc.setFont('helvetica', 'italic');
-      doc.setTextColor(59, 130, 246); // Jayna blue
-      doc.setFontSize(8);
-      doc.text(`Pg ${receiptImagePages.get(receipt.id)}`, 7.3, textYPos);
+      // Alternating row background (pale Jayna blue like UI)
+      if (sectionReceipts.indexOf(receipt) % 2 === 0) {
+        doc.setFillColor(239, 246, 255); // Jayna blue pale
+        doc.rect(0.5, yPos, 7.5, rowHeight, 'F'); // Full row height background
+      }
+
+      // Vertical centering: start text at center of row
+      const textYPos = yPos + (rowHeight / 2) + 0.03; // Center text vertically + slight offset for baseline
+
+      // Vendor (with wrapping) - BOLD
+      doc.setFont('helvetica', 'bold');
+      doc.text(wrappedVendor.slice(0, 2), 0.6, textYPos); // Max 2 lines
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(66, 66, 66);
-      doc.setFontSize(9);
+
+      // Date
+      doc.text(receipt.purchase_date, 1.8, textYPos);
+
+      // Amount
+      doc.text(`$${parseFloat(receipt.amount).toFixed(2)}`, 2.8, textYPos);
+
+      // Category (with wrapping)
+      doc.text(wrappedCategory.slice(0, 2), 3.6, textYPos); // Max 2 lines
+
+      // Details (with wrapping)
+      doc.text(wrappedDetails.slice(0, 2), 4.8, textYPos); // Max 2 lines
+
+      // Image page reference
+      if (receiptImagePages.has(receipt.id)) {
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(59, 130, 246); // Jayna blue
+        doc.setFontSize(8);
+        doc.text(`Pg ${receiptImagePages.get(receipt.id)}`, 7.3, textYPos);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(66, 66, 66);
+        doc.setFontSize(9);
+      }
+
+      // Move to next row (row height + small gap for visual separation)
+      yPos += rowHeight + 0.08;
     }
 
-    // Move to next row (row height + small gap for visual separation)
-    yPos += rowHeight + 0.08;
-  }
+    // Add spacing after section
+    yPos += 0.3;
+  };
+
+  // Render 3 separate sections
+  renderReceiptSection(amexReceipts, 'AMEX CARD 1100 RECEIPTS', [30, 64, 175]); // Blue
+  renderReceiptSection(cashReceipts, 'CASH RECEIPTS', [146, 64, 14]); // Yellow/Orange
+  renderReceiptSection(reimburseReceipts, 'PERSONAL/REIMBURSE RECEIPTS', [153, 27, 27]); // Red
 
   // Add image appendix pages
   for (const receipt of receipts) {
