@@ -246,7 +246,7 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.setTextColor(30, 64, 175); // Blue
   doc.text(`AMEX CARD 1100:`, 0.7, yPos);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${amexReceipts.length} entries | $${amexTotal.toFixed(2)}`, 2.2, yPos);
+  doc.text(`${amexReceipts.length} entries | $${amexTotal.toFixed(2)}`, 2.3, yPos);
   yPos += 0.18;
 
   // CASH Breakdown
@@ -254,7 +254,7 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.setTextColor(146, 64, 14); // Yellow/Orange
   doc.text(`CASH:`, 0.7, yPos);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${cashReceipts.length} entries | $${cashTotal.toFixed(2)}`, 2.2, yPos);
+  doc.text(`${cashReceipts.length} entries | $${cashTotal.toFixed(2)}`, 2.3, yPos);
   yPos += 0.18;
 
   // PERSONAL/REIMBURSE Breakdown
@@ -262,7 +262,7 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.setTextColor(153, 27, 27); // Red
   doc.text(`PERSONAL/REIMBURSE:`, 0.7, yPos);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${reimburseReceipts.length} entries | $${reimburseTotal.toFixed(2)}`, 2.2, yPos);
+  doc.text(`${reimburseReceipts.length} entries | $${reimburseTotal.toFixed(2)}`, 3.2, yPos);
   yPos += 0.25;
 
   // Grand Total Amount (bold, darker)
