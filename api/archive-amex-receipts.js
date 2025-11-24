@@ -407,18 +407,25 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
           doc.addPage();
 
           // Add header with receipt details
+          // Line 1: Vendor name (BLACK, BOLD, ALL CAPS)
           doc.setFontSize(12);
           doc.setFont('helvetica', 'bold');
-          doc.setTextColor(33, 33, 33);
-          doc.text('RECEIPT IMAGE', 4.25, 0.5, { align: 'center' });
+          doc.setTextColor(0, 0, 0); // Black
+          const vendorName = (receipt.vendor || 'N/A').toUpperCase();
+          doc.text(vendorName, 4.25, 0.5, { align: 'center' });
 
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(100, 100, 100);
-          doc.text(`${receipt.purchase_date} | ${receipt.category} | $${parseFloat(receipt.amount).toFixed(2)}`, 4.25, 0.75, { align: 'center' });
+          // Line 2: Date | Category | Amount | Payment Type (BLACK, BOLD, larger)
+          const paymentType = receipt.payment_type || 'AMEX CARD 1100';
+          doc.setFontSize(11); // Slightly larger than line 3
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(0, 0, 0); // Black
+          doc.text(`${receipt.purchase_date} | ${receipt.category} | $${parseFloat(receipt.amount).toFixed(2)} | ${paymentType}`, 4.25, 0.75, { align: 'center' });
 
+          // Line 3: Details (smaller, as before)
           if (receipt.details) {
             doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(100, 100, 100); // Gray
             const wrappedDetails = doc.splitTextToSize(receipt.details, 7);
             doc.text(wrappedDetails, 4.25, 0.95, { align: 'center' });
           }
