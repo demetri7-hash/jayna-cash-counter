@@ -1,13 +1,15 @@
 /**
  * Vercel Serverless Function: Process AMEX Receipt Files
  * Handles:
- * - Images: Compress to under 1MB
+ * - Images: Compress to under 1MB (including HEIC conversion)
+ * - HEIC: Convert to JPEG, then compress
  * - PDF/Word/Excel: Save as-is (no conversion)
  * Uploads to Supabase Storage
  */
 
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
+import convert from 'heic-convert';
 
 export const config = {
   api: {
@@ -47,8 +49,23 @@ export default async function handler(req, res) {
     let finalFileName = fileName || `receipt_${Date.now()}`;
     let contentType = fileType;
 
+    // Detect HEIC files by extension or MIME type
+    const isHEIC = fileName?.toLowerCase().endsWith('.heic') ||
+                   fileName?.toLowerCase().endsWith('.heif') ||
+                   fileType === 'image/heic' ||
+                   fileType === 'image/heif';
+
+    // Convert HEIC to JPEG first if needed
+    if (isHEIC) {
+      console.log('🔄 Converting HEIC to JPEG...');
+      fileBuffer = await convertHEICtoJPEG(fileBuffer);
+      finalFileName = finalFileName.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg');
+      contentType = 'image/jpeg';
+      console.log('✅ HEIC converted to JPEG');
+    }
+
     // Process based on file type
-    if (fileType.startsWith('image/')) {
+    if (fileType.startsWith('image/') || isHEIC) {
       // Compress images to under 1MB
       console.log('🖼️ Compressing image...');
       processedBuffer = await compressImage(fileBuffer);
@@ -137,5 +154,26 @@ async function compressImage(imageBuffer) {
     return compressed;
   } catch (error) {
     throw new Error(`Image compression failed: ${error.message}`);
+  }
+}
+
+/**
+ * Convert HEIC/HEIF to JPEG
+ */
+async function convertHEICtoJPEG(heicBuffer) {
+  try {
+    console.log(`📸 Converting HEIC file (${(heicBuffer.length / 1024).toFixed(0)}KB)...`);
+
+    const outputBuffer = await convert({
+      buffer: heicBuffer,
+      format: 'JPEG',
+      quality: 1 // Max quality for conversion (will compress later)
+    });
+
+    console.log(`✅ HEIC converted to JPEG (${(outputBuffer.length / 1024).toFixed(0)}KB)`);
+    return Buffer.from(outputBuffer);
+
+  } catch (error) {
+    throw new Error(`HEIC conversion failed: ${error.message}`);
   }
 }
