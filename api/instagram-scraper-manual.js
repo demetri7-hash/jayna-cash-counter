@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     const { data: config, error: configError } = await supabase
       .from('teacher_feast_config')
       .select('config_key, config_value')
-      .in('config_key', ['instagram_post_shortcode', 'last_scraped_comment_id']);
+      .in('config_key', ['instagram_post_shortcode', 'last_scraped_comment_id', 'instagram_session_cookie']);
 
     if (configError) throw configError;
 
@@ -45,6 +45,7 @@ export default async function handler(req, res) {
 
     const postShortcode = configMap.instagram_post_shortcode;
     const lastScrapedId = configMap.last_scraped_comment_id || null;
+    const sessionCookie = configMap.instagram_session_cookie || null;
 
     if (!postShortcode || postShortcode === 'PLACEHOLDER') {
       return res.status(400).json({
@@ -53,24 +54,38 @@ export default async function handler(req, res) {
       });
     }
 
+    if (!sessionCookie) {
+      console.log('⚠️ No session cookie configured - Instagram may block requests');
+    }
+
     console.log(`📸 Scraping comments from post: ${postShortcode}`);
     console.log(`📍 Last scraped comment ID: ${lastScrapedId || 'None (first run)'}`);
 
     // Try multiple Instagram endpoint formats
     // Based on working GitHub solutions (2024-2025)
+    const baseHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'X-IG-App-ID': '936619743392459', // Critical header from working scrapers
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Referer': `https://www.instagram.com/p/${postShortcode}/`,
+      'Origin': 'https://www.instagram.com'
+    };
+
+    // Add session cookie if configured (allows authenticated requests to bypass blocking)
+    if (sessionCookie) {
+      baseHeaders['Cookie'] = `sessionid=${sessionCookie}`;
+      console.log('🔐 Using authenticated session cookie');
+    }
+
     const endpointsToTry = [
       {
         name: 'GraphQL API (X-IG-App-ID)',
         url: `https://www.instagram.com/api/graphql`,
         method: 'POST',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'X-IG-App-ID': '936619743392459', // Critical header from working scrapers
+          ...baseHeaders,
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': '*/*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Origin': 'https://www.instagram.com',
-          'Referer': `https://www.instagram.com/p/${postShortcode}/`
+          'Accept': '*/*'
         },
         body: `variables={"shortcode":"${postShortcode}","first":50}&doc_id=25531498899829322`
       },
@@ -79,12 +94,9 @@ export default async function handler(req, res) {
         url: `https://www.instagram.com/p/${postShortcode}/?__a=1&__d=dis`,
         method: 'GET',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          ...baseHeaders,
           'Accept': 'application/json, text/html',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'X-IG-App-ID': '936619743392459',
-          'X-Requested-With': 'XMLHttpRequest',
-          'Referer': 'https://www.instagram.com/'
+          'X-Requested-With': 'XMLHttpRequest'
         }
       },
       {
@@ -92,10 +104,8 @@ export default async function handler(req, res) {
         url: `https://www.instagram.com/graphql/query/?query_hash=f0986789a5c5d17c2400faebf16efd0d&variables={"shortcode":"${postShortcode}"}`,
         method: 'GET',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'X-IG-App-ID': '936619743392459',
-          'Accept': '*/*',
-          'Referer': `https://www.instagram.com/p/${postShortcode}/`
+          ...baseHeaders,
+          'Accept': '*/*'
         }
       },
       {
@@ -103,8 +113,7 @@ export default async function handler(req, res) {
         url: `https://www.instagram.com/p/${postShortcode}/?__a=1`,
         method: 'GET',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'X-IG-App-ID': '936619743392459',
+          ...baseHeaders,
           'Accept': 'application/json'
         }
       }
@@ -140,6 +149,16 @@ export default async function handler(req, res) {
 
           // Now parse the cleaned JSON
           data = JSON.parse(responseText);
+
+          // Check if Instagram returned an error payload (soft-block)
+          if (data.error || (data.payload === null && data.errorSummary)) {
+            const errorMsg = data.errorDescription || data.errorSummary || 'Unknown Instagram error';
+            console.log(`❌ Instagram returned error ${data.error}: ${errorMsg}`);
+            lastError = `Instagram error ${data.error}: ${errorMsg}`;
+            data = null; // Clear data so we try next endpoint
+            continue;
+          }
+
           console.log(`✅ Success with ${endpoint.name}!`);
           console.log(`📊 Response structure:`, Object.keys(data));
           break;
@@ -155,7 +174,10 @@ export default async function handler(req, res) {
     }
 
     if (!data) {
-      throw new Error(`All Instagram endpoints failed. Last error: ${lastError}. Instagram may be blocking automated requests. Please use the CSV Import method as a backup.`);
+      const errorMsg = sessionCookie
+        ? `All Instagram endpoints failed. Last error: ${lastError}. Your session cookie may be expired. Try refreshing it or use the CSV Import method.`
+        : `All Instagram endpoints failed. Last error: ${lastError}. Instagram is blocking unauthenticated requests. Please add your Instagram session cookie to the config (see documentation) or use the CSV Import method.`;
+      throw new Error(errorMsg);
     }
 
     // Extract media data from Instagram response

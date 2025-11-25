@@ -278,6 +278,10 @@
                         <div class="status-value" id="currentShortcode">--</div>
                     </div>
                     <div class="status-row">
+                        <div class="status-label">Session Cookie:</div>
+                        <div class="status-value" id="sessionCookieStatus">--</div>
+                    </div>
+                    <div class="status-row">
                         <div class="status-label">Last Scraped Comment ID:</div>
                         <div class="status-value" id="lastScrapedId">--</div>
                     </div>
@@ -311,6 +315,15 @@
                 </div>
                 <div class="help-text" style="color: #065f46;">
                     ✓ This is what will be saved to the database
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="sessionCookie">🔐 Instagram Session Cookie (Optional but Recommended):</label>
+                <input type="password" id="sessionCookie" placeholder="Paste your Instagram sessionid cookie here">
+                <div class="help-text">
+                    <strong>Why needed?</strong> Instagram blocks unauthenticated scraping requests. Adding your session cookie allows the scraper to make authenticated requests (read-only, safe).<br>
+                    <strong>📖 <a href="/INSTAGRAM_SESSION_COOKIE_GUIDE.md" target="_blank" style="color: #176F9A; font-weight: 700;">Click here for step-by-step guide</a></strong> on how to get your session cookie from your browser.
                 </div>
             </div>
 
@@ -429,7 +442,7 @@
                 const { data, error } = await supabase
                     .from('teacher_feast_config')
                     .select('config_key, config_value')
-                    .in('config_key', ['instagram_post_shortcode', 'last_scraped_comment_id']);
+                    .in('config_key', ['instagram_post_shortcode', 'last_scraped_comment_id', 'instagram_session_cookie']);
 
                 if (error) throw error;
 
@@ -442,6 +455,11 @@
                     config.instagram_post_shortcode || 'Not configured';
                 document.getElementById('lastScrapedId').textContent =
                     config.last_scraped_comment_id || 'None (first run)';
+
+                const hasCookie = config.instagram_session_cookie && config.instagram_session_cookie.length > 10;
+                const cookieStatus = hasCookie ? '🔐 Configured' : '⚠️ Not configured (may be blocked)';
+                document.getElementById('sessionCookieStatus').textContent = cookieStatus;
+                document.getElementById('sessionCookieStatus').style.color = hasCookie ? '#059669' : '#ea580c';
 
                 const isConfigured = config.instagram_post_shortcode &&
                                    config.instagram_post_shortcode !== 'PLACEHOLDER';
@@ -470,7 +488,8 @@
             document.getElementById('saveBtn').textContent = 'Saving...';
 
             try {
-                const { error } = await supabase
+                // Save shortcode
+                const { error: shortcodeError } = await supabase
                     .from('teacher_feast_config')
                     .upsert({
                         config_key: 'instagram_post_shortcode',
@@ -480,12 +499,30 @@
                         onConflict: 'config_key'
                     });
 
-                if (error) throw error;
+                if (shortcodeError) throw shortcodeError;
 
-                showSuccess(`✅ Configuration saved! Scraper will monitor shortcode: ${currentShortcode}`);
+                // Save session cookie if provided
+                const sessionCookie = document.getElementById('sessionCookie').value.trim();
+                if (sessionCookie) {
+                    const { error: cookieError } = await supabase
+                        .from('teacher_feast_config')
+                        .upsert({
+                            config_key: 'instagram_session_cookie',
+                            config_value: sessionCookie,
+                            updated_at: new Date().toISOString()
+                        }, {
+                            onConflict: 'config_key'
+                        });
+
+                    if (cookieError) throw cookieError;
+                }
+
+                const cookieMsg = sessionCookie ? ' (with session cookie)' : ' (without session cookie - may be blocked)';
+                showSuccess(`✅ Configuration saved! Scraper will monitor shortcode: ${currentShortcode}${cookieMsg}`);
 
                 // Clear the form
                 document.getElementById('postUrl').value = '';
+                document.getElementById('sessionCookie').value = '';
                 document.getElementById('extractedShortcodeGroup').style.display = 'none';
                 currentShortcode = '';
 
