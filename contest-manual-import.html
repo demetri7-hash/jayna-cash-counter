@@ -314,15 +314,18 @@ Love this! @lincolnhigh
                     5. Click "Parse & Preview" to process<br>
                     6. Repeat daily for 15 days - smart duplicate detection works automatically!<br>
                     <br>
-                    🧠 <strong>Smart Duplicate Detection:</strong><br>
-                    • Tracks when YOU import comments (not Instagram's changing timestamps)<br>
-                    • Same text + school imported on SAME DAY = duplicate (prevents re-pasting)<br>
-                    • Same text + school imported on DIFFERENT DAYS = counts (new vote)<br>
-                    • Perfect for daily imports over 15 days - paste safely each day! ✅<br>
+                    🧠 <strong>Smart Duplicate Detection (12-Hour Tolerance):</strong><br>
+                    • Calculates ACTUAL comment time from Instagram's timestamp ("7h ago", "1d ago")<br>
+                    • Same text + school + within 12 hours = duplicate (same comment)<br>
+                    • Same text + school + outside 12 hours = COUNTS (new vote)<br>
+                    • Perfect for once-daily imports - accounts for Instagram's timestamp drift ✅<br>
                     <br>
-                    Example: Monday you paste "❤️ @lincolnhigh" → counts<br>
-                    Tuesday you accidentally re-paste Monday's comments → skipped (same day's data still visible)<br>
-                    Wednesday someone new comments "❤️ @lincolnhigh" → COUNTS! (different day = new vote)
+                    <strong>Example:</strong><br>
+                    • Day 1 (Mon 9am): "❤️ @lincolnhigh" shows "7h ago" → calculates to Mon 2am → COUNTS<br>
+                    • Day 2 (Tue 9am): SAME comment shows "1d ago" → calculates to Mon 9am<br>
+                    &nbsp;&nbsp;→ Compare: Mon 2am vs Mon 9am = 7h difference → within 12h → DUPLICATE ✅<br>
+                    • Day 3 (Wed 9am): NEW comment "❤️ @lincolnhigh" posted Wed 6am<br>
+                    &nbsp;&nbsp;→ Compare: Mon 2am vs Wed 6am = 52h difference → outside 12h → COUNTS! 🎉
                 </div>
             </div>
 
@@ -622,16 +625,12 @@ Love this! @lincolnhigh
             }
         }
 
-        function getImportDate() {
-            // Get today's date as YYYY-MM-DD (used for duplicate detection)
-            const today = new Date();
-            return today.toISOString().split('T')[0]; // "2025-11-25"
-        }
-
         function isDuplicate(commentText, schoolName, timestamp) {
-            // Check if this comment + school was already imported TODAY
+            // Check if this comment + school + calculated timestamp already exists
+            // Uses 12-hour tolerance to account for Instagram's timestamp imprecision
             const normalized = commentText.toLowerCase().trim();
-            const todayImportDate = getImportDate();
+            const commentTime = new Date(timestamp);
+            const TOLERANCE_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
 
             return existingVotes.some(vote => {
                 const existingNormalized = (vote.comment_text || '').toLowerCase().trim();
@@ -641,18 +640,19 @@ Love this! @lincolnhigh
                     return false;
                 }
 
-                // Check if it was imported on the same day
+                // Compare calculated timestamps with 12-hour tolerance
                 if (vote.voted_at) {
-                    const existingImportDate = new Date(vote.voted_at).toISOString().split('T')[0];
+                    const existingTime = new Date(vote.voted_at);
+                    const timeDiff = Math.abs(commentTime - existingTime);
 
-                    // If imported on same day, it's a duplicate
-                    if (existingImportDate === todayImportDate) {
+                    // If within 12 hours, it's the same comment
+                    if (timeDiff <= TOLERANCE_MS) {
                         return true;
                     }
                 }
 
-                // If no timestamp, fall back to exact text match (old data)
-                return existingNormalized === normalized && vote.school_name === schoolName;
+                // No match found
+                return false;
             });
         }
 
@@ -726,7 +726,7 @@ Love this! @lincolnhigh
             const school = document.createElement('div');
             school.className = `preview-school ${cssClass}`;
             if (vote.is_duplicate) {
-                school.textContent = `⚠️ DUPLICATE: ${vote.matched_school || 'No match'} (already imported today)`;
+                school.textContent = `⚠️ DUPLICATE: ${vote.matched_school || 'No match'} (same comment within 12h window)`;
             } else if (vote.matched_school) {
                 school.textContent = `✅ Matched to: ${vote.matched_school} (+${vote.points} pt${vote.points > 1 ? 's' : ''})`;
             } else {
@@ -802,8 +802,8 @@ Love this! @lincolnhigh
                 let errorCount = 0;
 
                 for (const vote of validVotes) {
-                    // Insert vote with CURRENT timestamp (tracks when YOU imported it)
-                    // This is critical for duplicate detection across multiple days!
+                    // Insert vote with CALCULATED timestamp from Instagram's relative time
+                    // This allows smart duplicate detection across multiple days
                     const { error: voteError } = await supabase
                         .from('teacher_feast_votes')
                         .insert([{
@@ -811,7 +811,7 @@ Love this! @lincolnhigh
                             vote_type: vote.vote_type,
                             points: vote.points,
                             comment_text: vote.comment_text,
-                            voted_at: new Date().toISOString() // Use IMPORT time, not Instagram's relative time
+                            voted_at: vote.voted_at // Use calculated comment time from Instagram timestamp
                         }]);
 
                     if (voteError) {
