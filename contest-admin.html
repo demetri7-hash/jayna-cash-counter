@@ -573,7 +573,7 @@
                 // Load existing votes for duplicate detection
                 const { data: votes, error: votesError } = await supabase
                     .from('teacher_feast_votes')
-                    .select('comment_text, school_name, instagram_username, vote_type, voted_at');
+                    .select('instagram_comment_id, school_name, instagram_username, vote_type, voted_at');
 
                 if (votesError) throw votesError;
                 existingVotes = votes;
@@ -645,7 +645,7 @@
                         };
 
                         // Check for duplicates using 12-hour tolerance
-                        if (isDuplicate(content, matchedSchool, vote.published)) {
+                        if (isDuplicate(content, matchedSchool, vote.published, username)) {
                             vote.is_duplicate = true;
                             vote.is_valid = false;
                         }
@@ -770,17 +770,15 @@
             return null;
         }
 
-        function isDuplicate(commentText, schoolName, timestamp) {
+        function isDuplicate(commentText, schoolName, timestamp, username) {
             // 12-hour tolerance window for duplicate detection
-            const normalized = commentText.toLowerCase().trim();
+            // Uses username + school + timestamp (since comment_text not stored in DB)
             const commentTime = new Date(timestamp);
             const TOLERANCE_MS = 12 * 60 * 60 * 1000; // 12 hours
 
             return existingVotes.some(vote => {
-                const existingNormalized = (vote.comment_text || '').toLowerCase().trim();
-
-                // Must match: same text + same school
-                if (existingNormalized !== normalized || vote.school_name !== schoolName) {
+                // Must match: same username + same school
+                if (vote.instagram_username !== username || vote.school_name !== schoolName) {
                     return false;
                 }
 
@@ -789,6 +787,7 @@
                     const existingTime = new Date(vote.voted_at);
                     const timeDiff = Math.abs(commentTime - existingTime);
 
+                    // If same user voted for same school within 12 hours, it's a duplicate
                     if (timeDiff <= TOLERANCE_MS) {
                         return true;
                     }
@@ -883,7 +882,6 @@
                             school_name: vote.matched_school,
                             vote_type: vote.vote_type,
                             points: vote.points,
-                            comment_text: vote.content,
                             instagram_username: vote.username,
                             voted_at: vote.published
                         }]);
