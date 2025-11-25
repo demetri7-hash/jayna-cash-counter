@@ -56,42 +56,90 @@ export default async function handler(req, res) {
     console.log(`📸 Scraping comments from post: ${postShortcode}`);
     console.log(`📍 Last scraped comment ID: ${lastScrapedId || 'None (first run)'}`);
 
-    // Try multiple Instagram endpoint formats (they keep changing!)
+    // Try multiple Instagram endpoint formats
+    // Based on working GitHub solutions (2024-2025)
     const endpointsToTry = [
-      `https://www.instagram.com/p/${postShortcode}/?__a=1&__d=dis`,
-      `https://www.instagram.com/graphql/query/?query_hash=f0986789a5c5d17c2400faebf16efd0d&variables={"shortcode":"${postShortcode}"}`,
-      `https://i.instagram.com/api/v1/media/${postShortcode}/comments/`,
-      `https://www.instagram.com/p/${postShortcode}/?__a=1`
+      {
+        name: 'GraphQL API (X-IG-App-ID)',
+        url: `https://www.instagram.com/api/graphql`,
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'X-IG-App-ID': '936619743392459', // Critical header from working scrapers
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': '*/*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Origin': 'https://www.instagram.com',
+          'Referer': `https://www.instagram.com/p/${postShortcode}/`
+        },
+        body: `variables={"shortcode":"${postShortcode}","first":50}&doc_id=25531498899829322`
+      },
+      {
+        name: 'Public JSON Endpoint',
+        url: `https://www.instagram.com/p/${postShortcode}/?__a=1&__d=dis`,
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/html',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'X-IG-App-ID': '936619743392459',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Referer': 'https://www.instagram.com/'
+        }
+      },
+      {
+        name: 'GraphQL Query Hash',
+        url: `https://www.instagram.com/graphql/query/?query_hash=f0986789a5c5d17c2400faebf16efd0d&variables={"shortcode":"${postShortcode}"}`,
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'X-IG-App-ID': '936619743392459',
+          'Accept': '*/*',
+          'Referer': `https://www.instagram.com/p/${postShortcode}/`
+        }
+      },
+      {
+        name: 'Legacy API',
+        url: `https://www.instagram.com/p/${postShortcode}/?__a=1`,
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'X-IG-App-ID': '936619743392459',
+          'Accept': 'application/json'
+        }
+      }
     ];
 
     let data = null;
     let lastError = null;
 
-    for (const instagramUrl of endpointsToTry) {
+    for (const endpoint of endpointsToTry) {
       try {
-        console.log(`🔄 Trying endpoint: ${instagramUrl.substring(0, 60)}...`);
+        console.log(`🔄 Trying ${endpoint.name}...`);
 
-        const response = await fetch(instagramUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/html',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Referer': 'https://www.instagram.com/'
-          }
-        });
+        const fetchOptions = {
+          method: endpoint.method,
+          headers: endpoint.headers
+        };
+
+        if (endpoint.body) {
+          fetchOptions.body = endpoint.body;
+        }
+
+        const response = await fetch(endpoint.url, fetchOptions);
 
         if (response.ok) {
           data = await response.json();
-          console.log(`✅ Success with endpoint!`);
+          console.log(`✅ Success with ${endpoint.name}!`);
+          console.log(`📊 Response structure:`, Object.keys(data));
           break;
         } else {
           lastError = `${response.status}: ${response.statusText}`;
-          console.log(`❌ Endpoint failed: ${lastError}`);
+          console.log(`❌ ${endpoint.name} failed: ${lastError}`);
         }
       } catch (error) {
         lastError = error.message;
-        console.log(`❌ Endpoint error: ${lastError}`);
+        console.log(`❌ ${endpoint.name} error: ${lastError}`);
         continue;
       }
     }
@@ -101,10 +149,33 @@ export default async function handler(req, res) {
     }
 
     // Extract media data from Instagram response
-    const media = data?.items?.[0] || data?.graphql?.shortcode_media;
+    // Try multiple response structures (Instagram keeps changing their API)
+    let media = null;
+
+    // Structure 1: GraphQL API (data.data.xdt_shortcode_media)
+    if (data?.data?.xdt_shortcode_media) {
+      media = data.data.xdt_shortcode_media;
+      console.log('📦 Using GraphQL API response structure');
+    }
+    // Structure 2: Legacy GraphQL (data.graphql.shortcode_media)
+    else if (data?.graphql?.shortcode_media) {
+      media = data.graphql.shortcode_media;
+      console.log('📦 Using legacy GraphQL response structure');
+    }
+    // Structure 3: Items array (data.items[0])
+    else if (data?.items?.[0]) {
+      media = data.items[0];
+      console.log('📦 Using items array response structure');
+    }
+    // Structure 4: Direct media object
+    else if (data?.shortcode_media) {
+      media = data.shortcode_media;
+      console.log('📦 Using direct media object structure');
+    }
 
     if (!media) {
-      throw new Error('Unable to parse Instagram response - media data not found');
+      console.error('❌ Full response data:', JSON.stringify(data, null, 2).substring(0, 500));
+      throw new Error('Unable to parse Instagram response - media data not found. Check console for response structure.');
     }
 
     // Extract comments from media data
@@ -112,21 +183,34 @@ export default async function handler(req, res) {
 
     // Try different response structures (Instagram changes format)
     if (media.edge_media_to_parent_comment) {
-      // GraphQL format
+      // GraphQL format (most common)
+      console.log(`💬 Found ${media.edge_media_to_parent_comment.edges?.length || 0} comments in GraphQL format`);
       allComments = media.edge_media_to_parent_comment.edges.map(edge => ({
         id: edge.node.id,
         text: edge.node.text,
         username: edge.node.owner.username,
         timestamp: edge.node.created_at
       }));
+    } else if (media.edge_media_preview_comment) {
+      // Alternative GraphQL format (preview comments)
+      console.log(`💬 Found ${media.edge_media_preview_comment.edges?.length || 0} comments in preview format`);
+      allComments = media.edge_media_preview_comment.edges.map(edge => ({
+        id: edge.node.id,
+        text: edge.node.text,
+        username: edge.node.owner.username,
+        timestamp: edge.node.created_at
+      }));
     } else if (media.comments) {
-      // Alternative format
+      // API v1 format
+      console.log(`💬 Found ${media.comments.length} comments in API v1 format`);
       allComments = media.comments.map(comment => ({
         id: comment.pk || comment.id,
         text: comment.text,
         username: comment.user?.username || 'unknown',
         timestamp: comment.created_at || comment.created_at_utc
       }));
+    } else {
+      console.error('❌ No comments found in media object. Available keys:', Object.keys(media));
     }
 
     console.log(`📥 Fetched ${allComments.length} comments total`);
