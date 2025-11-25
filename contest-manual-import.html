@@ -312,7 +312,13 @@ Love this! @lincolnhigh
                     3. Select and copy all visible comments (you can copy 20-50 at a time)<br>
                     4. Paste them in the box above<br>
                     5. Click "Parse & Preview" to process<br>
-                    6. Repeat daily for 15 days - duplicates will be automatically detected and skipped!
+                    6. Repeat daily for 15 days - smart duplicate detection works automatically!<br>
+                    <br>
+                    🧠 <strong>Smart Duplicate Detection:</strong><br>
+                    • Parses Instagram timestamps (7h, 1d, 22h) automatically<br>
+                    • Allows multiple people to comment the same text for the same school<br>
+                    • Only blocks duplicates within ±2 hour window (prevents accidental re-pasting)<br>
+                    • "❤️❤️❤️ @lincolnhigh" posted 7h ago + 1d ago = BOTH COUNT! ✅
                 </div>
             </div>
 
@@ -412,10 +418,10 @@ Love this! @lincolnhigh
                 if (schoolsError) throw schoolsError;
                 validSchools = schools;
 
-                // Load existing votes for duplicate detection
+                // Load existing votes for duplicate detection (include timestamp)
                 const { data: votes, error: votesError } = await supabase
                     .from('teacher_feast_votes')
-                    .select('comment_text, school_name, instagram_username, vote_type');
+                    .select('comment_text, school_name, instagram_username, vote_type, voted_at');
 
                 if (votesError) throw votesError;
                 existingVotes = votes;
@@ -451,6 +457,9 @@ Love this! @lincolnhigh
 
                 const commentText = lines[0].trim();
 
+                // Parse Instagram timestamp (e.g., "7h", "1d", "22h", "2m", "3w")
+                const timestamp = parseInstagramTimestamp(block);
+
                 // Extract @handles and #hashtags
                 const tags = extractTags(commentText);
 
@@ -464,14 +473,16 @@ Love this! @lincolnhigh
                         comment_text: commentText,
                         tag: tag,
                         matched_school: matchedSchool,
+                        voted_at: timestamp,
+                        timestamp_display: formatTimestamp(timestamp),
                         points: 1,
                         vote_type: 'instagram_manual',
                         is_duplicate: false,
                         is_valid: !!matchedSchool
                     };
 
-                    // Check for duplicates
-                    if (matchedSchool && isDuplicate(commentText, matchedSchool)) {
+                    // Check for duplicates (using timestamp-aware detection)
+                    if (matchedSchool && isDuplicate(commentText, matchedSchool, timestamp)) {
                         vote.is_duplicate = true;
                         vote.is_valid = false;
                     }
@@ -553,12 +564,89 @@ Love this! @lincolnhigh
             return null; // No match found
         }
 
-        function isDuplicate(commentText, schoolName) {
-            // Check if this exact comment + school combo already exists
+        function parseInstagramTimestamp(commentBlock) {
+            // Parse Instagram relative timestamps (7h, 1d, 22h, 2m, 3w)
+            const timestampPattern = /(\d+)(m|h|d|w)\s*\d*\s*likes?/i;
+            const match = commentBlock.match(timestampPattern);
+
+            if (!match) {
+                // No timestamp found, use current time
+                return new Date().toISOString();
+            }
+
+            const value = parseInt(match[1]);
+            const unit = match[2].toLowerCase();
+
+            // Calculate approximate time based on Instagram's relative format
+            const now = new Date();
+            let milliseconds = 0;
+
+            switch (unit) {
+                case 'm': // minutes
+                    milliseconds = value * 60 * 1000;
+                    break;
+                case 'h': // hours
+                    milliseconds = value * 60 * 60 * 1000;
+                    break;
+                case 'd': // days
+                    milliseconds = value * 24 * 60 * 60 * 1000;
+                    break;
+                case 'w': // weeks
+                    milliseconds = value * 7 * 24 * 60 * 60 * 1000;
+                    break;
+            }
+
+            const commentTime = new Date(now.getTime() - milliseconds);
+            return commentTime.toISOString();
+        }
+
+        function formatTimestamp(isoString) {
+            // Format timestamp for display (e.g., "2 hours ago", "1 day ago")
+            const commentTime = new Date(isoString);
+            const now = new Date();
+            const diffMs = now - commentTime;
+            const diffMins = Math.floor(diffMs / (60 * 1000));
+            const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+            const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+
+            if (diffMins < 60) {
+                return `${diffMins}m ago`;
+            } else if (diffHours < 24) {
+                return `${diffHours}h ago`;
+            } else {
+                return `${diffDays}d ago`;
+            }
+        }
+
+        function isDuplicate(commentText, schoolName, timestamp) {
+            // Check if this comment + school + similar timestamp already exists
             const normalized = commentText.toLowerCase().trim();
+            const commentTime = new Date(timestamp);
+
+            // Tolerance window: ±2 hours (same comment within 2 hours = duplicate)
+            const TOLERANCE_MS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
             return existingVotes.some(vote => {
                 const existingNormalized = (vote.comment_text || '').toLowerCase().trim();
+
+                // Must match: same text + same school
+                if (existingNormalized !== normalized || vote.school_name !== schoolName) {
+                    return false;
+                }
+
+                // If we have timestamp data, check if it's within tolerance window
+                if (vote.voted_at) {
+                    const existingTime = new Date(vote.voted_at);
+                    const timeDiff = Math.abs(commentTime - existingTime);
+
+                    // If within 2 hours, it's likely the same comment
+                    if (timeDiff <= TOLERANCE_MS) {
+                        return true;
+                    }
+                }
+
+                // Fallback: If no timestamp or outside tolerance, check if exact match
+                // (This handles old votes without timestamps)
                 return existingNormalized === normalized && vote.school_name === schoolName;
             });
         }
@@ -623,13 +711,17 @@ Love this! @lincolnhigh
 
             const tags = document.createElement('div');
             tags.className = 'preview-tags';
-            tags.innerHTML = `<strong>Extracted tag:</strong> ${vote.tag || 'N/A'}`;
+            if (vote.timestamp_display) {
+                tags.innerHTML = `<strong>Extracted tag:</strong> ${vote.tag || 'N/A'} | <strong>Posted:</strong> ${vote.timestamp_display}`;
+            } else {
+                tags.innerHTML = `<strong>Extracted tag:</strong> ${vote.tag || 'N/A'}`;
+            }
             item.appendChild(tags);
 
             const school = document.createElement('div');
             school.className = `preview-school ${cssClass}`;
             if (vote.is_duplicate) {
-                school.textContent = `⚠️ DUPLICATE: ${vote.matched_school || 'No match'} (already counted)`;
+                school.textContent = `⚠️ DUPLICATE: ${vote.matched_school || 'No match'} (already counted within 2h window)`;
             } else if (vote.matched_school) {
                 school.textContent = `✅ Matched to: ${vote.matched_school} (+${vote.points} pt${vote.points > 1 ? 's' : ''})`;
             } else {
@@ -669,6 +761,8 @@ Love this! @lincolnhigh
                 comment_text: `Newsletter: ${email}`,
                 tag: schoolInput,
                 matched_school: matchedSchool,
+                voted_at: new Date().toISOString(),
+                timestamp_display: 'just now',
                 points: 2,
                 vote_type: 'newsletter',
                 is_duplicate: isDupe,
@@ -703,7 +797,7 @@ Love this! @lincolnhigh
                 let errorCount = 0;
 
                 for (const vote of validVotes) {
-                    // Insert vote
+                    // Insert vote with actual Instagram timestamp (not current time)
                     const { error: voteError } = await supabase
                         .from('teacher_feast_votes')
                         .insert([{
@@ -711,7 +805,7 @@ Love this! @lincolnhigh
                             vote_type: vote.vote_type,
                             points: vote.points,
                             comment_text: vote.comment_text,
-                            voted_at: new Date().toISOString()
+                            voted_at: vote.voted_at || new Date().toISOString()
                         }]);
 
                     if (voteError) {
