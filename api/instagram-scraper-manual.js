@@ -129,7 +129,17 @@ export default async function handler(req, res) {
         const response = await fetch(endpoint.url, fetchOptions);
 
         if (response.ok) {
-          data = await response.json();
+          // Get raw text first (Instagram may prefix JSON with "for (;;);" to prevent hijacking)
+          let responseText = await response.text();
+
+          // Strip Instagram's JSON prefix if present
+          if (responseText.startsWith('for (;;);')) {
+            console.log('🔧 Stripping Instagram JSON prefix: for (;;);');
+            responseText = responseText.substring('for (;;);'.length);
+          }
+
+          // Now parse the cleaned JSON
+          data = JSON.parse(responseText);
           console.log(`✅ Success with ${endpoint.name}!`);
           console.log(`📊 Response structure:`, Object.keys(data));
           break;
