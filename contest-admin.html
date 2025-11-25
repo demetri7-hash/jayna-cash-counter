@@ -216,6 +216,129 @@
             background: #c5e1a5;
             color: #33691e;
         }
+
+        .btn {
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(70, 176, 228, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #176F9A;
+            border: 2px solid #46B0E4;
+        }
+
+        .file-input-wrapper {
+            display: inline-block;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .preview-box {
+            background: #f9fafb;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .preview-item {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .preview-item.valid {
+            border-color: #059669;
+            background: #f0fdf4;
+        }
+
+        .preview-item.invalid {
+            border-color: #dc2626;
+            background: #fef2f2;
+        }
+
+        .preview-item.duplicate {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .import-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .import-stat {
+            background: #f0f9ff;
+            border: 2px solid #46B0E4;
+            border-radius: 5px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .import-stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #176F9A;
+        }
+
+        .import-stat-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .success-message, .error-message {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .success-message {
+            background: #d1fae5;
+            border: 2px solid #059669;
+            color: #065f46;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            border: 2px solid #dc2626;
+            color: #991b1b;
+        }
     </style>
 </head>
 <body>
@@ -233,6 +356,55 @@
         </div>
 
         <button class="refresh-btn" onclick="loadData()">🔄 Refresh Data</button>
+
+        <!-- CSV Import Section -->
+        <div class="section">
+            <h2>📁 Import Instagram Comments (CSV)</h2>
+            <p style="margin-bottom: 20px; color: #666;">
+                Upload CSV exported from Instagram comments (Chrome extension). Smart duplicate detection using exact timestamps.
+            </p>
+
+            <div class="success-message" id="successMessage"></div>
+            <div class="error-message" id="errorMessage"></div>
+
+            <div class="file-input-wrapper">
+                <button class="btn">📤 Select CSV File</button>
+                <input type="file" id="csvFileInput" accept=".csv" onchange="handleFileSelect(event)">
+            </div>
+            <span id="fileName" style="margin-left: 15px; color: #666;"></span>
+
+            <div id="previewSection" style="display: none;">
+                <div class="import-stats">
+                    <div class="import-stat">
+                        <div class="import-stat-value" id="statTotal">0</div>
+                        <div class="import-stat-label">Total</div>
+                    </div>
+                    <div class="import-stat">
+                        <div class="import-stat-value" id="statValid">0</div>
+                        <div class="import-stat-label">Valid</div>
+                    </div>
+                    <div class="import-stat">
+                        <div class="import-stat-value" id="statDuplicates">0</div>
+                        <div class="import-stat-label">Duplicates</div>
+                    </div>
+                    <div class="import-stat">
+                        <div class="import-stat-value" id="statInvalid">0</div>
+                        <div class="import-stat-label">Invalid</div>
+                    </div>
+                    <div class="import-stat">
+                        <div class="import-stat-value" id="statPoints">0</div>
+                        <div class="import-stat-label">Points</div>
+                    </div>
+                </div>
+
+                <div class="preview-box" id="previewBox"></div>
+
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="saveVotes()" id="saveBtn">💾 Save All Votes</button>
+                    <button class="btn btn-secondary" onclick="cancelImport()">❌ Cancel</button>
+                </div>
+            </div>
+        </div>
 
         <div class="stats-grid">
             <div class="stat-card">
@@ -373,6 +545,410 @@
 
         // Auto-refresh every 60 seconds
         setInterval(loadData, 60000);
+    </script>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const supabase = createClient(
+            'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+        );
+
+        let validSchools = [];
+        let existingVotes = [];
+        let parsedVotes = [];
+
+        // Load schools and existing votes
+        async function loadSchoolsAndVotes() {
+            try {
+                // Load valid schools
+                const { data: schools, error: schoolsError } = await supabase
+                    .from('teacher_feast_schools')
+                    .select('school_name, instagram_handles');
+
+                if (schoolsError) throw schoolsError;
+                validSchools = schools;
+
+                // Load existing votes for duplicate detection
+                const { data: votes, error: votesError } = await supabase
+                    .from('teacher_feast_votes')
+                    .select('comment_text, school_name, instagram_username, vote_type, voted_at');
+
+                if (votesError) throw votesError;
+                existingVotes = votes;
+
+                console.log(`✅ Loaded ${validSchools.length} schools and ${existingVotes.length} existing votes`);
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showError('Failed to load school data: ' + error.message);
+            }
+        }
+
+        window.handleFileSelect = async function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileName').textContent = file.name;
+
+            // Load schools and votes if not already loaded
+            if (validSchools.length === 0) {
+                await loadSchoolsAndVotes();
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csv = e.target.result;
+                parseCSV(csv);
+            };
+            reader.readAsText(file);
+        };
+
+        function parseCSV(csv) {
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',');
+
+            parsedVotes = [];
+
+            // CSV format: User Name,UID,Profile URL,Content,Published,URL
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                const values = parseCSVLine(line);
+                if (values.length < 6) continue;
+
+                const username = values[0];
+                const content = values[3];
+                const published = values[4]; // Format: 2025/11/24 09:14:38
+
+                if (!content) continue;
+
+                // Extract school tags
+                const tags = extractSchoolTags(content);
+
+                for (const tag of tags) {
+                    const matchedSchool = matchSchoolName(tag);
+
+                    if (matchedSchool) {
+                        const vote = {
+                            username: username,
+                            content: content,
+                            tag: tag,
+                            matched_school: matchedSchool,
+                            published: parsePublishedDate(published),
+                            points: 1,
+                            vote_type: 'instagram_manual',
+                            is_duplicate: false,
+                            is_valid: true
+                        };
+
+                        // Check for duplicates using 12-hour tolerance
+                        if (isDuplicate(content, matchedSchool, vote.published)) {
+                            vote.is_duplicate = true;
+                            vote.is_valid = false;
+                        }
+
+                        parsedVotes.push(vote);
+                    } else {
+                        // Invalid tag
+                        parsedVotes.push({
+                            username: username,
+                            content: content,
+                            tag: tag,
+                            matched_school: null,
+                            published: parsePublishedDate(published),
+                            points: 0,
+                            vote_type: 'instagram_manual',
+                            is_duplicate: false,
+                            is_valid: false
+                        });
+                    }
+                }
+            }
+
+            displayPreview();
+        }
+
+        function parseCSVLine(line) {
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    values.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+
+            values.push(current.trim());
+            return values;
+        }
+
+        function parsePublishedDate(dateString) {
+            // Format: 2025/11/24 09:14:38
+            // Convert to ISO: 2025-11-24T09:14:38
+            const cleaned = dateString.replace(/\//g, '-').replace(' ', 'T');
+            return new Date(cleaned).toISOString();
+        }
+
+        function extractSchoolTags(text) {
+            const tags = [];
+
+            // Remove URLs and emojis
+            const cleanText = text
+                .replace(/https?:\/\/[^\s]+/g, '')
+                .replace(/[\u{1F600}-\u{1F64F}]/gu, '');
+
+            // Extract @handles and #hashtags
+            const tagPattern = /[@#]([a-zA-Z0-9_]+)/g;
+            let match;
+
+            while ((match = tagPattern.exec(cleanText)) !== null) {
+                const tag = match[1].trim();
+                if (tag.length > 2) {
+                    tags.push(tag.toLowerCase());
+                }
+            }
+
+            // Also check for plain school names
+            const lowerText = cleanText.toLowerCase();
+            for (const school of validSchools) {
+                const schoolLower = school.school_name.toLowerCase();
+                if (lowerText.includes(schoolLower)) {
+                    tags.push(schoolLower);
+                }
+            }
+
+            return [...new Set(tags)];
+        }
+
+        function matchSchoolName(tag) {
+            const tagLower = tag.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            // Priority 1: Instagram handle exact match
+            for (const school of validSchools) {
+                if (school.instagram_handles && Array.isArray(school.instagram_handles)) {
+                    for (const handle of school.instagram_handles) {
+                        const cleanHandle = handle.replace('@', '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                        if (cleanHandle === tagLower) {
+                            return school.school_name;
+                        }
+                    }
+                }
+            }
+
+            // Priority 2: Exact school name match
+            for (const school of validSchools) {
+                const schoolClean = school.school_name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (schoolClean === tagLower) {
+                    return school.school_name;
+                }
+            }
+
+            // Priority 3: Fuzzy match
+            for (const school of validSchools) {
+                const schoolClean = school.school_name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const tagCleaned = tagLower.replace(/high|middle|elementary|school/g, '');
+                const schoolCleaned = schoolClean.replace(/high|middle|elementary|school/g, '');
+
+                if (tagCleaned.length > 3 && schoolCleaned.length > 3) {
+                    if (tagCleaned.includes(schoolCleaned) || schoolCleaned.includes(tagCleaned)) {
+                        return school.school_name;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        function isDuplicate(commentText, schoolName, timestamp) {
+            // 12-hour tolerance window for duplicate detection
+            const normalized = commentText.toLowerCase().trim();
+            const commentTime = new Date(timestamp);
+            const TOLERANCE_MS = 12 * 60 * 60 * 1000; // 12 hours
+
+            return existingVotes.some(vote => {
+                const existingNormalized = (vote.comment_text || '').toLowerCase().trim();
+
+                // Must match: same text + same school
+                if (existingNormalized !== normalized || vote.school_name !== schoolName) {
+                    return false;
+                }
+
+                // Check timestamp tolerance
+                if (vote.voted_at) {
+                    const existingTime = new Date(vote.voted_at);
+                    const timeDiff = Math.abs(commentTime - existingTime);
+
+                    if (timeDiff <= TOLERANCE_MS) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+        }
+
+        function displayPreview() {
+            const validVotes = parsedVotes.filter(v => v.is_valid && !v.is_duplicate);
+            const duplicateVotes = parsedVotes.filter(v => v.is_duplicate);
+            const invalidVotes = parsedVotes.filter(v => !v.is_valid && !v.is_duplicate);
+
+            const totalPoints = validVotes.reduce((sum, v) => sum + v.points, 0);
+
+            // Update stats
+            document.getElementById('statTotal').textContent = parsedVotes.length;
+            document.getElementById('statValid').textContent = validVotes.length;
+            document.getElementById('statDuplicates').textContent = duplicateVotes.length;
+            document.getElementById('statInvalid').textContent = invalidVotes.length;
+            document.getElementById('statPoints').textContent = totalPoints;
+
+            // Display preview items
+            const previewBox = document.getElementById('previewBox');
+            previewBox.innerHTML = '';
+
+            // Show valid votes
+            for (const vote of validVotes.slice(0, 20)) {
+                previewBox.appendChild(createPreviewItem(vote, 'valid', '✅'));
+            }
+
+            // Show duplicates
+            for (const vote of duplicateVotes.slice(0, 10)) {
+                previewBox.appendChild(createPreviewItem(vote, 'duplicate', '⚠️'));
+            }
+
+            // Show invalid
+            for (const vote of invalidVotes.slice(0, 10)) {
+                previewBox.appendChild(createPreviewItem(vote, 'invalid', '❌'));
+            }
+
+            if (parsedVotes.length > 40) {
+                const moreDiv = document.createElement('div');
+                moreDiv.style.cssText = 'text-align: center; padding: 10px; color: #666;';
+                moreDiv.textContent = `... and ${parsedVotes.length - 40} more items`;
+                previewBox.appendChild(moreDiv);
+            }
+
+            document.getElementById('previewSection').style.display = 'block';
+        }
+
+        function createPreviewItem(vote, cssClass, icon) {
+            const item = document.createElement('div');
+            item.className = `preview-item ${cssClass}`;
+
+            let html = `<strong>${icon} ${vote.username}:</strong> ${vote.content.substring(0, 60)}...<br>`;
+            html += `<span style="color: #666;">Tag: ${vote.tag} → </span>`;
+
+            if (vote.is_duplicate) {
+                html += `<span style="color: #f59e0b; font-weight: 600;">DUPLICATE (${vote.matched_school})</span>`;
+            } else if (vote.matched_school) {
+                html += `<span style="color: #059669; font-weight: 600;">${vote.matched_school} (+1 pt)</span>`;
+            } else {
+                html += `<span style="color: #dc2626; font-weight: 600;">No match</span>`;
+            }
+
+            item.innerHTML = html;
+            return item;
+        }
+
+        window.saveVotes = async function() {
+            const validVotes = parsedVotes.filter(v => v.is_valid && !v.is_duplicate);
+
+            if (validVotes.length === 0) {
+                showError('No valid votes to save!');
+                return;
+            }
+
+            document.getElementById('saveBtn').disabled = true;
+            document.getElementById('saveBtn').textContent = 'Saving...';
+
+            try {
+                let successCount = 0;
+                let errorCount = 0;
+
+                for (const vote of validVotes) {
+                    // Insert vote with actual published timestamp
+                    const { error: voteError } = await supabase
+                        .from('teacher_feast_votes')
+                        .insert([{
+                            school_name: vote.matched_school,
+                            vote_type: vote.vote_type,
+                            points: vote.points,
+                            comment_text: vote.content,
+                            instagram_username: vote.username,
+                            voted_at: vote.published
+                        }]);
+
+                    if (voteError) {
+                        console.error('Vote insert error:', voteError);
+                        errorCount++;
+                        continue;
+                    }
+
+                    // Increment school votes
+                    await supabase.rpc('increment_school_votes', {
+                        school_name_param: vote.matched_school,
+                        points_param: vote.points
+                    });
+
+                    successCount++;
+                }
+
+                showSuccess(`✅ Successfully saved ${successCount} votes!${errorCount > 0 ? ` (${errorCount} errors)` : ''}`);
+
+                // Clear form and refresh
+                document.getElementById('csvFileInput').value = '';
+                document.getElementById('fileName').textContent = '';
+                parsedVotes = [];
+                document.getElementById('previewSection').style.display = 'none';
+
+                // Reload votes for next import
+                await loadSchoolsAndVotes();
+
+                // Refresh dashboard stats
+                loadData();
+
+            } catch (error) {
+                console.error('Save error:', error);
+                showError('Failed to save votes: ' + error.message);
+            } finally {
+                document.getElementById('saveBtn').disabled = false;
+                document.getElementById('saveBtn').textContent = '💾 Save All Votes';
+            }
+        };
+
+        window.cancelImport = function() {
+            document.getElementById('csvFileInput').value = '';
+            document.getElementById('fileName').textContent = '';
+            parsedVotes = [];
+            document.getElementById('previewSection').style.display = 'none';
+        };
+
+        function showSuccess(message) {
+            const el = document.getElementById('successMessage');
+            el.textContent = message;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+
+        function showError(message) {
+            const el = document.getElementById('errorMessage');
+            el.textContent = message;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+
+        // Load schools and votes on page load
+        loadSchoolsAndVotes();
     </script>
 </body>
 </html>
