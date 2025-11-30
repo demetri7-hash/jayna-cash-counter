@@ -618,6 +618,67 @@
           </div>
         </div>
 
+        <!-- Print Checklist Section -->
+        <div style="
+          background: var(--white);
+          border: 2px solid var(--gray-300);
+          padding: 20px;
+          margin-top: 30px;
+          margin-bottom: 20px;
+        ">
+          <h3 style="
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gray-900);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          ">🖨️ Print Checklist</h3>
+          <p style="
+            margin: 0 0 16px 0;
+            font-size: 13px;
+            color: var(--gray-600);
+          ">Select a checklist and send to Epson printer (PDF via email)</p>
+          <div style="display: flex; gap: 12px; align-items: flex-end;">
+            <div style="flex: 1;">
+              <label style="
+                display: block;
+                margin-bottom: 8px;
+                font-size: 11px;
+                font-weight: 700;
+                color: var(--gray-700);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+              ">Select Checklist</label>
+              <select id="printChecklistDropdown" style="
+                width: 100%;
+                padding: 14px;
+                border: 2px solid var(--gray-300);
+                border-radius: 0;
+                font-size: 14px;
+                background: white;
+                cursor: pointer;
+              ">
+                <option value="">-- Choose a checklist --</option>
+              </select>
+            </div>
+            <button id="printChecklistBtn" onclick="printSelectedChecklist()" style="
+              padding: 14px 24px;
+              background: var(--gray-900);
+              color: white;
+              border: 2px solid var(--gray-900);
+              border-radius: 0;
+              font-size: 13px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              cursor: pointer;
+              transition: all 0.15s ease;
+              white-space: nowrap;
+            ">🖨️ PRINT</button>
+          </div>
+        </div>
+
         <a href="index.html" class="submit-btn" style="margin-top: 20px; text-decoration: none;">Back to Menu</a>
       </div>
     </div>
@@ -646,6 +707,7 @@
     initializeSupabase();
     renderWorkflowSelector();
     startDailyReportScheduler(); // Start automated 4 AM report
+    populatePrintChecklistDropdown(); // Load checklists into print dropdown
   });
 
   // Initialize Supabase
@@ -11044,6 +11106,184 @@
   function cancelManagerPassword() {
     document.getElementById('passwordModal').remove();
   }
+
+  // ==================== PRINT CHECKLIST TO EPSON ====================
+  /**
+   * Populate print checklist dropdown with all available checklists
+   */
+  async function populatePrintChecklistDropdown() {
+    try {
+      const dropdown = document.getElementById('printChecklistDropdown');
+      if (!dropdown) return;
+
+      // Get all checklists from database
+      const { data: checklists, error } = await supabase
+        .from('checklist_definitions')
+        .select('type, title')
+        .not('type', 'like', 'boh_%')
+        .not('type', 'like', 'BOH_%')
+        .order('title');
+
+      if (error) throw error;
+
+      // Clear existing options (keep the default one)
+      dropdown.innerHTML = '<option value="">-- Choose a checklist --</option>';
+
+      // Add each checklist as an option
+      if (checklists && checklists.length > 0) {
+        checklists.forEach(checklist => {
+          const option = document.createElement('option');
+          option.value = checklist.type;
+          option.textContent = checklist.title;
+          dropdown.appendChild(option);
+        });
+        console.log(`✅ Loaded ${checklists.length} checklists into print dropdown`);
+      }
+    } catch (error) {
+      console.error('Error loading checklists for print dropdown:', error);
+    }
+  }
+
+  /**
+   * Print selected checklist - Generate PDF and send to Epson printer via email
+   */
+  async function printSelectedChecklist() {
+    try {
+      const dropdown = document.getElementById('printChecklistDropdown');
+      const printBtn = document.getElementById('printChecklistBtn');
+      const selectedType = dropdown.value;
+
+      if (!selectedType) {
+        showMessage('Please select a checklist to print', 'error');
+        return;
+      }
+
+      const selectedTitle = dropdown.options[dropdown.selectedIndex].text;
+
+      console.log(`🖨️ Printing checklist: ${selectedTitle} (${selectedType})`);
+
+      // Show loading modal
+      showLoading('SENDING TO PRINTER', 'Generating PDF and emailing to Epson printer...');
+
+      // Call serverless function to generate PDF and email to printer
+      const response = await fetch('/api/print-foh-checklist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          checklist_type: selectedType,
+          checklist_title: selectedTitle
+        })
+      });
+
+      const result = await response.json();
+
+      hideLoading();
+
+      if (!result.success) {
+        console.error(`❌ Failed to print checklist: ${result.error}`);
+        printBtn.textContent = '❌ PRINT FAILED';
+        printBtn.style.background = '#dc2626';
+        setTimeout(() => {
+          printBtn.textContent = '🖨️ PRINT';
+          printBtn.style.background = 'var(--gray-900)';
+        }, 3000);
+        showMessage(`Print failed: ${result.error}`, 'error');
+        return;
+      }
+
+      console.log(`✅ Checklist sent to printer successfully:`, result.messageId);
+
+      // Show success feedback in button
+      printBtn.textContent = '✓ SENT TO PRINTER';
+      printBtn.style.background = '#059669';
+      setTimeout(() => {
+        printBtn.textContent = '🖨️ PRINT';
+        printBtn.style.background = 'var(--gray-900)';
+      }, 2000);
+
+      // Show prominent success modal
+      showSuccessMessage('✅ CHECKLIST SENT TO PRINTER!', `${selectedTitle} has been emailed to the Epson printer successfully.`);
+
+    } catch (error) {
+      hideLoading();
+      console.error('❌ Error printing checklist:', error);
+      const printBtn = document.getElementById('printChecklistBtn');
+      printBtn.textContent = '❌ PRINT ERROR';
+      printBtn.style.background = '#dc2626';
+      setTimeout(() => {
+        printBtn.textContent = '🖨️ PRINT';
+        printBtn.style.background = 'var(--gray-900)';
+      }, 3000);
+      showMessage('Error printing checklist. Check console for details.', 'error');
+    }
+  }
+
+  /**
+   * Show a prominent success message modal with auto-dismiss (for print confirmation)
+   */
+  function showSuccessMessage(title, message) {
+    hideLoading(); // Hide loading first
+
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10001;
+      padding: 20px;
+    `;
+
+    // Create success message box
+    const messageBox = document.createElement('div');
+    messageBox.style.cssText = `
+      background: white;
+      padding: 32px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid #059669;
+      text-align: center;
+    `;
+
+    messageBox.innerHTML = `
+      <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+      <h3 style="
+        margin: 0 0 12px 0;
+        font-size: 18px;
+        font-weight: 700;
+        color: #065f46;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      ">${title}</h3>
+      <p style="
+        margin: 0;
+        font-size: 14px;
+        color: var(--gray-700);
+        line-height: 1.5;
+      ">${message}</p>
+    `;
+
+    overlay.appendChild(messageBox);
+    document.body.appendChild(overlay);
+
+    // Auto-dismiss after 2 seconds
+    setTimeout(() => {
+      overlay.remove();
+    }, 2000);
+
+    // Click anywhere to dismiss
+    overlay.onclick = () => overlay.remove();
+  }
+  // ==================== END PRINT CHECKLIST ====================
+
   // ==================== END PASSWORD PROTECTION ====================
 
   // ==================== LIVE STATS (TIPS/HR, TOP LEADER) ====================
