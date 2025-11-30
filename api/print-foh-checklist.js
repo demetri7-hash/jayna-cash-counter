@@ -52,23 +52,58 @@ export default async function handler(req, res) {
       .single();
 
     if (defError || !checklistDef) {
-      throw new Error('Checklist not found');
+      console.error('Checklist definition error:', defError);
+      throw new Error(`Checklist not found: ${defError?.message || 'Unknown error'}`);
     }
 
-    // Fetch checklist tasks
-    const { data: tasks, error: tasksError } = await supabase
-      .from('checklist_tasks')
+    console.log(`✓ Found checklist definition ID: ${checklistDef.id}`);
+
+    // Fetch sections for this checklist
+    const { data: sections, error: sectionsError } = await supabase
+      .from('checklist_sections')
       .select('*')
-      .eq('checklist_type', checklist_type)
-      .order('section_order', { ascending: true })
-      .order('task_order', { ascending: true });
+      .eq('checklist_id', checklistDef.id)
+      .order('display_order', { ascending: true });
 
-    if (tasksError) {
-      throw new Error('Failed to fetch checklist tasks');
+    if (sectionsError) {
+      console.error('Sections error:', sectionsError);
+      throw new Error(`Failed to fetch sections: ${sectionsError.message}`);
     }
+
+    console.log(`✓ Found ${sections?.length || 0} sections`);
+
+    // Fetch tasks for all sections
+    const allTasks = [];
+    for (const section of sections || []) {
+      if (section.section_type === 'checkbox') {
+        const { data: tasks, error: tasksError } = await supabase
+          .from('checklist_section_tasks')
+          .select('*')
+          .eq('section_id', section.id)
+          .order('display_order', { ascending: true });
+
+        if (tasksError) {
+          console.error(`Tasks error for section ${section.id}:`, tasksError);
+          continue;
+        }
+
+        // Add section name to each task
+        tasks.forEach(task => {
+          allTasks.push({
+            section_name: section.name,
+            section_order: section.display_order,
+            task_text: task.task_text,
+            is_required: task.is_required || false,
+            task_order: task.display_order
+          });
+        });
+      }
+    }
+
+    console.log(`✓ Found ${allTasks.length} total tasks`);
 
     // Generate PDF
-    const pdfBase64 = generateChecklistPDF(checklistDef, tasks || []);
+    const pdfBase64 = generateChecklistPDF(checklistDef, allTasks);
 
     const filename = `FOH_Checklist_${checklist_type}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -106,10 +141,12 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('❌ Print checklist error:', error);
+    console.error('Error stack:', error.stack);
     return res.status(500).json({
       success: false,
       error: 'Failed to print checklist',
-      details: error.message
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
