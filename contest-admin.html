@@ -860,10 +860,11 @@
         }
 
         window.saveVotes = async function() {
-            const validVotes = parsedVotes.filter(v => v.is_valid && !v.is_duplicate);
+            // Include ALL votes (both valid and invalid - we'll auto-create schools)
+            const votesToSave = parsedVotes.filter(v => !v.is_duplicate);
 
-            if (validVotes.length === 0) {
-                showError('No valid votes to save!');
+            if (votesToSave.length === 0) {
+                showError('No votes to save! All are duplicates.');
                 return;
             }
 
@@ -873,13 +874,42 @@
             try {
                 let successCount = 0;
                 let errorCount = 0;
+                let newSchoolsCreated = 0;
 
-                for (const vote of validVotes) {
+                for (const vote of votesToSave) {
+                    // If no matched school, auto-create it from the tag
+                    let schoolName = vote.matched_school;
+
+                    if (!schoolName) {
+                        // Extract school name from tag
+                        schoolName = extractSchoolNameFromTag(vote.tag);
+
+                        // Create new school in database
+                        console.log(`🆕 Creating new school: ${schoolName} (from tag: ${vote.tag})`);
+
+                        const { error: schoolError } = await supabase
+                            .from('teacher_feast_schools')
+                            .insert([{
+                                school_name: schoolName,
+                                instagram_handles: [`@${vote.tag.toLowerCase()}`],
+                                total_votes: 0,
+                                instagram_votes: 0,
+                                form_votes: 0
+                            }]);
+
+                        if (schoolError) {
+                            // School might already exist, that's okay
+                            console.log(`School already exists or error: ${schoolError.message}`);
+                        } else {
+                            newSchoolsCreated++;
+                        }
+                    }
+
                     // Insert vote with actual published timestamp
                     const { error: voteError } = await supabase
                         .from('teacher_feast_votes')
                         .insert([{
-                            school_name: vote.matched_school,
+                            school_name: schoolName,
                             vote_type: vote.vote_type,
                             points: vote.points,
                             instagram_username: vote.username,
@@ -894,14 +924,22 @@
 
                     // Increment school votes
                     await supabase.rpc('increment_school_votes', {
-                        school_name_param: vote.matched_school,
+                        school_name_param: schoolName,
                         points_param: vote.points
                     });
 
                     successCount++;
                 }
 
-                showSuccess(`✅ Successfully saved ${successCount} votes!${errorCount > 0 ? ` (${errorCount} errors)` : ''}`);
+                let successMsg = `✅ Successfully saved ${successCount} votes!`;
+                if (newSchoolsCreated > 0) {
+                    successMsg += ` (${newSchoolsCreated} new schools created)`;
+                }
+                if (errorCount > 0) {
+                    successMsg += ` (${errorCount} errors)`;
+                }
+
+                showSuccess(successMsg);
 
                 // Clear form and refresh
                 document.getElementById('csvFileInput').value = '';
@@ -923,6 +961,43 @@
                 document.getElementById('saveBtn').textContent = '💾 Save All Votes';
             }
         };
+
+        // Helper function to extract school name from Instagram tag
+        function extractSchoolNameFromTag(tag) {
+            // Remove special characters and convert to Title Case
+            let schoolName = tag
+                .replace(/[@#]/g, '')
+                .replace(/elementary|middle|high|school|charter/gi, '')
+                .trim();
+
+            // Convert camelCase or underscores to spaces
+            schoolName = schoolName
+                .replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase
+                .replace(/_/g, ' '); // underscores
+
+            // Title case each word
+            schoolName = schoolName
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
+
+            // Add "Elementary School" suffix if appropriate
+            const lowerTag = tag.toLowerCase();
+            if (lowerTag.includes('elementary')) {
+                schoolName += ' Elementary School';
+            } else if (lowerTag.includes('middle')) {
+                schoolName += ' Middle School';
+            } else if (lowerTag.includes('high')) {
+                schoolName += ' High School';
+            } else if (lowerTag.includes('charter')) {
+                schoolName += ' Charter School';
+            } else {
+                // Default to Elementary School
+                schoolName += ' Elementary School';
+            }
+
+            return schoolName;
+        }
 
         window.cancelImport = function() {
             document.getElementById('csvFileInput').value = '';
