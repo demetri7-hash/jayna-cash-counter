@@ -671,20 +671,61 @@
                 const badgeClass = vote.vote_type === 'form' ? 'badge-form' : 'badge-instagram';
                 const badgeText = vote.vote_type === 'form' ? 'FORM' : 'INSTAGRAM';
 
-                row.innerHTML = `
-                    <td>${formattedDate}</td>
-                    <td><span class="badge ${badgeClass}">${badgeText}</span></td>
-                    <td><strong>${vote.school_name}</strong></td>
-                    <td>${vote.full_name || '-'}</td>
-                    <td>${vote.email || '-'}</td>
-                    <td>${vote.phone || '-'}</td>
-                    <td><strong>${vote.points}</strong></td>
-                    <td>${vote.instagram_username || '-'}</td>
-                    <td style="font-family: monospace; font-size: 11px;">${vote.ip_address || '-'}</td>
-                    <td>
-                        <button class="btn-delete" onclick="deleteVote(${vote.id}, '${vote.school_name}', ${vote.points})">🗑️ DELETE</button>
-                    </td>
-                `;
+                // Create cells
+                const dateCell = document.createElement('td');
+                dateCell.textContent = formattedDate;
+
+                const typeCell = document.createElement('td');
+                const badge = document.createElement('span');
+                badge.className = `badge ${badgeClass}`;
+                badge.textContent = badgeText;
+                typeCell.appendChild(badge);
+
+                const schoolCell = document.createElement('td');
+                const schoolStrong = document.createElement('strong');
+                schoolStrong.textContent = vote.school_name;
+                schoolCell.appendChild(schoolStrong);
+
+                const nameCell = document.createElement('td');
+                nameCell.textContent = vote.full_name || '-';
+
+                const emailCell = document.createElement('td');
+                emailCell.textContent = vote.email || '-';
+
+                const phoneCell = document.createElement('td');
+                phoneCell.textContent = vote.phone || '-';
+
+                const pointsCell = document.createElement('td');
+                const pointsStrong = document.createElement('strong');
+                pointsStrong.textContent = vote.points;
+                pointsCell.appendChild(pointsStrong);
+
+                const igCell = document.createElement('td');
+                igCell.textContent = vote.instagram_username || '-';
+
+                const ipCell = document.createElement('td');
+                ipCell.style.fontFamily = 'monospace';
+                ipCell.style.fontSize = '11px';
+                ipCell.textContent = vote.ip_address || '-';
+
+                const actionsCell = document.createElement('td');
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn-delete';
+                deleteBtn.textContent = '🗑️ DELETE';
+                deleteBtn.onclick = () => deleteVote(vote.id, vote.school_name, vote.points);
+                actionsCell.appendChild(deleteBtn);
+
+                // Append all cells
+                row.appendChild(dateCell);
+                row.appendChild(typeCell);
+                row.appendChild(schoolCell);
+                row.appendChild(nameCell);
+                row.appendChild(emailCell);
+                row.appendChild(phoneCell);
+                row.appendChild(pointsCell);
+                row.appendChild(igCell);
+                row.appendChild(ipCell);
+                row.appendChild(actionsCell);
 
                 tbody.appendChild(row);
             });
