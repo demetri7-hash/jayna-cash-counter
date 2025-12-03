@@ -44,18 +44,38 @@ export default async function handler(req, res) {
       });
     }
 
-    // Verify school exists
-    const { data: schoolExists, error: schoolError } = await supabase
+    // Check if school exists, create if it doesn't (for custom schools)
+    const { data: schoolExists } = await supabase
       .from('teacher_feast_schools')
       .select('school_name')
       .eq('school_name', school_name)
       .single();
 
-    if (schoolError || !schoolExists) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid school selection'
-      });
+    if (!schoolExists) {
+      // Auto-create custom school
+      console.log(`🆕 Creating custom school: ${school_name}`);
+
+      const { error: createSchoolError } = await supabase
+        .from('teacher_feast_schools')
+        .insert([{
+          school_name: school_name,
+          instagram_handles: [],
+          total_votes: 0,
+          instagram_votes: 0,
+          form_votes: 0
+        }]);
+
+      if (createSchoolError) {
+        // Check if error is due to duplicate (race condition)
+        if (!createSchoolError.message.includes('duplicate')) {
+          console.error('Error creating custom school:', createSchoolError);
+          return res.status(500).json({
+            success: false,
+            error: 'Error creating custom school'
+          });
+        }
+        // If duplicate, it means another request created it, continue
+      }
     }
 
     // Check for duplicate vote (same email within 1 hour)

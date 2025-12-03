@@ -610,8 +610,17 @@
                     <label for="schoolName">Select Your School *</label>
                     <select id="schoolName" name="schoolName" required>
                         <option value="">-- Choose a school --</option>
+                        <option value="CUSTOM">➕ Add Custom School</option>
                         <!-- Schools will be populated dynamically -->
                     </select>
+                </div>
+
+                <div class="form-group" id="customSchoolGroup" style="display: none;">
+                    <label for="customSchoolName">Custom School Name *</label>
+                    <input type="text" id="customSchoolName" name="customSchoolName" placeholder="Enter your school name (e.g., Lincoln Elementary School)">
+                    <p style="font-size: 13px; color: #666; margin-top: 8px;">
+                        💡 Tip: Please use the full school name (e.g., "Lincoln Elementary School" not "Lincoln ES")
+                    </p>
                 </div>
 
                 <div class="form-group">
@@ -690,7 +699,36 @@
             await loadSchoolOptions();
             startCountdown();
             setupFormSubmission();
+            setupCustomSchoolToggle();
         });
+
+        // Setup custom school input toggle
+        function setupCustomSchoolToggle() {
+            const schoolSelect = document.getElementById('schoolName');
+            const customSchoolGroup = document.getElementById('customSchoolGroup');
+            const customSchoolInput = document.getElementById('customSchoolName');
+
+            schoolSelect.addEventListener('change', function() {
+                if (this.value === 'CUSTOM') {
+                    customSchoolGroup.style.display = 'block';
+                    customSchoolInput.required = true;
+                } else {
+                    customSchoolGroup.style.display = 'none';
+                    customSchoolInput.required = false;
+                    customSchoolInput.value = '';
+                }
+            });
+        }
+
+        // Title case function - capitalizes each word
+        function toTitleCase(str) {
+            return str
+                .toLowerCase()
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ')
+                .trim();
+        }
 
         // Countdown Timer
         function startCountdown() {
@@ -824,8 +862,26 @@
                 submitBtn.textContent = 'Submitting...';
 
                 try {
+                    // Get school name (either from dropdown or custom input)
+                    let schoolName = document.getElementById('schoolName').value;
+
+                    if (schoolName === 'CUSTOM') {
+                        const customSchoolName = document.getElementById('customSchoolName').value.trim();
+
+                        if (!customSchoolName) {
+                            throw new Error('Please enter a custom school name');
+                        }
+
+                        if (customSchoolName.length < 3) {
+                            throw new Error('School name must be at least 3 characters long');
+                        }
+
+                        // Clean up and title case the school name
+                        schoolName = toTitleCase(customSchoolName);
+                    }
+
                     const formData = {
-                        school_name: document.getElementById('schoolName').value,
+                        school_name: schoolName,
                         full_name: document.getElementById('fullName').value,
                         email: document.getElementById('email').value,
                         phone: document.getElementById('phone').value,
