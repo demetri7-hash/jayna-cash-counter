@@ -189,10 +189,67 @@
             transform: translateY(-1px);
         }
 
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
         .actions {
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .bulk-actions {
+            display: none;
+            padding: 15px;
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .bulk-actions.active {
+            display: block;
+        }
+
+        .bulk-actions-header {
+            font-weight: 700;
+            color: #92400e;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .bulk-actions-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .vote-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        tr.archived {
+            opacity: 0.6;
+            background: #fee2e2 !important;
+        }
+
+        .archived-badge {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 8px;
         }
 
         table {
@@ -383,6 +440,18 @@
                     </div>
                 </div>
 
+                <div class="bulk-actions" id="bulkActions">
+                    <div class="bulk-actions-header">
+                        <span id="selectedCount">0</span> vote(s) selected
+                    </div>
+                    <div class="bulk-actions-buttons">
+                        <button class="btn btn-warning" onclick="bulkChangeSchool()">🔄 Change School</button>
+                        <button class="btn btn-delete" onclick="bulkArchive()">📦 Archive</button>
+                        <button class="btn btn-success" onclick="bulkUnarchive()">↩️ Unarchive</button>
+                        <button class="btn btn-secondary" onclick="clearSelection()">✕ Clear Selection</button>
+                    </div>
+                </div>
+
                 <div class="actions">
                     <button class="btn btn-success" onclick="exportVotesToCSV()">📥 Export Votes to CSV</button>
                     <button class="btn btn-secondary" onclick="loadVotes()">🔄 Refresh</button>
@@ -399,6 +468,9 @@
                         <table>
                             <thead>
                                 <tr>
+                                    <th style="width: 40px;">
+                                        <input type="checkbox" id="selectAll" class="vote-checkbox" onchange="toggleSelectAll()">
+                                    </th>
                                     <th>Date/Time</th>
                                     <th>Type</th>
                                     <th>School</th>
@@ -516,6 +588,7 @@
         let allNewsletter = [];
         let filteredNewsletter = [];
         let allSchools = [];
+        let selectedVotes = new Set();
 
         // Tab switching
         window.switchTab = function(tab) {
@@ -659,6 +732,11 @@
             votes.forEach(vote => {
                 const row = document.createElement('tr');
 
+                // Add archived class if vote is archived
+                if (vote.is_archived) {
+                    row.classList.add('archived');
+                }
+
                 const votedDate = new Date(vote.voted_at);
                 const formattedDate = votedDate.toLocaleDateString('en-US', {
                     month: 'short',
@@ -670,6 +748,15 @@
 
                 const badgeClass = vote.vote_type === 'form' ? 'badge-form' : 'badge-instagram';
                 const badgeText = vote.vote_type === 'form' ? 'FORM' : 'INSTAGRAM';
+
+                // Create checkbox cell
+                const checkboxCell = document.createElement('td');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'vote-checkbox';
+                checkbox.checked = selectedVotes.has(vote.id);
+                checkbox.onchange = () => toggleVoteSelection(vote.id);
+                checkboxCell.appendChild(checkbox);
 
                 // Create cells
                 const dateCell = document.createElement('td');
@@ -685,6 +772,12 @@
                 const schoolStrong = document.createElement('strong');
                 schoolStrong.textContent = vote.school_name;
                 schoolCell.appendChild(schoolStrong);
+                if (vote.is_archived) {
+                    const archivedBadge = document.createElement('span');
+                    archivedBadge.className = 'archived-badge';
+                    archivedBadge.textContent = 'ARCHIVED';
+                    schoolCell.appendChild(archivedBadge);
+                }
 
                 const nameCell = document.createElement('td');
                 nameCell.textContent = vote.full_name || '-';
@@ -716,6 +809,7 @@
                 actionsCell.appendChild(deleteBtn);
 
                 // Append all cells
+                row.appendChild(checkboxCell);
                 row.appendChild(dateCell);
                 row.appendChild(typeCell);
                 row.appendChild(schoolCell);
@@ -1017,6 +1111,271 @@
                 }
             };
         };
+
+        // Toggle vote selection
+        window.toggleVoteSelection = function(voteId) {
+            if (selectedVotes.has(voteId)) {
+                selectedVotes.delete(voteId);
+            } else {
+                selectedVotes.add(voteId);
+            }
+            updateBulkActionsBar();
+        };
+
+        // Toggle select all
+        window.toggleSelectAll = function() {
+            const selectAllCheckbox = document.getElementById('selectAll');
+            if (selectAllCheckbox.checked) {
+                // Select all filtered votes
+                filteredVotes.forEach(vote => selectedVotes.add(vote.id));
+            } else {
+                // Deselect all
+                selectedVotes.clear();
+            }
+            updateBulkActionsBar();
+            displayVotes(filteredVotes); // Refresh to update checkboxes
+        };
+
+        // Clear selection
+        window.clearSelection = function() {
+            selectedVotes.clear();
+            document.getElementById('selectAll').checked = false;
+            updateBulkActionsBar();
+            displayVotes(filteredVotes);
+        };
+
+        // Update bulk actions bar
+        function updateBulkActionsBar() {
+            const bulkActions = document.getElementById('bulkActions');
+            const selectedCount = document.getElementById('selectedCount');
+
+            selectedCount.textContent = selectedVotes.size;
+
+            if (selectedVotes.size > 0) {
+                bulkActions.classList.add('active');
+            } else {
+                bulkActions.classList.remove('active');
+            }
+        }
+
+        // Bulk change school
+        window.bulkChangeSchool = async function() {
+            if (selectedVotes.size === 0) {
+                alert('Please select at least one vote');
+                return;
+            }
+
+            // Create modal for school selection
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = 'background: white; padding: 30px; max-width: 500px; width: 90%; border-radius: 15px;';
+
+            const schoolOptions = allSchools.map(s => `<option value="${s.school_name}">${s.school_name}</option>`).join('');
+
+            modalContent.innerHTML = `
+                <h3 style="color: #176F9A; margin-bottom: 15px; font-size: 20px;">🔄 Change School</h3>
+                <p style="margin-bottom: 20px; color: #666;">
+                    Moving <strong>${selectedVotes.size}</strong> vote(s) to a new school.
+                </p>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 700; color: #176F9A;">Select New School:</label>
+                    <select id="newSchoolSelect" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px;">
+                        <option value="">-- Select School --</option>
+                        ${schoolOptions}
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button id="confirmChangeBtn" class="btn" style="background: #46B0E4;">CHANGE SCHOOL</button>
+                    <button id="cancelChangeBtn" class="btn btn-secondary">CANCEL</button>
+                </div>
+            `;
+
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+
+            // Handle cancel
+            document.getElementById('cancelChangeBtn').onclick = () => {
+                document.body.removeChild(modal);
+            };
+
+            // Handle confirm
+            document.getElementById('confirmChangeBtn').onclick = async () => {
+                const newSchool = document.getElementById('newSchoolSelect').value;
+
+                if (!newSchool) {
+                    alert('Please select a school');
+                    return;
+                }
+
+                try {
+                    document.getElementById('confirmChangeBtn').textContent = 'CHANGING...';
+                    document.getElementById('confirmChangeBtn').disabled = true;
+
+                    // Get selected votes with their current schools and points
+                    const selectedVotesList = allVotes.filter(v => selectedVotes.has(v.id));
+
+                    // Group by old school to batch point adjustments
+                    const schoolAdjustments = {};
+                    for (const vote of selectedVotesList) {
+                        if (!schoolAdjustments[vote.school_name]) {
+                            schoolAdjustments[vote.school_name] = 0;
+                        }
+                        schoolAdjustments[vote.school_name] += vote.points;
+                    }
+
+                    // Decrement old schools and increment new school
+                    for (const [oldSchool, totalPoints] of Object.entries(schoolAdjustments)) {
+                        // Decrement old school
+                        await supabase.rpc('increment_school_votes', {
+                            school_name_param: oldSchool,
+                            points_param: -totalPoints
+                        });
+                    }
+
+                    // Increment new school
+                    const totalPoints = selectedVotesList.reduce((sum, v) => sum + v.points, 0);
+                    await supabase.rpc('increment_school_votes', {
+                        school_name_param: newSchool,
+                        points_param: totalPoints
+                    });
+
+                    // Update vote records
+                    for (const voteId of selectedVotes) {
+                        await supabase
+                            .from('teacher_feast_votes')
+                            .update({ school_name: newSchool })
+                            .eq('id', voteId);
+                    }
+
+                    document.body.removeChild(modal);
+                    showSuccessMessage(`✅ ${selectedVotes.size} vote(s) moved to ${newSchool}`);
+                    clearSelection();
+                    await loadVotes();
+
+                } catch (error) {
+                    console.error('Bulk change school error:', error);
+                    alert('Error changing school: ' + error.message);
+                    document.getElementById('confirmChangeBtn').textContent = 'CHANGE SCHOOL';
+                    document.getElementById('confirmChangeBtn').disabled = false;
+                }
+            };
+        };
+
+        // Bulk archive
+        window.bulkArchive = async function() {
+            if (selectedVotes.size === 0) {
+                alert('Please select at least one vote');
+                return;
+            }
+
+            if (!confirm(`Archive ${selectedVotes.size} vote(s)? This will remove their points from the leaderboard but keep the records.`)) {
+                return;
+            }
+
+            try {
+                // Get selected votes to calculate points
+                const selectedVotesList = allVotes.filter(v => selectedVotes.has(v.id));
+
+                // Group by school to batch point adjustments
+                const schoolAdjustments = {};
+                for (const vote of selectedVotesList) {
+                    if (!schoolAdjustments[vote.school_name]) {
+                        schoolAdjustments[vote.school_name] = 0;
+                    }
+                    schoolAdjustments[vote.school_name] += vote.points;
+                }
+
+                // Decrement school votes
+                for (const [school, totalPoints] of Object.entries(schoolAdjustments)) {
+                    await supabase.rpc('increment_school_votes', {
+                        school_name_param: school,
+                        points_param: -totalPoints
+                    });
+                }
+
+                // Archive votes
+                for (const voteId of selectedVotes) {
+                    await supabase
+                        .from('teacher_feast_votes')
+                        .update({ is_archived: true })
+                        .eq('id', voteId);
+                }
+
+                showSuccessMessage(`✅ ${selectedVotes.size} vote(s) archived`);
+                clearSelection();
+                await loadVotes();
+
+            } catch (error) {
+                console.error('Bulk archive error:', error);
+                alert('Error archiving votes: ' + error.message);
+            }
+        };
+
+        // Bulk unarchive
+        window.bulkUnarchive = async function() {
+            if (selectedVotes.size === 0) {
+                alert('Please select at least one vote');
+                return;
+            }
+
+            if (!confirm(`Unarchive ${selectedVotes.size} vote(s)? This will restore their points to the leaderboard.`)) {
+                return;
+            }
+
+            try {
+                // Get selected votes to calculate points
+                const selectedVotesList = allVotes.filter(v => selectedVotes.has(v.id));
+
+                // Group by school to batch point adjustments
+                const schoolAdjustments = {};
+                for (const vote of selectedVotesList) {
+                    if (!schoolAdjustments[vote.school_name]) {
+                        schoolAdjustments[vote.school_name] = 0;
+                    }
+                    schoolAdjustments[vote.school_name] += vote.points;
+                }
+
+                // Increment school votes
+                for (const [school, totalPoints] of Object.entries(schoolAdjustments)) {
+                    await supabase.rpc('increment_school_votes', {
+                        school_name_param: school,
+                        points_param: totalPoints
+                    });
+                }
+
+                // Unarchive votes
+                for (const voteId of selectedVotes) {
+                    await supabase
+                        .from('teacher_feast_votes')
+                        .update({ is_archived: false })
+                        .eq('id', voteId);
+                }
+
+                showSuccessMessage(`✅ ${selectedVotes.size} vote(s) restored`);
+                clearSelection();
+                await loadVotes();
+
+            } catch (error) {
+                console.error('Bulk unarchive error:', error);
+                alert('Error unarchiving votes: ' + error.message);
+            }
+        };
+
+        // Show success message helper
+        function showSuccessMessage(message) {
+            const successDiv = document.createElement('div');
+            successDiv.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #d1fae5; border: 2px solid #059669; color: #065f46; padding: 15px 30px; border-radius: 10px; z-index: 10001; font-weight: 600;';
+            successDiv.textContent = message;
+            document.body.appendChild(successDiv);
+
+            setTimeout(() => {
+                if (document.body.contains(successDiv)) {
+                    document.body.removeChild(successDiv);
+                }
+            }, 3000);
+        }
 
         // Load votes on page load
         loadVotes();
