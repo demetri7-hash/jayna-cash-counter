@@ -2207,12 +2207,15 @@
             header.style.cssText = 'margin-bottom: 20px;';
             header.innerHTML = `
                 <h3 style="color: #176F9A; font-size: 22px; margin-bottom: 10px;">🔍 Found ${duplicateGroups.length} Duplicate Group(s)</h3>
-                <p style="color: #666; font-size: 14px;">Review each group and select which vote to KEEP. All others will be archived.</p>
+                <p style="color: #666; font-size: 14px;">Review each group and select which votes to KEEP (you can select multiple). All unselected votes will be archived.</p>
             `;
             modalContent.appendChild(header);
 
-            // Track selections (groupIndex -> voteId)
+            // Track selections (groupIndex -> Set of voteIds to keep)
             const selections = {};
+            duplicateGroups.forEach((group, i) => {
+                selections[i] = new Set();
+            });
 
             // Create duplicate groups
             duplicateGroups.forEach((group, groupIndex) => {
@@ -2269,7 +2272,7 @@
 
                     voteCard.innerHTML = `
                         <div class="duplicate-vote-info">
-                            <input type="radio" name="keep_group_${groupIndex}" value="${vote.id}" style="width: 20px; height: 20px; cursor: pointer; margin-right: 15px;">
+                            <input type="checkbox" class="keep-checkbox" data-vote-id="${vote.id}" data-group-index="${groupIndex}" style="width: 20px; height: 20px; cursor: pointer; margin-right: 15px;">
                             <div style="flex: 1;">
                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
                                     <span class="badge ${badgeClass}">${badgeText}</span>
@@ -2292,22 +2295,23 @@
                     `;
 
                     // Handle selection
-                    const radio = voteCard.querySelector('input[type="radio"]');
-                    radio.addEventListener('change', () => {
-                        // Update selection
-                        selections[groupIndex] = vote.id;
-
-                        // Update visual selection
-                        const allVotesInGroup = groupDiv.querySelectorAll('.duplicate-vote');
-                        allVotesInGroup.forEach(v => v.classList.remove('selected'));
-                        voteCard.classList.add('selected');
+                    const checkbox = voteCard.querySelector('input[type="checkbox"]');
+                    checkbox.addEventListener('change', () => {
+                        // Toggle selection
+                        if (checkbox.checked) {
+                            selections[groupIndex].add(vote.id);
+                            voteCard.classList.add('selected');
+                        } else {
+                            selections[groupIndex].delete(vote.id);
+                            voteCard.classList.remove('selected');
+                        }
                     });
 
-                    // Click card to select
+                    // Click card to toggle selection
                     voteCard.addEventListener('click', (e) => {
                         if (e.target.tagName !== 'INPUT') {
-                            radio.checked = true;
-                            radio.dispatchEvent(new Event('change'));
+                            checkbox.checked = !checkbox.checked;
+                            checkbox.dispatchEvent(new Event('change'));
                         }
                     });
 
@@ -2325,21 +2329,34 @@
             archiveDuplicatesBtn.className = 'btn btn-warning';
             archiveDuplicatesBtn.textContent = '📦 Archive Duplicates';
             archiveDuplicatesBtn.onclick = async () => {
-                // Validate all groups have a selection
+                // Validate all groups have at least one selection
                 const missingSelections = [];
                 for (let i = 0; i < duplicateGroups.length; i++) {
-                    if (!selections[i]) {
+                    if (selections[i].size === 0) {
                         missingSelections.push(i + 1);
                     }
                 }
 
                 if (missingSelections.length > 0) {
-                    alert(`Please select which vote to keep in group(s): ${missingSelections.join(', ')}`);
+                    alert(`Please select at least one vote to keep in group(s): ${missingSelections.join(', ')}`);
+                    return;
+                }
+
+                // Calculate total votes to archive
+                let totalToArchive = 0;
+                for (let i = 0; i < duplicateGroups.length; i++) {
+                    const group = duplicateGroups[i];
+                    const keepCount = selections[i].size;
+                    const archiveCount = group.filter(v => !v.is_archived).length - keepCount;
+                    totalToArchive += Math.max(0, archiveCount);
+                }
+
+                if (totalToArchive === 0) {
+                    alert('No votes to archive. All selected votes are already marked to keep.');
                     return;
                 }
 
                 // Confirm action
-                const totalToArchive = duplicateGroups.reduce((sum, group) => sum + group.length - 1, 0);
                 if (!confirm(`Archive ${totalToArchive} duplicate vote(s)?\n\nThis will remove their points from the leaderboard but keep the records.`)) {
                     return;
                 }
@@ -2353,11 +2370,11 @@
                     // Process each group
                     for (let i = 0; i < duplicateGroups.length; i++) {
                         const group = duplicateGroups[i];
-                        const keepVoteId = selections[i];
+                        const keepVoteIds = selections[i];
 
-                        // Archive all votes except the one to keep
+                        // Archive all votes NOT in the keep set
                         for (const vote of group) {
-                            if (vote.id !== keepVoteId && !vote.is_archived) {
+                            if (!keepVoteIds.has(vote.id) && !vote.is_archived) {
                                 // Archive vote
                                 await supabase
                                     .from('teacher_feast_votes')
