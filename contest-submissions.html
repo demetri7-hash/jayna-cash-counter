@@ -573,6 +573,49 @@
                 <a href="/contest-instagram-handles.html" class="btn btn-secondary" target="_blank">📸 Instagram Handles</a>
             </div>
         </div>
+
+        <!-- SCHOOL MANAGEMENT SECTION -->
+        <div class="section">
+            <h2>🏫 Manage Schools</h2>
+            <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Add, edit, or remove schools from the contest. Be careful when deleting schools with existing votes!</p>
+
+            <div class="actions">
+                <button class="btn btn-success" onclick="showAddSchoolModal()">➕ Add New School</button>
+                <button class="btn btn-secondary" onclick="loadSchools()">🔄 Refresh Schools</button>
+            </div>
+
+            <div class="loading" id="schoolsLoading">
+                <div class="spinner"></div>
+                <p>Loading schools...</p>
+            </div>
+
+            <div id="schoolsTableContainer" style="display: none;">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>School Name</th>
+                                <th>Total Votes</th>
+                                <th>Total Points</th>
+                                <th>Form Votes</th>
+                                <th>Instagram Votes</th>
+                                <th>Instagram Handles</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schoolsTableBody"></tbody>
+                    </table>
+                </div>
+                <p style="margin-top: 15px; color: #666; font-size: 13px;">
+                    Total Schools: <strong id="schoolsCount">0</strong>
+                </p>
+            </div>
+
+            <div id="schoolsEmpty" class="empty-state" style="display: none;">
+                <h3>No schools found</h3>
+                <p>Add your first school to get started</p>
+            </div>
+        </div>
     </div>
 
     <script type="module">
@@ -1377,8 +1420,366 @@
             }, 3000);
         }
 
+        // ========================================
+        // SCHOOL MANAGEMENT FUNCTIONS
+        // ========================================
+
+        // Load schools
+        window.loadSchools = async function() {
+            document.getElementById('schoolsLoading').style.display = 'block';
+            document.getElementById('schoolsTableContainer').style.display = 'none';
+            document.getElementById('schoolsEmpty').style.display = 'none';
+
+            try {
+                const { data, error } = await supabase
+                    .from('teacher_feast_schools')
+                    .select('*')
+                    .order('total_votes', { ascending: false });
+
+                if (error) throw error;
+
+                displaySchools(data);
+
+                document.getElementById('schoolsLoading').style.display = 'none';
+
+            } catch (error) {
+                console.error('Error loading schools:', error);
+                alert('Error loading schools: ' + error.message);
+                document.getElementById('schoolsLoading').style.display = 'none';
+            }
+        };
+
+        // Display schools
+        function displaySchools(schools) {
+            const tbody = document.getElementById('schoolsTableBody');
+            tbody.innerHTML = '';
+
+            if (!schools || schools.length === 0) {
+                document.getElementById('schoolsTableContainer').style.display = 'none';
+                document.getElementById('schoolsEmpty').style.display = 'block';
+                return;
+            }
+
+            schools.forEach(school => {
+                const row = document.createElement('tr');
+
+                // School name cell
+                const nameCell = document.createElement('td');
+                const nameStrong = document.createElement('strong');
+                nameStrong.textContent = school.school_name;
+                nameCell.appendChild(nameStrong);
+
+                // Total votes cell
+                const totalVotesCell = document.createElement('td');
+                totalVotesCell.textContent = school.total_votes || 0;
+
+                // Total points - calculated field
+                const totalPointsCell = document.createElement('td');
+                const totalPoints = (school.form_votes * 2) + (school.instagram_votes * 1);
+                const pointsStrong = document.createElement('strong');
+                pointsStrong.style.color = '#176F9A';
+                pointsStrong.textContent = totalPoints;
+                totalPointsCell.appendChild(pointsStrong);
+
+                // Form votes cell
+                const formVotesCell = document.createElement('td');
+                formVotesCell.textContent = school.form_votes || 0;
+
+                // Instagram votes cell
+                const igVotesCell = document.createElement('td');
+                igVotesCell.textContent = school.instagram_votes || 0;
+
+                // Instagram handles cell
+                const handlesCell = document.createElement('td');
+                const handles = school.instagram_handles || [];
+                if (handles.length > 0) {
+                    handlesCell.textContent = handles.join(', ');
+                    handlesCell.style.fontSize = '12px';
+                } else {
+                    handlesCell.textContent = '-';
+                    handlesCell.style.color = '#999';
+                }
+
+                // Actions cell
+                const actionsCell = document.createElement('td');
+                actionsCell.style.display = 'flex';
+                actionsCell.style.gap = '8px';
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'btn btn-warning';
+                editBtn.style.padding = '6px 12px';
+                editBtn.style.fontSize = '11px';
+                editBtn.textContent = '✏️ EDIT';
+                editBtn.onclick = () => showEditSchoolModal(school);
+                actionsCell.appendChild(editBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn-delete';
+                deleteBtn.textContent = '🗑️ DELETE';
+                deleteBtn.onclick = () => deleteSchool(school);
+                actionsCell.appendChild(deleteBtn);
+
+                // Append all cells
+                row.appendChild(nameCell);
+                row.appendChild(totalVotesCell);
+                row.appendChild(totalPointsCell);
+                row.appendChild(formVotesCell);
+                row.appendChild(igVotesCell);
+                row.appendChild(handlesCell);
+                row.appendChild(actionsCell);
+
+                tbody.appendChild(row);
+            });
+
+            document.getElementById('schoolsCount').textContent = schools.length;
+            document.getElementById('schoolsTableContainer').style.display = 'block';
+            document.getElementById('schoolsEmpty').style.display = 'none';
+        }
+
+        // Show add school modal
+        window.showAddSchoolModal = function() {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = 'background: white; padding: 30px; max-width: 500px; width: 90%; border-radius: 15px;';
+
+            modalContent.innerHTML = `
+                <h3 style="color: #176F9A; margin-bottom: 15px; font-size: 20px;">➕ Add New School</h3>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 700; color: #176F9A;">School Name:</label>
+                    <input type="text" id="newSchoolName" placeholder="Enter school name..." style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px;">
+                    <p style="margin-top: 8px; font-size: 12px; color: #666;">Example: Lincoln Elementary School</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 700; color: #176F9A;">Instagram Handles (optional):</label>
+                    <input type="text" id="newSchoolHandles" placeholder="@handle1, @handle2, @handle3" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px;">
+                    <p style="margin-top: 8px; font-size: 12px; color: #666;">Separate multiple handles with commas</p>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button id="confirmAddBtn" class="btn btn-success">ADD SCHOOL</button>
+                    <button id="cancelAddBtn" class="btn btn-secondary">CANCEL</button>
+                </div>
+            `;
+
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+
+            // Handle cancel
+            document.getElementById('cancelAddBtn').onclick = () => {
+                document.body.removeChild(modal);
+            };
+
+            // Handle confirm
+            document.getElementById('confirmAddBtn').onclick = async () => {
+                const schoolName = document.getElementById('newSchoolName').value.trim();
+                const handlesInput = document.getElementById('newSchoolHandles').value.trim();
+
+                if (!schoolName) {
+                    alert('Please enter a school name');
+                    return;
+                }
+
+                // Parse Instagram handles
+                const handles = handlesInput
+                    ? handlesInput.split(',').map(h => h.trim().replace('@', '')).filter(h => h)
+                    : [];
+
+                try {
+                    document.getElementById('confirmAddBtn').textContent = 'ADDING...';
+                    document.getElementById('confirmAddBtn').disabled = true;
+
+                    const { error } = await supabase
+                        .from('teacher_feast_schools')
+                        .insert([{
+                            school_name: schoolName,
+                            instagram_handles: handles,
+                            total_votes: 0,
+                            instagram_votes: 0,
+                            form_votes: 0
+                        }]);
+
+                    if (error) throw error;
+
+                    document.body.removeChild(modal);
+                    showSuccessMessage(`✅ School "${schoolName}" added successfully`);
+                    await loadSchools();
+                    await loadSchoolsFilter(); // Refresh filter dropdowns
+
+                } catch (error) {
+                    console.error('Add school error:', error);
+                    alert('Error adding school: ' + error.message);
+                    document.getElementById('confirmAddBtn').textContent = 'ADD SCHOOL';
+                    document.getElementById('confirmAddBtn').disabled = false;
+                }
+            };
+        };
+
+        // Show edit school modal
+        window.showEditSchoolModal = function(school) {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = 'background: white; padding: 30px; max-width: 500px; width: 90%; border-radius: 15px;';
+
+            const currentHandles = (school.instagram_handles || []).map(h => '@' + h).join(', ');
+
+            modalContent.innerHTML = `
+                <h3 style="color: #176F9A; margin-bottom: 15px; font-size: 20px;">✏️ Edit School</h3>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 700; color: #176F9A;">School Name:</label>
+                    <input type="text" id="editSchoolName" value="${school.school_name}" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 700; color: #176F9A;">Instagram Handles:</label>
+                    <input type="text" id="editSchoolHandles" value="${currentHandles}" placeholder="@handle1, @handle2, @handle3" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px;">
+                    <p style="margin-top: 8px; font-size: 12px; color: #666;">Separate multiple handles with commas</p>
+                </div>
+                <div style="padding: 15px; background: #fef3c7; border-radius: 8px; margin-bottom: 20px;">
+                    <p style="font-size: 12px; color: #92400e; margin-bottom: 5px;"><strong>⚠️ Warning:</strong></p>
+                    <p style="font-size: 12px; color: #92400e;">Changing the school name will update ALL existing votes for this school.</p>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button id="confirmEditBtn" class="btn btn-warning">SAVE CHANGES</button>
+                    <button id="cancelEditBtn" class="btn btn-secondary">CANCEL</button>
+                </div>
+            `;
+
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+
+            // Handle cancel
+            document.getElementById('cancelEditBtn').onclick = () => {
+                document.body.removeChild(modal);
+            };
+
+            // Handle confirm
+            document.getElementById('confirmEditBtn').onclick = async () => {
+                const newSchoolName = document.getElementById('editSchoolName').value.trim();
+                const handlesInput = document.getElementById('editSchoolHandles').value.trim();
+
+                if (!newSchoolName) {
+                    alert('Please enter a school name');
+                    return;
+                }
+
+                // Parse Instagram handles
+                const handles = handlesInput
+                    ? handlesInput.split(',').map(h => h.trim().replace('@', '')).filter(h => h)
+                    : [];
+
+                try {
+                    document.getElementById('confirmEditBtn').textContent = 'SAVING...';
+                    document.getElementById('confirmEditBtn').disabled = true;
+
+                    // Update school record
+                    const { error: schoolError } = await supabase
+                        .from('teacher_feast_schools')
+                        .update({
+                            school_name: newSchoolName,
+                            instagram_handles: handles
+                        })
+                        .eq('school_name', school.school_name);
+
+                    if (schoolError) throw schoolError;
+
+                    // If school name changed, update all votes
+                    if (newSchoolName !== school.school_name) {
+                        const { error: votesError } = await supabase
+                            .from('teacher_feast_votes')
+                            .update({ school_name: newSchoolName })
+                            .eq('school_name', school.school_name);
+
+                        if (votesError) throw votesError;
+
+                        // Update newsletter records
+                        const { error: newsletterError } = await supabase
+                            .from('teacher_feast_newsletter')
+                            .update({ school_name: newSchoolName })
+                            .eq('school_name', school.school_name);
+
+                        if (newsletterError) {
+                            console.warn('Newsletter update warning:', newsletterError);
+                        }
+                    }
+
+                    document.body.removeChild(modal);
+                    showSuccessMessage(`✅ School updated successfully`);
+                    await loadSchools();
+                    await loadSchoolsFilter(); // Refresh filter dropdowns
+                    await loadVotes(); // Refresh votes if name changed
+
+                } catch (error) {
+                    console.error('Edit school error:', error);
+                    alert('Error updating school: ' + error.message);
+                    document.getElementById('confirmEditBtn').textContent = 'SAVE CHANGES';
+                    document.getElementById('confirmEditBtn').disabled = false;
+                }
+            };
+        };
+
+        // Delete school
+        window.deleteSchool = async function(school) {
+            // Check if school has votes
+            const { data: votes } = await supabase
+                .from('teacher_feast_votes')
+                .select('id')
+                .eq('school_name', school.school_name);
+
+            const voteCount = votes ? votes.length : 0;
+
+            let confirmMessage = `Delete "${school.school_name}"?`;
+            if (voteCount > 0) {
+                confirmMessage = `⚠️ WARNING: "${school.school_name}" has ${voteCount} vote(s)!\n\nDeleting this school will also DELETE ALL ${voteCount} VOTES.\n\nThis action CANNOT be undone.\n\nAre you absolutely sure you want to delete this school and all its votes?`;
+            } else {
+                confirmMessage = `Delete "${school.school_name}"?\n\nThis school has no votes yet.`;
+            }
+
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            // Double confirmation for schools with votes
+            if (voteCount > 0) {
+                if (!confirm(`FINAL CONFIRMATION:\n\nYou are about to permanently delete ${voteCount} vote(s).\n\nType the school name to confirm deletion.`)) {
+                    return;
+                }
+            }
+
+            try {
+                // Delete all votes for this school first
+                if (voteCount > 0) {
+                    const { error: votesError } = await supabase
+                        .from('teacher_feast_votes')
+                        .delete()
+                        .eq('school_name', school.school_name);
+
+                    if (votesError) throw votesError;
+                }
+
+                // Delete school
+                const { error: schoolError } = await supabase
+                    .from('teacher_feast_schools')
+                    .delete()
+                    .eq('school_name', school.school_name);
+
+                if (schoolError) throw schoolError;
+
+                showSuccessMessage(`✅ School "${school.school_name}" deleted${voteCount > 0 ? ` (${voteCount} votes removed)` : ''}`);
+                await loadSchools();
+                await loadSchoolsFilter(); // Refresh filter dropdowns
+                await loadVotes(); // Refresh votes list
+
+            } catch (error) {
+                console.error('Delete school error:', error);
+                alert('Error deleting school: ' + error.message);
+            }
+        };
+
         // Load votes on page load
         loadVotes();
+        loadSchools(); // Also load schools
     </script>
 </body>
 </html>
