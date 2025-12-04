@@ -252,6 +252,59 @@
             margin-left: 8px;
         }
 
+        .duplicate-group {
+            background: white;
+            border: 2px solid #f59e0b;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .duplicate-group-header {
+            font-weight: 700;
+            color: #92400e;
+            margin-bottom: 15px;
+            font-size: 14px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #fef3c7;
+        }
+
+        .duplicate-vote {
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .duplicate-vote:hover {
+            background: #f0f9ff;
+            border-color: #46B0E4;
+        }
+
+        .duplicate-vote.selected {
+            background: #d1fae5;
+            border-color: #059669;
+        }
+
+        .duplicate-vote-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .duplicate-match-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #fef3c7;
+            color: #92400e;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -454,6 +507,7 @@
 
                 <div class="actions">
                     <button class="btn btn-success" onclick="exportVotesToCSV()">📥 Export Votes to CSV</button>
+                    <button class="btn btn-warning" onclick="scanForDuplicates()">🔍 Scan for Duplicates</button>
                     <button class="btn btn-secondary" onclick="loadVotes()">🔄 Refresh</button>
                     <button class="btn btn-secondary" onclick="clearFilters()">✕ Clear Filters</button>
                 </div>
@@ -2041,6 +2095,312 @@
                 }
             };
         };
+
+        // ========================================
+        // DUPLICATE DETECTION
+        // ========================================
+
+        // Scan for duplicates
+        window.scanForDuplicates = async function() {
+            // Show loading indicator
+            const loadingDiv = document.createElement('div');
+            loadingDiv.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #fef3c7; border: 2px solid #f59e0b; color: #92400e; padding: 15px 30px; border-radius: 10px; z-index: 10001; font-weight: 600;';
+            loadingDiv.textContent = '🔍 Scanning for duplicates...';
+            document.body.appendChild(loadingDiv);
+
+            try {
+                // Get all votes
+                const { data: votes, error } = await supabase
+                    .from('teacher_feast_votes')
+                    .select('*')
+                    .order('voted_at', { ascending: false });
+
+                if (error) throw error;
+
+                // Group duplicates
+                const duplicateGroups = [];
+                const processedVotes = new Set();
+
+                for (let i = 0; i < votes.length; i++) {
+                    if (processedVotes.has(votes[i].id)) continue;
+
+                    const currentVote = votes[i];
+                    const similarVotes = [currentVote];
+                    processedVotes.add(currentVote.id);
+
+                    // Find similar votes
+                    for (let j = i + 1; j < votes.length; j++) {
+                        if (processedVotes.has(votes[j].id)) continue;
+
+                        const compareVote = votes[j];
+                        const matchReasons = [];
+
+                        // Exact email match
+                        if (currentVote.email && compareVote.email &&
+                            currentVote.email.toLowerCase() === compareVote.email.toLowerCase()) {
+                            matchReasons.push('email');
+                        }
+
+                        // Exact phone match
+                        if (currentVote.phone && compareVote.phone) {
+                            const phone1 = currentVote.phone.replace(/\D/g, '');
+                            const phone2 = compareVote.phone.replace(/\D/g, '');
+                            if (phone1 === phone2 && phone1.length >= 10) {
+                                matchReasons.push('phone');
+                            }
+                        }
+
+                        // Similar name (case-insensitive exact match)
+                        if (currentVote.full_name && compareVote.full_name) {
+                            const name1 = currentVote.full_name.toLowerCase().trim();
+                            const name2 = compareVote.full_name.toLowerCase().trim();
+                            if (name1 === name2) {
+                                matchReasons.push('name');
+                            }
+                        }
+
+                        // If any match found, add to similar votes
+                        if (matchReasons.length > 0) {
+                            similarVotes.push({
+                                ...compareVote,
+                                matchReasons
+                            });
+                            processedVotes.add(compareVote.id);
+                        }
+                    }
+
+                    // If more than one vote in group, it's a duplicate
+                    if (similarVotes.length > 1) {
+                        duplicateGroups.push(similarVotes);
+                    }
+                }
+
+                // Remove loading indicator
+                document.body.removeChild(loadingDiv);
+
+                // Show results
+                if (duplicateGroups.length === 0) {
+                    showSuccessMessage('✅ No duplicates found!');
+                    return;
+                }
+
+                // Show duplicates modal
+                showDuplicatesModal(duplicateGroups);
+
+            } catch (error) {
+                console.error('Duplicate scan error:', error);
+                document.body.removeChild(loadingDiv);
+                alert('Error scanning for duplicates: ' + error.message);
+            }
+        };
+
+        // Show duplicates modal
+        function showDuplicatesModal(duplicateGroups) {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000; overflow-y: auto; padding: 20px;';
+
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = 'background: white; padding: 30px; max-width: 1200px; width: 100%; border-radius: 15px; max-height: 90vh; overflow-y: auto;';
+
+            // Header
+            const header = document.createElement('div');
+            header.style.cssText = 'margin-bottom: 20px;';
+            header.innerHTML = `
+                <h3 style="color: #176F9A; font-size: 22px; margin-bottom: 10px;">🔍 Found ${duplicateGroups.length} Duplicate Group(s)</h3>
+                <p style="color: #666; font-size: 14px;">Review each group and select which vote to KEEP. All others will be archived.</p>
+            `;
+            modalContent.appendChild(header);
+
+            // Track selections (groupIndex -> voteId)
+            const selections = {};
+
+            // Create duplicate groups
+            duplicateGroups.forEach((group, groupIndex) => {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'duplicate-group';
+
+                // Calculate total points in group
+                const totalPoints = group.reduce((sum, v) => sum + v.points, 0);
+
+                // Get match reasons (from second vote since first is original)
+                const matchReasons = group[1].matchReasons || [];
+                const matchBadges = matchReasons.map(reason => {
+                    const colors = {
+                        email: { bg: '#fee2e2', text: '#991b1b' },
+                        phone: { bg: '#fef3c7', text: '#92400e' },
+                        name: { bg: '#dbeafe', text: '#1e40af' }
+                    };
+                    const color = colors[reason] || { bg: '#f3f4f6', text: '#4b5563' };
+                    return `<span style="display: inline-block; padding: 3px 8px; background: ${color.bg}; color: ${color.text}; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-right: 5px;">${reason}</span>`;
+                }).join('');
+
+                // Group header
+                const groupHeader = document.createElement('div');
+                groupHeader.className = 'duplicate-group-header';
+                groupHeader.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>Duplicate Group #${groupIndex + 1}</strong> - ${group.length} votes (${totalPoints} total points)
+                        </div>
+                        <div>
+                            Matched by: ${matchBadges}
+                        </div>
+                    </div>
+                `;
+                groupDiv.appendChild(groupHeader);
+
+                // Create vote cards
+                group.forEach((vote, voteIndex) => {
+                    const voteCard = document.createElement('div');
+                    voteCard.className = 'duplicate-vote';
+                    voteCard.id = `vote_${groupIndex}_${voteIndex}`;
+
+                    const votedDate = new Date(vote.voted_at);
+                    const formattedDate = votedDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    const badgeClass = vote.vote_type === 'form' ? 'badge-form' : 'badge-instagram';
+                    const badgeText = vote.vote_type === 'form' ? 'FORM' : 'INSTAGRAM';
+
+                    voteCard.innerHTML = `
+                        <div class="duplicate-vote-info">
+                            <input type="radio" name="keep_group_${groupIndex}" value="${vote.id}" style="width: 20px; height: 20px; cursor: pointer; margin-right: 15px;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                    <span class="badge ${badgeClass}">${badgeText}</span>
+                                    <strong style="font-size: 14px;">${vote.school_name}</strong>
+                                    <span style="font-weight: 600; color: #176F9A;">${vote.points} pts</span>
+                                    ${vote.is_archived ? '<span class="archived-badge">ARCHIVED</span>' : ''}
+                                </div>
+                                <div style="font-size: 13px; color: #666; margin-bottom: 5px;">
+                                    <strong>Name:</strong> ${vote.full_name || '-'} &nbsp;|&nbsp;
+                                    <strong>Email:</strong> ${vote.email || '-'} &nbsp;|&nbsp;
+                                    <strong>Phone:</strong> ${vote.phone || '-'}
+                                </div>
+                                <div style="font-size: 12px; color: #999;">
+                                    <strong>Date:</strong> ${formattedDate} &nbsp;|&nbsp;
+                                    <strong>IP:</strong> ${vote.ip_address || '-'}
+                                    ${vote.instagram_username ? ` &nbsp;|&nbsp; <strong>IG:</strong> ${vote.instagram_username}` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    // Handle selection
+                    const radio = voteCard.querySelector('input[type="radio"]');
+                    radio.addEventListener('change', () => {
+                        // Update selection
+                        selections[groupIndex] = vote.id;
+
+                        // Update visual selection
+                        const allVotesInGroup = groupDiv.querySelectorAll('.duplicate-vote');
+                        allVotesInGroup.forEach(v => v.classList.remove('selected'));
+                        voteCard.classList.add('selected');
+                    });
+
+                    // Click card to select
+                    voteCard.addEventListener('click', (e) => {
+                        if (e.target.tagName !== 'INPUT') {
+                            radio.checked = true;
+                            radio.dispatchEvent(new Event('change'));
+                        }
+                    });
+
+                    groupDiv.appendChild(voteCard);
+                });
+
+                modalContent.appendChild(groupDiv);
+            });
+
+            // Action buttons
+            const actionsDiv = document.createElement('div');
+            actionsDiv.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px; padding-top: 20px; border-top: 3px solid #e0f2fe;';
+
+            const archiveDuplicatesBtn = document.createElement('button');
+            archiveDuplicatesBtn.className = 'btn btn-warning';
+            archiveDuplicatesBtn.textContent = '📦 Archive Duplicates';
+            archiveDuplicatesBtn.onclick = async () => {
+                // Validate all groups have a selection
+                const missingSelections = [];
+                for (let i = 0; i < duplicateGroups.length; i++) {
+                    if (!selections[i]) {
+                        missingSelections.push(i + 1);
+                    }
+                }
+
+                if (missingSelections.length > 0) {
+                    alert(`Please select which vote to keep in group(s): ${missingSelections.join(', ')}`);
+                    return;
+                }
+
+                // Confirm action
+                const totalToArchive = duplicateGroups.reduce((sum, group) => sum + group.length - 1, 0);
+                if (!confirm(`Archive ${totalToArchive} duplicate vote(s)?\n\nThis will remove their points from the leaderboard but keep the records.`)) {
+                    return;
+                }
+
+                try {
+                    archiveDuplicatesBtn.textContent = 'ARCHIVING...';
+                    archiveDuplicatesBtn.disabled = true;
+
+                    let archivedCount = 0;
+
+                    // Process each group
+                    for (let i = 0; i < duplicateGroups.length; i++) {
+                        const group = duplicateGroups[i];
+                        const keepVoteId = selections[i];
+
+                        // Archive all votes except the one to keep
+                        for (const vote of group) {
+                            if (vote.id !== keepVoteId && !vote.is_archived) {
+                                // Archive vote
+                                await supabase
+                                    .from('teacher_feast_votes')
+                                    .update({ is_archived: true })
+                                    .eq('id', vote.id);
+
+                                // Decrement school points
+                                await supabase.rpc('increment_school_votes', {
+                                    school_name_param: vote.school_name,
+                                    points_param: -vote.points
+                                });
+
+                                archivedCount++;
+                            }
+                        }
+                    }
+
+                    document.body.removeChild(modal);
+                    showSuccessMessage(`✅ Archived ${archivedCount} duplicate vote(s)`);
+                    await loadVotes();
+
+                } catch (error) {
+                    console.error('Archive duplicates error:', error);
+                    alert('Error archiving duplicates: ' + error.message);
+                    archiveDuplicatesBtn.textContent = '📦 Archive Duplicates';
+                    archiveDuplicatesBtn.disabled = false;
+                }
+            };
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn btn-secondary';
+            closeBtn.textContent = 'Close';
+            closeBtn.onclick = () => {
+                document.body.removeChild(modal);
+            };
+
+            actionsDiv.appendChild(archiveDuplicatesBtn);
+            actionsDiv.appendChild(closeBtn);
+            modalContent.appendChild(actionsDiv);
+
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+        }
 
         // Load votes on page load
         loadVotes();
