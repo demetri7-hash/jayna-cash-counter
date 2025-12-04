@@ -44,6 +44,35 @@ export default async function handler(req, res) {
       });
     }
 
+    // Validate phone number - reject all zeros or invalid patterns
+    const phoneDigits = phone.replace(/\D/g, ''); // Remove all non-digit characters
+    if (phoneDigits.length < 10) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid phone number'
+      });
+    }
+    if (/^0+$/.test(phoneDigits)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid phone number'
+      });
+    }
+
+    // Check for duplicate email (only 1 vote per email address ever)
+    const { data: existingVote } = await supabase
+      .from('teacher_feast_votes')
+      .select('id, school_name, voted_at')
+      .eq('email', email)
+      .single();
+
+    if (existingVote) {
+      return res.status(400).json({
+        success: false,
+        error: 'This email address has already voted. Only 1 vote per email address is allowed. Thank you for your support!'
+      });
+    }
+
     // Check if school exists, create if it doesn't (for custom schools)
     const { data: schoolExists } = await supabase
       .from('teacher_feast_schools')
@@ -76,22 +105,6 @@ export default async function handler(req, res) {
         }
         // If duplicate, it means another request created it, continue
       }
-    }
-
-    // Check for duplicate vote (same email within 1 hour)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data: recentVote } = await supabase
-      .from('teacher_feast_votes')
-      .select('id')
-      .eq('email', email)
-      .gte('voted_at', oneHourAgo)
-      .single();
-
-    if (recentVote) {
-      return res.status(400).json({
-        success: false,
-        error: 'You have already voted within the last hour. Please try again later.'
-      });
     }
 
     // Get IP address for fraud tracking
