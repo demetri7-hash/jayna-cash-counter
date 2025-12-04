@@ -579,6 +579,16 @@
             <h2>🏫 Manage Schools</h2>
             <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Add, edit, or remove schools from the contest. Be careful when deleting schools with existing votes!</p>
 
+            <div class="bulk-actions" id="bulkSchoolActions">
+                <div class="bulk-actions-header">
+                    <span id="selectedSchoolCount">0</span> school(s) selected
+                </div>
+                <div class="bulk-actions-buttons">
+                    <button class="btn btn-warning" onclick="mergeSchools()">🔀 Merge Schools</button>
+                    <button class="btn btn-secondary" onclick="clearSchoolSelection()">✕ Clear Selection</button>
+                </div>
+            </div>
+
             <div class="actions">
                 <button class="btn btn-success" onclick="showAddSchoolModal()">➕ Add New School</button>
                 <button class="btn btn-secondary" onclick="loadSchools()">🔄 Refresh Schools</button>
@@ -594,6 +604,9 @@
                     <table>
                         <thead>
                             <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" id="selectAllSchools" class="vote-checkbox" onchange="toggleSelectAllSchools()">
+                                </th>
                                 <th>School Name</th>
                                 <th>Total Votes</th>
                                 <th>Total Points</th>
@@ -632,6 +645,7 @@
         let filteredNewsletter = [];
         let allSchools = [];
         let selectedVotes = new Set();
+        let selectedSchools = new Set();
 
         // Tab switching
         window.switchTab = function(tab) {
@@ -1463,6 +1477,15 @@
             schools.forEach(school => {
                 const row = document.createElement('tr');
 
+                // Checkbox cell
+                const checkboxCell = document.createElement('td');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'vote-checkbox';
+                checkbox.checked = selectedSchools.has(school.school_name);
+                checkbox.onchange = () => toggleSchoolSelection(school.school_name);
+                checkboxCell.appendChild(checkbox);
+
                 // School name cell
                 const nameCell = document.createElement('td');
                 const nameStrong = document.createElement('strong');
@@ -1520,6 +1543,7 @@
                 actionsCell.appendChild(deleteBtn);
 
                 // Append all cells
+                row.appendChild(checkboxCell);
                 row.appendChild(nameCell);
                 row.appendChild(totalVotesCell);
                 row.appendChild(totalPointsCell);
@@ -1775,6 +1799,247 @@
                 console.error('Delete school error:', error);
                 alert('Error deleting school: ' + error.message);
             }
+        };
+
+        // ========================================
+        // SCHOOL MERGE FUNCTIONS
+        // ========================================
+
+        // Toggle school selection
+        window.toggleSchoolSelection = function(schoolName) {
+            if (selectedSchools.has(schoolName)) {
+                selectedSchools.delete(schoolName);
+            } else {
+                selectedSchools.add(schoolName);
+            }
+            updateBulkSchoolActionsBar();
+        };
+
+        // Toggle select all schools
+        window.toggleSelectAllSchools = function() {
+            const selectAllCheckbox = document.getElementById('selectAllSchools');
+            if (selectAllCheckbox.checked) {
+                // Select all schools
+                allSchools.forEach(school => selectedSchools.add(school.school_name));
+            } else {
+                // Deselect all
+                selectedSchools.clear();
+            }
+            updateBulkSchoolActionsBar();
+            displaySchools(allSchools); // Refresh to update checkboxes
+        };
+
+        // Clear school selection
+        window.clearSchoolSelection = function() {
+            selectedSchools.clear();
+            document.getElementById('selectAllSchools').checked = false;
+            updateBulkSchoolActionsBar();
+            displaySchools(allSchools);
+        };
+
+        // Update bulk school actions bar
+        function updateBulkSchoolActionsBar() {
+            const bulkActions = document.getElementById('bulkSchoolActions');
+            const selectedCount = document.getElementById('selectedSchoolCount');
+
+            selectedCount.textContent = selectedSchools.size;
+
+            if (selectedSchools.size > 0) {
+                bulkActions.classList.add('active');
+            } else {
+                bulkActions.classList.remove('active');
+            }
+        }
+
+        // Merge schools
+        window.mergeSchools = async function() {
+            if (selectedSchools.size < 2) {
+                alert('Please select at least 2 schools to merge');
+                return;
+            }
+
+            // Get full school objects for selected schools
+            const selectedSchoolsList = allSchools.filter(s => selectedSchools.has(s.school_name));
+
+            // Create modal for selecting target school
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000; overflow-y: auto; padding: 20px;';
+
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = 'background: white; padding: 30px; max-width: 600px; width: 100%; border-radius: 15px; max-height: 90vh; overflow-y: auto;';
+
+            // Calculate totals for each school
+            const schoolOptions = selectedSchoolsList.map(school => {
+                const totalPoints = (school.form_votes * 2) + (school.instagram_votes * 1);
+                return `
+                    <div style="margin-bottom: 15px; padding: 15px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; transition: all 0.2s;"
+                         onclick="document.getElementById('targetSchool_${school.school_name.replace(/[^a-zA-Z0-9]/g, '_')}').checked = true"
+                         onmouseover="this.style.background='#f0f9ff'; this.style.borderColor='#46B0E4';"
+                         onmouseout="this.style.background='white'; this.style.borderColor='#ddd';">
+                        <label style="display: flex; align-items: center; cursor: pointer; margin: 0;">
+                            <input type="radio" name="targetSchool" id="targetSchool_${school.school_name.replace(/[^a-zA-Z0-9]/g, '_')}" value="${school.school_name}" style="margin-right: 12px; width: 20px; height: 20px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 700; font-size: 16px; color: #176F9A; margin-bottom: 5px;">${school.school_name}</div>
+                                <div style="font-size: 13px; color: #666;">
+                                    <strong>${school.total_votes || 0}</strong> votes •
+                                    <strong>${totalPoints}</strong> points •
+                                    <strong>${school.form_votes || 0}</strong> form •
+                                    <strong>${school.instagram_votes || 0}</strong> instagram
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                `;
+            }).join('');
+
+            // Calculate combined totals
+            const combinedVotes = selectedSchoolsList.reduce((sum, s) => sum + (s.total_votes || 0), 0);
+            const combinedPoints = selectedSchoolsList.reduce((sum, s) => sum + ((s.form_votes * 2) + (s.instagram_votes * 1)), 0);
+            const combinedForm = selectedSchoolsList.reduce((sum, s) => sum + (s.form_votes || 0), 0);
+            const combinedInstagram = selectedSchoolsList.reduce((sum, s) => sum + (s.instagram_votes || 0), 0);
+
+            modalContent.innerHTML = `
+                <h3 style="color: #176F9A; margin-bottom: 15px; font-size: 22px;">🔀 Merge ${selectedSchools.size} Schools</h3>
+
+                <div style="padding: 15px; background: #fef3c7; border: 2px solid #f59e0b; border-radius: 10px; margin-bottom: 20px;">
+                    <p style="font-size: 13px; color: #92400e; margin-bottom: 8px;"><strong>⚠️ Important:</strong></p>
+                    <p style="font-size: 13px; color: #92400e; margin-bottom: 8px;">
+                        All votes from the schools you DON'T select will be transferred to the school you DO select.
+                    </p>
+                    <p style="font-size: 13px; color: #92400e;">
+                        The other schools will be permanently deleted.
+                    </p>
+                </div>
+
+                <div style="padding: 15px; background: #d1fae5; border: 2px solid #059669; border-radius: 10px; margin-bottom: 20px;">
+                    <p style="font-size: 13px; color: #065f46; margin-bottom: 5px;"><strong>📊 Combined Totals After Merge:</strong></p>
+                    <p style="font-size: 13px; color: #065f46;">
+                        <strong>${combinedVotes}</strong> votes •
+                        <strong>${combinedPoints}</strong> points •
+                        <strong>${combinedForm}</strong> form •
+                        <strong>${combinedInstagram}</strong> instagram
+                    </p>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 12px; font-weight: 700; color: #176F9A; font-size: 14px;">
+                        Select the school to keep (all others will merge into this one):
+                    </label>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        ${schoolOptions}
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button id="confirmMergeBtn" class="btn btn-warning">MERGE SCHOOLS</button>
+                    <button id="cancelMergeBtn" class="btn btn-secondary">CANCEL</button>
+                </div>
+            `;
+
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+
+            // Handle cancel
+            document.getElementById('cancelMergeBtn').onclick = () => {
+                document.body.removeChild(modal);
+            };
+
+            // Handle confirm
+            document.getElementById('confirmMergeBtn').onclick = async () => {
+                const targetSchoolRadio = document.querySelector('input[name="targetSchool"]:checked');
+
+                if (!targetSchoolRadio) {
+                    alert('Please select which school to keep');
+                    return;
+                }
+
+                const targetSchoolName = targetSchoolRadio.value;
+                const schoolsToMerge = Array.from(selectedSchools).filter(s => s !== targetSchoolName);
+
+                if (!confirm(`FINAL CONFIRMATION:\n\nMerge ${schoolsToMerge.length} school(s) into "${targetSchoolName}"?\n\nThe following schools will be deleted:\n${schoolsToMerge.map(s => '• ' + s).join('\n')}\n\nThis action CANNOT be undone.`)) {
+                    return;
+                }
+
+                try {
+                    document.getElementById('confirmMergeBtn').textContent = 'MERGING...';
+                    document.getElementById('confirmMergeBtn').disabled = true;
+
+                    // Transfer all votes from schools to merge
+                    for (const schoolName of schoolsToMerge) {
+                        // Update votes
+                        await supabase
+                            .from('teacher_feast_votes')
+                            .update({ school_name: targetSchoolName })
+                            .eq('school_name', schoolName);
+
+                        // Update newsletter
+                        await supabase
+                            .from('teacher_feast_newsletter')
+                            .update({ school_name: targetSchoolName })
+                            .eq('school_name', schoolName);
+                    }
+
+                    // Get final vote counts for target school
+                    const { data: votes } = await supabase
+                        .from('teacher_feast_votes')
+                        .select('vote_type, points')
+                        .eq('school_name', targetSchoolName);
+
+                    // Calculate new totals
+                    const totalVotes = votes.length;
+                    const formVotes = votes.filter(v => v.vote_type === 'form').length;
+                    const instagramVotes = votes.filter(v => v.vote_type === 'instagram').length;
+                    const totalPoints = votes.reduce((sum, v) => sum + v.points, 0);
+
+                    // Update target school with new totals
+                    await supabase
+                        .from('teacher_feast_schools')
+                        .update({
+                            total_votes: totalPoints,
+                            form_votes: formVotes,
+                            instagram_votes: instagramVotes
+                        })
+                        .eq('school_name', targetSchoolName);
+
+                    // Merge Instagram handles (combine unique handles)
+                    const targetSchool = selectedSchoolsList.find(s => s.school_name === targetSchoolName);
+                    const allHandles = new Set(targetSchool.instagram_handles || []);
+
+                    for (const schoolName of schoolsToMerge) {
+                        const school = selectedSchoolsList.find(s => s.school_name === schoolName);
+                        if (school.instagram_handles) {
+                            school.instagram_handles.forEach(handle => allHandles.add(handle));
+                        }
+                    }
+
+                    // Update target school with merged handles
+                    await supabase
+                        .from('teacher_feast_schools')
+                        .update({ instagram_handles: Array.from(allHandles) })
+                        .eq('school_name', targetSchoolName);
+
+                    // Delete merged schools
+                    for (const schoolName of schoolsToMerge) {
+                        await supabase
+                            .from('teacher_feast_schools')
+                            .delete()
+                            .eq('school_name', schoolName);
+                    }
+
+                    document.body.removeChild(modal);
+                    showSuccessMessage(`✅ Successfully merged ${schoolsToMerge.length} school(s) into "${targetSchoolName}"`);
+                    clearSchoolSelection();
+                    await loadSchools();
+                    await loadSchoolsFilter(); // Refresh filter dropdowns
+                    await loadVotes(); // Refresh votes list
+
+                } catch (error) {
+                    console.error('Merge schools error:', error);
+                    alert('Error merging schools: ' + error.message);
+                    document.getElementById('confirmMergeBtn').textContent = 'MERGE SCHOOLS';
+                    document.getElementById('confirmMergeBtn').disabled = false;
+                }
+            };
         };
 
         // Load votes on page load
