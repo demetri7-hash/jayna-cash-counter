@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unarchive All Votes - Teacher's Feast Contest</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #176F9A;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 10px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(70, 176, 228, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: #059669;
+        }
+
+        .btn-success:hover {
+            background: #047857;
+            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4);
+        }
+
+        .results {
+            background: #f0f9ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .success {
+            background: #d1fae5;
+            border: 2px solid #059669;
+            color: #065f46;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+
+        .error {
+            background: #fee2e2;
+            border: 2px solid #dc2626;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+
+        .info {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            color: #92400e;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #e0f2fe;
+            border-top: 4px solid #46B0E4;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .stat-card {
+            background: #f0f9ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #46B0E4;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #176F9A;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>↩️ Unarchive All Votes</h1>
+            <p style="color: #666; margin-top: 10px;">Restore all archived votes and their points</p>
+        </div>
+
+        <div class="section">
+            <h2 style="color: #176F9A; margin-bottom: 20px;">Find Archived Votes</h2>
+            <p style="margin-bottom: 20px; color: #666;">Click the button below to find all archived votes in the database.</p>
+            <button class="btn" onclick="findArchivedVotes()" id="findBtn">🔍 Find Archived Votes</button>
+            <div id="findResults"></div>
+        </div>
+
+        <div class="section" id="unarchiveSection" style="display: none;">
+            <h2 style="color: #176F9A; margin-bottom: 20px;">Unarchive All Votes</h2>
+            <p style="margin-bottom: 20px; color: #666;">Click to restore all archived votes and add their points back to the schools.</p>
+            <button class="btn btn-success" onclick="unarchiveAllVotes()" id="unarchiveBtn">↩️ Unarchive All Votes</button>
+            <div id="unarchiveResults"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const supabase = createClient(
+            'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+        );
+
+        let archivedVotes = [];
+
+        // Find archived votes
+        window.findArchivedVotes = async function() {
+            const findBtn = document.getElementById('findBtn');
+            const findResults = document.getElementById('findResults');
+
+            findBtn.disabled = true;
+            findBtn.textContent = '🔍 Searching...';
+
+            findResults.innerHTML = '<div class="loading"><div class="spinner"></div><p>Finding archived votes...</p></div>';
+
+            try {
+                // Get all archived votes
+                const { data, error } = await supabase
+                    .from('teacher_feast_votes')
+                    .select('*')
+                    .eq('is_archived', true)
+                    .order('voted_at', { ascending: false });
+
+                if (error) throw error;
+
+                archivedVotes = data;
+
+                if (archivedVotes.length === 0) {
+                    findResults.innerHTML = '<div class="success">✅ No archived votes found! All votes are active.</div>';
+                    findBtn.textContent = '✅ No Archived Votes';
+                    return;
+                }
+
+                // Calculate stats
+                const totalPoints = archivedVotes.reduce((sum, v) => sum + v.points, 0);
+                const formVotes = archivedVotes.filter(v => v.vote_type === 'form').length;
+                const igVotes = archivedVotes.filter(v => v.vote_type === 'instagram').length;
+
+                // Group by school
+                const schoolGroups = {};
+                archivedVotes.forEach(vote => {
+                    if (!schoolGroups[vote.school_name]) {
+                        schoolGroups[vote.school_name] = { count: 0, points: 0 };
+                    }
+                    schoolGroups[vote.school_name].count++;
+                    schoolGroups[vote.school_name].points += vote.points;
+                });
+
+                // Display results
+                let html = `<div class="results">`;
+                html += `<h3 style="color: #176F9A; margin-bottom: 15px;">Found ${archivedVotes.length} Archived Vote(s)</h3>`;
+
+                html += `<div class="stat-card">`;
+                html += `<div class="stat-number">${archivedVotes.length}</div>`;
+                html += `<div class="stat-label">Total Archived Votes</div>`;
+                html += `</div>`;
+
+                html += `<div class="stat-card">`;
+                html += `<div class="stat-number">${totalPoints}</div>`;
+                html += `<div class="stat-label">Total Points to Restore</div>`;
+                html += `</div>`;
+
+                html += `<div style="margin-top: 20px;">`;
+                html += `<strong>Vote Types:</strong><br>`;
+                html += `• Form Votes: ${formVotes} (${formVotes * 2} points)<br>`;
+                html += `• Instagram Votes: ${igVotes} (${igVotes * 1} points)<br>`;
+                html += `</div>`;
+
+                html += `<div style="margin-top: 20px;">`;
+                html += `<strong>Points by School:</strong><br>`;
+                for (const [school, stats] of Object.entries(schoolGroups)) {
+                    html += `• ${school}: +${stats.points} points (${stats.count} votes)<br>`;
+                }
+                html += `</div>`;
+
+                html += `</div>`;
+                findResults.innerHTML = html;
+
+                // Show unarchive section
+                document.getElementById('unarchiveSection').style.display = 'block';
+                findBtn.textContent = `✅ Found ${archivedVotes.length} Archived Votes`;
+
+            } catch (error) {
+                console.error('Find error:', error);
+                findResults.innerHTML = `<div class="error">❌ Error finding archived votes: ${error.message}</div>`;
+                findBtn.disabled = false;
+                findBtn.textContent = '🔍 Find Archived Votes';
+            }
+        };
+
+        // Unarchive all votes
+        window.unarchiveAllVotes = async function() {
+            if (archivedVotes.length === 0) {
+                alert('No archived votes to restore. Please search first.');
+                return;
+            }
+
+            const totalPoints = archivedVotes.reduce((sum, v) => sum + v.points, 0);
+
+            if (!confirm(`⚠️ CONFIRMATION\n\nThis will UNARCHIVE ${archivedVotes.length} vote(s) and restore ${totalPoints} total points to the schools.\n\nProceed?`)) {
+                return;
+            }
+
+            const unarchiveBtn = document.getElementById('unarchiveBtn');
+            const unarchiveResults = document.getElementById('unarchiveResults');
+
+            unarchiveBtn.disabled = true;
+            unarchiveBtn.textContent = '↩️ Unarchiving...';
+
+            unarchiveResults.innerHTML = '<div class="loading"><div class="spinner"></div><p>Unarchiving votes and restoring points...</p></div>';
+
+            try {
+                let unarchivedCount = 0;
+                const schoolAdjustments = {};
+
+                // Process each archived vote
+                for (const vote of archivedVotes) {
+                    // Unarchive vote
+                    const { error: unarchiveError } = await supabase
+                        .from('teacher_feast_votes')
+                        .update({ is_archived: false })
+                        .eq('id', vote.id);
+
+                    if (unarchiveError) throw unarchiveError;
+
+                    // Track school point adjustments
+                    if (!schoolAdjustments[vote.school_name]) {
+                        schoolAdjustments[vote.school_name] = 0;
+                    }
+                    schoolAdjustments[vote.school_name] += vote.points;
+
+                    unarchivedCount++;
+                }
+
+                // Increment school points (restore them)
+                for (const [school, totalPoints] of Object.entries(schoolAdjustments)) {
+                    const { error: incrementError } = await supabase.rpc('increment_school_votes', {
+                        school_name_param: school,
+                        points_param: totalPoints  // Positive to add back
+                    });
+
+                    if (incrementError) {
+                        console.error(`Error incrementing points for ${school}:`, incrementError);
+                    }
+                }
+
+                // Show success
+                let html = `<div class="success">`;
+                html += `✅ <strong>Unarchive Complete!</strong><br><br>`;
+                html += `• Unarchived <strong>${unarchivedCount}</strong> vote(s)<br>`;
+                html += `• Restored points for <strong>${Object.keys(schoolAdjustments).length}</strong> school(s)<br><br>`;
+                html += `<strong>School Point Restorations:</strong><br>`;
+                for (const [school, points] of Object.entries(schoolAdjustments)) {
+                    html += `• ${school}: +${points} points<br>`;
+                }
+                html += `</div>`;
+
+                unarchiveResults.innerHTML = html;
+                unarchiveBtn.textContent = '✅ Unarchive Complete';
+
+                // Clear archived votes
+                archivedVotes = [];
+
+                // Offer to search again
+                setTimeout(() => {
+                    if (confirm('Unarchive complete! Would you like to search again to verify?')) {
+                        window.findArchivedVotes();
+                    }
+                }, 2000);
+
+            } catch (error) {
+                console.error('Unarchive error:', error);
+                unarchiveResults.innerHTML = `<div class="error">❌ Error during unarchive: ${error.message}</div>`;
+                unarchiveBtn.disabled = false;
+                unarchiveBtn.textContent = '↩️ Unarchive All Votes';
+            }
+        };
+    </script>
+</body>
+</html>
