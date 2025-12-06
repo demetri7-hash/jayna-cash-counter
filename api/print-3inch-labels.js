@@ -710,12 +710,11 @@ function generateLabelsFromPrep(prep, order) {
       });
     }
 
-    // Mixed Greens
-    const greensFullPans = Math.ceil(greensSets / 2);
-    for (let i = 1; i <= greensFullPans; i++) {
+    // Mixed Greens - FIXED to match prep sheet (greensSets half pans, not full pans)
+    for (let i = 1; i <= greensSets; i++) {
       labels.push({
         item: getLabelName('Mixed Greens'),
-        qty: greensFullPans > 1 ? `FULL PAN - ${i} OF ${greensFullPans}` : `FULL PAN - 1 OF 1`
+        qty: greensSets > 1 ? `HALF PAN - ${i} OF ${greensSets}` : `HALF PAN - 1 OF 1`
       });
     }
 
@@ -823,13 +822,61 @@ function generateLabelsFromPrep(prep, order) {
       });
     }
 
-    // WHOLE PITA (from BYO gyros)
+    // WHOLE PITA (from BYO gyros) - FIXED to match prep sheet tiered logic
     const pitasNeeded = prep.byoGyros.total + Math.ceil(prep.byoGyros.total / 10);
-    const pitaFullPans = Math.ceil(pitasNeeded / 25); // 25 whole pita per full pan
-    for (let i = 1; i <= pitaFullPans; i++) {
+
+    if (pitasNeeded >= 2 && pitasNeeded <= 12) {
+      // 2-12: 1 half pan
       labels.push({
         item: 'WHOLE PITA',
-        qty: pitaFullPans > 1 ? `FULL PAN - ${i} OF ${pitaFullPans}` : `FULL PAN - 1 OF 1`
+        qty: 'HALF PAN - 1 OF 1'
+      });
+    } else if (pitasNeeded >= 13 && pitasNeeded <= 25) {
+      // 13-25: 1 full pan
+      labels.push({
+        item: 'WHOLE PITA',
+        qty: 'FULL PAN - 1 OF 1'
+      });
+    } else if (pitasNeeded >= 26) {
+      // 26+: Multiple full pans with remainder logic
+      const pitaFullPansNeeded = Math.floor(pitasNeeded / 25);
+      const pitaRemainder = pitasNeeded % 25;
+
+      if (pitaRemainder >= 2 && pitaRemainder <= 12) {
+        // Full pans + 1 half pan
+        for (let i = 1; i <= pitaFullPansNeeded; i++) {
+          labels.push({
+            item: 'WHOLE PITA',
+            qty: `FULL PAN - ${i} OF ${pitaFullPansNeeded + 1}`
+          });
+        }
+        labels.push({
+          item: 'WHOLE PITA',
+          qty: `HALF PAN - ${pitaFullPansNeeded + 1} OF ${pitaFullPansNeeded + 1}`
+        });
+      } else if (pitaRemainder >= 13 && pitaRemainder <= 25) {
+        // All full pans
+        const totalFullPans = pitaFullPansNeeded + 1;
+        for (let i = 1; i <= totalFullPans; i++) {
+          labels.push({
+            item: 'WHOLE PITA',
+            qty: totalFullPans > 1 ? `FULL PAN - ${i} OF ${totalFullPans}` : `FULL PAN - 1 OF 1`
+          });
+        }
+      } else {
+        // Just full pans (no remainder or remainder < 2)
+        for (let i = 1; i <= pitaFullPansNeeded; i++) {
+          labels.push({
+            item: 'WHOLE PITA',
+            qty: pitaFullPansNeeded > 1 ? `FULL PAN - ${i} OF ${pitaFullPansNeeded}` : `FULL PAN - 1 OF 1`
+          });
+        }
+      }
+    } else {
+      // Less than 2 pitas (edge case)
+      labels.push({
+        item: 'WHOLE PITA',
+        qty: 'INDIVIDUAL'
       });
     }
   }
