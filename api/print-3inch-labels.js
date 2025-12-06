@@ -562,6 +562,31 @@ function calculatePrepList(lineItems, order) {
 }
 
 /**
+ * Convert half pans to full pans when possible
+ * 2 half pans → 1 full pan
+ * 3 half pans → 1 full pan + 1 half pan
+ * etc.
+ */
+function convertHalfPansToFullPans(halfPanCount) {
+  const fullPans = Math.floor(halfPanCount / 2);
+  const remainingHalfPans = halfPanCount % 2;
+
+  const pans = [];
+
+  // Add full pans
+  for (let i = 1; i <= fullPans; i++) {
+    pans.push({ type: 'FULL PAN', index: i, total: fullPans + remainingHalfPans });
+  }
+
+  // Add remaining half pan if any
+  if (remainingHalfPans > 0) {
+    pans.push({ type: 'HALF PAN', index: fullPans + 1, total: fullPans + remainingHalfPans });
+  }
+
+  return pans;
+}
+
+/**
  * Map old label names to new ALL CAPS names
  */
 function getLabelName(currentName) {
@@ -710,13 +735,14 @@ function generateLabelsFromPrep(prep, order) {
       });
     }
 
-    // Mixed Greens - FIXED to match prep sheet (greensSets half pans, not full pans)
-    for (let i = 1; i <= greensSets; i++) {
+    // Mixed Greens - Convert half pans to full pans (2 half = 1 full)
+    const greensPans = convertHalfPansToFullPans(greensSets);
+    greensPans.forEach(pan => {
       labels.push({
         item: getLabelName('Mixed Greens'),
-        qty: greensSets > 1 ? `HALF PAN - ${i} OF ${greensSets}` : `HALF PAN - 1 OF 1`
+        qty: `${pan.type} - ${pan.index} OF ${pan.total}`
       });
-    }
+    });
 
     // === TOPPINGS (COPIED FROM EXPORT LABELS) ===
     // COORDINATED BROWN BOWL LOGIC
@@ -730,96 +756,94 @@ function generateLabelsFromPrep(prep, order) {
     }
 
     // DICED TOMATOES
-    let tomatoContainerType = '';
-    let tomatoContainerCount = 0;
-    if (useBrownBowlForAllLabels) {
-      tomatoContainerType = 'brown bowl';
-      tomatoContainerCount = 1;
-    } else if (prep.byoGyros.total < 10) {
-      tomatoContainerType = '16oz deli';
-      tomatoContainerCount = 1;
-    } else if (prep.byoGyros.total <= 25) {
-      tomatoContainerType = 'brown bowl';
-      tomatoContainerCount = 1;
-    } else {
-      tomatoContainerType = 'half pan';
-      tomatoContainerCount = Math.ceil(prep.byoGyros.total / 50);
-    }
-    for (let i = 1; i <= tomatoContainerCount; i++) {
-      const containerLabel = tomatoContainerType.toUpperCase();
+    if (useBrownBowlForAllLabels || (prep.byoGyros.total >= 10 && prep.byoGyros.total <= 25)) {
+      // Brown bowl (single container)
       labels.push({
         item: getLabelName('Diced Tomatoes'),
-        qty: tomatoContainerCount > 1 ? `${containerLabel} - ${i} OF ${tomatoContainerCount}` : `${containerLabel} - 1 OF 1`
+        qty: 'BROWN BOWL - 1 OF 1'
+      });
+    } else if (prep.byoGyros.total < 10) {
+      // 16oz deli (single container)
+      labels.push({
+        item: getLabelName('Diced Tomatoes'),
+        qty: '16OZ DELI - 1 OF 1'
+      });
+    } else {
+      // Multiple half pans - convert to full pans when possible
+      const tomatoHalfPans = Math.ceil(prep.byoGyros.total / 50);
+      const tomatoPans = convertHalfPansToFullPans(tomatoHalfPans);
+      tomatoPans.forEach(pan => {
+        labels.push({
+          item: getLabelName('Diced Tomatoes'),
+          qty: `${pan.type} - ${pan.index} OF ${pan.total}`
+        });
       });
     }
 
     // SLICED RED ONION
-    let onionContainerType = '';
-    let onionContainerCount = 0;
-    if (useBrownBowlForAllLabels) {
-      onionContainerType = 'brown bowl';
-      onionContainerCount = 1;
-    } else if (prep.byoGyros.total < 20) {
-      onionContainerType = '16oz deli';
-      onionContainerCount = 1;
-    } else if (prep.byoGyros.total <= 45) {
-      onionContainerType = 'brown bowl';
-      onionContainerCount = 1;
-    } else {
-      onionContainerType = 'half pan';
-      onionContainerCount = Math.ceil(prep.byoGyros.total / 75);
-    }
-    for (let i = 1; i <= onionContainerCount; i++) {
-      const containerLabel = onionContainerType.toUpperCase();
+    if (useBrownBowlForAllLabels || (prep.byoGyros.total >= 20 && prep.byoGyros.total <= 45)) {
+      // Brown bowl (single container)
       labels.push({
         item: getLabelName('Sliced Red Onion'),
-        qty: onionContainerCount > 1 ? `${containerLabel} - ${i} OF ${onionContainerCount}` : `${containerLabel} - 1 OF 1`
+        qty: 'BROWN BOWL - 1 OF 1'
+      });
+    } else if (prep.byoGyros.total < 20) {
+      // 16oz deli (single container)
+      labels.push({
+        item: getLabelName('Sliced Red Onion'),
+        qty: '16OZ DELI - 1 OF 1'
+      });
+    } else {
+      // Multiple half pans - convert to full pans when possible
+      const onionHalfPans = Math.ceil(prep.byoGyros.total / 75);
+      const onionPans = convertHalfPansToFullPans(onionHalfPans);
+      onionPans.forEach(pan => {
+        labels.push({
+          item: getLabelName('Sliced Red Onion'),
+          qty: `${pan.type} - ${pan.index} OF ${pan.total}`
+        });
       });
     }
 
     // WHOLE PEPPERONCINI
-    let pepperonciniContainerType = '';
-    let pepperonciniContainerCount = 0;
-    if (useBrownBowlForAllLabels) {
-      pepperonciniContainerType = 'brown bowl';
-      pepperonciniContainerCount = 1;
+    if (useBrownBowlForAllLabels || (prep.byoGyros.total >= 10 && prep.byoGyros.total <= 30)) {
+      // Brown bowl or 32oz (single container)
+      const containerType = useBrownBowlForAllLabels ? 'BROWN BOWL' : '32OZ DELI';
+      labels.push({
+        item: getLabelName('Whole Pepperoncini'),
+        qty: `${containerType} - 1 OF 1`
+      });
     } else if (prep.byoGyros.total < 10) {
-      pepperonciniContainerType = '16oz deli';
-      pepperonciniContainerCount = 1;
-    } else if (prep.byoGyros.total <= 30) {
-      pepperonciniContainerType = '32oz deli';
-      pepperonciniContainerCount = 1;
+      // 16oz deli (single container)
+      labels.push({
+        item: getLabelName('Whole Pepperoncini'),
+        qty: '16OZ DELI - 1 OF 1'
+      });
     } else if (prep.byoGyros.total < 100) {
-      pepperonciniContainerType = 'half pan';
-      pepperonciniContainerCount = 1;
+      // 31-99: Single half pan
+      labels.push({
+        item: getLabelName('Whole Pepperoncini'),
+        qty: 'HALF PAN - 1 OF 1'
+      });
     } else {
       // 100+ portions: Generate full pan labels + half pan if remainder
       const pepperFullPans = Math.floor(prep.byoGyros.total / 100);
       const pepperRemainder = prep.byoGyros.total % 100;
+      const totalPans = pepperFullPans + (pepperRemainder > 0 ? 1 : 0);
 
       for (let i = 1; i <= pepperFullPans; i++) {
         labels.push({
           item: getLabelName('Whole Pepperoncini'),
-          qty: pepperFullPans > 1 ? `FULL PAN - ${i} OF ${pepperFullPans}` : `FULL PAN - 1 OF 1`
+          qty: `FULL PAN - ${i} OF ${totalPans}`
         });
       }
 
       if (pepperRemainder > 0) {
         labels.push({
           item: getLabelName('Whole Pepperoncini'),
-          qty: `HALF PAN - 1 OF 1`
+          qty: `HALF PAN - ${totalPans} OF ${totalPans}`
         });
       }
-
-      pepperonciniContainerCount = 0; // Skip normal generation
-    }
-
-    for (let i = 1; i <= pepperonciniContainerCount; i++) {
-      const containerLabel = pepperonciniContainerType.toUpperCase();
-      labels.push({
-        item: getLabelName('Whole Pepperoncini'),
-        qty: pepperonciniContainerCount > 1 ? `${containerLabel} - ${i} OF ${pepperonciniContainerCount}` : `${containerLabel} - 1 OF 1`
-      });
     }
 
     // WHOLE PITA (from BYO gyros) - FIXED to match prep sheet tiered logic
