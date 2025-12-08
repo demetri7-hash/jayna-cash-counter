@@ -880,11 +880,11 @@
           <div style="display: flex; gap: 15px; margin: 10px 0;">
             <div style="flex: 1;">
               <label for="tipPoolStartDate" style="font-size: 12px; color: #666;">Start Date:</label>
-              <input type="date" id="tipPoolStartDate" class="form-input" disabled style="background: #f0f0f0; cursor: not-allowed;" onchange="this.blur(); calculateCashTips();">
+              <input type="date" id="tipPoolStartDate" class="form-input" disabled style="background: #f0f0f0; cursor: not-allowed;" onchange="this.blur(); calculateCashTips(); generateWeeklyManagerUpdatesFields();">
             </div>
             <div style="flex: 1;">
               <label for="tipPoolEndDate" style="font-size: 12px; color: #666;">End Date:</label>
-              <input type="date" id="tipPoolEndDate" class="form-input" disabled style="background: #f0f0f0; cursor: not-allowed;" onchange="this.blur(); calculateCashTips(); autoFetchOnDateChange();">
+              <input type="date" id="tipPoolEndDate" class="form-input" disabled style="background: #f0f0f0; cursor: not-allowed;" onchange="this.blur(); calculateCashTips(); autoFetchOnDateChange(); generateWeeklyManagerUpdatesFields();">
             </div>
           </div>
           <div id="autoFetchStatus" style="font-size: 11px; color: #666; margin-top: 5px; min-height: 16px;">
@@ -1058,6 +1058,19 @@
                 <div id="tipPoolCashboxTotal" style="font-size: 28px; font-weight: bold; color: #333;">$0.00</div>
                 <div style="font-size: 12px; color: #666; margin-top: 8px;">This will be used for weekly reconciliation on the combined report</div>
               </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Weekly Manager Updates (Collapsible) -->
+        <details id="weeklyManagerUpdatesSection" style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 0;">
+          <summary style="cursor: pointer; font-size: 13px; color: #666; font-weight: 600;">
+            Weekly Manager Updates
+          </summary>
+          <div id="weeklyManagerUpdatesContainer" style="margin-top: 15px;">
+            <!-- Daily reports will be generated here based on selected date range -->
+            <div style="font-size: 12px; color: #999; font-style: italic; text-align: center; padding: 20px;">
+              Select a date range above to see daily report fields
             </div>
           </div>
         </details>
@@ -1562,6 +1575,168 @@
       counter: counterName,
       total: total,
       denominations: denominations
+    };
+  }
+
+  // ===== WEEKLY MANAGER UPDATES FUNCTIONS =====
+
+  function generateWeeklyManagerUpdatesFields() {
+    const startDateInput = document.getElementById('tipPoolStartDate');
+    const endDateInput = document.getElementById('tipPoolEndDate');
+    const container = document.getElementById('weeklyManagerUpdatesContainer');
+
+    if (!startDateInput || !endDateInput || !container) {
+      return;
+    }
+
+    const startDate = startDateInput.value;
+    const endDate = endDateInput.value;
+
+    if (!startDate || !endDate) {
+      // No dates selected, show placeholder message
+      container.innerHTML = `
+        <div style="font-size: 12px; color: #999; font-style: italic; text-align: center; padding: 20px;">
+          Select a date range above to see daily report fields
+        </div>
+      `;
+      return;
+    }
+
+    // Generate array of dates between start and end (inclusive)
+    const dates = [];
+    const current = new Date(startDate + 'T12:00:00'); // Pacific noon
+    const end = new Date(endDate + 'T12:00:00');
+
+    while (current <= end) {
+      dates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+
+    // Days of week names
+    const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+
+    // Build the HTML for daily reports
+    let html = '<div style="margin-bottom: 20px;">';
+    html += '<h5 style="color: #666; margin-bottom: 15px; font-size: 14px; text-transform: uppercase;">Daily Reports (Optional)</h5>';
+
+    dates.forEach((date, index) => {
+      const dayName = dayNames[date.getDay()];
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const year = date.getFullYear().toString().slice(-2); // Last 2 digits
+      const dateLabel = `${dayName}, ${month}/${day}/${year}`;
+
+      html += `
+        <div style="margin-bottom: 15px;">
+          <label for="managerUpdate_day${index}" style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #666;">
+            ${dateLabel}:
+          </label>
+          <textarea
+            id="managerUpdate_day${index}"
+            class="form-input"
+            rows="3"
+            placeholder="Enter manager updates for ${dayName.toLowerCase()}..."
+            data-date="${date.toISOString().split('T')[0]}"
+            data-day-name="${dayName}"
+          ></textarea>
+        </div>
+      `;
+    });
+
+    html += '</div>';
+
+    // Add urgent issues section
+    html += '<div style="margin-top: 25px; padding-top: 20px; border-top: 2px solid #ddd;">';
+    html += '<h5 style="color: #666; margin-bottom: 15px; font-size: 14px; text-transform: uppercase;">Urgent Issues (Optional)</h5>';
+
+    html += `
+      <div style="margin-bottom: 15px;">
+        <label for="managerUpdate_personnelIssues" style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #666;">
+          URGENT PERSONNEL ISSUES:
+        </label>
+        <textarea
+          id="managerUpdate_personnelIssues"
+          class="form-input"
+          rows="3"
+          placeholder="Enter any urgent personnel issues that require immediate attention..."
+        ></textarea>
+      </div>
+
+      <div style="margin-bottom: 0;">
+        <label for="managerUpdate_equipmentIssues" style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #666;">
+          URGENT EQUIPMENT ISSUES:
+        </label>
+        <textarea
+          id="managerUpdate_equipmentIssues"
+          class="form-input"
+          rows="3"
+          placeholder="Enter any urgent equipment issues that require immediate attention..."
+        ></textarea>
+      </div>
+    `;
+
+    html += '</div>';
+
+    container.innerHTML = html;
+  }
+
+  function getWeeklyManagerUpdatesData() {
+    const startDateInput = document.getElementById('tipPoolStartDate');
+    const endDateInput = document.getElementById('tipPoolEndDate');
+
+    if (!startDateInput || !endDateInput) {
+      return null;
+    }
+
+    const startDate = startDateInput.value;
+    const endDate = endDateInput.value;
+
+    if (!startDate || !endDate) {
+      return null;
+    }
+
+    // Generate array of dates between start and end (inclusive)
+    const dates = [];
+    const current = new Date(startDate + 'T12:00:00');
+    const end = new Date(endDate + 'T12:00:00');
+
+    while (current <= end) {
+      dates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+
+    // Collect daily reports
+    const dailyReports = [];
+    dates.forEach((date, index) => {
+      const textareaId = `managerUpdate_day${index}`;
+      const textarea = document.getElementById(textareaId);
+      if (textarea && textarea.value.trim()) {
+        const dayName = textarea.getAttribute('data-day-name');
+        const dateStr = textarea.getAttribute('data-date');
+        dailyReports.push({
+          date: dateStr,
+          dayName: dayName,
+          report: textarea.value.trim()
+        });
+      }
+    });
+
+    // Collect urgent issues
+    const personnelIssuesTextarea = document.getElementById('managerUpdate_personnelIssues');
+    const equipmentIssuesTextarea = document.getElementById('managerUpdate_equipmentIssues');
+
+    const personnelIssues = personnelIssuesTextarea ? personnelIssuesTextarea.value.trim() : '';
+    const equipmentIssues = equipmentIssuesTextarea ? equipmentIssuesTextarea.value.trim() : '';
+
+    // Only return data if at least one field has content
+    if (dailyReports.length === 0 && !personnelIssues && !equipmentIssues) {
+      return null;
+    }
+
+    return {
+      dailyReports: dailyReports,
+      personnelIssues: personnelIssues,
+      equipmentIssues: equipmentIssues
     };
   }
 
@@ -4044,32 +4219,12 @@
         cashSurplusNoteY += 8;
       }
 
-      // Add note about cashbox reconciliation if not available
-      if (!cashboxReconciliation || cashboxReconciliation.isFirstCount) {
-        const noteY = cashSurplusNoteY;
-        doc.setFont('helvetica', 'italic');
-        doc.setFontSize(7);
-        doc.setTextColor(128, 128, 128); // Light gray
-        
-        const noteText = cashboxReconciliation ? 
-          'Weekly cashbox reconciliation will be available after multiple counts are recorded.' :
-          'Weekly cashbox reconciliation feature coming soon - track total cash on hand vs. daily discrepancies.';
-        
-        const noteWidth = doc.getTextWidth(noteText);
-        const noteCenterX = (pageWidth / 2) - (noteWidth / 2);
-        doc.text(noteText, noteCenterX, noteY);
-        
-        // Reset font and color
-        doc.setTextColor(0, 0, 0);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-      }
+      // Note: Cashbox "coming soon" message removed per user request
       
       // Draw a horizontal line after summary with reduced spacing
-      // Calculate spacing based on whether we have surplus note and/or cashbox note
+      // Calculate spacing based on whether we have surplus note
       let extraSpacing = 12;
       if (tipPoolSummary.previousCashSurplus > 0) extraSpacing += 8; // Add space for surplus note
-      if (!cashboxReconciliation || cashboxReconciliation.isFirstCount) extraSpacing += 8; // Add space for cashbox note
       const postSummaryY = cashNeededY + extraSpacing;
       doc.setLineWidth(0.5);
       doc.line(margin, postSummaryY, pageWidth - margin, postSummaryY);
@@ -4457,8 +4612,11 @@
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.text(emailText, centerXEmail, footerY + 8); // Reduced spacing from 12 to 8
-      
-      // Add payday sign off sheet as page 2
+
+      // Add manager updates page as page 2 (if there are updates)
+      generateManagerUpdatesPage(doc, startDate, endDate);
+
+      // Add payday sign off sheet as page 3 (or page 2 if no manager updates)
       generatePaydaySignOffPage(doc, startDate, endDate);
 
       // Return PDF data for potential merging, or save directly if no attachments
@@ -4622,6 +4780,193 @@
   }
 
   // Generate Payday Sign Off Sheet as PDF page
+  function generateManagerUpdatesPage(doc, startDate, endDate) {
+    try {
+      // Get manager updates data
+      const updatesData = getWeeklyManagerUpdatesData();
+
+      // Only add page if there are updates
+      if (!updatesData) {
+        console.log('No manager updates to include in PDF');
+        return;
+      }
+
+      // Add new page for manager updates
+      doc.addPage();
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      let currentY = margin;
+
+      // Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(0, 0, 0);
+      doc.text('WEEKLY MANAGER UPDATES', pageWidth / 2, currentY + 15, { align: 'center' });
+
+      // Week range
+      currentY += 35;
+      doc.setFontSize(12);
+      doc.text('WEEK OF', margin, currentY);
+      doc.setFont('helvetica', 'normal');
+      const weekRange = `${startDate.toUpperCase()} - ${endDate.toUpperCase()}`;
+      doc.text(weekRange, margin + 60, currentY);
+
+      currentY += 20;
+
+      // Daily Reports Section
+      if (updatesData.dailyReports && updatesData.dailyReports.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('DAILY REPORTS', margin, currentY);
+        currentY += 15;
+
+        updatesData.dailyReports.forEach((dailyReport, index) => {
+          // Format date label (e.g., "MONDAY, 12/1/25")
+          const date = new Date(dailyReport.date + 'T12:00:00');
+          const dayName = dailyReport.dayName;
+          const month = date.getMonth() + 1;
+          const day = date.getDate();
+          const year = date.getFullYear().toString().slice(-2);
+          const dateLabel = `${dayName}, ${month}/${day}/${year}`;
+
+          // Day header
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+          doc.setTextColor(0, 0, 0);
+          doc.text(dateLabel + ':', margin, currentY);
+          currentY += 8;
+
+          // Report text
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(60, 60, 60); // Dark gray
+
+          const maxWidth = pageWidth - (2 * margin);
+          const reportLines = doc.splitTextToSize(dailyReport.report, maxWidth);
+
+          // Check if we need a new page
+          if (currentY + (reportLines.length * 6) > pageHeight - 60) {
+            doc.addPage();
+            currentY = margin;
+          }
+
+          reportLines.forEach(line => {
+            doc.text(line, margin + 5, currentY);
+            currentY += 6;
+          });
+
+          currentY += 10; // Space between reports
+        });
+
+        currentY += 5; // Extra space before urgent issues
+      }
+
+      // Urgent Issues Section
+      const hasPersonnelIssues = updatesData.personnelIssues && updatesData.personnelIssues.trim() !== '';
+      const hasEquipmentIssues = updatesData.equipmentIssues && updatesData.equipmentIssues.trim() !== '';
+
+      if (hasPersonnelIssues || hasEquipmentIssues) {
+        // Check if we need a new page for urgent issues section
+        if (currentY > pageHeight - 120) {
+          doc.addPage();
+          currentY = margin;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(220, 38, 38); // Red color for URGENT
+        doc.text('URGENT ISSUES', margin, currentY);
+        doc.setTextColor(0, 0, 0); // Back to black
+        currentY += 15;
+
+        // Personnel Issues
+        if (hasPersonnelIssues) {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+          doc.text('URGENT PERSONNEL ISSUES:', margin, currentY);
+          currentY += 8;
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(60, 60, 60);
+
+          const maxWidth = pageWidth - (2 * margin);
+          const personnelLines = doc.splitTextToSize(updatesData.personnelIssues, maxWidth);
+
+          personnelLines.forEach(line => {
+            if (currentY > pageHeight - 40) {
+              doc.addPage();
+              currentY = margin;
+            }
+            doc.text(line, margin + 5, currentY);
+            currentY += 6;
+          });
+
+          currentY += 12;
+        }
+
+        // Equipment Issues
+        if (hasEquipmentIssues) {
+          if (currentY > pageHeight - 80) {
+            doc.addPage();
+            currentY = margin;
+          }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+          doc.setTextColor(0, 0, 0);
+          doc.text('URGENT EQUIPMENT ISSUES:', margin, currentY);
+          currentY += 8;
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(60, 60, 60);
+
+          const maxWidth = pageWidth - (2 * margin);
+          const equipmentLines = doc.splitTextToSize(updatesData.equipmentIssues, maxWidth);
+
+          equipmentLines.forEach(line => {
+            if (currentY > pageHeight - 40) {
+              doc.addPage();
+              currentY = margin;
+            }
+            doc.text(line, margin + 5, currentY);
+            currentY += 6;
+          });
+        }
+      }
+
+      // Footer (at bottom of last page)
+      const footerY = pageHeight - 25;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+
+      // Get current date and time
+      const now = new Date();
+      const reportDate = now.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+      const reportTime = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+      const footerLine1 = `AS REPORTED BY DEMETRI GREGORAKIS ON ${reportDate} AT ${reportTime}`;
+      const footerLine2 = 'USING THE JAYNA GYRO APP';
+
+      const line1Width = doc.getTextWidth(footerLine1);
+      const line2Width = doc.getTextWidth(footerLine2);
+      const centerX1 = (pageWidth - line1Width) / 2;
+      const centerX2 = (pageWidth - line2Width) / 2;
+
+      doc.text(footerLine1, centerX1, footerY);
+      doc.text(footerLine2, centerX2, footerY + 8);
+
+      console.log('✅ Manager updates page added to PDF');
+    } catch (error) {
+      console.error('Error generating manager updates page:', error);
+      // Don't throw error - just skip this page if there's an issue
+    }
+  }
+
   function generatePaydaySignOffPage(doc, startDate, endDate) {
     try {
       // Add new page for payday sign off
