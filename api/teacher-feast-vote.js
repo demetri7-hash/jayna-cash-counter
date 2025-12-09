@@ -59,6 +59,36 @@ export default async function handler(req, res) {
       });
     }
 
+    // Get IP address for fraud tracking
+    const ip_address = req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+                       req.headers['x-real-ip'] ||
+                       'unknown';
+
+    // Check IP-based rate limiting (1 vote per hour per IP)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { data: recentIpVote } = await supabase
+      .from('teacher_feast_votes')
+      .select('voted_at')
+      .eq('ip_address', ip_address)
+      .gte('voted_at', oneHourAgo)
+      .order('voted_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (recentIpVote) {
+      const lastVoteTime = new Date(recentIpVote.voted_at);
+      const nextVoteTime = new Date(lastVoteTime.getTime() + 60 * 60 * 1000);
+      const now = new Date();
+      const minutesRemaining = Math.ceil((nextVoteTime - now) / (1000 * 60));
+
+      return res.status(429).json({
+        success: false,
+        error: `We see you're eager to help your school win! 🎓 You can vote again in ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''}. Thank you for your patience!`,
+        waitTime: minutesRemaining,
+        nextVoteTime: nextVoteTime.toISOString()
+      });
+    }
+
     // Check for duplicate email (only 1 vote per email address ever)
     const { data: existingVote } = await supabase
       .from('teacher_feast_votes')
@@ -69,7 +99,7 @@ export default async function handler(req, res) {
     if (existingVote) {
       return res.status(400).json({
         success: false,
-        error: 'This email address has already voted. Only 1 vote per email address is allowed. Thank you for your support!'
+        error: 'This email address has already voted. Only 1 vote per email address is allowed. Thank you for your support! ⚠️ Note: We\'ve noticed some people using fake email addresses to vote multiple times. This contest is for a good cause - to celebrate and feed our hardworking teachers. Cheating is NOT okay with us and undermines this wonderful initiative. Please play fair! 💙'
       });
     }
 
@@ -106,9 +136,6 @@ export default async function handler(req, res) {
         // If duplicate, it means another request created it, continue
       }
     }
-
-    // Get IP address for fraud tracking
-    const ip_address = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
 
     // Insert vote
     const { error: voteError } = await supabase

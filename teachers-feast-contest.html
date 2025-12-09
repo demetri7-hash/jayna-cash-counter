@@ -572,6 +572,22 @@
             text-align: center;
             font-weight: 600;
             display: none;
+            line-height: 1.6;
+            font-size: 15px;
+        }
+
+        .warning-message {
+            background: #fef3c7;
+            border: 3px solid #f59e0b;
+            color: #92400e;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+            line-height: 1.6;
+            font-size: 15px;
         }
 
         /* Responsive */
@@ -707,6 +723,10 @@
 
             <div class="success-message" id="successMessage">
                 ✓ Thank you! Your vote has been counted (2 points added)!
+            </div>
+
+            <div class="warning-message" id="warningMessage">
+                <!-- Warning message will be populated by JavaScript -->
             </div>
 
             <div class="error-message" id="errorMessage">
@@ -990,10 +1010,12 @@
 
                 const submitBtn = document.getElementById('submitBtn');
                 const successMsg = document.getElementById('successMessage');
+                const warningMsg = document.getElementById('warningMessage');
                 const errorMsg = document.getElementById('errorMessage');
 
                 // Hide messages
                 successMsg.style.display = 'none';
+                warningMsg.style.display = 'none';
                 errorMsg.style.display = 'none';
 
                 // Disable button
@@ -1038,6 +1060,16 @@
 
                     const data = await response.json();
 
+                    // Handle rate limiting (429 status code) with warning
+                    if (response.status === 429) {
+                        warningMsg.innerHTML = '⏰ ' + data.error;
+                        warningMsg.style.display = 'block';
+                        warningMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Cast My Vote (2 Points)';
+                        return;
+                    }
+
                     if (!data.success) {
                         throw new Error(data.error || 'Error submitting vote');
                     }
@@ -1054,7 +1086,7 @@
 
                 } catch (error) {
                     console.error('Error submitting vote:', error);
-                    errorMsg.textContent = '❌ ' + error.message;
+                    errorMsg.innerHTML = '❌ ' + error.message;
                     errorMsg.style.display = 'block';
                     errorMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 } finally {
