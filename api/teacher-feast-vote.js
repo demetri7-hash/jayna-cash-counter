@@ -49,13 +49,13 @@ export default async function handler(req, res) {
     if (phoneDigits.length < 10) {
       return res.status(400).json({
         success: false,
-        error: 'Please enter a valid phone number'
+        error: 'Please enter a valid phone number.<br><br>⚠️ <strong>Note:</strong> We\'ve noticed some people using fake contact information to vote multiple times. This contest is for a good cause - to celebrate and feed our hardworking teachers. Cheating is NOT okay with us and undermines this wonderful initiative. Please play fair! 💙'
       });
     }
     if (/^0+$/.test(phoneDigits)) {
       return res.status(400).json({
         success: false,
-        error: 'Please enter a valid phone number'
+        error: 'Please enter a valid phone number.<br><br>⚠️ <strong>Note:</strong> We\'ve noticed some people using fake contact information to vote multiple times. This contest is for a good cause - to celebrate and feed our hardworking teachers. Cheating is NOT okay with us and undermines this wonderful initiative. Please play fair! 💙'
       });
     }
 
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
 
       return res.status(429).json({
         success: false,
-        error: `We see you're eager to help your school win! 🎓 You can vote again in ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''}. Thank you for your patience!`,
+        error: `We see you're eager to help your school win! 🎓 You can vote again in ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''}. Thank you for your patience!<br><br>⚠️ <strong>Note:</strong> We've noticed some people using fake email addresses to vote multiple times. This contest is for a good cause - to celebrate and feed our hardworking teachers. Cheating is NOT okay with us and undermines this wonderful initiative. Please play fair! 💙`,
         waitTime: minutesRemaining,
         nextVoteTime: nextVoteTime.toISOString()
       });
@@ -99,7 +99,7 @@ export default async function handler(req, res) {
     if (existingVote) {
       return res.status(400).json({
         success: false,
-        error: 'This email address has already voted. Only 1 vote per email address is allowed. Thank you for your support! ⚠️ Note: We\'ve noticed some people using fake email addresses to vote multiple times. This contest is for a good cause - to celebrate and feed our hardworking teachers. Cheating is NOT okay with us and undermines this wonderful initiative. Please play fair! 💙'
+        error: 'This email address has already voted. Only 1 vote per email address is allowed. Thank you for your support!<br><br>⚠️ <strong>Note:</strong> We\'ve noticed some people using fake email addresses to vote multiple times. This contest is for a good cause - to celebrate and feed our hardworking teachers. Cheating is NOT okay with us and undermines this wonderful initiative. Please play fair! 💙'
       });
     }
 
