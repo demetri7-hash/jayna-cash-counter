@@ -474,12 +474,12 @@ async function sendOrderEmail(order, orderDate) {
   // Generate HTML email
   const html = generateOrderEmailHTML(order, orderDate);
 
-  // Check if this vendor gets PDF attachments and printer CC
+  // Check if this vendor gets PDF attachments and printer email
   const vendorsWithPDF = ['Mani Imports', 'Performance', 'Greenleaf'];
   const includePDF = vendorsWithPDF.includes(order.vendor);
   const PRINTER_EMAIL = 'GSS4168CTJJA73@print.epsonconnect.com';
 
-  // Base mail options
+  // Base mail options for main recipient (with full HTML + PDF)
   const mailOptions = {
     from: `Jayna Gyro Orders <${GMAIL_USER}>`,
     to: ORDER_EMAIL,
@@ -487,20 +487,19 @@ async function sendOrderEmail(order, orderDate) {
     html: html
   };
 
-  // Add CC to printer for specific vendors
-  if (includePDF) {
-    mailOptions.cc = PRINTER_EMAIL;
-  }
-
   // Generate and attach PDF for specific vendors
+  let pdfBuffer = null;
+  let filename = null;
+
   if (includePDF) {
     try {
       const pdfBase64 = await generateOrderingGuidePDF(order.vendor, order.items);
-      const filename = `${order.vendor.replace(/\s+/g, '_')}_Item_List_${orderDate.toISOString().split('T')[0]}.pdf`;
+      filename = `${order.vendor.replace(/\s+/g, '_')}_Item_List_${orderDate.toISOString().split('T')[0]}.pdf`;
+      pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
       mailOptions.attachments = [{
         filename: filename,
-        content: Buffer.from(pdfBase64, 'base64'),
+        content: pdfBuffer,
         contentType: 'application/pdf'
       }];
 
@@ -513,8 +512,33 @@ async function sendOrderEmail(order, orderDate) {
 
   console.log('📧 Sending email via Gmail for', order.vendor);
 
+  // Send main email to ORDER_EMAIL (with full HTML + PDF)
   const info = await transporter.sendMail(mailOptions);
   console.log(`✅ Order email sent for ${order.vendor}:`, info.messageId);
+
+  // Send SEPARATE email to printer (PDF ONLY, no AI recommendations)
+  if (includePDF && pdfBuffer) {
+    try {
+      const printerMailOptions = {
+        from: `Jayna Gyro Orders <${GMAIL_USER}>`,
+        to: PRINTER_EMAIL,
+        subject: `${order.vendor} - Inventory Sheet`,
+        html: `<p>Inventory sheet for ${order.vendor}</p>`, // Minimal HTML, no AI recommendations
+        attachments: [{
+          filename: filename,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }]
+      };
+
+      const printerInfo = await transporter.sendMail(printerMailOptions);
+      console.log(`🖨️ Printer email sent for ${order.vendor}:`, printerInfo.messageId);
+    } catch (printerError) {
+      console.warn(`⚠️ Failed to send to printer for ${order.vendor}:`, printerError.message);
+      // Don't fail the main email if printer email fails
+    }
+  }
+
   return true;
 }
 
