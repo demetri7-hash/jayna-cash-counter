@@ -479,14 +479,6 @@ async function sendOrderEmail(order, orderDate) {
   const includePDF = vendorsWithPDF.includes(order.vendor);
   const PRINTER_EMAIL = 'GSS4168CTJJA73@print.epsonconnect.com';
 
-  // Base mail options for main recipient (with full HTML + PDF)
-  const mailOptions = {
-    from: `Jayna Gyro Orders <${GMAIL_USER}>`,
-    to: ORDER_EMAIL,
-    subject: `Daily Order - ${order.vendor}`,
-    html: html
-  };
-
   // Generate and attach PDF for specific vendors
   let pdfBuffer = null;
   let filename = null;
@@ -497,33 +489,24 @@ async function sendOrderEmail(order, orderDate) {
       filename = `${order.vendor.replace(/\s+/g, '_')}_Item_List_${orderDate.toISOString().split('T')[0]}.pdf`;
       pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
-      mailOptions.attachments = [{
-        filename: filename,
-        content: pdfBuffer,
-        contentType: 'application/pdf'
-      }];
-
-      console.log(`📎 PDF attachment added for ${order.vendor}`);
+      console.log(`📎 PDF generated for ${order.vendor}`);
     } catch (pdfError) {
       console.warn(`⚠️ Failed to generate PDF for ${order.vendor}:`, pdfError.message);
-      // Continue sending email without PDF
+      // Continue without PDF
     }
   }
 
-  console.log('📧 Sending email via Gmail for', order.vendor);
+  console.log('📧 Sending emails via Gmail for', order.vendor);
 
-  // Send main email to ORDER_EMAIL (with full HTML + PDF)
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`✅ Order email sent for ${order.vendor}:`, info.messageId);
-
-  // Send SEPARATE email to printer (PDF ONLY, no AI recommendations)
+  // Send to PRINTER (PDF ONLY, completely empty body)
   if (includePDF && pdfBuffer) {
     try {
       const printerMailOptions = {
         from: `Jayna Gyro Orders <${GMAIL_USER}>`,
         to: PRINTER_EMAIL,
         subject: `${order.vendor} - Inventory Sheet`,
-        html: `<p>Inventory sheet for ${order.vendor}</p>`, // Minimal HTML, no AI recommendations
+        text: '', // Completely empty body
+        html: '', // Completely empty HTML
         attachments: [{
           filename: filename,
           content: pdfBuffer,
@@ -535,7 +518,37 @@ async function sendOrderEmail(order, orderDate) {
       console.log(`🖨️ Printer email sent for ${order.vendor}:`, printerInfo.messageId);
     } catch (printerError) {
       console.warn(`⚠️ Failed to send to printer for ${order.vendor}:`, printerError.message);
-      // Don't fail the main email if printer email fails
+    }
+  }
+
+  // Send reminder to ORDER_EMAIL (simple reminder + PDF, no AI recommendations)
+  if (includePDF && pdfBuffer) {
+    try {
+      const orderDateStr = orderDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+      const reminderMailOptions = {
+        from: `Jayna Gyro Orders <${GMAIL_USER}>`,
+        to: ORDER_EMAIL,
+        subject: `Reminder: ${order.vendor} Inventory Sheet Sent to Printer`,
+        html: `
+          <p><strong>Daily Order Reminder</strong></p>
+          <p>The inventory sheet for <strong>${order.vendor}</strong> has been sent to your printer.</p>
+          <p>Order Date: ${orderDateStr}<br>
+          Delivery Date: ${order.deliveryDate}<br>
+          Items: ${order.items.length}</p>
+          <p>PDF attached for your records.</p>
+        `,
+        attachments: [{
+          filename: filename,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }]
+      };
+
+      const reminderInfo = await transporter.sendMail(reminderMailOptions);
+      console.log(`✅ Reminder email sent for ${order.vendor}:`, reminderInfo.messageId);
+    } catch (reminderError) {
+      console.warn(`⚠️ Failed to send reminder for ${order.vendor}:`, reminderError.message);
     }
   }
 
