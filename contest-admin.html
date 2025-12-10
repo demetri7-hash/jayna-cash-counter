@@ -468,9 +468,44 @@
                 </table>
             </div>
         </div>
+
+        <!-- Manage Schools Section -->
+        <div class="section">
+            <h2>🏫 Manage Schools</h2>
+            <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
+                <label for="sortSelect" style="font-weight: 600; color: #176F9A;">Sort by:</label>
+                <select id="sortSelect" onchange="sortSchools(this.value)" style="padding: 8px 12px; border: 2px solid #46B0E4; border-radius: 5px; font-size: 14px;">
+                    <option value="votes-desc">Most Votes</option>
+                    <option value="votes-asc">Least Votes</option>
+                    <option value="name-asc">Alphabetical (A-Z)</option>
+                    <option value="name-desc">Alphabetical (Z-A)</option>
+                    <option value="date-desc">Date Added (Newest)</option>
+                    <option value="date-asc">Date Added (Oldest)</option>
+                    <option value="latest-vote">Latest Vote</option>
+                </select>
+                <span id="schoolCount" style="margin-left: auto; color: #666; font-size: 14px;"></span>
+            </div>
+            <div id="manageSchools">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>School Name</th>
+                            <th>Total Votes</th>
+                            <th>Instagram</th>
+                            <th>Form</th>
+                            <th>Date Added</th>
+                            <th>Latest Vote</th>
+                        </tr>
+                    </thead>
+                    <tbody id="manageSchoolsBody"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
+        let allSchools = []; // Store all schools for sorting
+
         async function loadData() {
             try {
                 document.getElementById('loading').style.display = 'block';
@@ -487,6 +522,7 @@
                 // Load totals (aggregate from database)
                 await loadTotalStats();
                 await loadRecentVotes();
+                await loadAllSchools(); // Load all schools for manage section
 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('leaderboard').style.display = 'block';
@@ -535,6 +571,96 @@
                     <td><strong>${school.total_votes || 0}</strong></td>
                     <td>${school.instagram_votes || 0}</td>
                     <td>${school.form_votes || 0}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function loadAllSchools() {
+            try {
+                const response = await fetch('/api/teacher-feast-schools');
+                const data = await response.json();
+
+                if (data.success) {
+                    allSchools = data.schools;
+
+                    // Default sort: most votes
+                    sortSchools('votes-desc');
+                }
+            } catch (error) {
+                console.error('Error loading all schools:', error);
+            }
+        }
+
+        function sortSchools(sortBy) {
+            if (!allSchools || allSchools.length === 0) return;
+
+            let sorted = [...allSchools];
+
+            switch(sortBy) {
+                case 'votes-desc':
+                    sorted.sort((a, b) => (b.total_votes || 0) - (a.total_votes || 0));
+                    break;
+                case 'votes-asc':
+                    sorted.sort((a, b) => (a.total_votes || 0) - (b.total_votes || 0));
+                    break;
+                case 'name-asc':
+                    sorted.sort((a, b) => a.school_name.localeCompare(b.school_name));
+                    break;
+                case 'name-desc':
+                    sorted.sort((a, b) => b.school_name.localeCompare(a.school_name));
+                    break;
+                case 'date-desc':
+                    sorted.sort((a, b) => {
+                        if (!a.created_at) return 1;
+                        if (!b.created_at) return -1;
+                        return new Date(b.created_at) - new Date(a.created_at);
+                    });
+                    break;
+                case 'date-asc':
+                    sorted.sort((a, b) => {
+                        if (!a.created_at) return 1;
+                        if (!b.created_at) return -1;
+                        return new Date(a.created_at) - new Date(b.created_at);
+                    });
+                    break;
+                case 'latest-vote':
+                    sorted.sort((a, b) => {
+                        if (!a.latest_vote) return 1;
+                        if (!b.latest_vote) return -1;
+                        return new Date(b.latest_vote) - new Date(a.latest_vote);
+                    });
+                    break;
+            }
+
+            displayManageSchools(sorted);
+        }
+
+        function displayManageSchools(schools) {
+            const tbody = document.getElementById('manageSchoolsBody');
+            tbody.innerHTML = '';
+
+            document.getElementById('schoolCount').textContent = `${schools.length} school${schools.length !== 1 ? 's' : ''}`;
+
+            schools.forEach((school) => {
+                const row = document.createElement('tr');
+
+                // Format dates
+                const dateAdded = school.created_at
+                    ? new Date(school.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'Unknown';
+
+                const latestVote = school.latest_vote
+                    ? new Date(school.latest_vote).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+                    : 'No votes yet';
+
+                row.innerHTML = `
+                    <td><strong>${school.school_name}</strong></td>
+                    <td><strong>${school.total_votes || 0}</strong></td>
+                    <td>${school.instagram_votes || 0}</td>
+                    <td>${school.form_votes || 0}</td>
+                    <td style="font-size: 12px; color: #666;">${dateAdded}</td>
+                    <td style="font-size: 12px; color: #666;">${latestVote}</td>
                 `;
                 tbody.appendChild(row);
             });

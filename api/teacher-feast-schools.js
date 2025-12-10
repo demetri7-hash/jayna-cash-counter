@@ -27,16 +27,36 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Get all schools with full details
     const { data: schools, error } = await supabase
       .from('teacher_feast_schools')
-      .select('school_name')
+      .select('*')
       .order('school_name', { ascending: true });
 
     if (error) throw error;
 
+    // Get latest vote for each school
+    const schoolsWithLatestVote = await Promise.all(
+      (schools || []).map(async (school) => {
+        // Get the most recent vote for this school
+        const { data: latestVoteData } = await supabase
+          .from('teacher_feast_votes')
+          .select('voted_at')
+          .eq('school_name', school.school_name)
+          .order('voted_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        return {
+          ...school,
+          latest_vote: latestVoteData?.voted_at || null
+        };
+      })
+    );
+
     res.status(200).json({
       success: true,
-      schools: schools || []
+      schools: schoolsWithLatestVote
     });
 
   } catch (error) {
