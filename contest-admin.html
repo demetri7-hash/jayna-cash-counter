@@ -339,6 +339,128 @@
             border: 2px solid #dc2626;
             color: #991b1b;
         }
+
+        /* Bulk Actions Bar */
+        .bulk-actions {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 15px 15px 0 0;
+            box-shadow: 0 -5px 30px rgba(0,0,0,0.3);
+            transition: bottom 0.3s ease;
+            z-index: 1000;
+            min-width: 800px;
+            max-width: 90%;
+        }
+
+        .bulk-actions.active {
+            bottom: 0;
+        }
+
+        .bulk-actions-header {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .bulk-actions-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .bulk-actions-buttons .btn {
+            margin: 0;
+            padding: 10px 20px;
+            font-size: 13px;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .btn-success {
+            background: #059669;
+        }
+
+        .btn-success:hover {
+            background: #047857;
+        }
+
+        .btn-delete {
+            background: #dc2626;
+        }
+
+        .btn-delete:hover {
+            background: #b91c1c;
+        }
+
+        .school-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-content h3 {
+            color: #176F9A;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        .modal-content input,
+        .modal-content select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -472,7 +594,7 @@
         <!-- Manage Schools Section -->
         <div class="section">
             <h2>🏫 Manage Schools</h2>
-            <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
+            <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <label for="sortSelect" style="font-weight: 600; color: #176F9A;">Sort by:</label>
                 <select id="sortSelect" onchange="sortSchools(this.value)" style="padding: 8px 12px; border: 2px solid #46B0E4; border-radius: 5px; font-size: 14px;">
                     <option value="votes-desc">Most Votes</option>
@@ -489,22 +611,45 @@
                 <table>
                     <thead>
                         <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="selectAllSchools" class="school-checkbox" onchange="toggleSelectAllSchools()">
+                            </th>
                             <th>School Name</th>
                             <th>Total Votes</th>
                             <th>Instagram</th>
                             <th>Form</th>
                             <th>Date Added</th>
                             <th>Latest Vote</th>
+                            <th style="width: 150px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="manageSchoolsBody"></tbody>
                 </table>
             </div>
         </div>
+
+        <!-- Bulk Actions Bar -->
+        <div class="bulk-actions" id="bulkSchoolActions">
+            <div class="bulk-actions-header">
+                <span id="selectedSchoolCount">0</span> school(s) selected
+            </div>
+            <div class="bulk-actions-buttons">
+                <button class="btn btn-warning" onclick="bulkMergeSchools()">🔀 Merge Schools</button>
+                <button class="btn btn-success" onclick="bulkAddVotes()">➕ Add Votes</button>
+                <button class="btn btn-warning" onclick="bulkReduceVotes()">➖ Reduce Votes</button>
+                <button class="btn btn-warning" onclick="bulkTransferVotes()">↗️ Transfer Votes</button>
+                <button class="btn btn-delete" onclick="bulkDeleteSchools()">🗑️ Delete Schools</button>
+                <button class="btn btn-secondary" onclick="clearSchoolSelection()">✕ Clear</button>
+            </div>
+        </div>
+
+        <!-- Modal Container -->
+        <div class="modal" id="schoolModal"></div>
     </div>
 
     <script>
         let allSchools = []; // Store all schools for sorting
+        let selectedSchools = new Set(); // Track selected schools
 
         async function loadData() {
             try {
@@ -654,17 +799,338 @@
                     ? new Date(school.latest_vote).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
                     : 'No votes yet';
 
-                row.innerHTML = `
-                    <td><strong>${school.school_name}</strong></td>
-                    <td><strong>${school.total_votes || 0}</strong></td>
-                    <td>${school.instagram_votes || 0}</td>
-                    <td>${school.form_votes || 0}</td>
-                    <td style="font-size: 12px; color: #666;">${dateAdded}</td>
-                    <td style="font-size: 12px; color: #666;">${latestVote}</td>
-                `;
+                // Checkbox cell
+                const checkboxCell = document.createElement('td');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'school-checkbox';
+                checkbox.checked = selectedSchools.has(school.school_name);
+                checkbox.onchange = () => toggleSchoolSelection(school.school_name);
+                checkboxCell.appendChild(checkbox);
+                row.appendChild(checkboxCell);
+
+                // School name
+                const nameCell = document.createElement('td');
+                nameCell.innerHTML = `<strong>${school.school_name}</strong>`;
+                row.appendChild(nameCell);
+
+                // Total votes
+                const votesCell = document.createElement('td');
+                votesCell.innerHTML = `<strong>${school.total_votes || 0}</strong>`;
+                row.appendChild(votesCell);
+
+                // Instagram votes
+                const igCell = document.createElement('td');
+                igCell.textContent = school.instagram_votes || 0;
+                row.appendChild(igCell);
+
+                // Form votes
+                const formCell = document.createElement('td');
+                formCell.textContent = school.form_votes || 0;
+                row.appendChild(formCell);
+
+                // Date added
+                const dateCell = document.createElement('td');
+                dateCell.style.cssText = 'font-size: 12px; color: #666;';
+                dateCell.textContent = dateAdded;
+                row.appendChild(dateCell);
+
+                // Latest vote
+                const latestCell = document.createElement('td');
+                latestCell.style.cssText = 'font-size: 12px; color: #666;';
+                latestCell.textContent = latestVote;
+                row.appendChild(latestCell);
+
+                // Actions cell
+                const actionsCell = document.createElement('td');
+                actionsCell.style.cssText = 'display: flex; gap: 5px; align-items: center;';
+
+                // Edit button
+                const editBtn = document.createElement('button');
+                editBtn.className = 'btn btn-warning';
+                editBtn.style.cssText = 'padding: 6px 12px; font-size: 11px;';
+                editBtn.textContent = '✏️';
+                editBtn.title = 'Edit School';
+                editBtn.onclick = () => editSchool(school);
+                actionsCell.appendChild(editBtn);
+
+                // Delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-delete';
+                deleteBtn.style.cssText = 'padding: 6px 12px; font-size: 11px;';
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.title = 'Delete School';
+                deleteBtn.onclick = () => deleteSchool(school);
+                actionsCell.appendChild(deleteBtn);
+
+                row.appendChild(actionsCell);
                 tbody.appendChild(row);
             });
         }
+
+        // Selection Management
+        window.toggleSchoolSelection = function(schoolName) {
+            if (selectedSchools.has(schoolName)) {
+                selectedSchools.delete(schoolName);
+            } else {
+                selectedSchools.add(schoolName);
+            }
+            updateBulkActionsBar();
+            displayManageSchools(allSchools); // Refresh to update checkboxes
+        };
+
+        window.toggleSelectAllSchools = function() {
+            const selectAllCheckbox = document.getElementById('selectAllSchools');
+            if (selectAllCheckbox.checked) {
+                allSchools.forEach(school => selectedSchools.add(school.school_name));
+            } else {
+                selectedSchools.clear();
+            }
+            updateBulkActionsBar();
+            displayManageSchools(allSchools);
+        };
+
+        window.clearSchoolSelection = function() {
+            selectedSchools.clear();
+            document.getElementById('selectAllSchools').checked = false;
+            updateBulkActionsBar();
+            displayManageSchools(allSchools);
+        };
+
+        function updateBulkActionsBar() {
+            const bulkActions = document.getElementById('bulkSchoolActions');
+            const selectedCount = document.getElementById('selectedSchoolCount');
+
+            selectedCount.textContent = selectedSchools.size;
+
+            if (selectedSchools.size > 0) {
+                bulkActions.classList.add('active');
+            } else {
+                bulkActions.classList.remove('active');
+            }
+        }
+
+        // Bulk Operations
+        window.bulkMergeSchools = async function() {
+            if (selectedSchools.size < 2) {
+                alert('Please select at least 2 schools to merge');
+                return;
+            }
+
+            const selectedList = allSchools.filter(s => selectedSchools.has(s.school_name));
+
+            // Show merge modal
+            showModal(`
+                <h3>🔀 Merge ${selectedSchools.size} Schools</h3>
+                <p style="margin-bottom: 15px; color: #666;">Select which school to keep (all others will be merged into it):</p>
+                ${selectedList.map(school => `
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: flex; align-items: center; gap: 10px; padding: 10px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer;">
+                            <input type="radio" name="targetSchool" value="${school.school_name}">
+                            <div>
+                                <strong>${school.school_name}</strong><br>
+                                <span style="font-size: 12px; color: #666;">${school.total_votes || 0} votes (${school.instagram_votes || 0} IG + ${school.form_votes || 0} Form)</span>
+                            </div>
+                        </label>
+                    </div>
+                `).join('')}
+                <div class="modal-buttons">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-warning" onclick="confirmMerge()">Merge Schools</button>
+                </div>
+            `);
+        };
+
+        window.confirmMerge = async function() {
+            const targetRadio = document.querySelector('input[name="targetSchool"]:checked');
+            if (!targetRadio) {
+                alert('Please select which school to keep');
+                return;
+            }
+
+            const targetSchool = targetRadio.value;
+            const schoolsToMerge = Array.from(selectedSchools).filter(s => s !== targetSchool);
+
+            if (!confirm(`FINAL CONFIRMATION:\n\nMerge ${schoolsToMerge.length} school(s) into "${targetSchool}"?\n\nSchools to be deleted:\n${schoolsToMerge.map(s => '• ' + s).join('\n')}\n\nThis CANNOT be undone.`)) {
+                return;
+            }
+
+            closeModal();
+
+            // Merge logic (implement with Supabase)
+            alert('Merge functionality will be implemented with Supabase integration');
+            // TODO: Transfer all votes, update vote counts, delete merged schools
+        };
+
+        window.bulkAddVotes = function() {
+            if (selectedSchools.size === 0) {
+                alert('Please select at least one school');
+                return;
+            }
+
+            showModal(`
+                <h3>➕ Add Manual Votes</h3>
+                <p style="margin-bottom: 15px; color: #666;">Adding votes to ${selectedSchools.size} school(s)</p>
+                <label style="display: block; margin-bottom: 8px; font-weight: 700;">Number of votes to add:</label>
+                <input type="number" id="voteCount" min="1" value="1" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px;">
+                <label style="display: block; margin-top: 15px; margin-bottom: 8px; font-weight: 700;">Vote type:</label>
+                <select id="voteType" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px;">
+                    <option value="instagram">Instagram (1 point each)</option>
+                    <option value="form">Form (2 points each)</option>
+                </select>
+                <div class="modal-buttons">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-success" onclick="confirmAddVotes()">Add Votes</button>
+                </div>
+            `);
+        };
+
+        window.confirmAddVotes = function() {
+            const count = parseInt(document.getElementById('voteCount').value);
+            const type = document.getElementById('voteType').value;
+
+            if (!count || count < 1) {
+                alert('Please enter a valid number');
+                return;
+            }
+
+            closeModal();
+            alert(`Will add ${count} ${type} vote(s) to ${selectedSchools.size} school(s)`);
+            // TODO: Implement with Supabase
+        };
+
+        window.bulkReduceVotes = function() {
+            if (selectedSchools.size === 0) {
+                alert('Please select at least one school');
+                return;
+            }
+
+            showModal(`
+                <h3>➖ Reduce Votes</h3>
+                <p style="margin-bottom: 15px; color: #666;">Reducing votes from ${selectedSchools.size} school(s)</p>
+                <label style="display: block; margin-bottom: 8px; font-weight: 700;">Number of votes to reduce:</label>
+                <input type="number" id="reduceCount" min="1" value="1">
+                <div class="modal-buttons">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-warning" onclick="confirmReduceVotes()">Reduce Votes</button>
+                </div>
+            `);
+        };
+
+        window.confirmReduceVotes = function() {
+            const count = parseInt(document.getElementById('reduceCount').value);
+            if (!count || count < 1) {
+                alert('Please enter a valid number');
+                return;
+            }
+
+            closeModal();
+            alert(`Will reduce ${count} vote(s) from ${selectedSchools.size} school(s)`);
+            // TODO: Implement with Supabase
+        };
+
+        window.bulkTransferVotes = function() {
+            if (selectedSchools.size === 0) {
+                alert('Please select at least one school to transfer votes FROM');
+                return;
+            }
+
+            // Get schools not selected
+            const availableSchools = allSchools.filter(s => !selectedSchools.has(s.school_name));
+
+            showModal(`
+                <h3>↗️ Transfer Votes</h3>
+                <p style="margin-bottom: 15px; color: #666;">Transfer ALL votes from ${selectedSchools.size} school(s) to another school</p>
+                <label style="display: block; margin-bottom: 8px; font-weight: 700;">Transfer TO:</label>
+                <select id="targetSchool" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px;">
+                    <option value="">-- Select School --</option>
+                    ${availableSchools.map(s => `<option value="${s.school_name}">${s.school_name} (${s.total_votes || 0} votes)</option>`).join('')}
+                </select>
+                <div class="modal-buttons">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-warning" onclick="confirmTransferVotes()">Transfer</button>
+                </div>
+            `);
+        };
+
+        window.confirmTransferVotes = function() {
+            const target = document.getElementById('targetSchool').value;
+            if (!target) {
+                alert('Please select a target school');
+                return;
+            }
+
+            closeModal();
+            alert(`Will transfer all votes to: ${target}`);
+            // TODO: Implement with Supabase
+        };
+
+        window.bulkDeleteSchools = function() {
+            if (selectedSchools.size === 0) {
+                alert('Please select at least one school');
+                return;
+            }
+
+            if (!confirm(`⚠️ WARNING:\n\nDelete ${selectedSchools.size} school(s) and ALL their votes?\n\nThis CANNOT be undone.`)) {
+                return;
+            }
+
+            alert(`Will delete ${selectedSchools.size} school(s)`);
+            // TODO: Implement with Supabase
+        };
+
+        // Individual Actions
+        window.editSchool = function(school) {
+            showModal(`
+                <h3>✏️ Edit School: ${school.school_name}</h3>
+                <label style="display: block; margin-bottom: 8px; font-weight: 700;">School Name:</label>
+                <input type="text" id="editSchoolName" value="${school.school_name}">
+                <label style="display: block; margin-top: 15px; margin-bottom: 8px; font-weight: 700;">Instagram Handles (comma-separated):</label>
+                <input type="text" id="editHandles" value="${(school.instagram_handles || []).join(', ')}">
+                <div class="modal-buttons">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-success" onclick="confirmEditSchool('${school.school_name}')">Save Changes</button>
+                </div>
+            `);
+        };
+
+        window.confirmEditSchool = function(originalName) {
+            const newName = document.getElementById('editSchoolName').value.trim();
+            const handles = document.getElementById('editHandles').value.trim();
+
+            if (!newName) {
+                alert('School name cannot be empty');
+                return;
+            }
+
+            closeModal();
+            alert(`Will update: ${originalName} → ${newName}`);
+            // TODO: Implement with Supabase
+        };
+
+        window.deleteSchool = function(school) {
+            if (!confirm(`⚠️ Delete "${school.school_name}" and all its ${school.total_votes || 0} votes?\n\nThis CANNOT be undone.`)) {
+                return;
+            }
+
+            alert(`Will delete: ${school.school_name}`);
+            // TODO: Implement with Supabase
+        };
+
+        // Modal Helpers
+        function showModal(html) {
+            const modal = document.getElementById('schoolModal');
+            modal.innerHTML = `<div class="modal-content">${html}</div>`;
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('schoolModal');
+            modal.classList.remove('active');
+            modal.innerHTML = '';
+        }
+
+        window.closeModal = closeModal;
 
         // Load data on page load
         loadData();
