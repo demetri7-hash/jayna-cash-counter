@@ -957,9 +957,80 @@
 
             closeModal();
 
-            // Merge logic (implement with Supabase)
-            alert('Merge functionality will be implemented with Supabase integration');
-            // TODO: Transfer all votes, update vote counts, delete merged schools
+            try {
+                // Import supabase from module scope
+                const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+                const supabase = createClient(
+                    'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+                );
+
+                let totalVotesMoved = 0;
+
+                // Transfer all votes from merged schools to target
+                for (const schoolName of schoolsToMerge) {
+                    const { data: votesToTransfer, error: fetchError } = await supabase
+                        .from('teacher_feast_votes')
+                        .select('*')
+                        .eq('school_name', schoolName);
+
+                    if (fetchError) throw fetchError;
+
+                    if (votesToTransfer && votesToTransfer.length > 0) {
+                        // Update all votes to point to target school
+                        const { error: updateError } = await supabase
+                            .from('teacher_feast_votes')
+                            .update({ school_name: targetSchool })
+                            .eq('school_name', schoolName);
+
+                        if (updateError) throw updateError;
+
+                        totalVotesMoved += votesToTransfer.length;
+                    }
+                }
+
+                // Delete merged schools
+                const { error: deleteError } = await supabase
+                    .from('teacher_feast_schools')
+                    .delete()
+                    .in('school_name', schoolsToMerge);
+
+                if (deleteError) throw deleteError;
+
+                // Recalculate vote counts for target school
+                const { data: allVotes, error: countError } = await supabase
+                    .from('teacher_feast_votes')
+                    .select('vote_type, points')
+                    .eq('school_name', targetSchool);
+
+                if (countError) throw countError;
+
+                const instagramVotes = allVotes.filter(v => v.vote_type === 'instagram').length;
+                const formVotes = allVotes.filter(v => v.vote_type === 'form').length;
+                const totalPoints = allVotes.reduce((sum, v) => sum + (v.points || 0), 0);
+
+                // Update target school vote counts
+                const { error: updateSchoolError } = await supabase
+                    .from('teacher_feast_schools')
+                    .update({
+                        total_votes: totalPoints,
+                        instagram_votes: instagramVotes,
+                        form_votes: formVotes
+                    })
+                    .eq('school_name', targetSchool);
+
+                if (updateSchoolError) throw updateSchoolError;
+
+                alert(`✅ Success!\n\nMerged ${schoolsToMerge.length} school(s) into "${targetSchool}"\n${totalVotesMoved} votes transferred\nNew total: ${totalPoints} points`);
+
+                // Clear selection and refresh
+                clearSchoolSelection();
+                await loadData();
+
+            } catch (error) {
+                console.error('Merge error:', error);
+                alert(`❌ Error during merge: ${error.message}\n\nPlease refresh the page and check the data.`);
+            }
         };
 
         window.bulkAddVotes = function() {
@@ -985,7 +1056,7 @@
             `);
         };
 
-        window.confirmAddVotes = function() {
+        window.confirmAddVotes = async function() {
             const count = parseInt(document.getElementById('voteCount').value);
             const type = document.getElementById('voteType').value;
 
@@ -995,8 +1066,62 @@
             }
 
             closeModal();
-            alert(`Will add ${count} ${type} vote(s) to ${selectedSchools.size} school(s)`);
-            // TODO: Implement with Supabase
+
+            try {
+                const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+                const supabase = createClient(
+                    'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+                );
+
+                const pointsPerVote = type === 'instagram' ? 1 : 2;
+                const totalPoints = count * pointsPerVote;
+                let successCount = 0;
+
+                for (const schoolName of selectedSchools) {
+                    // Insert manual votes
+                    const votesToInsert = [];
+                    for (let i = 0; i < count; i++) {
+                        votesToInsert.push({
+                            school_name: schoolName,
+                            vote_type: type,
+                            points: pointsPerVote,
+                            instagram_username: type === 'instagram' ? 'manual_admin_entry' : null,
+                            full_name: type === 'form' ? 'Manual Admin Entry' : null,
+                            email: type === 'form' ? `admin_manual_${Date.now()}_${i}@jaynagryo.com` : null,
+                            phone: type === 'form' ? '0000000000' : null,
+                            newsletter_signup: type === 'form' ? false : null,
+                            voted_at: new Date().toISOString()
+                        });
+                    }
+
+                    const { error: insertError } = await supabase
+                        .from('teacher_feast_votes')
+                        .insert(votesToInsert);
+
+                    if (insertError) throw insertError;
+
+                    // Update school vote counts
+                    const { error: updateError } = await supabase.rpc('increment_school_votes', {
+                        school_name_param: schoolName,
+                        points_param: totalPoints
+                    });
+
+                    if (updateError) throw updateError;
+
+                    successCount++;
+                }
+
+                alert(`✅ Success!\n\nAdded ${count} ${type} vote(s) to ${successCount} school(s)\nTotal points added: ${totalPoints * successCount}`);
+
+                // Clear selection and refresh
+                clearSchoolSelection();
+                await loadData();
+
+            } catch (error) {
+                console.error('Add votes error:', error);
+                alert(`❌ Error adding votes: ${error.message}`);
+            }
         };
 
         window.bulkReduceVotes = function() {
@@ -1017,7 +1142,7 @@
             `);
         };
 
-        window.confirmReduceVotes = function() {
+        window.confirmReduceVotes = async function() {
             const count = parseInt(document.getElementById('reduceCount').value);
             if (!count || count < 1) {
                 alert('Please enter a valid number');
@@ -1025,8 +1150,81 @@
             }
 
             closeModal();
-            alert(`Will reduce ${count} vote(s) from ${selectedSchools.size} school(s)`);
-            // TODO: Implement with Supabase
+
+            try {
+                const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+                const supabase = createClient(
+                    'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+                );
+
+                let successCount = 0;
+
+                for (const schoolName of selectedSchools) {
+                    // Get most recent votes to delete
+                    const { data: recentVotes, error: fetchError } = await supabase
+                        .from('teacher_feast_votes')
+                        .select('id, points, vote_type')
+                        .eq('school_name', schoolName)
+                        .order('voted_at', { ascending: false })
+                        .limit(count);
+
+                    if (fetchError) throw fetchError;
+
+                    if (!recentVotes || recentVotes.length === 0) {
+                        alert(`⚠️ ${schoolName} has no votes to reduce`);
+                        continue;
+                    }
+
+                    const votesToDelete = recentVotes.slice(0, Math.min(count, recentVotes.length));
+                    const idsToDelete = votesToDelete.map(v => v.id);
+                    const pointsToReduce = votesToDelete.reduce((sum, v) => sum + (v.points || 0), 0);
+
+                    // Delete votes
+                    const { error: deleteError } = await supabase
+                        .from('teacher_feast_votes')
+                        .delete()
+                        .in('id', idsToDelete);
+
+                    if (deleteError) throw deleteError;
+
+                    // Recalculate vote counts
+                    const { data: remainingVotes, error: countError } = await supabase
+                        .from('teacher_feast_votes')
+                        .select('vote_type, points')
+                        .eq('school_name', schoolName);
+
+                    if (countError) throw countError;
+
+                    const instagramVotes = (remainingVotes || []).filter(v => v.vote_type === 'instagram').length;
+                    const formVotes = (remainingVotes || []).filter(v => v.vote_type === 'form').length;
+                    const totalPoints = (remainingVotes || []).reduce((sum, v) => sum + (v.points || 0), 0);
+
+                    // Update school
+                    const { error: updateError } = await supabase
+                        .from('teacher_feast_schools')
+                        .update({
+                            total_votes: totalPoints,
+                            instagram_votes: instagramVotes,
+                            form_votes: formVotes
+                        })
+                        .eq('school_name', schoolName);
+
+                    if (updateError) throw updateError;
+
+                    successCount++;
+                }
+
+                alert(`✅ Success!\n\nReduced votes from ${successCount} school(s)`);
+
+                // Clear selection and refresh
+                clearSchoolSelection();
+                await loadData();
+
+            } catch (error) {
+                console.error('Reduce votes error:', error);
+                alert(`❌ Error reducing votes: ${error.message}`);
+            }
         };
 
         window.bulkTransferVotes = function() {
@@ -1053,7 +1251,7 @@
             `);
         };
 
-        window.confirmTransferVotes = function() {
+        window.confirmTransferVotes = async function() {
             const target = document.getElementById('targetSchool').value;
             if (!target) {
                 alert('Please select a target school');
@@ -1061,22 +1259,148 @@
             }
 
             closeModal();
-            alert(`Will transfer all votes to: ${target}`);
-            // TODO: Implement with Supabase
+
+            try {
+                const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+                const supabase = createClient(
+                    'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+                );
+
+                let totalVotesTransferred = 0;
+                const sourceSchools = Array.from(selectedSchools);
+
+                // Transfer all votes to target
+                for (const schoolName of sourceSchools) {
+                    const { data: votesToTransfer, error: fetchError } = await supabase
+                        .from('teacher_feast_votes')
+                        .select('id')
+                        .eq('school_name', schoolName);
+
+                    if (fetchError) throw fetchError;
+
+                    if (votesToTransfer && votesToTransfer.length > 0) {
+                        const { error: updateError } = await supabase
+                            .from('teacher_feast_votes')
+                            .update({ school_name: target })
+                            .eq('school_name', schoolName);
+
+                        if (updateError) throw updateError;
+
+                        totalVotesTransferred += votesToTransfer.length;
+                    }
+                }
+
+                // Recalculate vote counts for target school
+                const { data: targetVotes, error: countError } = await supabase
+                    .from('teacher_feast_votes')
+                    .select('vote_type, points')
+                    .eq('school_name', target);
+
+                if (countError) throw countError;
+
+                const instagramVotes = (targetVotes || []).filter(v => v.vote_type === 'instagram').length;
+                const formVotes = (targetVotes || []).filter(v => v.vote_type === 'form').length;
+                const totalPoints = (targetVotes || []).reduce((sum, v) => sum + (v.points || 0), 0);
+
+                // Update target school
+                const { error: updateTargetError } = await supabase
+                    .from('teacher_feast_schools')
+                    .update({
+                        total_votes: totalPoints,
+                        instagram_votes: instagramVotes,
+                        form_votes: formVotes
+                    })
+                    .eq('school_name', target);
+
+                if (updateTargetError) throw updateTargetError;
+
+                // Reset source schools to 0
+                for (const schoolName of sourceSchools) {
+                    const { error: resetError } = await supabase
+                        .from('teacher_feast_schools')
+                        .update({
+                            total_votes: 0,
+                            instagram_votes: 0,
+                            form_votes: 0
+                        })
+                        .eq('school_name', schoolName);
+
+                    if (resetError) console.warn('Reset error:', resetError);
+                }
+
+                alert(`✅ Success!\n\nTransferred ${totalVotesTransferred} votes to "${target}"\nNew total: ${totalPoints} points`);
+
+                // Clear selection and refresh
+                clearSchoolSelection();
+                await loadData();
+
+            } catch (error) {
+                console.error('Transfer votes error:', error);
+                alert(`❌ Error transferring votes: ${error.message}`);
+            }
         };
 
-        window.bulkDeleteSchools = function() {
+        window.bulkDeleteSchools = async function() {
             if (selectedSchools.size === 0) {
                 alert('Please select at least one school');
                 return;
             }
 
-            if (!confirm(`⚠️ WARNING:\n\nDelete ${selectedSchools.size} school(s) and ALL their votes?\n\nThis CANNOT be undone.`)) {
+            const schoolList = Array.from(selectedSchools);
+
+            if (!confirm(`⚠️ WARNING:\n\nDelete ${selectedSchools.size} school(s) and ALL their votes?\n\nSchools to be deleted:\n${schoolList.map(s => '• ' + s).join('\n')}\n\nThis CANNOT be undone.`)) {
                 return;
             }
 
-            alert(`Will delete ${selectedSchools.size} school(s)`);
-            // TODO: Implement with Supabase
+            try {
+                const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+                const supabase = createClient(
+                    'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+                );
+
+                let totalVotesDeleted = 0;
+
+                // Delete all votes for each school
+                for (const schoolName of schoolList) {
+                    const { data: votesToDelete, error: fetchError } = await supabase
+                        .from('teacher_feast_votes')
+                        .select('id')
+                        .eq('school_name', schoolName);
+
+                    if (fetchError) throw fetchError;
+
+                    if (votesToDelete && votesToDelete.length > 0) {
+                        const { error: deleteVotesError } = await supabase
+                            .from('teacher_feast_votes')
+                            .delete()
+                            .eq('school_name', schoolName);
+
+                        if (deleteVotesError) throw deleteVotesError;
+
+                        totalVotesDeleted += votesToDelete.length;
+                    }
+                }
+
+                // Delete schools
+                const { error: deleteSchoolsError } = await supabase
+                    .from('teacher_feast_schools')
+                    .delete()
+                    .in('school_name', schoolList);
+
+                if (deleteSchoolsError) throw deleteSchoolsError;
+
+                alert(`✅ Success!\n\nDeleted ${schoolList.length} school(s)\n${totalVotesDeleted} votes removed`);
+
+                // Clear selection and refresh
+                clearSchoolSelection();
+                await loadData();
+
+            } catch (error) {
+                console.error('Delete schools error:', error);
+                alert(`❌ Error deleting schools: ${error.message}`);
+            }
         };
 
         // Individual Actions
@@ -1094,7 +1418,7 @@
             `);
         };
 
-        window.confirmEditSchool = function(originalName) {
+        window.confirmEditSchool = async function(originalName) {
             const newName = document.getElementById('editSchoolName').value.trim();
             const handles = document.getElementById('editHandles').value.trim();
 
@@ -1104,17 +1428,90 @@
             }
 
             closeModal();
-            alert(`Will update: ${originalName} → ${newName}`);
-            // TODO: Implement with Supabase
+
+            try {
+                const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+                const supabase = createClient(
+                    'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+                );
+
+                // Parse Instagram handles
+                const handlesArray = handles
+                    .split(',')
+                    .map(h => h.trim())
+                    .filter(h => h.length > 0)
+                    .map(h => h.startsWith('@') ? h : '@' + h);
+
+                // Update school
+                const { error: updateSchoolError } = await supabase
+                    .from('teacher_feast_schools')
+                    .update({
+                        school_name: newName,
+                        instagram_handles: handlesArray
+                    })
+                    .eq('school_name', originalName);
+
+                if (updateSchoolError) throw updateSchoolError;
+
+                // If name changed, update all votes
+                if (originalName !== newName) {
+                    const { error: updateVotesError } = await supabase
+                        .from('teacher_feast_votes')
+                        .update({ school_name: newName })
+                        .eq('school_name', originalName);
+
+                    if (updateVotesError) throw updateVotesError;
+                }
+
+                alert(`✅ Success!\n\nUpdated school: ${originalName}${originalName !== newName ? ` → ${newName}` : ''}\nInstagram handles: ${handlesArray.join(', ')}`);
+
+                // Refresh data
+                await loadData();
+
+            } catch (error) {
+                console.error('Edit school error:', error);
+                alert(`❌ Error updating school: ${error.message}`);
+            }
         };
 
-        window.deleteSchool = function(school) {
+        window.deleteSchool = async function(school) {
             if (!confirm(`⚠️ Delete "${school.school_name}" and all its ${school.total_votes || 0} votes?\n\nThis CANNOT be undone.`)) {
                 return;
             }
 
-            alert(`Will delete: ${school.school_name}`);
-            // TODO: Implement with Supabase
+            try {
+                const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+                const supabase = createClient(
+                    'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+                );
+
+                // Delete all votes for this school
+                const { error: deleteVotesError } = await supabase
+                    .from('teacher_feast_votes')
+                    .delete()
+                    .eq('school_name', school.school_name);
+
+                if (deleteVotesError) throw deleteVotesError;
+
+                // Delete school
+                const { error: deleteSchoolError } = await supabase
+                    .from('teacher_feast_schools')
+                    .delete()
+                    .eq('school_name', school.school_name);
+
+                if (deleteSchoolError) throw deleteSchoolError;
+
+                alert(`✅ Success!\n\nDeleted "${school.school_name}"\n${school.total_votes || 0} votes removed`);
+
+                // Refresh data
+                await loadData();
+
+            } catch (error) {
+                console.error('Delete school error:', error);
+                alert(`❌ Error deleting school: ${error.message}`);
+            }
         };
 
         // Modal Helpers
