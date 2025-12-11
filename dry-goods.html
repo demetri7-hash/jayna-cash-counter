@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>Dry Goods Inventory - Jayna Gyro</title>
+
+  <link rel="apple-touch-icon" href="https://static.spotapps.co/website_images/ab_websites/229800_website_v1/logo.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#00A8E1">
+
+  <style>
+    /* Jayna Brand Design - Sky Blue & Grayscale */
+    :root {
+      --primary-blue: #00A8E1;
+      --secondary-blue: #0094D6;
+      --light-blue: #E3F4FC;
+      --accent-blue: #0081C6;
+      --gray-900: #212121;
+      --gray-700: #424242;
+      --gray-600: #616161;
+      --gray-500: #757575;
+      --gray-400: #BDBDBD;
+      --gray-300: #E0E0E0;
+      --gray-100: #F5F5F5;
+      --success: #00C853;
+      --warning: #FFB300;
+      --error: #D32F2F;
+      --white: #FFFFFF;
+      --blue-bg: #dbeafe;
+      --blue-text: #1e40af;
+      --success-bg: #d1fae5;
+      --success-text: #065f46;
+      --success-border: #059669;
+      --warning-bg: #fef3c7;
+      --warning-text: #92400e;
+      --warning-border: #f59e0b;
+      --error-bg: #fee2e2;
+      --error-text: #991b1b;
+      --error-border: #dc2626;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      font-family: 'Aptos', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--white);
+      min-height: 100vh;
+      padding: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: var(--white);
+      border-radius: 0;
+      overflow: visible;
+      box-shadow: none;
+      min-height: auto;
+      max-height: none;
+      padding-bottom: 40px;
+    }
+
+    /* Content */
+    .content {
+      padding: 12px;
+      max-height: none;
+      overflow: visible;
+    }
+
+    /* Page Header */
+    .page-header {
+      background: var(--light-blue);
+      padding: 20px;
+      border: 2px solid var(--primary-blue);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .page-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--primary-blue);
+      margin-bottom: 6px;
+    }
+    .page-header p {
+      font-size: 11px;
+      color: var(--gray-700);
+      font-weight: 500;
+    }
+
+    /* Stats Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 12px 8px;
+      text-align: center;
+    }
+    .stat-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--gray-600);
+      margin-bottom: 6px;
+    }
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--primary-blue);
+    }
+
+    /* Inventory List */
+    .inventory-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Inventory Item Card */
+    .item-card {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 14px;
+      transition: all 0.15s ease;
+    }
+    .item-card.low-stock {
+      border-color: var(--warning-border);
+      background: var(--warning-bg);
+    }
+    .item-card.out-of-stock {
+      border-color: var(--error-border);
+      background: var(--error-bg);
+    }
+
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .item-name {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--gray-900);
+    }
+    .item-status-badge {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .badge-ok {
+      background: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid var(--success-border);
+    }
+    .badge-low {
+      background: var(--warning-bg);
+      color: var(--warning-text);
+      border: 1px solid var(--warning-border);
+    }
+    .badge-out {
+      background: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid var(--error-border);
+    }
+
+    .item-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .field-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .field-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--gray-600);
+      margin-bottom: 4px;
+    }
+    .field-input {
+      width: 100%;
+      padding: 10px 8px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+      color: var(--gray-900);
+      transition: all 0.15s ease;
+      -webkit-appearance: none;
+      -moz-appearance: textfield;
+    }
+    .field-input:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 2px rgba(0, 168, 225, 0.15);
+    }
+    .field-input::-webkit-outer-spin-button,
+    .field-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    /* Location Field (full width) */
+    .location-field {
+      margin-top: 4px;
+    }
+    .location-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gray-900);
+      transition: all 0.15s ease;
+      text-transform: uppercase;
+    }
+    .location-input:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 2px rgba(0, 168, 225, 0.15);
+    }
+
+    /* Last Updated Info */
+    .item-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--gray-300);
+      font-size: 9px;
+      color: var(--gray-500);
+    }
+
+    /* Loading Spinner */
+    .loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--gray-500);
+    }
+    .spinner {
+      border: 3px solid var(--gray-200);
+      border-top: 3px solid var(--primary-blue);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Save Indicator */
+    .save-indicator {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--success-bg);
+      border: 2px solid var(--success-border);
+      color: var(--success-text);
+      padding: 12px 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      border-radius: 0;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .save-indicator.show {
+      opacity: 1;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .action-btn {
+      flex: 1;
+      padding: 12px;
+      background: var(--gray-700);
+      color: white;
+      border: 2px solid var(--gray-700);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .action-btn:hover {
+      background: var(--gray-600);
+      border-color: var(--gray-600);
+    }
+    .action-btn.secondary {
+      background: var(--white);
+      color: var(--gray-900);
+      border-color: var(--gray-300);
+    }
+    .action-btn.secondary:hover {
+      background: var(--gray-100);
+      border-color: var(--gray-400);
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .item-fields {
+        grid-template-columns: 1fr;
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- App Header (Injected by app-header.js) -->
+    <div id="appHeader"></div>
+
+    <div class="content">
+      <!-- Page Header -->
+      <div class="page-header">
+        <h2>📦 DRY GOODS INVENTORY</h2>
+        <p>Update counts, par levels, and storage locations</p>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Items</div>
+          <div class="stat-value" id="statTotal">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Low Stock</div>
+          <div class="stat-value" id="statLow" style="color: var(--warning);">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Out of Stock</div>
+          <div class="stat-value" id="statOut" style="color: var(--error);">--</div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <button class="action-btn" onclick="refreshInventory()">🔄 REFRESH</button>
+        <button class="action-btn secondary" onclick="resetAllCounts()">📋 RESET COUNTS</button>
+      </div>
+
+      <!-- Loading -->
+      <div id="loadingIndicator" class="loading">
+        <div class="spinner"></div>
+        <p>Loading inventory...</p>
+      </div>
+
+      <!-- Inventory List -->
+      <div id="inventoryList" class="inventory-list" style="display: none;"></div>
+    </div>
+
+    <!-- Save Indicator -->
+    <div id="saveIndicator" class="save-indicator">✓ SAVED</div>
+  </div>
+
+  <!-- Supabase -->
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    const supabase = createClient(
+      'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+    );
+
+    // Make supabase available globally for header
+    window.supabase = supabase;
+
+    // Dry Goods State
+    const dryGoodsState = {
+      items: [],
+      activeUser: 'System',
+      lastUpdate: null
+    };
+
+    // Initial dry goods inventory items
+    const INITIAL_DRY_GOODS = [
+      { name: 'TO GO BOWLS', unit: 'pcs', par: 500 },
+      { name: 'BOWL LIDS', unit: 'pcs', par: 500 },
+      { name: 'PITA BOXES', unit: 'pcs', par: 200 },
+      { name: 'FRY BOXES', unit: 'pcs', par: 300 },
+      { name: 'ISKENDER CONTAINERS', unit: 'pcs', par: 100 },
+      { name: 'BAKLAVA CONTAINER', unit: 'pcs', par: 150 },
+      { name: 'DIP TRIO CONTAINER', unit: 'pcs', par: 100 },
+      { name: 'DIP TRIO LID', unit: 'pcs', par: 100 },
+      { name: 'BAKLAVA LID', unit: 'pcs', par: 150 },
+      { name: 'WHITE SOUP CUPS', unit: 'pcs', par: 200 },
+      { name: 'WHITE SOUP LIDS', unit: 'pcs', par: 200 },
+      { name: '16OZ DELI CONTAINERS', unit: 'pcs', par: 150 },
+      { name: '32OZ DELI CONTAINER', unit: 'pcs', par: 150 },
+      { name: 'DELI CONTAINER LIDS', unit: 'pcs', par: 300 },
+      { name: '2OZ RAMIKENS', unit: 'pcs', par: 200 },
+      { name: '3OZ RAIKENS', unit: 'pcs', par: 200 },
+      { name: '2OZ RAMIKEN LIDS', unit: 'pcs', par: 200 },
+      { name: '3OZ RAMIKEN LIDS', unit: 'pcs', par: 200 }
+    ];
+
+    /**
+     * Load inventory from database or initialize
+     */
+    async function loadInventory() {
+      try {
+        document.getElementById('loadingIndicator').style.display = 'block';
+        document.getElementById('inventoryList').style.display = 'none';
+
+        // Fetch all dry goods items
+        const { data: existingItems, error } = await supabase
+          .from('inventory_items')
+          .select('*')
+          .eq('item_type', 'dry_goods')
+          .order('item_name', { ascending: true });
+
+        if (error) throw error;
+
+        // If no items exist, initialize with default list
+        if (!existingItems || existingItems.length === 0) {
+          console.log('🆕 No dry goods found, initializing default inventory');
+          await initializeDefaultInventory();
+          return; // Reload will be called after initialization
+        }
+
+        dryGoodsState.items = existingItems;
+        renderInventory();
+        updateStats();
+
+        document.getElementById('loadingIndicator').style.display = 'none';
+        document.getElementById('inventoryList').style.display = 'flex';
+
+      } catch (error) {
+        console.error('Error loading inventory:', error);
+        alert('Error loading inventory. Please refresh the page.');
+      }
+    }
+
+    /**
+     * Initialize default dry goods inventory
+     */
+    async function initializeDefaultInventory() {
+      try {
+        const itemsToInsert = INITIAL_DRY_GOODS.map(item => ({
+          item_name: item.name,
+          item_type: 'dry_goods',
+          vendor: 'DRY GOODS',
+          unit: item.unit,
+          par_level: item.par,
+          current_stock: 0,
+          storage_location: 'STORAGE',
+          last_counted_date: null,
+          last_counted_by: null
+        }));
+
+        const { error } = await supabase
+          .from('inventory_items')
+          .insert(itemsToInsert);
+
+        if (error) throw error;
+
+        console.log('✅ Initialized', itemsToInsert.length, 'dry goods items');
+
+        // Reload after initialization
+        await loadInventory();
+
+      } catch (error) {
+        console.error('Error initializing inventory:', error);
+        alert('Error initializing inventory. Please try again.');
+      }
+    }
+
+    /**
+     * Render inventory list
+     */
+    function renderInventory() {
+      const listDiv = document.getElementById('inventoryList');
+      listDiv.innerHTML = '';
+
+      dryGoodsState.items.forEach(item => {
+        const card = createItemCard(item);
+        listDiv.appendChild(card);
+      });
+    }
+
+    /**
+     * Create item card element
+     */
+    function createItemCard(item) {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+
+      // Determine status
+      const currentStock = item.current_stock || 0;
+      const parLevel = item.par_level || 0;
+      let status = 'ok';
+      let statusText = 'OK';
+      let statusClass = 'badge-ok';
+
+      if (currentStock === 0) {
+        status = 'out';
+        statusText = 'OUT';
+        statusClass = 'badge-out';
+        card.classList.add('out-of-stock');
+      } else if (currentStock <= parLevel * 0.3) {
+        status = 'low';
+        statusText = 'LOW';
+        statusClass = 'badge-low';
+        card.classList.add('low-stock');
+      }
+
+      // Last updated info
+      const lastCounted = item.last_counted_date
+        ? new Date(item.last_counted_date).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+          })
+        : 'Never';
+      const countedBy = item.last_counted_by || 'Unknown';
+
+      card.innerHTML = `
+        <div class="item-header">
+          <div class="item-name">${item.item_name}</div>
+          <span class="item-status-badge ${statusClass}">${statusText}</span>
+        </div>
+        <div class="item-fields">
+          <div class="field-group">
+            <label class="field-label">Current</label>
+            <input
+              type="number"
+              class="field-input"
+              value="${currentStock}"
+              data-item-id="${item.id}"
+              data-field="current_stock"
+              onchange="updateItemField(this)"
+              min="0"
+            >
+          </div>
+          <div class="field-group">
+            <label class="field-label">Par Level</label>
+            <input
+              type="number"
+              class="field-input"
+              value="${parLevel}"
+              data-item-id="${item.id}"
+              data-field="par_level"
+              onchange="updateItemField(this)"
+              min="0"
+            >
+          </div>
+          <div class="field-group">
+            <label class="field-label">Unit</label>
+            <div class="field-input" style="cursor: default; background: var(--gray-100);">${item.unit}</div>
+          </div>
+        </div>
+        <div class="location-field">
+          <label class="field-label">Storage Location</label>
+          <input
+            type="text"
+            class="location-input"
+            value="${item.storage_location || 'STORAGE'}"
+            data-item-id="${item.id}"
+            data-field="storage_location"
+            onchange="updateItemField(this)"
+            placeholder="Enter location..."
+          >
+        </div>
+        <div class="item-meta">
+          <span>Last counted: ${lastCounted}</span>
+          <span>by ${countedBy}</span>
+        </div>
+      `;
+
+      return card;
+    }
+
+    /**
+     * Update item field in database
+     */
+    window.updateItemField = async function(input) {
+      const itemId = input.dataset.itemId;
+      const field = input.dataset.field;
+      let value = input.value;
+
+      // Convert to number for numeric fields
+      if (field === 'current_stock' || field === 'par_level') {
+        value = parseInt(value) || 0;
+      }
+
+      try {
+        const updateData = { [field]: value };
+
+        // If updating current_stock, also update last counted info
+        if (field === 'current_stock') {
+          updateData.last_counted_date = new Date().toISOString();
+          updateData.last_counted_by = dryGoodsState.activeUser;
+        }
+
+        const { error } = await supabase
+          .from('inventory_items')
+          .update(updateData)
+          .eq('id', itemId);
+
+        if (error) throw error;
+
+        // Show save indicator
+        showSaveIndicator();
+
+        // Update local state
+        const itemIndex = dryGoodsState.items.findIndex(i => i.id === itemId);
+        if (itemIndex !== -1) {
+          dryGoodsState.items[itemIndex][field] = value;
+          if (field === 'current_stock') {
+            dryGoodsState.items[itemIndex].last_counted_date = updateData.last_counted_date;
+            dryGoodsState.items[itemIndex].last_counted_by = updateData.last_counted_by;
+          }
+        }
+
+        // Refresh display
+        await loadInventory();
+
+      } catch (error) {
+        console.error('Error updating item:', error);
+        alert('Failed to save changes. Please try again.');
+      }
+    };
+
+    /**
+     * Update stats display
+     */
+    function updateStats() {
+      const total = dryGoodsState.items.length;
+      let lowStock = 0;
+      let outOfStock = 0;
+
+      dryGoodsState.items.forEach(item => {
+        const current = item.current_stock || 0;
+        const par = item.par_level || 0;
+
+        if (current === 0) {
+          outOfStock++;
+        } else if (current <= par * 0.3) {
+          lowStock++;
+        }
+      });
+
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statLow').textContent = lowStock;
+      document.getElementById('statOut').textContent = outOfStock;
+    }
+
+    /**
+     * Show save indicator
+     */
+    function showSaveIndicator() {
+      const indicator = document.getElementById('saveIndicator');
+      indicator.classList.add('show');
+      setTimeout(() => {
+        indicator.classList.remove('show');
+      }, 2000);
+    }
+
+    /**
+     * Refresh inventory
+     */
+    window.refreshInventory = async function() {
+      await loadInventory();
+    };
+
+    /**
+     * Reset all counts to 0
+     */
+    window.resetAllCounts = async function() {
+      if (!confirm('⚠️ Reset ALL item counts to 0?\n\nThis will clear all current stock values. Par levels and locations will remain unchanged.\n\nThis action CANNOT be undone.')) {
+        return;
+      }
+
+      try {
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({
+            current_stock: 0,
+            last_counted_date: new Date().toISOString(),
+            last_counted_by: dryGoodsState.activeUser
+          })
+          .eq('item_type', 'dry_goods');
+
+        if (error) throw error;
+
+        alert('✅ All counts reset to 0');
+        await loadInventory();
+
+      } catch (error) {
+        console.error('Error resetting counts:', error);
+        alert('Failed to reset counts. Please try again.');
+      }
+    };
+
+    // Load inventory on page load
+    loadInventory();
+  </script>
+
+  <!-- App Header Script -->
+  <script src="./app-header.js"></script>
+</body>
+</html>
