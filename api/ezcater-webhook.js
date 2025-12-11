@@ -108,7 +108,8 @@ export default async function handler(req, res) {
         last_synced_at: new Date().toISOString()
       }, {
         onConflict: 'source_system,external_order_id'
-      });
+      })
+      .select(); // CRITICAL FIX: Always return the row (insert OR update)
 
     if (error) {
       console.error('❌ Error saving order to database:', error);
