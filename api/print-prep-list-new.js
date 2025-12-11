@@ -863,8 +863,9 @@ function generatePrepListPDF(prep, order, lineItems) {
   // Salads - 1 tong per type, 1 small spoon per type for lemon vin, 2 large serving spoons total
   if (prep.salads.length > 0) {
     prep.salads.forEach(salad => {
-      halfPans += salad.qty < 4 ? salad.qty : Math.ceil(salad.qty / 2);
-      deliContainers += salad.qty; // lemon vinaigrette
+      halfPans += salad.qty; // Each salad is ALWAYS 1 half pan
+      const fullPansEquivalent = Math.ceil(salad.qty / 2); // 2 half pans = 1 full pan
+      deliContainers += fullPansEquivalent; // lemon vinaigrette (1 per full pan equivalent)
     });
     tongs += prep.salads.length; // 1 tong per salad type
     smallSpoons += prep.salads.length; // 1 small spoon per salad type for lemon vinaigrette
@@ -1160,10 +1161,11 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
     prep.salads.forEach(salad => {
-      const halfPans = salad.qty < 4 ? salad.qty : salad.qty * 2;
+      const halfPans = salad.qty; // Each salad is ALWAYS 1 half pan
+      const fullPansEquivalent = Math.ceil(halfPans / 2); // 2 half pans = 1 full pan
       renderTextWithBold(doc, `[ ] ${salad.qty}x ${toTitleCase(salad.name)} (**${formatPanCount(halfPans)}**) - **1 tong**`, margin + 10, y); y += ss(9);
       doc.setTextColor(...darkGray);
-      renderTextWithBold(doc, `    - ${salad.qty}x **16oz** Lemon Vin - **1 small spoon**`, margin + 16, y);
+      renderTextWithBold(doc, `    - ${fullPansEquivalent}x **16oz** Lemon Vin - **1 small spoon**`, margin + 16, y);
       doc.setTextColor(...black);
       y += ss(11);
     });

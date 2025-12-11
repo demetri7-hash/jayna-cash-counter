@@ -958,12 +958,14 @@ function generateLabelsFromPrep(prep, order) {
     });
   });
 
-  // DIPS
+  // DIPS - Print 1 label per quantity (not 1 label with "2X")
   prep.dips.forEach(dip => {
-    labels.push({
-      item: getLabelName(dip.name),
-      qty: `${dip.qty}X 16OZ DELI`
-    });
+    for (let i = 0; i < dip.qty; i++) {
+      labels.push({
+        item: getLabelName(dip.name),
+        qty: `16OZ DELI`
+      });
+    }
   });
 
   // GREEK FRIES BAR
