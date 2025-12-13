@@ -299,8 +299,10 @@
       showStatus('Authenticating with Toast API...', 'loading');
 
       try {
-        // DON'T convert dates - use YYYY-MM-DD format from date picker (same as tip-pool.html!)
-        console.log(`Fetching orders from ${startDate} to ${endDate}`);
+        // Convert dates to YYYYMMDD format (same as manager.html!)
+        const formattedStart = startDate.replace(/-/g, ''); // YYYY-MM-DD → YYYYMMDD
+        const formattedEnd = endDate.replace(/-/g, '');     // YYYY-MM-DD → YYYYMMDD
+        console.log(`Fetching orders from ${formattedStart} to ${formattedEnd}`);
 
         // Step 1: Authenticate with Toast API (EXACT same method as tip-pool.html)
         const authResponse = await fetch('/api/toast-auth', {
@@ -321,10 +323,10 @@
         const token = authData.data.accessToken;
         console.log('✅ Authentication successful');
 
-        // Step 2: Fetch orders using the EXISTING working endpoint
+        // Step 2: Fetch orders using the EXISTING working endpoint with YYYYMMDD dates
         showStatus('Fetching orders from Toast API...', 'loading', 'This may take 1-2 minutes for large date ranges');
 
-        const apiUrl = `/api/toast-orders-flexible?accessToken=${encodeURIComponent(token)}&startDate=${startDate}&endDate=${endDate}`;
+        const apiUrl = `/api/toast-orders-flexible?accessToken=${encodeURIComponent(token)}&startDate=${formattedStart}&endDate=${formattedEnd}`;
 
         const response = await fetch(apiUrl);
 
