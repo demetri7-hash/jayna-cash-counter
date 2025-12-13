@@ -933,19 +933,23 @@ function generateLabelsFromPrep(prep, order) {
       }
     });
 
-    // Generate SLICED PITA labels
-    for (let i = 1; i <= slicedPitaCount; i++) {
+    // Generate SLICED PITA labels - Convert half pans to full pans when possible
+    const slicedPitaPans = convertHalfPansToFullPans(slicedPitaCount);
+    slicedPitaPans.forEach(pan => {
       labels.push({
         item: 'SLICED PITA',
-        qty: slicedPitaCount > 1 ? `HALF PAN - ${i} OF ${slicedPitaCount}` : `HALF PAN - 1 OF 1`
+        qty: `${pan.type} - ${pan.index} OF ${pan.total}`
       });
-    }
+    });
 
-    // Generate SLICED GF PITA labels
-    for (let i = 1; i <= slicedGFPitaCount; i++) {
-      labels.push({
-        item: 'SLICED GF PITA',
-        qty: slicedGFPitaCount > 1 ? `HALF PAN - ${i} OF ${slicedGFPitaCount}` : `HALF PAN - 1 OF 1`
+    // Generate SLICED GF PITA labels - Convert half pans to full pans when possible
+    if (slicedGFPitaCount > 0) {
+      const slicedGFPitaPans = convertHalfPansToFullPans(slicedGFPitaCount);
+      slicedGFPitaPans.forEach(pan => {
+        labels.push({
+          item: 'SLICED GF PITA',
+          qty: `${pan.type} - ${pan.index} OF ${pan.total}`
+        });
       });
     }
   }
@@ -992,12 +996,41 @@ function generateLabelsFromPrep(prep, order) {
     });
   });
 
-  // SIDES
+  // SIDES - Convert multiple items to full/half pans and generate one label per container
   prep.sides.forEach(side => {
-    labels.push({
-      item: side.name.toUpperCase(),
-      qty: `${side.qty}X`
-    });
+    const sideName = side.name.toUpperCase();
+    const qty = side.qty;
+
+    // Check if this is Greek Fries or Rice (items that come in half pans when "feeds 5 to 7")
+    const isGreekFries = sideName.includes('GREEK FRIES') && !sideName.includes('BAR');
+    const isRice = sideName.includes('RICE');
+
+    if ((isGreekFries || isRice) && qty >= 2) {
+      // Multiple items - convert to full/half pans (2 items = 1 full pan)
+      const pans = convertHalfPansToFullPans(qty);
+      pans.forEach(pan => {
+        labels.push({
+          item: sideName,
+          qty: `${pan.type} - ${pan.index} OF ${pan.total}`
+        });
+      });
+
+      // For Greek Fries, ALSO add aioli labels (2 aioli per order as each comes with spicy aioli)
+      if (isGreekFries) {
+        for (let i = 0; i < qty; i++) {
+          labels.push({
+            item: 'SPICY AIOLI',
+            qty: `16OZ DELI - FOR GREEK FRIES`
+          });
+        }
+      }
+    } else {
+      // Single item or non-pannable item
+      labels.push({
+        item: sideName,
+        qty: `${qty}X`
+      });
+    }
   });
 
   // DESSERTS

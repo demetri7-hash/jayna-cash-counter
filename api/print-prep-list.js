@@ -558,7 +558,8 @@ function generatePrepListPDF(prep, order, lineItems) {
 
   // BYO GYRO PITAS (Beef & Lamb, Chicken, Roasted Chickpeas, Falafel)
   if (prep.byoGyros.total > 0) {
-    const sets = Math.ceil(prep.byoGyros.total / 10);
+    const sets = Math.ceil(prep.byoGyros.total / 10); // Sauce containers (1 per 10 portions)
+    const greensSets = Math.ceil(prep.byoGyros.total / 15); // Mixed greens (1 per 15 portions)
 
     // Calculate box height dynamically
     const proteinLines = prep.byoGyros.items?.length || 0;
@@ -600,7 +601,7 @@ function generatePrepListPDF(prep, order, lineItems) {
     doc.text(`[ ] ${sets}x 16oz Tzatziki (no dill) - 1 small spoon`, 50, yPos); yPos += 12;
     doc.text(`[ ] ${sets}x 16oz Spicy Aioli - 1 small spoon`, 50, yPos); yPos += 12;
     doc.text(`[ ] ${sets}x 16oz Lemon Vinaigrette - 1 small spoon`, 50, yPos); yPos += 12;
-    doc.text(`[ ] ${formatPanCount(sets)} Mixed Greens - 1 tong`, 50, yPos); yPos += 12;
+    doc.text(`[ ] ${formatPanCount(greensSets)} Mixed Greens - 1 tong`, 50, yPos); yPos += 12;
 
     // Calculate pan counts for vegetables (1 half pan per 10 portions if >= 10, brown bowls if < 10)
     if (prep.byoGyros.total < 10) {
