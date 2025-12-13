@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Toast Bulk Order Export</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      color: #1a1a1a;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border: 2px solid #d1d5db;
+      padding: 30px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 30px;
+      color: #1a1a1a;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #4a4a4a;
+      margin-bottom: 8px;
+    }
+
+    input[type="date"],
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #d1d5db;
+      border-radius: 0;
+      font-size: 14px;
+      font-weight: 400;
+      background: white;
+    }
+
+    input:focus {
+      border-color: #4a4a4a;
+      outline: none;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    button {
+      padding: 14px 24px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border: 2px solid #1a1a1a;
+      border-radius: 0;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: #1a1a1a;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4a4a4a;
+    }
+
+    .btn-primary:disabled {
+      background: #9ca3af;
+      border-color: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #1a1a1a;
+      border-color: #d1d5db;
+    }
+
+    .btn-secondary:hover {
+      background: #e5e7eb;
+    }
+
+    .status-box {
+      margin-top: 30px;
+      padding: 16px;
+      border: 2px solid #d1d5db;
+      background: #f9fafb;
+      display: none;
+    }
+
+    .status-box.show {
+      display: block;
+    }
+
+    .status-box.loading {
+      border-color: #3b82f6;
+      background: #dbeafe;
+    }
+
+    .status-box.success {
+      border-color: #059669;
+      background: #d1fae5;
+    }
+
+    .status-box.error {
+      border-color: #dc2626;
+      background: #fee2e2;
+    }
+
+    .status-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 3px solid #d1d5db;
+      border-top-color: #1a1a1a;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .info-box {
+      margin-top: 30px;
+      padding: 16px;
+      background: #fef3c7;
+      border: 2px solid #f59e0b;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .info-box strong {
+      display: block;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .stats {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #4a4a4a;
+    }
+
+    .helper-text {
+      font-size: 11px;
+      color: #6b6b6b;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Toast Bulk Order Export</h1>
+
+    <div class="form-group">
+      <label for="accessToken">Toast Access Token</label>
+      <input type="text" id="accessToken" placeholder="Enter Toast API access token">
+      <div class="helper-text">Get your access token from Toast POS dashboard → Developer → API Tokens</div>
+    </div>
+
+    <div class="form-group">
+      <label for="startDate">Start Date</label>
+      <input type="date" id="startDate">
+    </div>
+
+    <div class="form-group">
+      <label for="endDate">End Date</label>
+      <input type="date" id="endDate">
+    </div>
+
+    <div class="button-group">
+      <button class="btn-primary" id="exportBtn" onclick="fetchAndExport()">
+        Export to CSV
+      </button>
+      <button class="btn-secondary" onclick="set30DayRange()">
+        Set 30-Day Range
+      </button>
+    </div>
+
+    <div id="statusBox" class="status-box">
+      <div class="status-text" id="statusText"></div>
+      <div class="stats" id="statsText"></div>
+    </div>
+
+    <div class="info-box">
+      <strong>What data is exported?</strong>
+      <ul style="margin-left: 20px; margin-top: 8px;">
+        <li>Order details (GUID, number, date, time, server, totals)</li>
+        <li>Customer information (name, phone, email)</li>
+        <li>Delivery/pickup details (address, instructions, times)</li>
+        <li>All checks with selections (menu items, modifiers, pricing)</li>
+        <li>Payment details (type, amount, tip, status)</li>
+        <li>Discounts, voids, refunds, service charges</li>
+        <li>Dining option, source, table info</li>
+      </ul>
+      <div style="margin-top: 12px; font-weight: 600;">
+        Note: Large date ranges (30+ days) may take 1-2 minutes to fetch all data.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Set default date range to last 30 days
+    window.addEventListener('DOMContentLoaded', () => {
+      set30DayRange();
+    });
+
+    function set30DayRange() {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+
+      document.getElementById('startDate').valueAsDate = startDate;
+      document.getElementById('endDate').valueAsDate = endDate;
+    }
+
+    function showStatus(message, type = 'loading', stats = '') {
+      const statusBox = document.getElementById('statusBox');
+      const statusText = document.getElementById('statusText');
+      const statsText = document.getElementById('statsText');
+
+      statusBox.className = 'status-box show ' + type;
+
+      if (type === 'loading') {
+        statusText.innerHTML = '<span class="spinner"></span>' + message;
+      } else {
+        statusText.textContent = message;
+      }
+
+      statsText.textContent = stats;
+    }
+
+    function hideStatus() {
+      document.getElementById('statusBox').classList.remove('show');
+    }
+
+    function formatDateToYYYYMMDD(dateStr) {
+      const date = new Date(dateStr);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}${month}${day}`;
+    }
+
+    async function fetchAndExport() {
+      const accessToken = document.getElementById('accessToken').value.trim();
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      const exportBtn = document.getElementById('exportBtn');
+
+      // Validation
+      if (!accessToken) {
+        showStatus('❌ Please enter your Toast API access token', 'error');
+        return;
+      }
+
+      if (!startDate || !endDate) {
+        showStatus('❌ Please select both start and end dates', 'error');
+        return;
+      }
+
+      if (new Date(startDate) > new Date(endDate)) {
+        showStatus('❌ Start date must be before end date', 'error');
+        return;
+      }
+
+      // Disable button during fetch
+      exportBtn.disabled = true;
+      showStatus('Fetching orders from Toast API...', 'loading', 'This may take 1-2 minutes for large date ranges');
+
+      try {
+        // Format dates to YYYYMMDD
+        const formattedStart = formatDateToYYYYMMDD(startDate);
+        const formattedEnd = formatDateToYYYYMMDD(endDate);
+
+        console.log(`Fetching orders from ${formattedStart} to ${formattedEnd}`);
+
+        // Call the existing Toast API endpoint with full pagination
+        const apiUrl = `/api/toast-orders-flexible?accessToken=${encodeURIComponent(accessToken)}&startDate=${formattedStart}&endDate=${formattedEnd}`;
+
+        const response = await fetch(apiUrl);
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || `API returned status ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to fetch orders');
+        }
+
+        const orders = result.data || [];
+        console.log(`Received ${orders.length} orders from API`);
+
+        if (orders.length === 0) {
+          showStatus('⚠️ No orders found for this date range', 'error');
+          exportBtn.disabled = false;
+          return;
+        }
+
+        showStatus(`Processing ${orders.length} orders...`, 'loading', `Flattening data structure for CSV export`);
+
+        // Give UI time to update
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Flatten orders to CSV rows (ALL available data)
+        const csvRows = flattenOrdersToCSV(orders);
+
+        // Generate CSV
+        const csv = generateCSV(csvRows);
+
+        // Download CSV
+        const filename = `toast_orders_${formattedStart}_to_${formattedEnd}.csv`;
+        downloadCSV(csv, filename);
+
+        showStatus(
+          `✅ Successfully exported ${orders.length} orders!`,
+          'success',
+          `File: ${filename} | Total rows: ${csvRows.length} | Pages fetched: ${result.pagesFetched || 'N/A'}`
+        );
+
+      } catch (error) {
+        console.error('Export error:', error);
+        showStatus(`❌ Error: ${error.message}`, 'error');
+      } finally {
+        exportBtn.disabled = false;
+      }
+    }
+
+    function flattenOrdersToCSV(orders) {
+      const rows = [];
+
+      orders.forEach(order => {
+        // Basic order info
+        const orderBase = {
+          order_guid: order.guid || '',
+          order_number: order.entityType === 'OnlineOrder' ? order.externalId : order.displayNumber || '',
+          business_date: order.businessDate || '',
+          opened_date: order.openedDate || '',
+          closed_date: order.closedDate || '',
+          modified_date: order.modifiedDate || '',
+          deleted: order.deleted || false,
+          voided: order.voided || false,
+          entity_type: order.entityType || '',
+          source: order.source || '',
+
+          // Server info
+          server_guid: order.server?.guid || '',
+          server_name: order.server ? `${order.server.firstName || ''} ${order.server.lastName || ''}`.trim() : '',
+
+          // Customer info
+          customer_name: order.customer?.firstName ? `${order.customer.firstName} ${order.customer.lastName || ''}`.trim() : '',
+          customer_phone: order.customer?.phone || '',
+          customer_email: order.customer?.email || '',
+
+          // Delivery info
+          delivery_info_address1: order.deliveryInfo?.address1 || '',
+          delivery_info_address2: order.deliveryInfo?.address2 || '',
+          delivery_info_city: order.deliveryInfo?.city || '',
+          delivery_info_state: order.deliveryInfo?.state || '',
+          delivery_info_zipcode: order.deliveryInfo?.zipCode || '',
+          delivery_info_notes: order.deliveryInfo?.notes || '',
+          delivery_info_latitude: order.deliveryInfo?.latitude || '',
+          delivery_info_longitude: order.deliveryInfo?.longitude || '',
+
+          // Promised date/time
+          promised_date: order.promisedDate || '',
+          promised_time: order.promisedTime || '',
+
+          // Dining option
+          dining_option_guid: order.diningOption?.guid || '',
+          dining_option_name: order.diningOption?.name || '',
+          dining_option_behavior: order.diningOption?.behavior || '',
+
+          // Table info
+          table_guid: order.table?.guid || '',
+          table_name: order.table?.name || '',
+
+          // Totals
+          total: order.total || 0,
+          tax: order.tax || 0,
+          amount_due: order.amountDue || 0,
+          total_discount: order.totalDiscount || 0,
+          void_business_date: order.voidBusinessDate || '',
+          void_date: order.voidDate || '',
+          void_approved_by_guid: order.voidApprovedBy?.guid || '',
+          void_approved_by_name: order.voidApprovedBy ? `${order.voidApprovedBy.firstName || ''} ${order.voidApprovedBy.lastName || ''}`.trim() : '',
+
+          // Approval status
+          approval_status: order.approvalStatus || '',
+
+          // Number of payments
+          number_of_payments: order.payments?.length || 0
+        };
+
+        // If there are checks, create a row for each check with selections
+        if (order.checks && order.checks.length > 0) {
+          order.checks.forEach((check, checkIndex) => {
+            // Check-level data
+            const checkData = {
+              ...orderBase,
+              check_index: checkIndex + 1,
+              check_guid: check.guid || '',
+              check_opened_date: check.openedDate || '',
+              check_closed_date: check.closedDate || '',
+              check_deleted: check.deleted || false,
+              check_voided: check.voided || false,
+              check_amount: check.amount || 0,
+              check_tax_amount: check.taxAmount || 0,
+              check_total_amount: check.totalAmount || 0,
+              check_payment_status: check.paymentStatus || '',
+              check_customer_name: check.customer?.firstName ? `${check.customer.firstName} ${check.customer.lastName || ''}`.trim() : '',
+              check_customer_phone: check.customer?.phone || '',
+              number_of_selections: check.selections?.length || 0
+            };
+
+            // If there are selections, create a row for each selection
+            if (check.selections && check.selections.length > 0) {
+              check.selections.forEach((selection, selIndex) => {
+                const selectionData = {
+                  ...checkData,
+                  selection_index: selIndex + 1,
+                  selection_guid: selection.guid || '',
+                  selection_name: selection.item?.name || selection.displayName || '',
+                  selection_sku: selection.item?.sku || '',
+                  selection_plu: selection.item?.plu || '',
+                  selection_quantity: selection.quantity || 1,
+                  selection_price: selection.price || 0,
+                  selection_preDiscountPrice: selection.preDiscountPrice || 0,
+                  selection_tax: selection.tax || 0,
+                  selection_voided: selection.voided || false,
+                  selection_voidDate: selection.voidDate || '',
+                  selection_deferred: selection.deferred || false,
+                  selection_preModifier: selection.preModifier || '',
+                  selection_postModifier: selection.postModifier || '',
+
+                  // Modifiers (flatten to comma-separated string)
+                  modifiers: selection.modifiers?.map(m => m.name || '').join('; ') || '',
+                  modifiers_price_impact: selection.modifiers?.reduce((sum, m) => sum + (m.price || 0), 0) || 0
+                };
+
+                rows.push(selectionData);
+              });
+            } else {
+              // No selections, just add check data
+              rows.push(checkData);
+            }
+          });
+        } else {
+          // No checks, just add order data
+          rows.push(orderBase);
+        }
+      });
+
+      return rows;
+    }
+
+    function generateCSV(rows) {
+      if (rows.length === 0) return '';
+
+      // Get all unique column names from all rows
+      const allColumns = new Set();
+      rows.forEach(row => {
+        Object.keys(row).forEach(key => allColumns.add(key));
+      });
+
+      const columns = Array.from(allColumns);
+
+      // CSV header row
+      const header = columns.map(col => `"${col}"`).join(',');
+
+      // CSV data rows
+      const dataRows = rows.map(row => {
+        return columns.map(col => {
+          const value = row[col];
+          if (value === null || value === undefined) return '""';
+
+          // Escape quotes in strings
+          const stringValue = String(value).replace(/"/g, '""');
+          return `"${stringValue}"`;
+        }).join(',');
+      });
+
+      return [header, ...dataRows].join('\n');
+    }
+
+    function downloadCSV(csvContent, filename) {
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+
+      if (navigator.msSaveBlob) {
+        // IE 10+
+        navigator.msSaveBlob(blob, filename);
+      } else {
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    }
+  </script>
+</body>
+</html>
