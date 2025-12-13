@@ -40,15 +40,25 @@ export default async function handler(req, res) {
       });
     }
 
-    // Convert YYYYMMDD format to proper ISO-8601 format for date ranges
-    const formatToISO8601 = (yyyymmdd) => {
-      if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd;
-      
-      // Convert YYYYMMDD to YYYY-MM-DDTHH:MM:SSZ
-      const year = yyyymmdd.substring(0, 4);
-      const month = yyyymmdd.substring(4, 6);
-      const day = yyyymmdd.substring(6, 8);
-      return `${year}-${month}-${day}T00:00:00Z`;
+    // Convert YYYYMMDD or YYYY-MM-DD format to proper ISO-8601 format for date ranges
+    const formatToISO8601 = (dateStr) => {
+      if (!dateStr) return dateStr;
+
+      // Handle YYYYMMDD format (length 8)
+      if (dateStr.length === 8) {
+        const year = dateStr.substring(0, 4);
+        const month = dateStr.substring(4, 6);
+        const day = dateStr.substring(6, 8);
+        return `${year}-${month}-${day}T00:00:00Z`;
+      }
+
+      // Handle YYYY-MM-DD format (length 10)
+      if (dateStr.length === 10 && dateStr.includes('-')) {
+        return `${dateStr}T00:00:00Z`;
+      }
+
+      // Return as-is for other formats
+      return dateStr;
     };
 
     // If no pageSize provided, use maximum (100) and enable pagination to get ALL orders
