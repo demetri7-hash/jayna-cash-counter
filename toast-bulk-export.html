@@ -192,12 +192,6 @@
     <h1>Toast Bulk Order Export</h1>
 
     <div class="form-group">
-      <label for="accessToken">Toast Access Token</label>
-      <input type="text" id="accessToken" placeholder="Enter Toast API access token">
-      <div class="helper-text">Get your access token from Toast POS dashboard → Developer → API Tokens</div>
-    </div>
-
-    <div class="form-group">
       <label for="startDate">Start Date</label>
       <input type="date" id="startDate">
     </div>
@@ -233,7 +227,10 @@
         <li>Dining option, source, table info</li>
       </ul>
       <div style="margin-top: 12px; font-weight: 600;">
-        Note: Large date ranges (30+ days) may take 1-2 minutes to fetch all data.
+        Note: Uses existing Toast API credentials from environment variables.
+      </div>
+      <div style="margin-top: 8px; font-weight: 600;">
+        Large date ranges (30+ days) may take 1-2 minutes to fetch all data.
       </div>
     </div>
   </div>
@@ -282,17 +279,11 @@
     }
 
     async function fetchAndExport() {
-      const accessToken = document.getElementById('accessToken').value.trim();
       const startDate = document.getElementById('startDate').value;
       const endDate = document.getElementById('endDate').value;
       const exportBtn = document.getElementById('exportBtn');
 
       // Validation
-      if (!accessToken) {
-        showStatus('❌ Please enter your Toast API access token', 'error');
-        return;
-      }
-
       if (!startDate || !endDate) {
         showStatus('❌ Please select both start and end dates', 'error');
         return;
@@ -305,7 +296,7 @@
 
       // Disable button during fetch
       exportBtn.disabled = true;
-      showStatus('Fetching orders from Toast API...', 'loading', 'This may take 1-2 minutes for large date ranges');
+      showStatus('Authenticating & fetching orders from Toast API...', 'loading', 'This may take 1-2 minutes for large date ranges');
 
       try {
         // Format dates to YYYYMMDD
@@ -314,8 +305,8 @@
 
         console.log(`Fetching orders from ${formattedStart} to ${formattedEnd}`);
 
-        // Call the existing Toast API endpoint with full pagination
-        const apiUrl = `/api/toast-orders-flexible?accessToken=${encodeURIComponent(accessToken)}&startDate=${formattedStart}&endDate=${formattedEnd}`;
+        // Call the new bulk export endpoint (handles auth automatically!)
+        const apiUrl = `/api/toast-bulk-export?startDate=${formattedStart}&endDate=${formattedEnd}`;
 
         const response = await fetch(apiUrl);
 
