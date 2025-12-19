@@ -6262,25 +6262,21 @@
   }
 
   /**
-   * Print checklist PDF to Epson printer
+   * Print completed checklist PDF to Epson printer
+   * Uses new API with dynamic one-page formatting
    */
   async function printChecklistPDF(sessionId) {
     try {
-      const doc = await generateChecklistPDF(sessionId);
-      if (!doc) return;
+      console.log(`🖨️ Printing completed checklist session: ${sessionId}`);
 
-      showLoading('Sending to printer...', 'Preparing PDF...');
+      showLoading('SENDING TO PRINTER', 'Generating clean one-page PDF and emailing to Epson...');
 
-      const pdfBase64 = doc.output('datauristring').split(',')[1];
-      const filename = `Checklist_${sessionId}_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      // Send to printer via backend API
-      const response = await fetch('/api/send-ordering-guide-email', {
+      // Call new API that generates simple one-page PDF
+      const response = await fetch('/api/print-completed-checklist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pdfBase64: pdfBase64,
-          filename: filename
+          session_id: sessionId
         })
       });
 
@@ -6288,14 +6284,17 @@
 
       hideLoading();
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to send to printer');
+      if (!result.success) {
+        console.error(`❌ Failed to print checklist: ${result.error}`);
+        showMessage(`Print failed: ${result.error}`, 'error');
+        return;
       }
 
-      showMessage('✅ Checklist sent to printer!', 'success');
+      console.log(`✅ Checklist sent to printer successfully:`, result.messageId);
+      showMessage('✅ Checklist sent to printer successfully!', 'success');
 
     } catch (error) {
-      console.error('Error printing PDF:', error);
+      console.error('❌ Error printing checklist:', error);
       hideLoading();
       showMessage('Error sending to printer: ' + error.message, 'error');
     }
