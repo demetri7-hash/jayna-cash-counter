@@ -3901,6 +3901,13 @@
    * Start Checklist Session - Create session in database (UPDATED FOR MULTI-USER + AUTO-POPULATE)
    */
   async function startChecklistSession() {
+    // Check if digital checklists are enabled
+    const checklistsEnabled = await checkDigitalChecklistsEnabled();
+    if (!checklistsEnabled) {
+      showDigitalChecklistsDisabledModal();
+      return;
+    }
+
     // Collect all names from inputs
     const nameInputs = document.querySelectorAll('.staff-name-input');
     const manualNames = [];
@@ -8177,6 +8184,23 @@
             transition: all 0.15s ease;
           "
         >🔒 ACCESS CONTROL</button>
+        <button
+          id="watchdogTab_settings"
+          onclick="showWatchdogSection('settings')"
+          style="
+            padding: 12px 20px;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: none;
+            border-radius: 0;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          "
+        >⚙️ SETTINGS</button>
       </div>
 
       <!-- History Section -->
@@ -8242,6 +8266,82 @@
           <p style="text-align: center; padding: 20px;">Loading access control panel...</p>
         </div>
       </div>
+
+      <!-- Settings Section -->
+      <div id="watchdog_settings" style="display: none;">
+        <div style="
+          background: var(--white);
+          border: 2px solid var(--gray-300);
+          padding: 24px;
+          margin-bottom: 20px;
+        ">
+          <h3 style="
+            margin: 0 0 20px 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gray-900);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          ">⚙️ DIGITAL CHECKLISTS</h3>
+
+          <div style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: var(--gray-100);
+            border: 2px solid var(--gray-300);
+            margin-bottom: 16px;
+          ">
+            <div>
+              <div style="
+                font-size: 14px;
+                font-weight: 700;
+                color: var(--gray-900);
+                margin-bottom: 4px;
+              ">Enable Digital Checklists</div>
+              <div style="
+                font-size: 12px;
+                color: var(--gray-600);
+              ">When OFF, staff must print and complete checklists manually</div>
+            </div>
+
+            <label style="
+              position: relative;
+              display: inline-block;
+              width: 60px;
+              height: 34px;
+              cursor: pointer;
+            ">
+              <input type="checkbox" id="digitalChecklistsToggle" onchange="toggleDigitalChecklists()" style="opacity: 0; width: 0; height: 0;">
+              <span style="
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #ccc;
+                transition: 0.4s;
+                border-radius: 34px;
+              " id="toggleSlider"></span>
+              <span style="
+                position: absolute;
+                content: '';
+                height: 26px;
+                width: 26px;
+                left: 4px;
+                bottom: 4px;
+                background-color: white;
+                transition: 0.4s;
+                border-radius: 50%;
+              " id="toggleCircle"></span>
+            </label>
+          </div>
+
+          <div id="digitalChecklistStatusMessage"></div>
+        </div>
+      </div>
     `;
 
     // Load last 2 days by default
@@ -8257,12 +8357,14 @@
     document.getElementById('watchdog_amcash').style.display = 'none';
     document.getElementById('watchdog_passwords').style.display = 'none';
     document.getElementById('watchdog_access').style.display = 'none';
+    document.getElementById('watchdog_settings').style.display = 'none';
 
     // Update button styles
     const historyBtn = document.getElementById('watchdogTab_history');
     const amCashBtn = document.getElementById('watchdogTab_amcash');
     const passwordsBtn = document.getElementById('watchdogTab_passwords');
     const accessBtn = document.getElementById('watchdogTab_access');
+    const settingsBtn = document.getElementById('watchdogTab_settings');
 
     historyBtn.style.background = 'var(--gray-100)';
     historyBtn.style.color = 'var(--gray-700)';
@@ -8272,6 +8374,8 @@
     passwordsBtn.style.color = 'var(--gray-700)';
     accessBtn.style.background = 'var(--gray-100)';
     accessBtn.style.color = 'var(--gray-700)';
+    settingsBtn.style.background = 'var(--gray-100)';
+    settingsBtn.style.color = 'var(--gray-700)';
 
     // Show selected section
     if (section === 'history') {
@@ -8293,7 +8397,334 @@
       accessBtn.style.background = 'var(--gray-700)';
       accessBtn.style.color = 'white';
       loadAccessControlPanel();
+    } else if (section === 'settings') {
+      document.getElementById('watchdog_settings').style.display = 'block';
+      settingsBtn.style.background = 'var(--gray-700)';
+      settingsBtn.style.color = 'white';
+      loadDigitalChecklistsSettings();
     }
+  }
+
+  /**
+   * Load Digital Checklists Settings from Database
+   */
+  async function loadDigitalChecklistsSettings() {
+    try {
+      // Fetch setting from database
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'digital_checklists_enabled')
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 is "no rows returned" - not a real error
+        console.error('Error loading digital checklists setting:', error);
+        // Default to enabled if error
+        updateToggleUI(true);
+        return;
+      }
+
+      // If no setting exists, default to enabled
+      const isEnabled = data?.value ?? true;
+
+      // Update toggle UI
+      updateToggleUI(isEnabled);
+
+      // Update status message
+      const statusDiv = document.getElementById('digitalChecklistStatusMessage');
+      statusDiv.innerHTML = `
+        <div style="
+          padding: 12px;
+          background: ${isEnabled ? 'var(--success-bg)' : 'var(--warning-bg)'};
+          border: 2px solid ${isEnabled ? 'var(--success-border)' : 'var(--warning-border)'};
+          color: ${isEnabled ? 'var(--success-text)' : 'var(--warning-text)'};
+          font-size: 13px;
+          font-weight: 600;
+        ">
+          ${isEnabled
+            ? '✓ Digital checklists are currently ENABLED'
+            : '⚠ Digital checklists are currently DISABLED - Staff must print and complete manually'}
+        </div>
+      `;
+
+    } catch (err) {
+      console.error('Failed to load digital checklists setting:', err);
+      updateToggleUI(true); // Default to enabled
+    }
+  }
+
+  /**
+   * Update Toggle UI State
+   */
+  function updateToggleUI(isEnabled) {
+    const checkbox = document.getElementById('digitalChecklistsToggle');
+    const slider = document.getElementById('toggleSlider');
+    const circle = document.getElementById('toggleCircle');
+
+    checkbox.checked = isEnabled;
+
+    if (isEnabled) {
+      slider.style.backgroundColor = '#059669'; // Success green
+      circle.style.transform = 'translateX(26px)';
+    } else {
+      slider.style.backgroundColor = '#ccc'; // Gray
+      circle.style.transform = 'translateX(0)';
+    }
+  }
+
+  /**
+   * Toggle Digital Checklists On/Off
+   */
+  async function toggleDigitalChecklists() {
+    const checkbox = document.getElementById('digitalChecklistsToggle');
+    const isEnabled = checkbox.checked;
+
+    try {
+      showLoading('Saving Setting', 'Updating digital checklists status...');
+
+      // Upsert setting in database
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          key: 'digital_checklists_enabled',
+          value: isEnabled,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'key'
+        });
+
+      if (error) throw error;
+
+      hideLoading();
+
+      // Update toggle UI
+      updateToggleUI(isEnabled);
+
+      // Update status message
+      const statusDiv = document.getElementById('digitalChecklistStatusMessage');
+      statusDiv.innerHTML = `
+        <div style="
+          padding: 12px;
+          background: ${isEnabled ? 'var(--success-bg)' : 'var(--warning-bg)'};
+          border: 2px solid ${isEnabled ? 'var(--success-border)' : 'var(--warning-border)'};
+          color: ${isEnabled ? 'var(--success-text)' : 'var(--warning-text)'};
+          font-size: 13px;
+          font-weight: 600;
+        ">
+          ${isEnabled
+            ? '✓ Digital checklists are now ENABLED'
+            : '⚠ Digital checklists are now DISABLED - Staff must print and complete manually'}
+        </div>
+      `;
+
+    } catch (err) {
+      hideLoading();
+      console.error('Failed to save digital checklists setting:', err);
+      showMessage('Failed to save setting. Please try again.', 'error');
+
+      // Revert checkbox state
+      checkbox.checked = !isEnabled;
+      updateToggleUI(!isEnabled);
+    }
+  }
+
+  /**
+   * Check if Digital Checklists are Enabled
+   */
+  async function checkDigitalChecklistsEnabled() {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'digital_checklists_enabled')
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking digital checklists setting:', error);
+        return true; // Default to enabled on error
+      }
+
+      // If no setting exists, default to enabled
+      return data?.value ?? true;
+
+    } catch (err) {
+      console.error('Failed to check digital checklists setting:', err);
+      return true; // Default to enabled on error
+    }
+  }
+
+  /**
+   * Show Digital Checklists Disabled Modal
+   */
+  function showDigitalChecklistsDisabledModal() {
+    const checklist = fohSystemState.currentChecklist;
+
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      overflow-y: auto;
+      padding: 20px;
+    `;
+
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      background: white;
+      padding: 32px;
+      max-width: 600px;
+      width: 100%;
+      border: 3px solid var(--gray-700);
+    `;
+
+    modal.innerHTML = `
+      <h2 style="
+        margin: 0 0 20px 0;
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--gray-900);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      ">⚠️ DIGITAL CHECKLISTS DISABLED</h2>
+
+      <div style="
+        padding: 20px;
+        background: var(--warning-bg);
+        border: 2px solid var(--warning-border);
+        margin-bottom: 24px;
+      ">
+        <p style="
+          margin: 0 0 16px 0;
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--warning-text);
+          line-height: 1.5;
+        ">
+          Digital checklists have been disabled by the manager.
+        </p>
+        <p style="
+          margin: 0 0 16px 0;
+          font-size: 14px;
+          color: var(--gray-700);
+          line-height: 1.6;
+        ">
+          Please print the <strong>${checklist.title}</strong> checklist and complete it manually with a pen.
+        </p>
+        <div style="
+          padding: 16px;
+          background: white;
+          border: 2px solid var(--warning-border);
+          margin-top: 16px;
+        ">
+          <p style="
+            margin: 0 0 12px 0;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--gray-900);
+            text-transform: uppercase;
+          ">REQUIRED STEPS:</p>
+          <ol style="
+            margin: 0;
+            padding-left: 20px;
+            font-size: 13px;
+            color: var(--gray-700);
+            line-height: 1.8;
+          ">
+            <li>Print the checklist using the button below</li>
+            <li>Complete all items with a pen</li>
+            <li>Sign the checklist when finished</li>
+            <li>Place it in <strong>Demetri's inbox above the computer</strong></li>
+            <li><strong style="color: var(--error-text);">DO NOT</strong> leave checklists on the bar overnight or anywhere else</li>
+          </ol>
+        </div>
+      </div>
+
+      <div style="
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+      ">
+        <button id="closeDisabledModal" style="
+          padding: 14px 24px;
+          background: var(--gray-100);
+          border: 2px solid var(--gray-300);
+          color: var(--gray-900);
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        ">CANCEL</button>
+        <button id="printDisabledChecklist" style="
+          padding: 14px 24px;
+          background: var(--gray-900);
+          border: 2px solid var(--gray-900);
+          color: white;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        ">🖨️ PRINT CHECKLIST</button>
+      </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Close modal handler
+    document.getElementById('closeDisabledModal').onclick = () => {
+      document.body.removeChild(overlay);
+    };
+
+    // Print checklist handler
+    document.getElementById('printDisabledChecklist').onclick = async () => {
+      try {
+        showLoading('Preparing Print', 'Generating PDF...');
+
+        const response = await fetch('/api/print-foh-checklist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            checklist_type: checklist.type,
+            checklist_title: checklist.title
+          })
+        });
+
+        const result = await response.json();
+
+        hideLoading();
+
+        if (result.success) {
+          showMessage('✅ Checklist sent to printer!', 'success');
+          document.body.removeChild(overlay);
+        } else {
+          showMessage(`Print failed: ${result.error || 'Unknown error'}`, 'error');
+        }
+
+      } catch (error) {
+        hideLoading();
+        console.error('Print error:', error);
+        showMessage('Failed to print checklist. Please try again.', 'error');
+      }
+    };
+
+    // Close on overlay click
+    overlay.onclick = (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+      }
+    };
   }
 
   /**
