@@ -28,7 +28,7 @@ function renderSharedHeader() {
     </div>
 
     <div class="header" style="padding-top: 20px;">
-      <img src="jayna-logo.png" alt="Jayna Gyro Logo" class="logo" style="max-width: 576px; width: 100%; height: auto; display: block; margin: 0 auto;">
+      <img src="jayna-logo-new.png" alt="Jayna Gyro Logo" class="logo" style="max-width: 576px; width: 100%; height: auto; display: block; margin: 0 auto;">
       <h1>JAYNA GYRO</h1>
       <p style="opacity: 0.7;">FOR AUTHORIZED USE ONLY</p>
 
