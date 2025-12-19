@@ -183,18 +183,20 @@ function generateChecklistPDF(checklist, tasks) {
 
   const sectionNames = Object.keys(sections);
 
-  // Calculate estimated height
+  // Calculate estimated height (INCLUDING new fillable fields)
   let estimatedHeight = 0;
   estimatedHeight += 80; // Header
+  estimatedHeight += 100; // Fillable fields section (Date, Shift, Names)
   sectionNames.forEach(sectionName => {
     estimatedHeight += 30; // Section header
     estimatedHeight += sections[sectionName].length * 18; // Tasks (18pt per task)
     estimatedHeight += 10; // Section spacing
   });
+  estimatedHeight += 60; // Notes section at bottom
 
   // Calculate scaling factor if content is too large
   const scaleFactor = estimatedHeight > maxContentHeight
-    ? Math.max(0.6, maxContentHeight / estimatedHeight)
+    ? Math.max(0.55, maxContentHeight / estimatedHeight)
     : 1.0;
 
   // Scale functions
@@ -216,8 +218,38 @@ function generateChecklistPDF(checklist, tasks) {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkGray);
     doc.text(`Time Range: ${checklist.time_range}`, margin, y);
-    y += ss(25);
+    y += ss(15);
   }
+
+  // ===== FILLABLE FIELDS SECTION =====
+  doc.setFontSize(sf(10));
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...darkGray);
+
+  // Date field
+  doc.text('DATE:', margin, y);
+  doc.setDrawColor(...gray);
+  doc.setLineWidth(0.5);
+  doc.line(margin + 45, y + 2, margin + 180, y + 2);
+
+  // Shift field (same line, right side)
+  doc.text('SHIFT:', margin + 200, y);
+  doc.line(margin + 245, y + 2, margin + 380, y + 2);
+  y += ss(20);
+
+  // Name fields (3 lines)
+  doc.text('NAMES:', margin, y);
+  y += ss(3);
+  doc.setFont('helvetica', 'normal');
+  for (let i = 1; i <= 3; i++) {
+    doc.setFontSize(sf(8));
+    doc.setTextColor(...gray);
+    doc.text(`${i}.`, margin + 10, y);
+    doc.setDrawColor(...lightGray);
+    doc.line(margin + 25, y + 2, pageWidth - margin, y + 2);
+    y += ss(16);
+  }
+  y += ss(5);
 
   // Gray separator line
   doc.setDrawColor(...gray);
@@ -270,6 +302,24 @@ function generateChecklistPDF(checklist, tasks) {
 
     y += ss(10); // Section spacing
   });
+
+  // ===== NOTES SECTION =====
+  y += ss(10);
+  doc.setFontSize(sf(11));
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...darkGray);
+  doc.text('NOTES:', margin, y);
+  y += ss(8);
+
+  // Draw 3 lines for notes
+  doc.setDrawColor(...lightGray);
+  doc.setLineWidth(0.5);
+  for (let i = 0; i < 3; i++) {
+    if (y < 750) { // Only if there's space
+      doc.line(margin, y, pageWidth - margin, y);
+      y += ss(16);
+    }
+  }
 
   // ===== FOOTER =====
   doc.setFontSize(sf(8));
