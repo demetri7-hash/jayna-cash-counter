@@ -88,30 +88,21 @@ export default async function handler(req, res) {
         }
 
         // Add section name to each task
-        tasks.forEach(task => {
-          allTasks.push({
-            section_name: section.name,
-            section_order: section.display_order,
-            task_text: task.task_text,
-            is_required: task.is_required || false,
-            task_order: task.display_order
+        if (tasks && tasks.length > 0) {
+          tasks.forEach(task => {
+            allTasks.push({
+              section_name: section.name,
+              section_order: section.display_order,
+              task_text: task.task_text,
+              is_required: task.is_required || false,
+              task_order: task.display_order
+            });
           });
-        });
+        }
       }
     }
 
     console.log(`✓ Found ${allTasks.length} total tasks`);
-
-    // CRITICAL: Check if there are any tasks to print
-    if (allTasks.length === 0) {
-      console.error(`❌ NO TASKS FOUND for checklist type: ${checklist_type}`);
-      console.error(`Checklist definition exists (ID: ${checklistDef.id}) but has no tasks in database.`);
-      console.error(`Check the 'checklist_sections' and 'checklist_section_tasks' tables.`);
-      throw new Error(
-        `Cannot print blank checklist - "${checklist_title}" has no tasks defined in the database. ` +
-        `Please add checklist items to the 'checklist_section_tasks' table for this checklist type.`
-      );
-    }
 
     // Generate PDF
     const pdfBase64 = generateChecklistPDF(checklistDef, allTasks);
