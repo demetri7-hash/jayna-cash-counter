@@ -511,6 +511,47 @@
             color: var(--gray-600);
         }
 
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--gray-300);
+        }
+
+        .tab {
+            padding: 12px 20px;
+            background: var(--gray-100);
+            border: 2px solid var(--gray-300);
+            border-bottom: none;
+            color: var(--gray-700);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-bottom: -2px;
+        }
+
+        .tab:hover {
+            background: var(--gray-200);
+        }
+
+        .tab.active {
+            background: var(--white);
+            color: var(--gray-900);
+            border-bottom: 2px solid var(--white);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .progress-stats {
@@ -960,37 +1001,21 @@
             updateUnitProgress(moduleNum, unitNum, completed);
         }
 
-        function openUnitDetail(module, unit, isCompleted) {
+        async function openUnitDetail(module, unit, isCompleted) {
             const overlay = document.createElement('div');
             overlay.className = 'modal-overlay';
 
             const modal = document.createElement('div');
             modal.className = 'modal-content';
 
+            // Show loading state
             modal.innerHTML = `
                 <div class="modal-header">
                     <h2>Module ${module.number}, Unit ${unit.number}: ${unit.title}</h2>
                     <div class="meta">⏱️ Duration: ${unit.duration} | Trainer: ${unit.trainer}</div>
                 </div>
-
                 <div class="modal-body">
-                    <div class="content-section">
-                        <h3>📋 ABOUT THIS UNIT</h3>
-                        <p>This unit is part of <strong>${module.name}</strong> module.</p>
-                        <p><em>${module.description}</em></p>
-                        <p style="margin-top: 16px; padding: 12px; background: var(--blue-bg); border: 2px solid var(--blue-text); font-size: 12px;">
-                            <strong>Full training content</strong> including detailed lessons, activities, worksheets, and assessments
-                            is available in the source markdown files. This is a Phase 1 MVP showing the navigation and progress tracking structure.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">CLOSE</button>
-                    ${!isCompleted ?
-                        `<button class="btn btn-success" onclick="markComplete(${module.number}, ${unit.number})">MARK COMPLETE ✓</button>` :
-                        `<span class="btn btn-primary">COMPLETED ✓</span>`
-                    }
+                    <div class="loading">Loading training content...</div>
                 </div>
             `;
 
@@ -1002,6 +1027,227 @@
                     overlay.remove();
                 }
             };
+
+            // Fetch content from API
+            try {
+                const response = await fetch('/api/training-get-unit-content', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        module_number: module.number,
+                        unit_number: unit.number
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load content');
+                }
+
+                // Render full content with tabs
+                renderUnitContent(modal, module, unit, data.unit, isCompleted);
+
+            } catch (error) {
+                console.error('Error loading unit content:', error);
+                modal.innerHTML = `
+                    <div class="modal-header">
+                        <h2>Module ${module.number}, Unit ${unit.number}: ${unit.title}</h2>
+                        <div class="meta">⏱️ Duration: ${unit.duration} | Trainer: ${unit.trainer}</div>
+                    </div>
+                    <div class="modal-body">
+                        <div class="content-section">
+                            <h3>ERROR LOADING CONTENT</h3>
+                            <p style="color: var(--error-text);">${error.message}</p>
+                            <p style="margin-top: 16px; padding: 12px; background: var(--blue-bg); border: 2px solid var(--blue-text); font-size: 12px;">
+                                This unit is part of <strong>${module.name}</strong> module.<br>
+                                <em>${module.description}</em>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">CLOSE</button>
+                    </div>
+                `;
+            }
+        }
+
+        function renderUnitContent(modal, module, unit, unitContent, isCompleted) {
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h2>Module ${module.number}, Unit ${unit.number}: ${unitContent.title || unit.title}</h2>
+                    <div class="meta">⏱️ Duration: ${unitContent.duration || unit.duration} | Trainer: ${unitContent.trainer || unit.trainer}</div>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Tabs -->
+                    <div class="tabs">
+                        <div class="tab active" onclick="switchTab(event, 'overview')">OVERVIEW</div>
+                        <div class="tab" onclick="switchTab(event, 'lesson')">LESSON</div>
+                        <div class="tab" onclick="switchTab(event, 'activities')">ACTIVITIES</div>
+                        <div class="tab" onclick="switchTab(event, 'reflection')">REFLECTION</div>
+                        <div class="tab" onclick="switchTab(event, 'resources')">RESOURCES</div>
+                    </div>
+
+                    <!-- Overview Tab -->
+                    <div id="overview" class="tab-content active">
+                        <div class="content-section">
+                            <h3>PURPOSE</h3>
+                            <p>${unitContent.purpose || 'Training unit purpose and objectives.'}</p>
+                        </div>
+                        <div class="content-section">
+                            <h3>MODULE CONTEXT</h3>
+                            <p><strong>${module.name}</strong></p>
+                            <p><em>${module.description}</em></p>
+                        </div>
+                    </div>
+
+                    <!-- Lesson Tab -->
+                    <div id="lesson" class="tab-content">
+                        ${renderLessonContent(unitContent)}
+                    </div>
+
+                    <!-- Activities Tab -->
+                    <div id="activities" class="tab-content">
+                        ${renderActivitiesContent(unitContent)}
+                    </div>
+
+                    <!-- Reflection Tab -->
+                    <div id="reflection" class="tab-content">
+                        ${renderReflectionContent(unitContent)}
+                    </div>
+
+                    <!-- Resources Tab -->
+                    <div id="resources" class="tab-content">
+                        <div class="content-section">
+                            <h3>TRAINING MATERIALS</h3>
+                            <p style="padding: 12px; background: var(--gray-100); border: 2px solid var(--gray-300);">
+                                <strong>Full Module ${module.number} Training Guide:</strong><br>
+                                Download the complete training manual with detailed lesson plans, trainer notes, and assessment tools.
+                            </p>
+                            <p style="margin-top: 12px; padding: 12px; background: var(--gray-100); border: 2px solid var(--gray-300);">
+                                <strong>Reflection Workbook:</strong><br>
+                                Download the Module ${module.number} reflection workbook for documenting learning and progress.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">CLOSE</button>
+                    ${!isCompleted ?
+                        `<button class="btn btn-success" onclick="markComplete(${module.number}, ${unit.number})">MARK COMPLETE ✓</button>` :
+                        `<span class="btn btn-primary">COMPLETED ✓</span>`
+                    }
+                </div>
+            `;
+        }
+
+        function switchTab(event, tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        function renderLessonContent(unitContent) {
+            if (!unitContent.contentSections || unitContent.contentSections.length === 0) {
+                return '<div class="content-section"><p>Lesson content is being loaded...</p></div>';
+            }
+
+            let html = '';
+            unitContent.contentSections.forEach(section => {
+                html += `<div class="content-section">`;
+                html += `<h3>${section.heading}</h3>`;
+
+                if (section.content && Array.isArray(section.content)) {
+                    section.content.forEach(item => {
+                        if (item.type === 'heading') {
+                            html += `<p style="font-weight: 700; margin-top: 12px;">${item.content}</p>`;
+                            if (item.detail) {
+                                html += `<p>${item.detail}</p>`;
+                            }
+                        } else if (item.type === 'paragraph') {
+                            html += `<p>${item.content}</p>`;
+                        } else if (item.type === 'list' && item.items) {
+                            html += '<ul>';
+                            item.items.forEach(listItem => {
+                                html += `<li>${listItem}</li>`;
+                            });
+                            html += '</ul>';
+                        }
+                    });
+                } else if (typeof section.content === 'string') {
+                    html += `<p>${section.content}</p>`;
+                }
+
+                html += `</div>`;
+            });
+
+            return html;
+        }
+
+        function renderActivitiesContent(unitContent) {
+            if (!unitContent.activities || unitContent.activities.length === 0) {
+                return '<div class="content-section"><p>No hands-on activities for this unit.</p></div>';
+            }
+
+            let html = '';
+            unitContent.activities.forEach((activity, index) => {
+                html += `<div class="content-section">`;
+                html += `<h3>ACTIVITY ${index + 1}: ${activity.title}</h3>`;
+
+                if (activity.content && Array.isArray(activity.content)) {
+                    activity.content.forEach(item => {
+                        if (item.type === 'heading') {
+                            html += `<p style="font-weight: 700; margin-top: 12px;">${item.content}</p>`;
+                        } else if (item.type === 'paragraph') {
+                            html += `<p>${item.content}</p>`;
+                        } else if (item.type === 'list' && item.items) {
+                            html += '<ul>';
+                            item.items.forEach(listItem => {
+                                html += `<li>${listItem}</li>`;
+                            });
+                            html += '</ul>';
+                        }
+                    });
+                } else if (typeof activity.content === 'string') {
+                    html += `<p>${activity.content}</p>`;
+                }
+
+                html += `</div>`;
+            });
+
+            return html;
+        }
+
+        function renderReflectionContent(unitContent) {
+            if (!unitContent.reflection || unitContent.reflection.length === 0) {
+                return '<div class="content-section"><p>No reflection questions for this unit.</p></div>';
+            }
+
+            let html = '<div class="content-section"><h3>REFLECTION QUESTIONS</h3>';
+            html += '<p style="margin-bottom: 16px;">After completing this unit, reflect on these questions:</p>';
+            html += '<ol>';
+
+            unitContent.reflection.forEach(question => {
+                html += `<li style="margin-bottom: 16px; font-weight: 600;">${question}</li>`;
+            });
+
+            html += '</ol></div>';
+
+            return html;
         }
 
         function markComplete(moduleNum, unitNum) {
