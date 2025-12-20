@@ -8690,15 +8690,24 @@
     // Print checklist handler
     document.getElementById('printDisabledChecklist').onclick = async () => {
       try {
+        console.log('🖨️ PRINT: Attempting to print checklist');
+        console.log('🔍 DEBUG: Current checklist object:', checklist);
+        console.log('🔍 DEBUG: Checklist type:', checklist.type);
+        console.log('🔍 DEBUG: Checklist title:', checklist.title);
+        console.log('🔍 DEBUG: Checklist sections:', checklist.sections);
+
         showLoading('Preparing Print', 'Generating PDF...');
+
+        const payload = {
+          checklist_type: checklist.type,
+          checklist_title: checklist.title
+        };
+        console.log('🔍 DEBUG: Sending payload to API:', payload);
 
         const response = await fetch('/api/print-foh-checklist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            checklist_type: checklist.type,
-            checklist_title: checklist.title
-          })
+          body: JSON.stringify(payload)
         });
 
         const result = await response.json();

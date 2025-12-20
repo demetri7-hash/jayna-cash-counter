@@ -43,6 +43,8 @@ export default async function handler(req, res) {
     }
 
     console.log(`🖨️ Generating checklist PDF for: ${checklist_title} (${checklist_type})`);
+    console.log(`🔍 DEBUG: Exact checklist_type received: "${checklist_type}"`);
+    console.log(`🔍 DEBUG: Checklist_type length: ${checklist_type?.length}`);
 
     // Fetch checklist definition
     const { data: checklistDef, error: defError } = await supabase
@@ -52,7 +54,15 @@ export default async function handler(req, res) {
       .single();
 
     if (defError || !checklistDef) {
-      console.error('Checklist definition error:', defError);
+      console.error('❌ Checklist definition error:', defError);
+      console.error('🔍 DEBUG: Searching for type:', checklist_type);
+
+      // Try to find ALL checklists to see what exists
+      const { data: allDefs } = await supabase
+        .from('checklist_definitions')
+        .select('type, title');
+      console.log('🔍 DEBUG: All available checklist types in database:', allDefs);
+
       throw new Error(`Checklist not found: ${defError?.message || 'Unknown error'}`);
     }
 
@@ -72,9 +82,18 @@ export default async function handler(req, res) {
 
     console.log(`✓ Found ${sections?.length || 0} sections`);
 
+    if (sections && sections.length > 0) {
+      console.log(`🔍 DEBUG: Section details:`);
+      sections.forEach(s => {
+        console.log(`  - Section "${s.name}" (ID: ${s.id}, Type: ${s.section_type}, Order: ${s.display_order})`);
+      });
+    }
+
     // Fetch tasks for all sections
     const allTasks = [];
     for (const section of sections || []) {
+      console.log(`🔍 DEBUG: Processing section "${section.name}" (type: ${section.section_type})`);
+
       if (section.section_type === 'checkbox') {
         const { data: tasks, error: tasksError } = await supabase
           .from('checklist_section_tasks')
@@ -83,8 +102,13 @@ export default async function handler(req, res) {
           .order('display_order', { ascending: true });
 
         if (tasksError) {
-          console.error(`Tasks error for section ${section.id}:`, tasksError);
+          console.error(`❌ Tasks error for section ${section.id}:`, tasksError);
           continue;
+        }
+
+        console.log(`  ✓ Found ${tasks?.length || 0} tasks for section "${section.name}"`);
+        if (tasks && tasks.length > 0) {
+          console.log(`    First task: "${tasks[0].task_text}"`);
         }
 
         // Add section name to each task
@@ -97,10 +121,12 @@ export default async function handler(req, res) {
             task_order: task.display_order
           });
         });
+      } else {
+        console.log(`  ⚠️  Skipping section "${section.name}" - not a checkbox type (type: ${section.section_type})`);
       }
     }
 
-    console.log(`✓ Found ${allTasks.length} total tasks`);
+    console.log(`✓ Found ${allTasks.length} total tasks across all sections`);
 
     // CRITICAL: Check if there are any tasks to print
     if (allTasks.length === 0) {
