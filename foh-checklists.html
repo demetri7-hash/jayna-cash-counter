@@ -8665,17 +8665,31 @@
           text-transform: uppercase;
           letter-spacing: 0.5px;
         ">CANCEL</button>
-        <button id="printDisabledChecklist" style="
-          padding: 14px 24px;
-          background: var(--gray-900);
-          border: 2px solid var(--gray-900);
-          color: white;
-          font-size: 13px;
-          font-weight: 700;
-          cursor: pointer;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        ">🖨️ PRINT CHECKLIST</button>
+        ${checklist.title.toUpperCase().includes('REVIEW') ? `
+          <button id="downloadDisabledChecklist" style="
+            padding: 14px 24px;
+            background: var(--gray-900);
+            border: 2px solid var(--gray-900);
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          ">📥 DOWNLOAD PDF</button>
+        ` : `
+          <button id="printDisabledChecklist" style="
+            padding: 14px 24px;
+            background: var(--gray-900);
+            border: 2px solid var(--gray-900);
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          ">🖨️ PRINT CHECKLIST</button>
+        `}
       </div>
     `;
 
@@ -8687,37 +8701,85 @@
       document.body.removeChild(overlay);
     };
 
-    // Print checklist handler
-    document.getElementById('printDisabledChecklist').onclick = async () => {
-      try {
-        showLoading('Preparing Print', 'Generating PDF...');
+    // Print checklist handler (for regular checklists)
+    const printBtn = document.getElementById('printDisabledChecklist');
+    if (printBtn) {
+      printBtn.onclick = async () => {
+        try {
+          showLoading('Preparing Print', 'Generating PDF...');
 
-        const response = await fetch('/api/print-foh-checklist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            checklist_type: checklist.type,
-            checklist_title: checklist.title
-          })
-        });
+          const response = await fetch('/api/print-foh-checklist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              checklist_type: checklist.type,
+              checklist_title: checklist.title
+            })
+          });
 
-        const result = await response.json();
+          const result = await response.json();
 
-        hideLoading();
+          hideLoading();
 
-        if (result.success) {
-          showMessage('✅ Checklist sent to printer!', 'success');
-          document.body.removeChild(overlay);
-        } else {
-          showMessage(`Print failed: ${result.error || 'Unknown error'}`, 'error');
+          if (result.success) {
+            showMessage('✅ Checklist sent to printer!', 'success');
+            document.body.removeChild(overlay);
+          } else {
+            showMessage(`Print failed: ${result.error || 'Unknown error'}`, 'error');
+          }
+
+        } catch (error) {
+          hideLoading();
+          console.error('Print error:', error);
+          showMessage('Failed to print checklist. Please try again.', 'error');
         }
+      };
+    }
 
-      } catch (error) {
-        hideLoading();
-        console.error('Print error:', error);
-        showMessage('Failed to print checklist. Please try again.', 'error');
-      }
-    };
+    // Download PDF handler (for review sheets only)
+    const downloadBtn = document.getElementById('downloadDisabledChecklist');
+    if (downloadBtn) {
+      downloadBtn.onclick = async () => {
+        try {
+          showLoading('Generating PDF', 'Creating downloadable file...');
+
+          const response = await fetch('/api/download-foh-checklist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              checklist_type: checklist.type,
+              checklist_title: checklist.title
+            })
+          });
+
+          hideLoading();
+
+          if (response.ok) {
+            // Download the PDF file
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${checklist.type}_${new Date().toISOString().split('T')[0]}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            showMessage('✅ PDF downloaded successfully!', 'success');
+            document.body.removeChild(overlay);
+          } else {
+            const result = await response.json();
+            showMessage(`Download failed: ${result.error || 'Unknown error'}`, 'error');
+          }
+
+        } catch (error) {
+          hideLoading();
+          console.error('Download error:', error);
+          showMessage('Failed to download PDF. Please try again.', 'error');
+        }
+      };
+    }
 
     // Close on overlay click
     overlay.onclick = (e) => {
