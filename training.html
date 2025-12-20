@@ -1121,14 +1121,34 @@
                     <div id="resources" class="tab-content">
                         <div class="content-section">
                             <h3>TRAINING MATERIALS</h3>
-                            <p style="padding: 12px; background: var(--gray-100); border: 2px solid var(--gray-300);">
-                                <strong>Full Module ${module.number} Training Guide:</strong><br>
-                                Download the complete training manual with detailed lesson plans, trainer notes, and assessment tools.
+                            <p style="margin-bottom: 16px; color: var(--gray-600); font-size: 13px;">
+                                Download full training materials for offline study, printing, or reference.
                             </p>
-                            <p style="margin-top: 12px; padding: 12px; background: var(--gray-100); border: 2px solid var(--gray-300);">
-                                <strong>Reflection Workbook:</strong><br>
-                                Download the Module ${module.number} reflection workbook for documenting learning and progress.
-                            </p>
+
+                            <div style="background: var(--gray-100); border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 16px;">
+                                <p style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">📖 Full Module ${module.number} Training Guide</p>
+                                <p style="font-size: 12px; color: var(--gray-600); margin-bottom: 12px;">
+                                    Complete training manual with detailed lesson plans, trainer notes, and assessment tools.
+                                </p>
+                                <button class="btn btn-primary" style="width: 100%;" onclick="downloadModuleFile(${module.number}, 'main')">
+                                    DOWNLOAD TRAINING GUIDE
+                                </button>
+                            </div>
+
+                            <div style="background: var(--gray-100); border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 16px;">
+                                <p style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">📝 Reflection Workbook</p>
+                                <p style="font-size: 12px; color: var(--gray-600); margin-bottom: 12px;">
+                                    Module ${module.number} reflection workbook for documenting learning and progress.
+                                </p>
+                                <button class="btn btn-primary" style="width: 100%;" onclick="downloadModuleFile(${module.number}, 'reflection')">
+                                    DOWNLOAD WORKBOOK
+                                </button>
+                            </div>
+
+                            <div style="background: var(--blue-bg); border: 2px solid var(--blue-text); padding: 12px; font-size: 12px;">
+                                <p style="font-weight: 700; margin-bottom: 4px;">💡 TIP</p>
+                                <p>Print these materials for easier note-taking during training sessions. Completed workbooks become part of your training record.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1253,6 +1273,46 @@
         function markComplete(moduleNum, unitNum) {
             updateUnitProgress(moduleNum, unitNum, true);
             document.querySelector('.modal-overlay')?.remove();
+        }
+
+        // Download module files
+        async function downloadModuleFile(moduleNum, type) {
+            try {
+                const moduleNames = {
+                    1: 'FOUNDATION_AND_CULTURE',
+                    2: 'OPERATIONS_MASTERY',
+                    3: 'GUEST_EXPERIENCE',
+                    4: 'BAR_PROGRAM',
+                    5: 'LEADERSHIP'
+                };
+
+                const moduleName = moduleNames[moduleNum];
+                const fileName = type === 'main'
+                    ? `MODULE_${moduleNum}_${moduleName}.md`
+                    : `MODULE_${moduleNum}_REFLECTION_WORKBOOK.md`;
+
+                const filePath = `/training/modules/${fileName}`;
+
+                // Fetch the file
+                const response = await fetch(filePath);
+                if (!response.ok) {
+                    throw new Error('File not found');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('Failed to download file. Please try again.');
+            }
         }
 
         // Initialize on page load
