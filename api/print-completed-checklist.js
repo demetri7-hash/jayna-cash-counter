@@ -72,6 +72,14 @@ export default async function handler(req, res) {
 
     console.log(`✓ Found ${tasks?.length || 0} tasks`);
 
+    // CRITICAL: Check if there are no tasks to print
+    if (!tasks || tasks.length === 0) {
+      console.error(`❌ NO TASKS FOUND for session ${session_id} (${session.checklist_type})`);
+      console.error(`This means the checklist has no items in the database.`);
+      console.error(`Check the 'checklist_sections' and 'checklist_section_tasks' tables for checklist type: ${session.checklist_type}`);
+      throw new Error(`Cannot print blank checklist - no tasks found in database for ${session.checklist_type}`);
+    }
+
     // Generate PDF
     const pdfBase64 = generateCompletedChecklistPDF(session, tasks);
 
