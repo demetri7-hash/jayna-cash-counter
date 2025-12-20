@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jayna Gyro - Training Center</title>
+
+    <style>
+        :root {
+            --white: #ffffff;
+            --gray-900: #1a1a1a;
+            --gray-700: #4a4a4a;
+            --gray-600: #6b6b6b;
+            --gray-500: #9ca3af;
+            --gray-400: #d1d5db;
+            --gray-300: #e5e7eb;
+            --gray-200: #f3f4f6;
+            --gray-100: #f9fafb;
+            --gray-50: #fafafa;
+
+            --success-bg: #d1fae5;
+            --success-text: #065f46;
+            --success-border: #059669;
+
+            --warning-bg: #fef3c7;
+            --warning-text: #92400e;
+            --warning-border: #f59e0b;
+
+            --error-bg: #fee2e2;
+            --error-text: #991b1b;
+            --error-border: #dc2626;
+
+            --blue-bg: #dbeafe;
+            --blue-text: #1e40af;
+            --blue-border: #3b82f6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--gray-100);
+            color: var(--gray-900);
+            line-height: 1.5;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Login Screen */
+        .login-container {
+            max-width: 500px;
+            margin: 100px auto;
+            background: white;
+            border: 3px solid var(--gray-700);
+            padding: 40px;
+        }
+
+        .login-container h1 {
+            font-size: 24px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .login-container .subtitle {
+            text-align: center;
+            font-size: 13px;
+            color: var(--gray-600);
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-700);
+            margin-bottom: 8px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--gray-300);
+            font-size: 14px;
+            background: white;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            border-color: var(--gray-700);
+            outline: none;
+        }
+
+        .error-message {
+            background: var(--error-bg);
+            border: 2px solid var(--error-border);
+            color: var(--error-text);
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* Training Header */
+        .training-header {
+            background: white;
+            border: 2px solid var(--gray-300);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .training-header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--gray-900);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+        }
+
+        .training-header .subtitle {
+            font-size: 14px;
+            color: var(--gray-600);
+            margin-bottom: 4px;
+        }
+
+        .training-header .welcome {
+            font-size: 13px;
+            color: var(--gray-700);
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            margin-top: 16px;
+            padding: 10px 20px;
+            background: var(--gray-100);
+            border: 2px solid var(--gray-300);
+            color: var(--gray-900);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+        }
+
+        .logout-btn:hover {
+            border-color: var(--gray-700);
+        }
+
+        /* Progress Overview */
+        .progress-overview {
+            background: white;
+            border: 2px solid var(--gray-300);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .section-header {
+            background: var(--gray-900);
+            color: white;
+            padding: 12px 20px;
+            margin-bottom: 12px;
+        }
+
+        .section-header h2 {
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .progress-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: var(--gray-100);
+            border: 2px solid var(--gray-300);
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-card .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 4px;
+        }
+
+        .stat-card .stat-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background: var(--gray-200);
+            border: 2px solid var(--gray-300);
+            margin-top: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--success-border);
+            transition: width 0.3s ease;
+        }
+
+        .progress-bar-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--gray-900);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Modules */
+        .modules-section {
+            margin-bottom: 20px;
+        }
+
+        .module-container {
+            background: white;
+            border: 2px solid var(--gray-300);
+            margin-bottom: 16px;
+        }
+
+        .module-header {
+            background: var(--gray-100);
+            border-bottom: 2px solid var(--gray-300);
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .module-header:hover {
+            background: var(--gray-200);
+        }
+
+        .module-header.locked {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .module-header.completed {
+            background: var(--success-bg);
+            border-bottom-color: var(--success-border);
+        }
+
+        .module-info h3 {
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .module-info .meta {
+            font-size: 12px;
+            color: var(--gray-600);
+        }
+
+        .module-stats {
+            text-align: right;
+        }
+
+        .module-stats .completion {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .module-stats .units {
+            font-size: 11px;
+            color: var(--gray-600);
+            font-weight: 600;
+        }
+
+        .units-list {
+            padding: 20px;
+        }
+
+        .unit-item {
+            background: var(--gray-100);
+            border: 2px solid var(--gray-300);
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .unit-item:hover {
+            border-color: var(--gray-700);
+        }
+
+        .unit-item.completed {
+            background: var(--success-bg);
+            border-color: var(--success-border);
+        }
+
+        .unit-info h4 {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .unit-info .duration {
+            font-size: 11px;
+            color: var(--gray-600);
+        }
+
+        .unit-checkbox {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 3px solid var(--gray-700);
+        }
+
+        .modal-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .modal-header .meta {
+            font-size: 12px;
+            color: var(--gray-600);
+            margin-bottom: 16px;
+        }
+
+        .modal-body {
+            margin: 20px 0;
+        }
+
+        .content-section {
+            margin-bottom: 24px;
+        }
+
+        .content-section h3 {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            color: var(--gray-900);
+        }
+
+        .content-section p,
+        .content-section ul,
+        .content-section ol {
+            font-size: 13px;
+            line-height: 1.8;
+            color: var(--gray-700);
+            margin-bottom: 12px;
+        }
+
+        .content-section ul,
+        .content-section ol {
+            padding-left: 24px;
+        }
+
+        .content-section li {
+            margin-bottom: 8px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            padding-top: 20px;
+            border-top: 2px solid var(--gray-300);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 14px 24px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            border: 2px solid;
+            transition: all 0.15s ease;
+        }
+
+        .btn-primary {
+            background: var(--gray-900);
+            border-color: var(--gray-900);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--gray-700);
+            border-color: var(--gray-700);
+        }
+
+        .btn-secondary {
+            background: var(--gray-100);
+            border-color: var(--gray-300);
+            color: var(--gray-900);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--gray-700);
+        }
+
+        .btn-success {
+            background: var(--success-border);
+            border-color: var(--success-border);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: var(--success-text);
+            border-color: var(--success-text);
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 14px;
+            color: var(--gray-600);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .progress-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .module-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .module-stats {
+                margin-top: 12px;
+                text-align: left;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Shared Header -->
+    <div id="sharedHeader"></div>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <h1>📚 Training Login</h1>
+        <p class="subtitle">Heming Huang's 30-Day Assistant Manager Training Program</p>
+
+        <div id="loginError" class="error-message hidden"></div>
+
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="Enter your username" autocomplete="off">
+        </div>
+
+        <div class="form-group">
+            <label for="fullName">Full Name</label>
+            <input type="text" id="fullName" placeholder="Your full name">
+        </div>
+
+        <button class="btn btn-primary" style="width: 100%; margin-bottom: 12px;" onclick="createAccount()">Create Account</button>
+        <button class="btn btn-secondary" style="width: 100%;" onclick="loginExisting()">Login to Existing Account</button>
+
+        <p style="font-size: 11px; color: var(--gray-600); margin-top: 20px; text-align: center;">
+            Create an account to start training, or login with your existing username.
+        </p>
+    </div>
+
+    <!-- Training Dashboard (Hidden initially) -->
+    <div id="trainingDashboard" class="hidden">
+        <div class="container">
+            <!-- Training Header -->
+            <div class="training-header">
+                <h1>📚 30-Day Training Program</h1>
+                <p class="subtitle">Heming Huang — Assistant Manager Onboarding</p>
+                <p class="welcome" id="welcomeMessage"></p>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+
+            <!-- Progress Overview -->
+            <div class="progress-overview">
+                <div class="section-header">
+                    <h2>Your Progress</h2>
+                </div>
+
+                <div class="progress-stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="completedUnits">0</div>
+                        <div class="stat-label">Completed Units</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="currentModule">Module 1</div>
+                        <div class="stat-label">Current Module</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="completionPercent">0%</div>
+                        <div class="stat-label">Overall Progress</div>
+                    </div>
+                </div>
+
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
+                    <div class="progress-bar-text" id="progressBarText">0 of 30 Units Completed</div>
+                </div>
+            </div>
+
+            <!-- Training Modules -->
+            <div class="modules-section">
+                <div class="section-header">
+                    <h2>Training Modules</h2>
+                </div>
+                <div id="modulesContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="hidden">
+        <div class="loading">Loading training data...</div>
+    </div>
+
+    <!-- Shared Header Script -->
+    <script src="shared-header.js"></script>
+    <script>
+        // Initialize shared header
+        initializeSharedHeader();
+
+        // Global state
+        let currentUser = null;
+        let userProgress = null;
+
+        // Training program structure (5 modules × 6 units = 30 total)
+        const TRAINING_MODULES = [
+            {
+                number: 1,
+                name: "Foundation & Culture",
+                description: "Before you learn WHAT to do, you must understand WHO we are.",
+                trainer: "Demetri",
+                units: [
+                    { number: 1, title: "Welcome & Orientation", duration: "3-4 hours", trainer: "Demetri" },
+                    { number: 2, title: "HR Onboarding & Compliance", duration: "2-3 hours", trainer: "Demetri" },
+                    { number: 3, title: "Meet the Team — FOH", duration: "2-3 hours", trainer: "Demetri + Team" },
+                    { number: 4, title: "Meet the Team — BOH", duration: "2-3 hours", trainer: "Demetri + Kitchen" },
+                    { number: 5, title: "Guest Experience Philosophy", duration: "3-4 hours", trainer: "Demetri" },
+                    { number: 6, title: "Menu Immersion", duration: "3-4 hours", trainer: "Demetri + BOH" }
+                ]
+            },
+            {
+                number: 2,
+                name: "Operations Mastery",
+                description: "Systems create freedom. Master the systems, and you'll never feel lost.",
+                trainer: "Demetri + Kat",
+                units: [
+                    { number: 1, title: "Opening Procedures — Theory", duration: "2-3 hours", trainer: "Demetri" },
+                    { number: 2, title: "Opening Procedures — Practice", duration: "4-6 hours", trainer: "Demetri" },
+                    { number: 3, title: "Transition Procedures", duration: "3-4 hours", trainer: "Demetri" },
+                    { number: 4, title: "Closing Procedures — Theory", duration: "2-3 hours", trainer: "Demetri" },
+                    { number: 5, title: "Closing + Cash Handling", duration: "6-8 hours", trainer: "Demetri" },
+                    { number: 6, title: "Bar Closing", duration: "3-4 hours", trainer: "Kat" }
+                ]
+            },
+            {
+                number: 3,
+                name: "Guest Experience & Service Recovery",
+                description: "Hospitality isn't about being perfect. It's about how fast and gracefully we respond when we mess up.",
+                trainer: "Demetri",
+                units: [
+                    { number: 1, title: "Psychology of Hospitality", duration: "2-3 hours", trainer: "Demetri" },
+                    { number: 2, title: "Reading the Room", duration: "3-4 hours", trainer: "Demetri" },
+                    { number: 3, title: "Complaint Handling — Theory", duration: "2-3 hours", trainer: "Demetri" },
+                    { number: 4, title: "Complaint Handling — Practice", duration: "4-6 hours", trainer: "Demetri" },
+                    { number: 5, title: "Unreasonable Hospitality", duration: "2-3 hours", trainer: "Demetri" },
+                    { number: 6, title: "Difficult Situations", duration: "3-4 hours", trainer: "Demetri" }
+                ]
+            },
+            {
+                number: 4,
+                name: "Bar Program (101 & 102)",
+                description: "We don't just serve booze—we serve stories.",
+                trainer: "Kayla",
+                units: [
+                    { number: 1, title: "Spirits 101 — Foundations", duration: "3-4 hours", trainer: "Kayla" },
+                    { number: 2, title: "Wine Program Mastery", duration: "3-4 hours", trainer: "Kayla" },
+                    { number: 3, title: "Cocktail Theory & Technique", duration: "3-4 hours", trainer: "Kayla" },
+                    { number: 4, title: "Signature Cocktails — Builds", duration: "4-5 hours", trainer: "Kayla" },
+                    { number: 5, title: "Bar Service & Operations", duration: "4-6 hours", trainer: "Kayla" },
+                    { number: 6, title: "Responsible Service", duration: "2-3 hours", trainer: "Kayla + Demetri" }
+                ]
+            },
+            {
+                number: 5,
+                name: "Leadership & Management",
+                description: "An Assistant Manager doesn't just run shifts—they develop people and protect the culture.",
+                trainer: "Demetri",
+                units: [
+                    { number: 1, title: "Shift Leadership Fundamentals", duration: "3-4 hours", trainer: "Demetri" },
+                    { number: 2, title: "Coaching & Accountability", duration: "3-4 hours", trainer: "Demetri" },
+                    { number: 3, title: "HR Documentation", duration: "3-4 hours", trainer: "Demetri" },
+                    { number: 4, title: "Catering Operations", duration: "3-4 hours", trainer: "Demetri" },
+                    { number: 5, title: "Judgment & Decision-Making", duration: "2-3 hours", trainer: "Demetri" },
+                    { number: 6, title: "Independent Shifts (Capstone)", duration: "8-12 hours", trainer: "Demetri" }
+                ]
+            }
+        ];
+
+        // API Functions
+        async function createAccount() {
+            const username = document.getElementById('username').value.trim();
+            const fullName = document.getElementById('fullName').value.trim();
+
+            if (!username || !fullName) {
+                showError('Please enter both username and full name');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/training-create-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, full_name: fullName, role: 'Assistant Manager' })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showError(data.error || 'Failed to create account');
+                    return;
+                }
+
+                // Account created successfully
+                currentUser = { username: data.user.username, full_name: data.user.full_name };
+                await loadUserProgress();
+
+            } catch (error) {
+                console.error('Create account error:', error);
+                showError('Network error. Please try again.');
+            }
+        }
+
+        async function loginExisting() {
+            const username = document.getElementById('username').value.trim();
+
+            if (!username) {
+                showError('Please enter your username');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/training-get-progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showError(data.error || 'User not found');
+                    return;
+                }
+
+                // Login successful
+                currentUser = data.user;
+                userProgress = data.progress;
+                showDashboard();
+
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('Network error. Please try again.');
+            }
+        }
+
+        async function loadUserProgress() {
+            if (!currentUser) return;
+
+            try {
+                const response = await fetch('/api/training-get-progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUser.username })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    userProgress = data.progress;
+                    showDashboard();
+                }
+
+            } catch (error) {
+                console.error('Load progress error:', error);
+            }
+        }
+
+        async function updateUnitProgress(moduleNum, unitNum, completed) {
+            if (!currentUser) return;
+
+            try {
+                const response = await fetch('/api/training-update-progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: currentUser.username,
+                        module_number: moduleNum,
+                        unit_number: unitNum,
+                        completed: completed
+                    })
+                });
+
+                if (response.ok) {
+                    // Reload progress
+                    await loadUserProgress();
+                }
+
+            } catch (error) {
+                console.error('Update progress error:', error);
+            }
+        }
+
+        // UI Functions
+        function showError(message) {
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function logout() {
+            currentUser = null;
+            userProgress = null;
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('trainingDashboard').classList.add('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('fullName').value = '';
+            document.getElementById('loginError').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('trainingDashboard').classList.remove('hidden');
+
+            // Update welcome message
+            document.getElementById('welcomeMessage').textContent =
+                `Welcome back, ${currentUser.full_name}!`;
+
+            // Render modules and progress
+            renderProgress();
+            renderModules();
+        }
+
+        function renderProgress() {
+            if (!userProgress) return;
+
+            const totalUnits = 30;
+            const completedUnits = userProgress.filter(p => p.completed).length;
+            const percentage = Math.round((completedUnits / totalUnits) * 100);
+
+            // Find current unit (first incomplete)
+            const currentUnit = userProgress.find(p => !p.completed);
+            const currentModuleNum = currentUnit ? currentUnit.module_number : 5;
+
+            // Update stats
+            document.getElementById('completedUnits').textContent = completedUnits;
+            document.getElementById('currentModule').textContent = `Module ${currentModuleNum}`;
+            document.getElementById('completionPercent').textContent = `${percentage}%`;
+
+            // Update progress bar
+            document.getElementById('progressBarFill').style.width = `${percentage}%`;
+            document.getElementById('progressBarText').textContent = `${completedUnits} of ${totalUnits} Units Completed`;
+        }
+
+        function renderModules() {
+            const container = document.getElementById('modulesContainer');
+            container.innerHTML = '';
+
+            TRAINING_MODULES.forEach(module => {
+                const moduleProgress = userProgress.filter(p => p.module_number === module.number);
+                const completedInModule = moduleProgress.filter(p => p.completed).length;
+                const completionPercentage = Math.round((completedInModule / 6) * 100);
+                const isCompleted = completedInModule === 6;
+
+                const moduleDiv = document.createElement('div');
+                moduleDiv.className = 'module-container';
+
+                const headerDiv = document.createElement('div');
+                headerDiv.className = `module-header ${isCompleted ? 'completed' : ''}`;
+                headerDiv.onclick = () => toggleModule(module.number);
+
+                headerDiv.innerHTML = `
+                    <div class="module-info">
+                        <h3>${module.number}. ${module.name}</h3>
+                        <div class="meta">${module.description}</div>
+                        <div class="meta">Trainer: ${module.trainer}</div>
+                    </div>
+                    <div class="module-stats">
+                        <div class="completion">${completionPercentage}%</div>
+                        <div class="units">${completedInModule}/6 units</div>
+                    </div>
+                `;
+
+                const unitsList = document.createElement('div');
+                unitsList.className = 'units-list hidden';
+                unitsList.id = `module-${module.number}-units`;
+
+                module.units.forEach(unit => {
+                    const unitProgress = moduleProgress.find(p => p.unit_number === unit.number);
+                    const isCompleted = unitProgress?.completed || false;
+
+                    const unitDiv = document.createElement('div');
+                    unitDiv.className = `unit-item ${isCompleted ? 'completed' : ''}`;
+                    unitDiv.onclick = () => openUnitDetail(module, unit, isCompleted);
+
+                    unitDiv.innerHTML = `
+                        <div class="unit-info">
+                            <h4>${module.number}.${unit.number} — ${unit.title}</h4>
+                            <div class="duration">⏱️ ${unit.duration} | Trainer: ${unit.trainer}</div>
+                        </div>
+                        <input type="checkbox" class="unit-checkbox" ${isCompleted ? 'checked' : ''}
+                               onclick="event.stopPropagation(); toggleUnitCompletion(${module.number}, ${unit.number}, this.checked)">
+                    `;
+
+                    unitsList.appendChild(unitDiv);
+                });
+
+                moduleDiv.appendChild(headerDiv);
+                moduleDiv.appendChild(unitsList);
+                container.appendChild(moduleDiv);
+            });
+        }
+
+        function toggleModule(moduleNum) {
+            const unitsList = document.getElementById(`module-${moduleNum}-units`);
+            if (unitsList) {
+                unitsList.classList.toggle('hidden');
+            }
+        }
+
+        function toggleUnitCompletion(moduleNum, unitNum, completed) {
+            updateUnitProgress(moduleNum, unitNum, completed);
+        }
+
+        function openUnitDetail(module, unit, isCompleted) {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-content';
+
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h2>Module ${module.number}, Unit ${unit.number}: ${unit.title}</h2>
+                    <div class="meta">⏱️ Duration: ${unit.duration} | Trainer: ${unit.trainer}</div>
+                </div>
+
+                <div class="modal-body">
+                    <div class="content-section">
+                        <h3>📋 About This Unit</h3>
+                        <p>This unit is part of <strong>${module.name}</strong> module.</p>
+                        <p><em>${module.description}</em></p>
+                        <p style="margin-top: 16px; padding: 12px; background: var(--blue-bg); border: 2px solid var(--blue-border); font-size: 12px;">
+                            <strong>Full training content</strong> including detailed lessons, activities, worksheets, and assessments
+                            is available in the source markdown files. This is a Phase 1 MVP showing the navigation and progress tracking structure.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Close</button>
+                    ${!isCompleted ?
+                        `<button class="btn btn-success" onclick="markComplete(${module.number}, ${unit.number})">Mark Complete ✓</button>` :
+                        `<span class="btn btn-primary">Completed ✓</span>`
+                    }
+                </div>
+            `;
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    overlay.remove();
+                }
+            };
+        }
+
+        function markComplete(moduleNum, unitNum) {
+            updateUnitProgress(moduleNum, unitNum, true);
+            document.querySelector('.modal-overlay')?.remove();
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if user is already logged in (could use localStorage for persistence)
+            const savedUsername = localStorage.getItem('training_username');
+            if (savedUsername) {
+                currentUser = { username: savedUsername };
+                loadUserProgress();
+            }
+        });
+
+        // Save username to localStorage on successful login
+        function saveLoginState() {
+            if (currentUser) {
+                localStorage.setItem('training_username', currentUser.username);
+            }
+        }
+
+        // Update the login functions to save state
+        const originalShowDashboard = showDashboard;
+        showDashboard = function() {
+            originalShowDashboard();
+            saveLoginState();
+        };
+    </script>
+</body>
+</html>
