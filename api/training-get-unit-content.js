@@ -96,82 +96,119 @@ export default async function handler(req, res) {
   }
 }
 
-// Parse unit content from markdown
+// Parse unit content from markdown - simplified approach
 function parseUnitFromMarkdown(markdown, moduleNum, unitNum) {
   try {
-    // Find the unit section (e.g., "# UNIT 1.1:")
-    const unitRegex = new RegExp(`# UNIT ${moduleNum}\\.${unitNum}:`, 'i');
-    const match = markdown.match(unitRegex);
+    // Find the unit heading
+    const unitHeading = `# UNIT ${moduleNum}.${unitNum}:`;
+    const startIndex = markdown.indexOf(unitHeading);
 
-    if (!match) {
+    if (startIndex === -1) {
       return null;
     }
 
-    // Extract the unit section (everything between this heading and the next # UNIT heading)
-    const startIndex = markdown.indexOf(match[0]);
-
-    // Find the next unit or end of file
+    // Find where this unit ends (next unit or end of file)
     let endIndex = markdown.length;
-    const nextUnitPattern = new RegExp(`\\n# UNIT ${moduleNum}\\.(\\d+):`, 'g');
-    nextUnitPattern.lastIndex = startIndex + match[0].length;
-    const nextMatch = nextUnitPattern.exec(markdown);
-    if (nextMatch) {
-      endIndex = nextMatch.index;
-    }
+    const searchStart = startIndex + unitHeading.length;
 
-    const unitSection = markdown.substring(startIndex, endIndex);
-
-    // Extract title from the heading
-    const titleMatch = unitSection.match(/# UNIT \d+\.\d+:\s*(.+)/i);
-    const title = titleMatch ? titleMatch[1].trim() : 'Training Unit';
-
-    // Extract metadata (multiline safe)
-    const durationMatch = unitSection.match(/\*\*Duration:\*\*\s*([^\n]+)/i);
-    const trainerMatch = unitSection.match(/\*\*Trainer:\*\*\s*([^\n]+)/i);
-    const locationMatch = unitSection.match(/\*\*Location:\*\*\s*([^\n]+)/i);
-
-    // Extract purpose
-    const purposeMatch = unitSection.match(/## Purpose\s*\n+([^#]+?)(?=\n##)/i);
-    const purpose = purposeMatch ? purposeMatch[1].trim() : '';
-
-    // Extract all ### sections for content (using exec loop instead of matchAll)
-    const contentSections = [];
-    const sectionRegex = /###\s+(.+?)(?:\s*\([^)]+\))?\s*\n([\s\S]+?)(?=\n###|\n##\s|$)/g;
-    let sectionMatch;
-
-    while ((sectionMatch = sectionRegex.exec(unitSection)) !== null) {
-      const heading = sectionMatch[1].trim();
-      const content = sectionMatch[2].trim();
-
-      // Skip Activity sections (handled separately)
-      if (!heading.toLowerCase().startsWith('activity')) {
-        contentSections.push({
-          heading,
-          content: parseMarkdownContent(content)
-        });
+    // Look for next unit heading
+    for (let i = moduleNum; i <= 5; i++) {
+      for (let j = 1; j <= 6; j++) {
+        if (i === moduleNum && j === unitNum) continue;
+        const nextHeading = `\n# UNIT ${i}.${j}:`;
+        const nextIndex = markdown.indexOf(nextHeading, searchStart);
+        if (nextIndex !== -1 && nextIndex < endIndex) {
+          endIndex = nextIndex;
+        }
       }
     }
 
-    // Extract activities
-    const activities = [];
-    const activityRegex = /###\s+Activity\s+\d+:\s+(.+?)\s*\n([\s\S]+?)(?=\n###|\n##|$)/gi;
-    let activityMatch;
+    const unitSection = markdown.substring(startIndex, endIndex);
+    const lines = unitSection.split('\n');
 
-    while ((activityMatch = activityRegex.exec(unitSection)) !== null) {
-      activities.push({
-        title: activityMatch[1].trim(),
-        content: parseMarkdownContent(activityMatch[2].trim())
-      });
+    // Extract title (first line)
+    const title = lines[0].replace(unitHeading, '').trim();
+
+    // Extract metadata
+    let duration = '';
+    let trainer = '';
+    let location = '';
+
+    for (let i = 0; i < Math.min(10, lines.length); i++) {
+      const line = lines[i];
+      if (line.includes('**Duration:**')) {
+        duration = line.split('**Duration:**')[1].trim();
+      }
+      if (line.includes('**Trainer:**')) {
+        trainer = line.split('**Trainer:**')[1].trim();
+      }
+      if (line.includes('**Location:**')) {
+        location = line.split('**Location:**')[1].trim();
+      }
+    }
+
+    // Extract purpose
+    let purpose = '';
+    const purposeStart = unitSection.indexOf('## Purpose');
+    if (purposeStart !== -1) {
+      const purposeEnd = unitSection.indexOf('\n##', purposeStart + 10);
+      if (purposeEnd !== -1) {
+        purpose = unitSection.substring(purposeStart + 10, purposeEnd).trim();
+      }
+    }
+
+    // Extract content sections (### headings)
+    const contentSections = [];
+    const activities = [];
+
+    const sectionLines = unitSection.split('\n');
+    for (let i = 0; i < sectionLines.length; i++) {
+      const line = sectionLines[i];
+
+      // Found a ### heading
+      if (line.startsWith('### ')) {
+        const heading = line.substring(4).trim();
+
+        // Find the content until next ### or ## or end
+        let contentLines = [];
+        let j = i + 1;
+        while (j < sectionLines.length && !sectionLines[j].startsWith('###') && !sectionLines[j].startsWith('## ')) {
+          contentLines.push(sectionLines[j]);
+          j++;
+        }
+
+        const content = contentLines.join('\n').trim();
+
+        // Check if it's an activity
+        if (heading.toLowerCase().startsWith('activity')) {
+          // Remove "Activity N: " prefix
+          let activityTitle = heading;
+          const colonIndex = heading.indexOf(':');
+          if (colonIndex !== -1) {
+            activityTitle = heading.substring(colonIndex + 1).trim();
+          }
+
+          activities.push({
+            title: activityTitle,
+            content: parseMarkdownContent(content)
+          });
+        } else {
+          contentSections.push({
+            heading: heading,
+            content: parseMarkdownContent(content)
+          });
+        }
+      }
     }
 
     return {
-      title,
-      duration: durationMatch ? durationMatch[1].trim() : 'varies',
-      trainer: trainerMatch ? trainerMatch[1].trim() : 'Demetri',
-      location: locationMatch ? locationMatch[1].trim() : '',
-      purpose,
-      contentSections,
-      activities,
+      title: title || 'Training Unit',
+      duration: duration || 'varies',
+      trainer: trainer || 'Demetri',
+      location: location || '',
+      purpose: purpose,
+      contentSections: contentSections,
+      activities: activities,
       fullMarkdown: unitSection
     };
   } catch (error) {
@@ -180,36 +217,63 @@ function parseUnitFromMarkdown(markdown, moduleNum, unitNum) {
   }
 }
 
-// Parse reflection questions from workbook
+// Parse reflection questions from workbook - simplified
 function parseReflectionQuestions(markdown, moduleNum, unitNum) {
   if (!markdown) return [];
 
-  // Find the unit section in the workbook
-  const unitRegex = new RegExp(`# UNIT ${moduleNum}\\.${unitNum}:([^#]+)`, 'i');
-  const match = markdown.match(unitRegex);
+  try {
+    // Find the unit section in the workbook
+    const unitHeading = `# UNIT ${moduleNum}.${unitNum}:`;
+    const startIndex = markdown.indexOf(unitHeading);
 
-  if (!match) {
+    if (startIndex === -1) {
+      return [];
+    }
+
+    // Find end of this unit section
+    let endIndex = markdown.indexOf('\n# UNIT', startIndex + unitHeading.length);
+    if (endIndex === -1) {
+      endIndex = markdown.indexOf('\n---', startIndex + unitHeading.length);
+    }
+    if (endIndex === -1) {
+      endIndex = markdown.length;
+    }
+
+    const unitSection = markdown.substring(startIndex, endIndex);
+
+    // Extract questions - look for **1. **, **2. **, etc.
+    const questions = [];
+    const lines = unitSection.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Look for pattern like **1. Question text:**
+      if (line.startsWith('**') && line.includes(':**')) {
+        // Extract the question between ** and :**
+        const firstStar = line.indexOf('**');
+        const lastColon = line.lastIndexOf(':**');
+
+        if (firstStar !== -1 && lastColon !== -1) {
+          const questionText = line.substring(firstStar + 2, lastColon);
+
+          // Remove the number prefix (e.g., "1. ")
+          const dotIndex = questionText.indexOf('. ');
+          if (dotIndex !== -1) {
+            const cleanQuestion = questionText.substring(dotIndex + 2).trim();
+            if (cleanQuestion.length > 0) {
+              questions.push(cleanQuestion);
+            }
+          }
+        }
+      }
+    }
+
+    return questions;
+  } catch (error) {
+    console.error('Error parsing reflection questions:', error);
     return [];
   }
-
-  const startIndex = markdown.indexOf(match[0]);
-  const nextUnitIndex = markdown.indexOf('\n# UNIT', startIndex + match[0].length);
-  const endIndex = nextUnitIndex > 0 ? nextUnitIndex : markdown.indexOf('\n---', startIndex + match[0].length);
-
-  if (endIndex <= startIndex) return [];
-
-  const unitSection = markdown.substring(startIndex, endIndex);
-
-  // Extract questions (look for **1.**, **2.**, etc.)
-  const questions = [];
-  const questionRegex = /\*\*\d+\.\s+(.+?):\*\*/g;
-  let questionMatch;
-
-  while ((questionMatch = questionRegex.exec(unitSection)) !== null) {
-    questions.push(questionMatch[1].trim());
-  }
-
-  return questions;
 }
 
 // Parse markdown content into structured format
@@ -246,12 +310,16 @@ function parseMarkdownContent(content) {
         currentList = null;
       }
 
-      const boldMatch = line.match(/\*\*(.+?):\*\*(.*)/);
-      if (boldMatch) {
+      // Extract text between ** and :**
+      const colonPos = line.indexOf(':**');
+      if (colonPos !== -1) {
+        const boldText = line.substring(2, colonPos).trim();
+        const afterColon = line.substring(colonPos + 3).trim();
+
         parsed.push({
           type: 'heading',
-          content: boldMatch[1].trim(),
-          detail: boldMatch[2].trim()
+          content: boldText,
+          detail: afterColon
         });
       }
       continue;
