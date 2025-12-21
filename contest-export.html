@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -57,7 +57,7 @@
         .date-range {
             display: flex;
             gap: 20px;
-            align-items: center;
+            align-items: flex-end;
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
@@ -111,6 +111,10 @@
             background: linear-gradient(135deg, #059669 0%, #047857 100%);
         }
 
+        .btn-success:hover {
+            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4);
+        }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -159,6 +163,9 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-size: 11px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         tr:hover {
@@ -190,7 +197,7 @@
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
-            display: none;
+            font-weight: 600;
         }
 
         .message.success {
@@ -224,7 +231,7 @@
         }
 
         .table-container {
-            max-height: 500px;
+            max-height: 600px;
             overflow-y: auto;
             border: 2px solid #e0f2fe;
             border-radius: 8px;
@@ -236,30 +243,65 @@
             margin-top: 20px;
             flex-wrap: wrap;
         }
+
+        .connection-status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .connection-status.connected {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .connection-status.disconnected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        @media (max-width: 768px) {
+            .date-range {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 8px 6px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Great Teachers Feast</h1>
-            <p style="color: #666; margin-top: 10px;">Contest Data Export Tool</p>
+            <h1>🎓 Great Teachers Feast Contest 🎓</h1>
+            <p style="color: #666; margin-top: 10px;">Data Export Tool - December 1-15, 2025</p>
+            <span class="connection-status disconnected" id="connectionStatus">⚠️ Connecting...</span>
         </div>
 
         <div class="section">
-            <h2>Select Date Range</h2>
-            <div class="message success" id="successMessage"></div>
-            <div class="message error" id="errorMessage"></div>
+            <h2>📅 Select Date Range</h2>
+            <div class="message success" id="successMessage" style="display: none;"></div>
+            <div class="message error" id="errorMessage" style="display: none;"></div>
 
             <div class="date-range">
                 <div class="date-input">
                     <label>Start Date</label>
-                    <input type="date" id="startDate" value="2024-12-01">
+                    <input type="date" id="startDate" value="2025-12-01">
                 </div>
                 <div class="date-input">
                     <label>End Date</label>
-                    <input type="date" id="endDate" value="2024-12-15">
+                    <input type="date" id="endDate" value="2025-12-15">
                 </div>
-                <button class="btn" onclick="loadData()">Load Data</button>
+                <button class="btn" onclick="loadData()" id="loadBtn">📊 Load Contest Data</button>
             </div>
 
             <div class="stats-grid" id="statsGrid" style="display: none;">
@@ -269,43 +311,48 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="formEntries">0</div>
-                    <div class="stat-label">Form Submissions</div>
+                    <div class="stat-label">Form Submissions (2 pts)</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="instagramEntries">0</div>
-                    <div class="stat-label">Instagram Votes</div>
+                    <div class="stat-label">Instagram Votes (1 pt)</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="uniqueEmails">0</div>
                     <div class="stat-label">Unique Emails</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalPoints">0</div>
+                    <div class="stat-label">Total Points</div>
+                </div>
             </div>
         </div>
 
         <div class="section" id="dataSection" style="display: none;">
-            <h2>Contest Entries</h2>
+            <h2>📋 Contest Entries</h2>
 
             <div class="export-buttons">
-                <button class="btn btn-success" onclick="exportCSV()">Download CSV</button>
-                <button class="btn" onclick="copyToClipboard()">Copy to Clipboard</button>
+                <button class="btn btn-success" onclick="exportCSV()">📥 Download Excel CSV</button>
+                <button class="btn" onclick="copyToClipboard()">📋 Copy to Clipboard</button>
             </div>
 
             <div class="loading" id="loading" style="display: none;">
                 <div class="spinner"></div>
-                <p>Loading data...</p>
+                <p>Loading contest data from Supabase...</p>
             </div>
 
             <div class="table-container" id="tableContainer">
                 <table>
                     <thead>
                         <tr>
-                            <th>Date</th>
+                            <th>Date & Time</th>
                             <th>Full Name</th>
                             <th>Email</th>
                             <th>Phone</th>
                             <th>Instagram</th>
                             <th>Type</th>
                             <th>School</th>
+                            <th>Points</th>
                         </tr>
                     </thead>
                     <tbody id="dataBody"></tbody>
@@ -317,12 +364,49 @@
     <script type="module">
         import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-        const supabase = createClient(
-            'https://gaawtbqpnnbbnsyswqwv.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
-        );
+        const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
 
+        let supabase;
         let allData = [];
+
+        // Initialize Supabase connection
+        async function initSupabase() {
+            try {
+                supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+                // Test connection
+                const { data, error } = await supabase
+                    .from('teacher_feast_votes')
+                    .select('count')
+                    .limit(1);
+
+                if (error) {
+                    console.error('Supabase connection test failed:', error);
+                    updateConnectionStatus(false, error.message);
+                } else {
+                    console.log('✅ Supabase connected successfully');
+                    updateConnectionStatus(true);
+                }
+            } catch (error) {
+                console.error('Supabase initialization error:', error);
+                updateConnectionStatus(false, error.message);
+            }
+        }
+
+        function updateConnectionStatus(connected, errorMsg = '') {
+            const statusEl = document.getElementById('connectionStatus');
+            if (connected) {
+                statusEl.textContent = '✅ Database Connected';
+                statusEl.className = 'connection-status connected';
+            } else {
+                statusEl.textContent = '❌ Connection Failed';
+                statusEl.className = 'connection-status disconnected';
+                if (errorMsg) {
+                    showError('Database connection error: ' + errorMsg);
+                }
+            }
+        }
 
         window.loadData = async function() {
             const startDate = document.getElementById('startDate').value;
@@ -333,18 +417,28 @@
                 return;
             }
 
+            if (!supabase) {
+                showError('Database not connected. Please refresh the page.');
+                return;
+            }
+
+            const loadBtn = document.getElementById('loadBtn');
+            loadBtn.disabled = true;
+            loadBtn.textContent = '⏳ Loading...';
+
             document.getElementById('loading').style.display = 'block';
             document.getElementById('tableContainer').style.display = 'none';
             document.getElementById('dataSection').style.display = 'block';
+            hideMessages();
 
             try {
-                // Query votes within date range
-                const startDateTime = new Date(startDate);
-                startDateTime.setHours(0, 0, 0, 0);
+                // Create date range with proper timezone handling
+                const startDateTime = new Date(startDate + 'T00:00:00');
+                const endDateTime = new Date(endDate + 'T23:59:59');
 
-                const endDateTime = new Date(endDate);
-                endDateTime.setHours(23, 59, 59, 999);
+                console.log('Querying votes from', startDateTime, 'to', endDateTime);
 
+                // Query all votes within date range
                 const { data: votes, error } = await supabase
                     .from('teacher_feast_votes')
                     .select('*')
@@ -352,32 +446,50 @@
                     .lte('voted_at', endDateTime.toISOString())
                     .order('voted_at', { ascending: false });
 
-                if (error) throw error;
+                if (error) {
+                    console.error('Supabase query error:', error);
+                    throw error;
+                }
 
+                console.log(`✅ Loaded ${votes?.length || 0} entries from database`);
                 allData = votes || [];
 
-                // Calculate stats
-                const formEntries = allData.filter(v => v.vote_type === 'form');
-                const instagramEntries = allData.filter(v => v.vote_type === 'instagram');
-                const uniqueEmails = new Set(allData.filter(v => v.email).map(v => v.email.toLowerCase())).size;
+                if (allData.length === 0) {
+                    showError(`No entries found between ${startDate} and ${endDate}. Please check the date range.`);
+                } else {
+                    // Calculate statistics
+                    const formEntries = allData.filter(v => v.vote_type === 'form');
+                    const instagramEntries = allData.filter(v => v.vote_type === 'instagram');
+                    const uniqueEmails = new Set(
+                        allData
+                            .filter(v => v.email)
+                            .map(v => v.email.toLowerCase().trim())
+                    ).size;
+                    const totalPoints = allData.reduce((sum, v) => sum + (v.points || 1), 0);
 
-                document.getElementById('totalEntries').textContent = allData.length;
-                document.getElementById('formEntries').textContent = formEntries.length;
-                document.getElementById('instagramEntries').textContent = instagramEntries.length;
-                document.getElementById('uniqueEmails').textContent = uniqueEmails;
-                document.getElementById('statsGrid').style.display = 'grid';
+                    // Update stats
+                    document.getElementById('totalEntries').textContent = allData.length.toLocaleString();
+                    document.getElementById('formEntries').textContent = formEntries.length.toLocaleString();
+                    document.getElementById('instagramEntries').textContent = instagramEntries.length.toLocaleString();
+                    document.getElementById('uniqueEmails').textContent = uniqueEmails.toLocaleString();
+                    document.getElementById('totalPoints').textContent = totalPoints.toLocaleString();
+                    document.getElementById('statsGrid').style.display = 'grid';
 
-                // Display data
-                displayData(allData);
+                    // Display data in table
+                    displayData(allData);
 
-                showSuccess(`Loaded ${allData.length} entries from ${startDate} to ${endDate}`);
+                    showSuccess(`✅ Loaded ${allData.length.toLocaleString()} entries! Ready to export.`);
+                }
 
             } catch (error) {
                 console.error('Error loading data:', error);
                 showError('Failed to load data: ' + error.message);
+                document.getElementById('dataSection').style.display = 'none';
             } finally {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('tableContainer').style.display = 'block';
+                loadBtn.disabled = false;
+                loadBtn.textContent = '📊 Load Contest Data';
             }
         };
 
@@ -386,38 +498,73 @@
             tbody.innerHTML = '';
 
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #666; padding: 40px;">No entries found for this date range</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #666; padding: 40px;">No entries found for this date range</td></tr>';
                 return;
             }
 
             for (const entry of data) {
                 const row = document.createElement('tr');
 
-                // Format date
-                const date = entry.voted_at
-                    ? new Date(entry.voted_at).toLocaleDateString('en-US', {
+                // Format date and time
+                const votedDate = entry.voted_at ? new Date(entry.voted_at) : null;
+                const dateStr = votedDate
+                    ? votedDate.toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
-                        year: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit'
+                        year: 'numeric'
                     })
                     : 'Unknown';
+                const timeStr = votedDate
+                    ? votedDate.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                    })
+                    : '';
 
                 // Type badge
                 const typeBadge = entry.vote_type === 'form'
-                    ? '<span class="badge badge-form">Form</span>'
-                    : '<span class="badge badge-instagram">Instagram</span>';
+                    ? '<span class="badge badge-form">Form (2 pts)</span>'
+                    : '<span class="badge badge-instagram">Instagram (1 pt)</span>';
 
-                row.innerHTML = `
-                    <td style="font-size: 12px; color: #666;">${date}</td>
-                    <td><strong>${entry.full_name || '-'}</strong></td>
-                    <td>${entry.email || '-'}</td>
-                    <td>${entry.phone || '-'}</td>
-                    <td>${entry.instagram_username ? '@' + entry.instagram_username : '-'}</td>
-                    <td>${typeBadge}</td>
-                    <td style="font-size: 12px;">${entry.school_name || '-'}</td>
-                `;
+                const dateTimeCell = document.createElement('td');
+                dateTimeCell.style.fontSize = '12px';
+                dateTimeCell.style.color = '#666';
+                dateTimeCell.innerHTML = `${dateStr}<br><small>${timeStr}</small>`;
+
+                const nameCell = document.createElement('td');
+                nameCell.innerHTML = `<strong>${entry.full_name || '-'}</strong>`;
+
+                const emailCell = document.createElement('td');
+                emailCell.textContent = entry.email || '-';
+                emailCell.style.fontSize = '13px';
+
+                const phoneCell = document.createElement('td');
+                phoneCell.textContent = entry.phone || '-';
+
+                const instagramCell = document.createElement('td');
+                instagramCell.textContent = entry.instagram_username ? '@' + entry.instagram_username : '-';
+
+                const typeCell = document.createElement('td');
+                typeCell.innerHTML = typeBadge;
+
+                const schoolCell = document.createElement('td');
+                schoolCell.textContent = entry.school_name || '-';
+                schoolCell.style.fontSize = '12px';
+
+                const pointsCell = document.createElement('td');
+                pointsCell.innerHTML = `<strong>${entry.points || 1}</strong>`;
+                pointsCell.style.textAlign = 'center';
+                pointsCell.style.color = entry.points === 2 ? '#059669' : '#666';
+
+                row.appendChild(dateTimeCell);
+                row.appendChild(nameCell);
+                row.appendChild(emailCell);
+                row.appendChild(phoneCell);
+                row.appendChild(instagramCell);
+                row.appendChild(typeCell);
+                row.appendChild(schoolCell);
+                row.appendChild(pointsCell);
 
                 tbody.appendChild(row);
             }
@@ -425,89 +572,137 @@
 
         window.exportCSV = function() {
             if (allData.length === 0) {
-                showError('No data to export');
+                showError('No data to export. Please load data first.');
                 return;
             }
 
-            // Create CSV content
-            const headers = ['Date', 'Full Name', 'Email', 'Phone', 'Instagram Handle', 'Type', 'School'];
-            const rows = allData.map(entry => [
-                entry.voted_at ? new Date(entry.voted_at).toISOString() : '',
-                entry.full_name || '',
-                entry.email || '',
-                entry.phone || '',
-                entry.instagram_username || '',
-                entry.vote_type || '',
-                entry.school_name || ''
-            ]);
+            try {
+                // CSV headers
+                const headers = [
+                    'Date',
+                    'Time',
+                    'Full Name',
+                    'Email',
+                    'Phone',
+                    'Instagram Handle',
+                    'Vote Type',
+                    'Points',
+                    'School',
+                    'Newsletter Signup',
+                    'IP Address'
+                ];
 
-            let csv = headers.join(',') + '\n';
-            for (const row of rows) {
-                csv += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
+                // Convert data to CSV rows
+                const rows = allData.map(entry => {
+                    const votedDate = entry.voted_at ? new Date(entry.voted_at) : null;
+
+                    return [
+                        votedDate ? votedDate.toLocaleDateString('en-US') : '',
+                        votedDate ? votedDate.toLocaleTimeString('en-US') : '',
+                        entry.full_name || '',
+                        entry.email || '',
+                        entry.phone || '',
+                        entry.instagram_username || '',
+                        entry.vote_type || '',
+                        entry.points || 1,
+                        entry.school_name || '',
+                        entry.newsletter_signup ? 'Yes' : 'No',
+                        entry.ip_address || ''
+                    ];
+                });
+
+                // Build CSV content
+                let csv = headers.join(',') + '\n';
+                for (const row of rows) {
+                    csv += row.map(cell => {
+                        // Escape quotes and wrap in quotes if contains comma
+                        const cellStr = String(cell).replace(/"/g, '""');
+                        return cellStr.includes(',') ? `"${cellStr}"` : cellStr;
+                    }).join(',') + '\n';
+                }
+
+                // Download CSV file
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `great-teachers-feast-contest-${document.getElementById('startDate').value}-to-${document.getElementById('endDate').value}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                showSuccess(`✅ CSV downloaded successfully! ${allData.length.toLocaleString()} entries exported.`);
+            } catch (error) {
+                console.error('Export error:', error);
+                showError('Failed to export CSV: ' + error.message);
             }
-
-            // Download
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `great-teachers-feast-${document.getElementById('startDate').value}-to-${document.getElementById('endDate').value}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            showSuccess('CSV downloaded successfully!');
         };
 
         window.copyToClipboard = function() {
             if (allData.length === 0) {
-                showError('No data to copy');
+                showError('No data to copy. Please load data first.');
                 return;
             }
 
-            // Create tab-separated content for easy pasting into spreadsheets
-            const headers = ['Date', 'Full Name', 'Email', 'Phone', 'Instagram Handle', 'Type', 'School'];
-            const rows = allData.map(entry => [
-                entry.voted_at ? new Date(entry.voted_at).toLocaleDateString() : '',
-                entry.full_name || '',
-                entry.email || '',
-                entry.phone || '',
-                entry.instagram_username || '',
-                entry.vote_type || '',
-                entry.school_name || ''
-            ]);
+            try {
+                // Tab-separated format for pasting into Excel/Sheets
+                const headers = ['Date', 'Time', 'Full Name', 'Email', 'Phone', 'Instagram Handle', 'Vote Type', 'Points', 'School'];
+                const rows = allData.map(entry => {
+                    const votedDate = entry.voted_at ? new Date(entry.voted_at) : null;
 
-            let text = headers.join('\t') + '\n';
-            for (const row of rows) {
-                text += row.join('\t') + '\n';
+                    return [
+                        votedDate ? votedDate.toLocaleDateString('en-US') : '',
+                        votedDate ? votedDate.toLocaleTimeString('en-US') : '',
+                        entry.full_name || '',
+                        entry.email || '',
+                        entry.phone || '',
+                        entry.instagram_username || '',
+                        entry.vote_type || '',
+                        entry.points || 1,
+                        entry.school_name || ''
+                    ];
+                });
+
+                let text = headers.join('\t') + '\n';
+                for (const row of rows) {
+                    text += row.join('\t') + '\n';
+                }
+
+                navigator.clipboard.writeText(text).then(() => {
+                    showSuccess('✅ Copied to clipboard! Paste directly into Excel or Google Sheets.');
+                }).catch(err => {
+                    console.error('Clipboard error:', err);
+                    showError('Failed to copy: ' + err.message);
+                });
+            } catch (error) {
+                console.error('Copy error:', error);
+                showError('Failed to copy: ' + error.message);
             }
-
-            navigator.clipboard.writeText(text).then(() => {
-                showSuccess('Copied to clipboard! You can paste directly into Excel or Google Sheets.');
-            }).catch(err => {
-                showError('Failed to copy: ' + err.message);
-            });
         };
 
         function showSuccess(message) {
+            hideMessages();
             const el = document.getElementById('successMessage');
             el.textContent = message;
             el.style.display = 'block';
-            document.getElementById('errorMessage').style.display = 'none';
-            setTimeout(() => { el.style.display = 'none'; }, 5000);
+            setTimeout(() => { el.style.display = 'none'; }, 10000);
         }
 
         function showError(message) {
+            hideMessages();
             const el = document.getElementById('errorMessage');
             el.textContent = message;
             el.style.display = 'block';
-            document.getElementById('successMessage').style.display = 'none';
-            setTimeout(() => { el.style.display = 'none'; }, 5000);
         }
 
-        // Auto-load data on page load with default dates
-        loadData();
+        function hideMessages() {
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        // Initialize on page load
+        initSupabase();
     </script>
 </body>
 </html>
