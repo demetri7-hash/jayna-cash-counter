@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Great Teachers Feast - Contest Data Export</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #176F9A;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 10px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            color: #176F9A;
+            font-size: 20px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .date-range {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .date-input {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .date-input label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .date-input input {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #46B0E4 0%, #176F9A 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(70, 176, 228, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #f0f9ff;
+            border: 2px solid #46B0E4;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #176F9A;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0f2fe;
+        }
+
+        th {
+            background: #f0f9ff;
+            color: #176F9A;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 11px;
+        }
+
+        tr:hover {
+            background: #f9fafb;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #46B0E4;
+        }
+
+        .spinner {
+            border: 4px solid #e0f2fe;
+            border-top: 4px solid #46B0E4;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d1fae5;
+            border: 2px solid #059669;
+            color: #065f46;
+        }
+
+        .message.error {
+            background: #fee2e2;
+            border: 2px solid #dc2626;
+            color: #991b1b;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-instagram {
+            background: #e1bee7;
+            color: #6a1b9a;
+        }
+
+        .badge-form {
+            background: #c5e1a5;
+            color: #33691e;
+        }
+
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 2px solid #e0f2fe;
+            border-radius: 8px;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Great Teachers Feast</h1>
+            <p style="color: #666; margin-top: 10px;">Contest Data Export Tool</p>
+        </div>
+
+        <div class="section">
+            <h2>Select Date Range</h2>
+            <div class="message success" id="successMessage"></div>
+            <div class="message error" id="errorMessage"></div>
+
+            <div class="date-range">
+                <div class="date-input">
+                    <label>Start Date</label>
+                    <input type="date" id="startDate" value="2024-12-01">
+                </div>
+                <div class="date-input">
+                    <label>End Date</label>
+                    <input type="date" id="endDate" value="2024-12-15">
+                </div>
+                <button class="btn" onclick="loadData()">Load Data</button>
+            </div>
+
+            <div class="stats-grid" id="statsGrid" style="display: none;">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalEntries">0</div>
+                    <div class="stat-label">Total Entries</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="formEntries">0</div>
+                    <div class="stat-label">Form Submissions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="instagramEntries">0</div>
+                    <div class="stat-label">Instagram Votes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="uniqueEmails">0</div>
+                    <div class="stat-label">Unique Emails</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section" id="dataSection" style="display: none;">
+            <h2>Contest Entries</h2>
+
+            <div class="export-buttons">
+                <button class="btn btn-success" onclick="exportCSV()">Download CSV</button>
+                <button class="btn" onclick="copyToClipboard()">Copy to Clipboard</button>
+            </div>
+
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Loading data...</p>
+            </div>
+
+            <div class="table-container" id="tableContainer">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Full Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Instagram</th>
+                            <th>Type</th>
+                            <th>School</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+        const supabase = createClient(
+            'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+        );
+
+        let allData = [];
+
+        window.loadData = async function() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (!startDate || !endDate) {
+                showError('Please select both start and end dates');
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('tableContainer').style.display = 'none';
+            document.getElementById('dataSection').style.display = 'block';
+
+            try {
+                // Query votes within date range
+                const startDateTime = new Date(startDate);
+                startDateTime.setHours(0, 0, 0, 0);
+
+                const endDateTime = new Date(endDate);
+                endDateTime.setHours(23, 59, 59, 999);
+
+                const { data: votes, error } = await supabase
+                    .from('teacher_feast_votes')
+                    .select('*')
+                    .gte('voted_at', startDateTime.toISOString())
+                    .lte('voted_at', endDateTime.toISOString())
+                    .order('voted_at', { ascending: false });
+
+                if (error) throw error;
+
+                allData = votes || [];
+
+                // Calculate stats
+                const formEntries = allData.filter(v => v.vote_type === 'form');
+                const instagramEntries = allData.filter(v => v.vote_type === 'instagram');
+                const uniqueEmails = new Set(allData.filter(v => v.email).map(v => v.email.toLowerCase())).size;
+
+                document.getElementById('totalEntries').textContent = allData.length;
+                document.getElementById('formEntries').textContent = formEntries.length;
+                document.getElementById('instagramEntries').textContent = instagramEntries.length;
+                document.getElementById('uniqueEmails').textContent = uniqueEmails;
+                document.getElementById('statsGrid').style.display = 'grid';
+
+                // Display data
+                displayData(allData);
+
+                showSuccess(`Loaded ${allData.length} entries from ${startDate} to ${endDate}`);
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showError('Failed to load data: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('tableContainer').style.display = 'block';
+            }
+        };
+
+        function displayData(data) {
+            const tbody = document.getElementById('dataBody');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #666; padding: 40px;">No entries found for this date range</td></tr>';
+                return;
+            }
+
+            for (const entry of data) {
+                const row = document.createElement('tr');
+
+                // Format date
+                const date = entry.voted_at
+                    ? new Date(entry.voted_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                    })
+                    : 'Unknown';
+
+                // Type badge
+                const typeBadge = entry.vote_type === 'form'
+                    ? '<span class="badge badge-form">Form</span>'
+                    : '<span class="badge badge-instagram">Instagram</span>';
+
+                row.innerHTML = `
+                    <td style="font-size: 12px; color: #666;">${date}</td>
+                    <td><strong>${entry.full_name || '-'}</strong></td>
+                    <td>${entry.email || '-'}</td>
+                    <td>${entry.phone || '-'}</td>
+                    <td>${entry.instagram_username ? '@' + entry.instagram_username : '-'}</td>
+                    <td>${typeBadge}</td>
+                    <td style="font-size: 12px;">${entry.school_name || '-'}</td>
+                `;
+
+                tbody.appendChild(row);
+            }
+        }
+
+        window.exportCSV = function() {
+            if (allData.length === 0) {
+                showError('No data to export');
+                return;
+            }
+
+            // Create CSV content
+            const headers = ['Date', 'Full Name', 'Email', 'Phone', 'Instagram Handle', 'Type', 'School'];
+            const rows = allData.map(entry => [
+                entry.voted_at ? new Date(entry.voted_at).toISOString() : '',
+                entry.full_name || '',
+                entry.email || '',
+                entry.phone || '',
+                entry.instagram_username || '',
+                entry.vote_type || '',
+                entry.school_name || ''
+            ]);
+
+            let csv = headers.join(',') + '\n';
+            for (const row of rows) {
+                csv += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
+            }
+
+            // Download
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `great-teachers-feast-${document.getElementById('startDate').value}-to-${document.getElementById('endDate').value}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showSuccess('CSV downloaded successfully!');
+        };
+
+        window.copyToClipboard = function() {
+            if (allData.length === 0) {
+                showError('No data to copy');
+                return;
+            }
+
+            // Create tab-separated content for easy pasting into spreadsheets
+            const headers = ['Date', 'Full Name', 'Email', 'Phone', 'Instagram Handle', 'Type', 'School'];
+            const rows = allData.map(entry => [
+                entry.voted_at ? new Date(entry.voted_at).toLocaleDateString() : '',
+                entry.full_name || '',
+                entry.email || '',
+                entry.phone || '',
+                entry.instagram_username || '',
+                entry.vote_type || '',
+                entry.school_name || ''
+            ]);
+
+            let text = headers.join('\t') + '\n';
+            for (const row of rows) {
+                text += row.join('\t') + '\n';
+            }
+
+            navigator.clipboard.writeText(text).then(() => {
+                showSuccess('Copied to clipboard! You can paste directly into Excel or Google Sheets.');
+            }).catch(err => {
+                showError('Failed to copy: ' + err.message);
+            });
+        };
+
+        function showSuccess(message) {
+            const el = document.getElementById('successMessage');
+            el.textContent = message;
+            el.style.display = 'block';
+            document.getElementById('errorMessage').style.display = 'none';
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+
+        function showError(message) {
+            const el = document.getElementById('errorMessage');
+            el.textContent = message;
+            el.style.display = 'block';
+            document.getElementById('successMessage').style.display = 'none';
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+
+        // Auto-load data on page load with default dates
+        loadData();
+    </script>
+</body>
+</html>
