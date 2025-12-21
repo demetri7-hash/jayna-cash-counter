@@ -18,24 +18,25 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log('=== API REQUEST START ===');
     const { module_number, unit_number } = req.body;
+    console.log(`Requesting Module ${module_number}, Unit ${unit_number}`);
 
     if (!module_number || !unit_number) {
+      console.error('Missing parameters');
       return res.status(400).json({
         error: 'module_number and unit_number are required'
       });
     }
 
-    // Read the appropriate module file
-    const modulePath = path.join(
-      process.cwd(),
-      'training',
-      'modules',
-      `MODULE_${module_number}_*.md`
-    );
-
     // Find the main module file (not reflection workbook)
-    const moduleFiles = fs.readdirSync(path.join(process.cwd(), 'training', 'modules'));
+    console.log('Reading directory...');
+    const modulesDir = path.join(process.cwd(), 'training', 'modules');
+    console.log('Modules directory:', modulesDir);
+
+    const moduleFiles = fs.readdirSync(modulesDir);
+    console.log('Found files:', moduleFiles);
+
     const mainModuleFile = moduleFiles.find(f =>
       f.startsWith(`MODULE_${module_number}_`) &&
       !f.includes('REFLECTION') &&
@@ -47,51 +48,77 @@ export default async function handler(req, res) {
       (f.includes('REFLECTION') || f.includes('WORKBOOK'))
     );
 
+    console.log('Main module file:', mainModuleFile);
+    console.log('Reflection file:', reflectionFile);
+
     if (!mainModuleFile) {
+      console.error(`Module ${module_number} not found`);
       return res.status(404).json({
         error: `Module ${module_number} not found`
       });
     }
 
     // Read module content
+    console.log('Reading main module file...');
     const moduleContent = fs.readFileSync(
-      path.join(process.cwd(), 'training', 'modules', mainModuleFile),
+      path.join(modulesDir, mainModuleFile),
       'utf-8'
     );
+    console.log(`Read ${moduleContent.length} characters from main module`);
 
     // Read reflection workbook if exists
     let reflectionContent = '';
     if (reflectionFile) {
+      console.log('Reading reflection file...');
       reflectionContent = fs.readFileSync(
-        path.join(process.cwd(), 'training', 'modules', reflectionFile),
+        path.join(modulesDir, reflectionFile),
         'utf-8'
       );
+      console.log(`Read ${reflectionContent.length} characters from reflection`);
     }
 
     // Parse the markdown to extract unit content
+    console.log('Parsing unit content...');
     const unitContent = parseUnitFromMarkdown(moduleContent, module_number, unit_number);
-    const reflectionQuestions = parseReflectionQuestions(reflectionContent, module_number, unit_number);
 
     if (!unitContent) {
+      console.error(`Unit ${module_number}.${unit_number} not found in markdown`);
       return res.status(404).json({
         error: `Unit ${module_number}.${unit_number} not found`
       });
     }
+    console.log('Unit content parsed successfully');
+
+    console.log('Parsing reflection questions...');
+    const reflectionQuestions = parseReflectionQuestions(reflectionContent, module_number, unit_number);
+    console.log(`Found ${reflectionQuestions.length} reflection questions`);
 
     // Add reflection questions to unit content
     unitContent.reflection = reflectionQuestions;
 
-    res.setHeader('Content-Type', 'application/json');
-    return res.status(200).json({
+    console.log('Preparing JSON response...');
+    const responseData = {
       success: true,
       unit: unitContent
-    });
+    };
+
+    // Try to serialize to check for issues
+    const jsonString = JSON.stringify(responseData);
+    console.log(`JSON response is ${jsonString.length} characters`);
+
+    res.setHeader('Content-Type', 'application/json');
+    console.log('=== API REQUEST SUCCESS ===');
+    return res.status(200).json(responseData);
 
   } catch (error) {
-    console.error('Error fetching training content:', error);
+    console.error('=== API ERROR ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     return res.status(500).json({
       error: 'Failed to fetch training content',
-      details: error.message
+      details: error.message,
+      errorType: error.constructor.name
     });
   }
 }
@@ -99,11 +126,15 @@ export default async function handler(req, res) {
 // Parse unit content from markdown - simplified approach
 function parseUnitFromMarkdown(markdown, moduleNum, unitNum) {
   try {
+    console.log(`  parseUnitFromMarkdown: Looking for Module ${moduleNum}, Unit ${unitNum}`);
     // Find the unit heading
     const unitHeading = `# UNIT ${moduleNum}.${unitNum}:`;
+    console.log(`  Searching for heading: "${unitHeading}"`);
     const startIndex = markdown.indexOf(unitHeading);
+    console.log(`  Found at index: ${startIndex}`);
 
     if (startIndex === -1) {
+      console.error(`  Unit heading not found in markdown`);
       return null;
     }
 
