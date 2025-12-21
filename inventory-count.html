@@ -1,1135 +1,974 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Inventory Count - Jayna Gyro</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
-    <style>
-        :root {
-            --primary: #1a1a1a;
-            --primary-light: #4a4a4a;
-            --success: #059669;
-            --success-bg: #d1fae5;
-            --success-border: #047857;
-            --warning: #f59e0b;
-            --warning-bg: #fef3c7;
-            --error: #dc2626;
-            --error-bg: #fee2e2;
-            --gray-50: #f9fafb;
-            --gray-100: #f3f4f6;
-            --gray-200: #e5e7eb;
-            --gray-300: #d1d5db;
-            --gray-400: #9ca3af;
-            --gray-500: #6b7280;
-            --gray-600: #4b5563;
-            --gray-700: #374151;
-            --gray-800: #1f2937;
-            --gray-900: #111827;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--gray-50);
-            color: var(--gray-900);
-            font-size: 16px;
-            line-height: 1.5;
-            padding-bottom: 80px;
-        }
-
-        /* Header */
-        .header {
-            background: var(--primary);
-            color: white;
-            padding: 16px 20px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .header h1 {
-            font-size: 20px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .header-subtitle {
-            font-size: 13px;
-            opacity: 0.9;
-            font-weight: 500;
-        }
-
-        /* Staff Counter Display */
-        .counter-bar {
-            background: var(--gray-800);
-            padding: 12px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            border-bottom: 2px solid var(--gray-700);
-            flex-wrap: wrap;
-        }
-
-        .counter-info {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex: 1;
-            min-width: 200px;
-        }
-
-        .counter-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--gray-400);
-            font-weight: 700;
-        }
-
-        .counter-name {
-            background: var(--success);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: 700;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-            user-select: none;
-            min-height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .counter-name:active {
-            transform: scale(0.98);
-            background: var(--success-border);
-        }
-
-        .counter-hint {
-            font-size: 11px;
-            color: var(--gray-400);
-            font-style: italic;
-        }
-
-        /* Controls Bar */
-        .controls-bar {
-            background: white;
-            padding: 16px 20px;
-            border-bottom: 2px solid var(--gray-200);
-            position: sticky;
-            top: 82px;
-            z-index: 90;
-        }
-
-        .controls-row {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            flex: 1;
-            min-width: 140px;
-        }
-
-        .control-label {
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--gray-700);
-        }
-
-        .control-select {
-            padding: 12px 14px;
-            border: 2px solid var(--gray-300);
-            border-radius: 0;
-            font-size: 14px;
-            font-weight: 500;
-            background: white;
-            color: var(--gray-900);
-            cursor: pointer;
-            min-height: 48px;
-        }
-
-        .control-select:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 12px 20px;
-            border: 2px solid var(--gray-300);
-            background: white;
-            color: var(--gray-900);
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-radius: 0;
-            min-height: 48px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            white-space: nowrap;
-        }
-
-        .btn:hover {
-            background: var(--gray-50);
-        }
-
-        .btn:active {
-            transform: scale(0.98);
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-light);
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: white;
-            border-color: var(--success);
-        }
-
-        .btn-success:hover {
-            background: var(--success-border);
-        }
-
-        /* Stats Bar */
-        .stats-bar {
-            background: var(--gray-100);
-            padding: 16px 20px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 12px;
-        }
-
-        .stat-card {
-            background: white;
-            border: 2px solid var(--gray-200);
-            padding: 12px;
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--primary);
-            line-height: 1;
-        }
-
-        .stat-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--gray-600);
-            margin-top: 6px;
-            font-weight: 600;
-        }
-
-        /* Inventory List */
-        .inventory-container {
-            padding: 20px;
-        }
-
-        .group-section {
-            background: white;
-            border: 2px solid var(--gray-300);
-            margin-bottom: 20px;
-        }
-
-        .group-header {
-            background: var(--gray-900);
-            color: white;
-            padding: 14px 16px;
-            font-size: 14px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .group-count {
-            background: var(--gray-700);
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-        .item-card {
-            border-bottom: 1px solid var(--gray-200);
-            padding: 16px;
-            transition: background 0.2s;
-        }
-
-        .item-card:last-child {
-            border-bottom: none;
-        }
-
-        .item-card.counted {
-            background: var(--success-bg);
-        }
-
-        .item-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-            gap: 12px;
-        }
-
-        .item-name {
-            font-size: 15px;
-            font-weight: 700;
-            color: var(--gray-900);
-            line-height: 1.3;
-            flex: 1;
-        }
-
-        .item-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        .meta-badge {
-            background: var(--gray-100);
-            border: 1px solid var(--gray-300);
-            padding: 4px 8px;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--gray-700);
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-
-        .meta-badge.vendor {
-            background: #dbeafe;
-            border-color: #3b82f6;
-            color: #1e40af;
-        }
-
-        .meta-badge.location {
-            background: #fef3c7;
-            border-color: #f59e0b;
-            color: #92400e;
-        }
-
-        .item-input-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .input-label {
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--gray-700);
-        }
-
-        .count-input {
-            padding: 14px;
-            border: 3px solid var(--gray-300);
-            font-size: 18px;
-            font-weight: 700;
-            text-align: center;
-            border-radius: 0;
-            background: white;
-            color: var(--gray-900);
-            min-height: 56px;
-            transition: all 0.2s;
-        }
-
-        .count-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            background: var(--gray-50);
-        }
-
-        .count-input.saved {
-            border-color: var(--success);
-            background: var(--success-bg);
-        }
-
-        .location-select {
-            padding: 14px;
-            border: 3px solid var(--gray-300);
-            font-size: 14px;
-            font-weight: 600;
-            border-radius: 0;
-            background: white;
-            min-height: 56px;
-        }
-
-        .location-select:focus {
-            outline: none;
-            border-color: var(--warning);
-        }
-
-        .item-footer {
-            margin-top: 12px;
-            font-size: 12px;
-            color: var(--gray-600);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .counted-by {
-            background: var(--gray-100);
-            padding: 6px 12px;
-            border-left: 3px solid var(--success);
-            font-style: italic;
-            flex: 1;
-        }
-
-        .counted-by strong {
-            color: var(--success-border);
-        }
-
-        /* Loading State */
-        .loading {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--gray-500);
-        }
-
-        .spinner {
-            border: 4px solid var(--gray-200);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Print Styles */
-        @media print {
-            body {
-                background: white;
-                padding: 0;
-            }
-
-            .header,
-            .counter-bar,
-            .controls-bar,
-            .btn-group,
-            .no-print {
-                display: none !important;
-            }
-
-            .group-section {
-                page-break-inside: avoid;
-                margin-bottom: 30px;
-            }
-
-            .item-card {
-                page-break-inside: avoid;
-            }
-
-            .count-input,
-            .location-select {
-                border: 1px solid #000;
-            }
-        }
-
-        /* Mobile Optimizations */
-        @media (max-width: 600px) {
-            .controls-row {
-                flex-direction: column;
-            }
-
-            .control-group {
-                width: 100%;
-            }
-
-            .btn-group {
-                width: 100%;
-            }
-
-            .btn {
-                flex: 1;
-                justify-content: center;
-            }
-
-            .item-input-row {
-                grid-template-columns: 1fr;
-            }
-
-            .stats-bar {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        /* Touch feedback */
-        @media (hover: none) {
-            .btn:active,
-            .count-input:active,
-            .location-select:active {
-                opacity: 0.8;
-            }
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--gray-500);
-        }
-
-        .empty-state-icon {
-            font-size: 64px;
-            margin-bottom: 20px;
-            opacity: 0.3;
-        }
-
-        .empty-state-text {
-            font-size: 16px;
-            font-weight: 600;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>Inventory Count - Jayna Gyro</title>
+
+  <link rel="apple-touch-icon" href="https://static.spotapps.co/website_images/ab_websites/229800_website_v1/logo.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#00A8E1">
+
+  <style>
+    /* Jayna Brand Design - Sky Blue & Grayscale */
+    :root {
+      --primary-blue: #00A8E1;
+      --secondary-blue: #0094D6;
+      --light-blue: #E3F4FC;
+      --accent-blue: #0081C6;
+      --gray-900: #212121;
+      --gray-700: #424242;
+      --gray-600: #616161;
+      --gray-500: #757575;
+      --gray-400: #BDBDBD;
+      --gray-300: #E0E0E0;
+      --gray-100: #F5F5F5;
+      --success: #00C853;
+      --warning: #FFB300;
+      --error: #D32F2F;
+      --white: #FFFFFF;
+      --blue-bg: #dbeafe;
+      --blue-text: #1e40af;
+      --success-bg: #d1fae5;
+      --success-text: #065f46;
+      --success-border: #059669;
+      --warning-bg: #fef3c7;
+      --warning-text: #92400e;
+      --warning-border: #f59e0b;
+      --error-bg: #fee2e2;
+      --error-text: #991b1b;
+      --error-border: #dc2626;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      font-family: 'Aptos', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--white);
+      min-height: 100vh;
+      padding: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: var(--white);
+      border-radius: 0;
+      overflow: visible;
+      box-shadow: none;
+      min-height: auto;
+      max-height: none;
+    }
+
+    .header {
+      background: var(--white);
+      color: var(--gray-900);
+      text-align: center;
+      padding: 12px;
+      border-radius: 0;
+      border-bottom: 1px solid var(--gray-300);
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 2px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .header p {
+      opacity: 0.7;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .content {
+      padding: 12px;
+      max-height: none;
+      overflow: visible;
+    }
+
+    /* Counter Name Display */
+    .counter-section {
+      background: var(--gray-100);
+      padding: 16px;
+      margin-bottom: 20px;
+      border: 2px solid var(--gray-300);
+      text-align: center;
+    }
+
+    .counter-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-600);
+      margin-bottom: 8px;
+    }
+
+    .counter-name-display {
+      background: var(--success);
+      color: white;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+      border: 3px solid var(--success-border);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .counter-name-display:hover {
+      background: var(--success-border);
+    }
+
+    .counter-hint {
+      font-size: 11px;
+      color: var(--gray-500);
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    /* Controls */
+    .controls {
+      background: var(--gray-100);
+      padding: 16px;
+      margin-bottom: 20px;
+      border: 2px solid var(--gray-300);
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-700);
+    }
+
+    .control-select {
+      padding: 14px;
+      border: 2px solid var(--gray-300);
+      border-radius: 0;
+      font-size: 14px;
+      font-weight: 600;
+      background: white;
+      color: var(--gray-900);
+      min-height: 48px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 12px 16px;
+      border: 2px solid var(--gray-700);
+      background: var(--gray-700);
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+      min-width: 100px;
+      min-height: 48px;
+    }
+
+    .btn:hover {
+      background: var(--gray-600);
+      border-color: var(--gray-600);
+    }
+
+    .btn.primary {
+      background: var(--success);
+      border-color: var(--success);
+    }
+
+    .btn.primary:hover {
+      background: var(--success-border);
+      border-color: var(--success-border);
+    }
+
+    /* Stats */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: white;
+      border: 2px solid var(--gray-300);
+      padding: 16px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--gray-900);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-600);
+      margin-top: 8px;
+      font-weight: 600;
+    }
+
+    /* Item Cards */
+    .group-section {
+      background: white;
+      border: 2px solid var(--gray-300);
+      margin-bottom: 20px;
+    }
+
+    .group-header {
+      background: var(--gray-900);
+      color: white;
+      padding: 14px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .group-count {
+      background: var(--gray-700);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+    }
+
+    .item-card {
+      border-bottom: 1px solid var(--gray-200);
+      padding: 16px;
+    }
+
+    .item-card:last-child {
+      border-bottom: none;
+    }
+
+    .item-card.counted {
+      background: var(--success-bg);
+    }
+
+    .item-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 12px;
+    }
+
+    .item-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .meta-badge {
+      background: var(--gray-100);
+      border: 1px solid var(--gray-300);
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--gray-700);
+      text-transform: uppercase;
+    }
+
+    .meta-badge.vendor {
+      background: var(--blue-bg);
+      border-color: #3b82f6;
+      color: var(--blue-text);
+    }
+
+    .meta-badge.location {
+      background: var(--warning-bg);
+      border-color: var(--warning);
+      color: var(--warning-text);
+    }
+
+    .item-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .input-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-700);
+    }
+
+    .count-input, .location-select {
+      padding: 14px;
+      border: 3px solid var(--gray-300);
+      font-size: 16px;
+      font-weight: 700;
+      border-radius: 0;
+      background: white;
+      min-height: 56px;
+      text-align: center;
+    }
+
+    .count-input:focus, .location-select:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+    }
+
+    .count-input.saved {
+      border-color: var(--success);
+      background: var(--success-bg);
+    }
+
+    .counted-info {
+      margin-top: 12px;
+      padding: 8px 12px;
+      background: var(--gray-100);
+      border-left: 3px solid var(--success);
+      font-size: 12px;
+      color: var(--gray-700);
+    }
+
+    .counted-info strong {
+      color: var(--success-border);
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--gray-500);
+    }
+
+    .spinner {
+      border: 4px solid var(--gray-200);
+      border-top-color: var(--primary-blue);
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Print */
+    @media print {
+      .header img, .controls, .btn-group, .counter-section { display: none !important; }
+      body { background: white; }
+    }
+
+    @media (max-width: 600px) {
+      .control-row {
+        grid-template-columns: 1fr;
+      }
+      .item-inputs {
+        grid-template-columns: 1fr;
+      }
+      .stats-bar {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
 </head>
 <body>
-    <!-- Header -->
-    <div class="header">
-        <h1>📦 Inventory Count</h1>
-        <div class="header-subtitle" id="currentDate">Loading...</div>
+  <div class="container">
+    <!-- HARDCODED HEADER (from app-header.js) -->
+    <div class="header" style="padding-top: 20px;">
+      <img src="jayna-logo-new.png" alt="Jayna Gyro Logo" class="logo" style="max-width: 576px; width: 100%; height: auto; display: block; margin: 0 auto;">
+      <h1>INVENTORY COUNT</h1>
+      <p style="opacity: 0.7;">FOR AUTHORIZED USE ONLY</p>
+
+      <!-- MAIN MENU NAVIGATION (CENTERED COLUMN) -->
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; margin-bottom: 20px;">
+        <a href="index.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CASH</a>
+        <a href="orders-prep.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">ORDERS & PREP</a>
+        <a href="dry-goods.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">DRY GOODS</a>
+        <a href="foh-checklists.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">FOH</a>
+        <a href="boh.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">BOH</a>
+        <a href="catering.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CATERING</a>
+        <a href="drivers.html" class="menu-btn primary" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">DRIVERS</a>
+        <a href="teamupdates.html" class="menu-btn" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">TEAM UPDATES</a>
+      </div>
+
+      <p style="opacity: 0.7; margin-top: 12px;">APP CREATED BY DEMETRI GREGORAKIS</p>
     </div>
 
-    <!-- Staff Counter Bar -->
-    <div class="counter-bar">
-        <div class="counter-info">
-            <span class="counter-label">Counted By:</span>
-            <div class="counter-name" id="counterName" onclick="cycleCounterName()" title="Click to cycle through staff">
-                Loading...
-            </div>
+    <div class="content">
+      <!-- Counter Name Section (like orders-prep.html) -->
+      <div class="counter-section">
+        <div class="counter-label">COUNTED BY:</div>
+        <div class="counter-name-display" id="counterNameDisplay" onclick="cycleCounterName()">
+          Loading...
         </div>
-        <span class="counter-hint">Tap name to change • Persists 30 min</span>
-    </div>
+        <div class="counter-hint">Tap name to change • Persists 30 minutes</div>
+      </div>
 
-    <!-- Controls -->
-    <div class="controls-bar">
-        <div class="controls-row">
-            <div class="control-group">
-                <label class="control-label">Group By</label>
-                <select class="control-select" id="groupBySelect" onchange="renderInventory()">
-                    <option value="vendor">Vendor</option>
-                    <option value="location">Physical Location</option>
-                    <option value="category">Category</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label class="control-label">Sort By</label>
-                <select class="control-select" id="sortBySelect" onchange="renderInventory()">
-                    <option value="name">Item Name (A-Z)</option>
-                    <option value="name-desc">Item Name (Z-A)</option>
-                    <option value="count-asc">Count (Low to High)</option>
-                    <option value="count-desc">Count (High to Low)</option>
-                </select>
-            </div>
+      <!-- Controls -->
+      <div class="controls">
+        <div class="control-row">
+          <div class="control-group">
+            <label class="control-label">Group By</label>
+            <select class="control-select" id="groupBySelect" onchange="renderInventory()">
+              <option value="vendor">Vendor</option>
+              <option value="location">Physical Location</option>
+              <option value="category">Category</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label class="control-label">Sort By</label>
+            <select class="control-select" id="sortBySelect" onchange="renderInventory()">
+              <option value="name">Item Name (A-Z)</option>
+              <option value="name-desc">Item Name (Z-A)</option>
+              <option value="count-asc">Count (Low to High)</option>
+              <option value="count-desc">Count (High to Low)</option>
+            </select>
+          </div>
         </div>
         <div class="btn-group">
-            <button class="btn btn-success" onclick="generateReport()">
-                📊 View Report
-            </button>
-            <button class="btn" onclick="exportCSV()">
-                📥 Export CSV
-            </button>
-            <button class="btn" onclick="window.print()">
-                🖨️ Print
-            </button>
+          <button class="btn primary" onclick="generateReport()">📊 Report</button>
+          <button class="btn" onclick="exportCSV()">📥 CSV</button>
+          <button class="btn" onclick="window.print()">🖨️ Print</button>
         </div>
-    </div>
+      </div>
 
-    <!-- Stats Bar -->
-    <div class="stats-bar" id="statsBar">
+      <!-- Stats -->
+      <div class="stats-bar">
         <div class="stat-card">
-            <div class="stat-value" id="totalItems">0</div>
-            <div class="stat-label">Total Items</div>
+          <div class="stat-value" id="totalItems">0</div>
+          <div class="stat-label">Total Items</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value" id="countedItems">0</div>
-            <div class="stat-label">Counted</div>
+          <div class="stat-value" id="countedItems">0</div>
+          <div class="stat-label">Counted</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value" id="percentComplete">0%</div>
-            <div class="stat-label">Complete</div>
+          <div class="stat-value" id="percentComplete">0%</div>
+          <div class="stat-label">Complete</div>
         </div>
-    </div>
+      </div>
 
-    <!-- Inventory List -->
-    <div class="inventory-container" id="inventoryContainer">
+      <!-- Inventory List -->
+      <div id="inventoryContainer">
         <div class="loading">
-            <div class="spinner"></div>
-            <p>Loading inventory items...</p>
+          <div class="spinner"></div>
+          <p>Loading inventory...</p>
         </div>
+      </div>
     </div>
+  </div>
 
-    <script type="module">
-        // Supabase initialization
-        const SUPABASE_URL = 'https://gaawtbqpnnbbnsyswqwv.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg';
-        const { createClient } = supabase;
-        const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module">
+    // Supabase
+    const { createClient } = supabase;
+    const db = createClient(
+      'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+    );
 
-        // Global state
-        let inventoryItems = [];
-        let clockedInStaff = [];
-        let activeCounterIndex = 0;
-        let activeCounterName = 'Unknown';
-        let counterTimeout = null;
+    // STAFF TRACKING STATE (EXACT PATTERN FROM ORDERS-PREP.HTML)
+    const inventoryCountState = {
+      clockedInEmployees: [],
+      teamNames: [], // Array of {name: string, color: string}
+      activeUserIndex: 0,
+      activeUserTimeout: null,
+      lastFetched: null
+    };
 
-        // Physical location options
-        const LOCATIONS = [
-            'Not Assigned',
-            'Walk-in Cooler',
-            'Freezer',
-            'Dry Storage',
-            'Bar',
-            'Line Station',
-            'Prep Area',
-            'Back Office',
-            'Reach-in Cooler',
-            'Shelf - Top',
-            'Shelf - Middle',
-            'Shelf - Bottom'
-        ];
+    const USER_COLORS = [
+      '#0094D6', '#00C853', '#FFB300', '#9C27B0',
+      '#F44336', '#00BCD4', '#FF9800', '#4CAF50'
+    ];
 
-        // Initialize
-        async function init() {
-            updateDateDisplay();
-            await fetchClockedInStaff();
-            await loadInventoryItems();
-            renderInventory();
-            updateStats();
+    const LOCATIONS = [
+      'Not Assigned', 'Walk-in Cooler', 'Freezer', 'Dry Storage',
+      'Bar', 'Line Station', 'Prep Area', 'Back Office',
+      'Reach-in Cooler', 'Shelf - Top', 'Shelf - Middle', 'Shelf - Bottom'
+    ];
 
-            // Set active counter from localStorage if exists and not expired
-            const savedCounter = localStorage.getItem('inventory_counter_name');
-            const savedTime = localStorage.getItem('inventory_counter_time');
-            const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
+    let inventoryItems = [];
 
-            if (savedCounter && savedTime && parseInt(savedTime) > thirtyMinutesAgo) {
-                activeCounterName = savedCounter;
-                document.getElementById('counterName').textContent = activeCounterName;
-            } else {
-                // Default to first staff or Demetri
-                if (clockedInStaff.length > 0) {
-                    activeCounterName = clockedInStaff[0];
-                } else {
-                    activeCounterName = 'Demetri Gregorakis';
-                }
-                document.getElementById('counterName').textContent = activeCounterName;
-            }
+    function getUserColor(index) {
+      return USER_COLORS[index % USER_COLORS.length];
+    }
+
+    function setActiveInventoryCounter(index) {
+      inventoryCountState.activeUserIndex = index;
+      if (inventoryCountState.activeUserTimeout) {
+        clearTimeout(inventoryCountState.activeUserTimeout);
+      }
+      inventoryCountState.activeUserTimeout = setTimeout(() => {
+        inventoryCountState.activeUserIndex = 0;
+        console.log('⏰ Counter timeout - reset to default');
+      }, 1800000); // 30 minutes
+    }
+
+    function getActiveCounterName() {
+      if (inventoryCountState.teamNames.length === 0) return 'Demetri Gregorakis';
+      return inventoryCountState.teamNames[inventoryCountState.activeUserIndex]?.name || 'Demetri Gregorakis';
+    }
+
+    function updateCounterDisplay() {
+      const nameEl = document.getElementById('counterNameDisplay');
+      if (nameEl) {
+        nameEl.textContent = getActiveCounterName();
+      }
+    }
+
+    window.cycleCounterName = function() {
+      if (inventoryCountState.teamNames.length === 0) return;
+      const nextIndex = (inventoryCountState.activeUserIndex + 1) % inventoryCountState.teamNames.length;
+      setActiveInventoryCounter(nextIndex);
+      updateCounterDisplay();
+      console.log(`👤 Switched to: ${getActiveCounterName()}`);
+    };
+
+    async function fetchClockedInStaff() {
+      try {
+        const todayPacific = new Date().toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+        const [month, day, year] = todayPacific.split(', ')[0].split('/');
+        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+        const authResponse = await fetch('/api/toast-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!authResponse.ok) {
+          console.error('Toast auth failed');
+          inventoryCountState.clockedInEmployees = [];
+          inventoryCountState.teamNames = [{ name: 'Demetri Gregorakis', color: getUserColor(0) }];
+          updateCounterDisplay();
+          return;
         }
 
-        function updateDateDisplay() {
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-            const timeStr = now.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-            });
-            document.getElementById('currentDate').textContent = `${dateStr} • ${timeStr}`;
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) {
+          console.error('No Toast token');
+          inventoryCountState.clockedInEmployees = [];
+          inventoryCountState.teamNames = [{ name: 'Demetri Gregorakis', color: getUserColor(0) }];
+          updateCounterDisplay();
+          return;
         }
 
-        // Fetch clocked-in staff from Toast API
-        async function fetchClockedInStaff() {
-            try {
-                const today = new Date().toISOString().split('T')[0];
+        const token = authData.data.accessToken;
+        const clockedInUrl = `/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`;
+        const response = await fetch(clockedInUrl);
 
-                // Authenticate with Toast
-                const authResponse = await fetch('/api/toast-auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                if (!authResponse.ok) {
-                    console.error('Toast auth failed');
-                    clockedInStaff = ['Demetri Gregorakis'];
-                    return;
-                }
-
-                const authData = await authResponse.json();
-                if (!authData.success || !authData.data?.accessToken) {
-                    console.error('Toast token missing');
-                    clockedInStaff = ['Demetri Gregorakis'];
-                    return;
-                }
-
-                const token = authData.data.accessToken;
-
-                // Fetch clocked-in employees
-                const clockedInUrl = `/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`;
-                const response = await fetch(clockedInUrl);
-
-                if (!response.ok) {
-                    console.error('Failed to fetch clocked-in staff');
-                    clockedInStaff = ['Demetri Gregorakis'];
-                    return;
-                }
-
-                const result = await response.json();
-                if (!result.success) {
-                    console.error('Clocked-in API error:', result.error);
-                    clockedInStaff = ['Demetri Gregorakis'];
-                    return;
-                }
-
-                // Extract first names
-                const names = result.clockedIn
-                    .map(emp => {
-                        const fullName = emp.fullName || emp.name || '';
-                        return fullName.split(' ')[0];
-                    })
-                    .filter(name => name)
-                    .sort();
-
-                // Always include Demetri Gregorakis
-                clockedInStaff = ['Demetri Gregorakis', ...names];
-
-                console.log('✅ Clocked-in staff loaded:', clockedInStaff);
-
-            } catch (error) {
-                console.error('Error fetching clocked-in staff:', error);
-                clockedInStaff = ['Demetri Gregorakis'];
-            }
+        if (!response.ok) {
+          inventoryCountState.clockedInEmployees = [];
+          inventoryCountState.teamNames = [{ name: 'Demetri Gregorakis', color: getUserColor(0) }];
+          updateCounterDisplay();
+          return;
         }
 
-        // Cycle through counter names
-        window.cycleCounterName = function() {
-            if (clockedInStaff.length === 0) {
-                activeCounterName = 'Demetri Gregorakis';
-                document.getElementById('counterName').textContent = activeCounterName;
-                return;
-            }
-
-            activeCounterIndex = (activeCounterIndex + 1) % clockedInStaff.length;
-            activeCounterName = clockedInStaff[activeCounterIndex];
-            document.getElementById('counterName').textContent = activeCounterName;
-
-            // Save to localStorage with timestamp
-            localStorage.setItem('inventory_counter_name', activeCounterName);
-            localStorage.setItem('inventory_counter_time', Date.now().toString());
-
-            // Clear existing timeout
-            if (counterTimeout) {
-                clearTimeout(counterTimeout);
-            }
-
-            // Set 30-minute timeout
-            counterTimeout = setTimeout(() => {
-                localStorage.removeItem('inventory_counter_name');
-                localStorage.removeItem('inventory_counter_time');
-            }, 30 * 60 * 1000);
-
-            // Visual feedback
-            const nameEl = document.getElementById('counterName');
-            nameEl.style.background = '#047857';
-            setTimeout(() => {
-                nameEl.style.background = 'var(--success)';
-            }, 200);
-        };
-
-        // Load inventory items from database
-        async function loadInventoryItems() {
-            try {
-                const { data, error } = await db
-                    .from('inventory_items')
-                    .select('*')
-                    .order('item_name', { ascending: true });
-
-                if (error) throw error;
-
-                inventoryItems = data || [];
-                console.log(`✅ Loaded ${inventoryItems.length} inventory items`);
-
-            } catch (error) {
-                console.error('Error loading inventory:', error);
-                document.getElementById('inventoryContainer').innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">❌</div>
-                        <div class="empty-state-text">Failed to load inventory items</div>
-                        <p style="margin-top: 12px; color: var(--error);">${error.message}</p>
-                    </div>
-                `;
-            }
+        const result = await response.json();
+        if (!result.success) {
+          inventoryCountState.clockedInEmployees = [];
+          inventoryCountState.teamNames = [{ name: 'Demetri Gregorakis', color: getUserColor(0) }];
+          updateCounterDisplay();
+          return;
         }
 
-        // Render inventory list
-        window.renderInventory = function() {
-            const groupBy = document.getElementById('groupBySelect').value;
-            const sortBy = document.getElementById('sortBySelect').value;
-            const container = document.getElementById('inventoryContainer');
+        const names = result.clockedIn
+          .map(emp => {
+            const fullName = emp.fullName || emp.name || '';
+            return fullName.split(' ')[0];
+          })
+          .filter(name => name)
+          .sort();
 
-            if (inventoryItems.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📦</div>
-                        <div class="empty-state-text">No inventory items found</div>
-                        <p style="margin-top: 12px;">Import items to get started</p>
-                    </div>
-                `;
-                return;
-            }
+        // ALWAYS INCLUDE DEMETRI FIRST
+        inventoryCountState.clockedInEmployees = ['Demetri Gregorakis', ...names.filter(n => n !== 'Demetri')];
+        inventoryCountState.teamNames = inventoryCountState.clockedInEmployees.map((name, index) => ({
+          name: name,
+          color: getUserColor(index)
+        }));
 
-            // Group items
-            const groups = {};
-            inventoryItems.forEach(item => {
-                let groupKey;
-                if (groupBy === 'vendor') {
-                    groupKey = item.vendor_name || 'Unknown Vendor';
-                } else if (groupBy === 'location') {
-                    groupKey = item.physical_location || 'Not Assigned';
-                } else if (groupBy === 'category') {
-                    groupKey = item.category || 'Uncategorized';
-                }
+        console.log('✅ Clocked-in staff loaded:', inventoryCountState.clockedInEmployees);
+        updateCounterDisplay();
 
-                if (!groups[groupKey]) {
-                    groups[groupKey] = [];
-                }
-                groups[groupKey].push(item);
-            });
+      } catch (error) {
+        console.error('Error fetching clocked-in staff:', error);
+        inventoryCountState.clockedInEmployees = [];
+        inventoryCountState.teamNames = [{ name: 'Demetri Gregorakis', color: getUserColor(0) }];
+        updateCounterDisplay();
+      }
+    }
 
-            // Sort items within each group
-            Object.keys(groups).forEach(groupKey => {
-                groups[groupKey].sort((a, b) => {
-                    if (sortBy === 'name') {
-                        return a.item_name.localeCompare(b.item_name);
-                    } else if (sortBy === 'name-desc') {
-                        return b.item_name.localeCompare(a.item_name);
-                    } else if (sortBy === 'count-asc') {
-                        return (a.current_on_hand || 0) - (b.current_on_hand || 0);
-                    } else if (sortBy === 'count-desc') {
-                        return (b.current_on_hand || 0) - (a.current_on_hand || 0);
-                    }
-                    return 0;
-                });
-            });
+    async function loadInventoryData() {
+      try {
+        const { data, error } = await db
+          .from('inventory_items')
+          .select('*')
+          .order('item_name', { ascending: true });
 
-            // Render groups
-            let html = '';
-            const sortedGroupKeys = Object.keys(groups).sort();
+        if (error) throw error;
 
-            sortedGroupKeys.forEach(groupKey => {
-                const items = groups[groupKey];
-                html += `
-                    <div class="group-section">
-                        <div class="group-header">
-                            <span>${groupKey}</span>
-                            <span class="group-count">${items.length} items</span>
-                        </div>
-                `;
+        // Map to match orders-prep.html structure (use vendor, not vendor_name!)
+        inventoryItems = (data || []).map(item => ({
+          id: item.id,
+          itemName: item.item_name,
+          vendor: item.vendor, // CRITICAL: Use 'vendor', NOT 'vendor_name'
+          category: item.category,
+          unit: item.unit,
+          parLevel: item.par_level || 0,
+          currentOnHand: item.current_on_hand,
+          physicalLocation: item.physical_location,
+          countedBy: item.counted_by,
+          lastCounted: item.last_counted,
+          currentCost: item.current_cost
+        }));
 
-                items.forEach(item => {
-                    const isCounted = item.last_counted && item.current_on_hand !== null && item.current_on_hand !== undefined;
-                    const countedClass = isCounted ? 'counted' : '';
+        console.log(`✅ Loaded ${inventoryItems.length} inventory items`);
 
-                    html += `
-                        <div class="item-card ${countedClass}">
-                            <div class="item-header">
-                                <div class="item-name">${item.item_name}</div>
-                            </div>
-                            <div class="item-meta">
-                                ${item.vendor_name ? `<span class="meta-badge vendor">${item.vendor_name}</span>` : ''}
-                                ${item.category ? `<span class="meta-badge">${item.category}</span>` : ''}
-                                ${item.physical_location ? `<span class="meta-badge location">📍 ${item.physical_location}</span>` : ''}
-                                ${item.unit ? `<span class="meta-badge">${item.unit}</span>` : ''}
-                            </div>
-                            <div class="item-input-row">
-                                <div class="input-group">
-                                    <label class="input-label">Count</label>
-                                    <input
-                                        type="number"
-                                        class="count-input"
-                                        id="count-${item.id}"
-                                        value="${item.current_on_hand || ''}"
-                                        placeholder="0"
-                                        inputmode="decimal"
-                                        step="0.1"
-                                        onblur="saveCount(${item.id}, this.value)"
-                                    />
-                                </div>
-                                <div class="input-group">
-                                    <label class="input-label">Location</label>
-                                    <select
-                                        class="location-select"
-                                        id="location-${item.id}"
-                                        onchange="saveLocation(${item.id}, this.value)"
-                                    >
-                                        ${LOCATIONS.map(loc =>
-                                            `<option value="${loc}" ${item.physical_location === loc ? 'selected' : ''}>${loc}</option>`
-                                        ).join('')}
-                                    </select>
-                                </div>
-                            </div>
-                            ${item.counted_by ? `
-                                <div class="item-footer">
-                                    <div class="counted-by">
-                                        ✓ Counted by <strong>${item.counted_by}</strong>
-                                        ${item.last_counted ? `• ${new Date(item.last_counted).toLocaleString('en-US', {
-                                            month: 'short',
-                                            day: 'numeric',
-                                            hour: 'numeric',
-                                            minute: '2-digit',
-                                            hour12: true
-                                        })}` : ''}
-                                    </div>
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
-                });
+      } catch (error) {
+        console.error('Error loading inventory:', error);
+        document.getElementById('inventoryContainer').innerHTML = `
+          <div class="loading">
+            <p style="color: var(--error);">Failed to load inventory: ${error.message}</p>
+          </div>
+        `;
+      }
+    }
 
-                html += '</div>';
-            });
+    window.renderInventory = function() {
+      const groupBy = document.getElementById('groupBySelect').value;
+      const sortBy = document.getElementById('sortBySelect').value;
+      const container = document.getElementById('inventoryContainer');
 
-            container.innerHTML = html;
-        };
+      if (inventoryItems.length === 0) {
+        container.innerHTML = '<div class="loading"><p>No inventory items found</p></div>';
+        return;
+      }
 
-        // Save count to database
-        window.saveCount = async function(itemId, value) {
-            const inputEl = document.getElementById(`count-${itemId}`);
-            const countValue = value === '' ? null : parseFloat(value);
-
-            try {
-                const timestamp = new Date().toISOString();
-
-                // Update inventory_items
-                const { error: itemError } = await db
-                    .from('inventory_items')
-                    .update({
-                        current_on_hand: countValue,
-                        last_counted: timestamp,
-                        counted_by: activeCounterName
-                    })
-                    .eq('id', itemId);
-
-                if (itemError) throw itemError;
-
-                // Insert into inventory_counts for history
-                const item = inventoryItems.find(i => i.id === itemId);
-                if (item && countValue !== null) {
-                    await db.from('inventory_counts').insert({
-                        count_date: new Date().toISOString().split('T')[0],
-                        inventory_item_id: itemId,
-                        quantity_counted: countValue,
-                        counted_by: activeCounterName,
-                        physical_location: item.physical_location,
-                        timestamp: timestamp
-                    });
-                }
-
-                // Visual feedback
-                inputEl.classList.add('saved');
-                setTimeout(() => {
-                    inputEl.classList.remove('saved');
-                }, 1000);
-
-                // Update local state
-                const itemIndex = inventoryItems.findIndex(i => i.id === itemId);
-                if (itemIndex !== -1) {
-                    inventoryItems[itemIndex].current_on_hand = countValue;
-                    inventoryItems[itemIndex].last_counted = timestamp;
-                    inventoryItems[itemIndex].counted_by = activeCounterName;
-                }
-
-                updateStats();
-                console.log(`✅ Saved count for item ${itemId}: ${countValue}`);
-
-            } catch (error) {
-                console.error('Error saving count:', error);
-                inputEl.style.borderColor = 'var(--error)';
-                setTimeout(() => {
-                    inputEl.style.borderColor = '';
-                }, 2000);
-            }
-        };
-
-        // Save location to database
-        window.saveLocation = async function(itemId, location) {
-            try {
-                const { error } = await db
-                    .from('inventory_items')
-                    .update({ physical_location: location })
-                    .eq('id', itemId);
-
-                if (error) throw error;
-
-                // Update local state
-                const itemIndex = inventoryItems.findIndex(i => i.id === itemId);
-                if (itemIndex !== -1) {
-                    inventoryItems[itemIndex].physical_location = location;
-                }
-
-                console.log(`✅ Saved location for item ${itemId}: ${location}`);
-
-            } catch (error) {
-                console.error('Error saving location:', error);
-            }
-        };
-
-        // Update statistics
-        function updateStats() {
-            const total = inventoryItems.length;
-            const counted = inventoryItems.filter(i => i.current_on_hand !== null && i.current_on_hand !== undefined && i.last_counted).length;
-            const percent = total > 0 ? Math.round((counted / total) * 100) : 0;
-
-            document.getElementById('totalItems').textContent = total;
-            document.getElementById('countedItems').textContent = counted;
-            document.getElementById('percentComplete').textContent = percent + '%';
+      // Group items
+      const groups = {};
+      inventoryItems.forEach(item => {
+        let groupKey;
+        if (groupBy === 'vendor') {
+          groupKey = item.vendor || 'Unknown Vendor';
+        } else if (groupBy === 'location') {
+          groupKey = item.physicalLocation || 'Not Assigned';
+        } else if (groupBy === 'category') {
+          groupKey = item.category || 'Uncategorized';
         }
 
-        // Generate report (opens new window with formatted report)
-        window.generateReport = function() {
-            const reportWindow = window.open('', '_blank');
-            reportWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Inventory Count Report</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; padding: 40px; }
-                        h1 { font-size: 24px; margin-bottom: 20px; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-                        th { background: #1a1a1a; color: white; font-weight: 700; text-transform: uppercase; font-size: 11px; }
-                        tr:nth-child(even) { background: #f9f9f9; }
-                        .footer { margin-top: 40px; font-size: 12px; color: #666; }
-                    </style>
-                </head>
-                <body>
-                    <h1>📦 Inventory Count Report</h1>
-                    <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
-                    <p><strong>Counted By:</strong> ${activeCounterName}</p>
-                    <p><strong>Total Items:</strong> ${inventoryItems.length}</p>
-                    <p><strong>Items Counted:</strong> ${inventoryItems.filter(i => i.last_counted).length}</p>
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(item);
+      });
 
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Item Name</th>
-                                <th>Vendor</th>
-                                <th>Location</th>
-                                <th>Count</th>
-                                <th>Unit</th>
-                                <th>Counted By</th>
-                                <th>Timestamp</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${inventoryItems.map(item => `
-                                <tr>
-                                    <td>${item.item_name}</td>
-                                    <td>${item.vendor_name || '-'}</td>
-                                    <td>${item.physical_location || '-'}</td>
-                                    <td><strong>${item.current_on_hand !== null ? item.current_on_hand : '-'}</strong></td>
-                                    <td>${item.unit || '-'}</td>
-                                    <td>${item.counted_by || '-'}</td>
-                                    <td>${item.last_counted ? new Date(item.last_counted).toLocaleString() : '-'}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+      // Sort items within groups
+      Object.keys(groups).forEach(key => {
+        groups[key].sort((a, b) => {
+          if (sortBy === 'name') return a.itemName.localeCompare(b.itemName);
+          if (sortBy === 'name-desc') return b.itemName.localeCompare(a.itemName);
+          if (sortBy === 'count-asc') return (a.currentOnHand || 0) - (b.currentOnHand || 0);
+          if (sortBy === 'count-desc') return (b.currentOnHand || 0) - (a.currentOnHand || 0);
+          return 0;
+        });
+      });
 
-                    <div class="footer">
-                        Generated by Jayna Gyro Inventory System • ${new Date().toLocaleString()}
-                    </div>
-                </body>
-                </html>
-            `);
-            reportWindow.document.close();
-        };
+      // Render
+      let html = '';
+      Object.keys(groups).sort().forEach(groupKey => {
+        const items = groups[groupKey];
+        html += `
+          <div class="group-section">
+            <div class="group-header">
+              <span>${groupKey}</span>
+              <span class="group-count">${items.length}</span>
+            </div>
+        `;
 
-        // Export to CSV
-        window.exportCSV = function() {
-            const headers = ['Item Name', 'Vendor', 'Physical Location', 'Category', 'Count', 'Unit', 'Counted By', 'Timestamp'];
-            const rows = inventoryItems.map(item => [
-                item.item_name,
-                item.vendor_name || '',
-                item.physical_location || '',
-                item.category || '',
-                item.current_on_hand !== null ? item.current_on_hand : '',
-                item.unit || '',
-                item.counted_by || '',
-                item.last_counted || ''
-            ]);
+        items.forEach(item => {
+          const isCounted = item.lastCounted && item.currentOnHand !== null;
+          const countedClass = isCounted ? 'counted' : '';
 
-            let csv = headers.join(',') + '\n';
-            rows.forEach(row => {
-                csv += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
-            });
+          html += `
+            <div class="item-card ${countedClass}">
+              <div class="item-name">${item.itemName}</div>
+              <div class="item-meta">
+                ${item.vendor ? `<span class="meta-badge vendor">${item.vendor}</span>` : ''}
+                ${item.category ? `<span class="meta-badge">${item.category}</span>` : ''}
+                ${item.physicalLocation ? `<span class="meta-badge location">📍 ${item.physicalLocation}</span>` : ''}
+                ${item.unit ? `<span class="meta-badge">${item.unit}</span>` : ''}
+              </div>
+              <div class="item-inputs">
+                <div class="input-group">
+                  <label class="input-label">Count</label>
+                  <input
+                    type="number"
+                    class="count-input"
+                    id="count-${item.id}"
+                    value="${item.currentOnHand !== null ? item.currentOnHand : ''}"
+                    placeholder="0"
+                    inputmode="decimal"
+                    step="0.1"
+                    onblur="saveCount(${item.id}, this.value)"
+                  />
+                </div>
+                <div class="input-group">
+                  <label class="input-label">Location</label>
+                  <select
+                    class="location-select"
+                    id="location-${item.id}"
+                    onchange="saveLocation(${item.id}, this.value)"
+                  >
+                    ${LOCATIONS.map(loc =>
+                      `<option value="${loc}" ${item.physicalLocation === loc ? 'selected' : ''}>${loc}</option>`
+                    ).join('')}
+                  </select>
+                </div>
+              </div>
+              ${item.countedBy && item.lastCounted ? `
+                <div class="counted-info">
+                  ✓ Counted by <strong>${item.countedBy}</strong> on ${formatDateTime(item.lastCounted)}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        });
 
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `inventory-count-${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        };
+        html += '</div>';
+      });
 
-        // Initialize on page load
-        init();
-    </script>
+      container.innerHTML = html;
+      updateStats();
+    };
+
+    function formatDateTime(isoString) {
+      const date = new Date(isoString);
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return `${dateStr} at ${timeStr}`;
+    }
+
+    window.saveCount = async function(itemId, value) {
+      const inputEl = document.getElementById(`count-${itemId}`);
+      const countValue = value === '' ? null : parseFloat(value);
+
+      try {
+        const timestamp = new Date().toISOString();
+        const counterName = getActiveCounterName();
+
+        // Update database
+        const { error } = await db
+          .from('inventory_items')
+          .update({
+            current_on_hand: countValue,
+            last_counted: timestamp,
+            counted_by: counterName
+          })
+          .eq('id', itemId);
+
+        if (error) throw error;
+
+        // Update local state
+        const item = inventoryItems.find(i => i.id === itemId);
+        if (item) {
+          item.currentOnHand = countValue;
+          item.lastCounted = timestamp;
+          item.countedBy = counterName;
+        }
+
+        // Visual feedback
+        inputEl.classList.add('saved');
+        setTimeout(() => {
+          inputEl.classList.remove('saved');
+          renderInventory(); // Re-render to show counted info
+        }, 800);
+
+        console.log(`✅ Saved count: ${item.itemName} = ${countValue} by ${counterName}`);
+
+      } catch (error) {
+        console.error('Error saving count:', error);
+        inputEl.style.borderColor = 'var(--error)';
+        setTimeout(() => {
+          inputEl.style.borderColor = '';
+        }, 2000);
+      }
+    };
+
+    window.saveLocation = async function(itemId, location) {
+      try {
+        const { error } = await db
+          .from('inventory_items')
+          .update({ physical_location: location })
+          .eq('id', itemId);
+
+        if (error) throw error;
+
+        const item = inventoryItems.find(i => i.id === itemId);
+        if (item) {
+          item.physicalLocation = location;
+        }
+
+        console.log(`✅ Saved location: ${location}`);
+
+      } catch (error) {
+        console.error('Error saving location:', error);
+      }
+    };
+
+    function updateStats() {
+      const total = inventoryItems.length;
+      const counted = inventoryItems.filter(i => i.lastCounted && i.currentOnHand !== null).length;
+      const percent = total > 0 ? Math.round((counted / total) * 100) : 0;
+
+      document.getElementById('totalItems').textContent = total;
+      document.getElementById('countedItems').textContent = counted;
+      document.getElementById('percentComplete').textContent = percent + '%';
+    }
+
+    window.generateReport = function() {
+      const reportWin = window.open('', '_blank');
+      reportWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Inventory Count Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; }
+            h1 { font-size: 24px; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+            th { background: #212121; color: white; font-weight: 700; text-transform: uppercase; font-size: 11px; }
+            tr:nth-child(even) { background: #f9f9f9; }
+          </style>
+        </head>
+        <body>
+          <h1>📦 Inventory Count Report</h1>
+          <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+          <p><strong>Counted By:</strong> ${getActiveCounterName()}</p>
+          <p><strong>Total Items:</strong> ${inventoryItems.length}</p>
+          <p><strong>Items Counted:</strong> ${inventoryItems.filter(i => i.lastCounted).length}</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Item Name</th>
+                <th>Vendor</th>
+                <th>Location</th>
+                <th>Count</th>
+                <th>Unit</th>
+                <th>Counted By</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${inventoryItems.map(item => `
+                <tr>
+                  <td>${item.itemName}</td>
+                  <td>${item.vendor || '-'}</td>
+                  <td>${item.physicalLocation || '-'}</td>
+                  <td><strong>${item.currentOnHand !== null ? item.currentOnHand : '-'}</strong></td>
+                  <td>${item.unit || '-'}</td>
+                  <td>${item.countedBy || '-'}</td>
+                  <td>${item.lastCounted ? new Date(item.lastCounted).toLocaleString() : '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div style="margin-top: 40px; font-size: 12px; color: #666;">
+            Generated by Jayna Gyro Inventory System • ${new Date().toLocaleString()}
+          </div>
+        </body>
+        </html>
+      `);
+      reportWin.document.close();
+    };
+
+    window.exportCSV = function() {
+      const headers = ['Item Name', 'Vendor', 'Physical Location', 'Category', 'Count', 'Unit', 'Counted By', 'Timestamp'];
+      const rows = inventoryItems.map(item => [
+        item.itemName,
+        item.vendor || '',
+        item.physicalLocation || '',
+        item.category || '',
+        item.currentOnHand !== null ? item.currentOnHand : '',
+        item.unit || '',
+        item.countedBy || '',
+        item.lastCounted || ''
+      ]);
+
+      let csv = headers.join(',') + '\n';
+      rows.forEach(row => {
+        csv += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inventory-count-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+
+    // Initialize
+    async function init() {
+      await fetchClockedInStaff();
+      await loadInventoryData();
+      renderInventory();
+      updateStats();
+    }
+
+    init();
+  </script>
 </body>
 </html>
