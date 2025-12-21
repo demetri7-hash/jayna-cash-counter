@@ -637,7 +637,10 @@
                     <h1>30-DAY TRAINING PROGRAM</h1>
                     <p class="subtitle">Heming Huang — Assistant Manager Onboarding</p>
                     <p class="welcome" id="welcomeMessage"></p>
-                    <button class="logout-btn" onclick="logout()">LOGOUT</button>
+                    <div style="display: flex; gap: 12px; margin-top: 16px;">
+                        <button class="btn btn-primary" style="flex: 1;" onclick="downloadCompleteManual()">📄 DOWNLOAD COMPLETE MANUAL (PDF)</button>
+                        <button class="logout-btn" style="margin-top: 0;" onclick="logout()">LOGOUT</button>
+                    </div>
                 </div>
 
                 <!-- Progress Overview -->
@@ -1278,7 +1281,53 @@
             document.querySelector('.modal-overlay')?.remove();
         }
 
-        // Download module files
+        // Download complete training manual PDF
+        async function downloadCompleteManual() {
+            try {
+                // Show loading state
+                const downloadBtn = event.target;
+                const originalText = downloadBtn.textContent;
+                downloadBtn.textContent = '⏳ GENERATING PDF...';
+                downloadBtn.disabled = true;
+
+                // Call API to generate PDF
+                const response = await fetch('/api/download-training-manual', {
+                    method: 'GET'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to generate PDF');
+                }
+
+                // Get PDF blob
+                const blob = await response.blob();
+
+                // Download the file
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'Jayna_Gyro_Training_Manual_Complete.pdf';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                // Reset button
+                downloadBtn.textContent = originalText;
+                downloadBtn.disabled = false;
+
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('Failed to download training manual. Please try again.');
+
+                // Reset button
+                const downloadBtn = event.target;
+                downloadBtn.textContent = '📄 DOWNLOAD COMPLETE MANUAL (PDF)';
+                downloadBtn.disabled = false;
+            }
+        }
+
+        // Download individual module files
         async function downloadModuleFile(moduleNum, type) {
             try {
                 const moduleNames = {
