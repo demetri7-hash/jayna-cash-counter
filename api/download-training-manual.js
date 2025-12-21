@@ -1,6 +1,6 @@
 /**
  * Generate Complete Training Manual PDF
- * All 5 modules + signature cocktails + reflection workbooks
+ * Uses pre-processed JSON files for fast, reliable rendering
  * Brand-ready format matching existing Jayna PDF style
  */
 
@@ -15,78 +15,43 @@ const __dirname = path.dirname(__filename);
 export default async function handler(req, res) {
   try {
     console.log('=== TRAINING MANUAL GENERATION START ===');
-    console.log('Current directory:', process.cwd());
 
-    // Read all training modules and workbooks
-    const modulesDir = path.join(process.cwd(), 'training', 'modules');
-    console.log('Modules directory:', modulesDir);
+    // Use pre-processed JSON files (much faster and more reliable)
+    const processedDir = path.join(process.cwd(), 'training', 'processed');
+    console.log('Looking for processed files in:', processedDir);
 
-    // Check if directory exists
-    if (!fs.existsSync(modulesDir)) {
-      throw new Error(`Modules directory not found: ${modulesDir}`);
+    if (!fs.existsSync(processedDir)) {
+      throw new Error(`Processed directory not found: ${processedDir}`);
     }
 
-    const allFiles = fs.readdirSync(modulesDir);
-    console.log('Files in modules directory:', allFiles);
+    const allUnits = [];
 
-    const trainingContent = {
-      modules: [],
-      workbooks: [],
-      cocktails: null
-    };
+    // Load all 30 unit JSON files
+    for (let moduleNum = 1; moduleNum <= 5; moduleNum++) {
+      for (let unitNum = 1; unitNum <= 6; unitNum++) {
+        const filename = `module_${moduleNum}_unit_${unitNum}.json`;
+        const filePath = path.join(processedDir, filename);
 
-    // Load all 5 modules
-    for (let i = 1; i <= 5; i++) {
-      console.log(`Loading module ${i}...`);
+        if (fs.existsSync(filePath)) {
+          const jsonContent = fs.readFileSync(filePath, 'utf-8');
+          const unitData = JSON.parse(jsonContent);
 
-      const mainFile = allFiles.find(f =>
-        f.startsWith(`MODULE_${i}_`) &&
-        !f.includes('REFLECTION') &&
-        !f.includes('WORKBOOK')
-      );
+          allUnits.push({
+            module: moduleNum,
+            unit: unitNum,
+            ...unitData.unit
+          });
 
-      const workbookFile = allFiles.find(f =>
-        f.startsWith(`MODULE_${i}_`) &&
-        (f.includes('REFLECTION') || f.includes('WORKBOOK'))
-      );
-
-      console.log(`  Main file: ${mainFile}`);
-      console.log(`  Workbook file: ${workbookFile}`);
-
-      if (mainFile) {
-        const content = fs.readFileSync(path.join(modulesDir, mainFile), 'utf-8');
-        console.log(`  Main content length: ${content.length} chars`);
-        trainingContent.modules.push({
-          number: i,
-          filename: mainFile,
-          content: content
-        });
-      }
-
-      if (workbookFile) {
-        const content = fs.readFileSync(path.join(modulesDir, workbookFile), 'utf-8');
-        console.log(`  Workbook content length: ${content.length} chars`);
-        trainingContent.workbooks.push({
-          number: i,
-          filename: workbookFile,
-          content: content
-        });
+          console.log(`✓ Loaded Module ${moduleNum}, Unit ${unitNum}`);
+        }
       }
     }
 
-    // Load cocktail recipes
-    const cocktailFile = allFiles.find(f => f.includes('SIGNATURE_COCKTAIL'));
-    console.log('Cocktail file:', cocktailFile);
-    if (cocktailFile) {
-      trainingContent.cocktails = fs.readFileSync(path.join(modulesDir, cocktailFile), 'utf-8');
-      console.log(`Cocktail content length: ${trainingContent.cocktails.length} chars`);
-    }
-
-    console.log(`✅ Loaded ${trainingContent.modules.length} modules, ${trainingContent.workbooks.length} workbooks`);
+    console.log(`✅ Loaded ${allUnits.length} units`);
 
     // Generate PDF
     console.log('Starting PDF generation...');
-    const pdfBuffer = await generateTrainingManualPDF(trainingContent);
+    const pdfBuffer = await generateTrainingManualPDF(allUnits);
     console.log(`PDF generated, size: ${pdfBuffer.length} bytes`);
 
     // Return PDF as download
@@ -110,9 +75,9 @@ export default async function handler(req, res) {
 }
 
 /**
- * Generate complete training manual PDF
+ * Generate complete training manual PDF from structured JSON
  */
-async function generateTrainingManualPDF(trainingContent) {
+async function generateTrainingManualPDF(allUnits) {
   try {
     console.log('Creating jsPDF instance...');
     const doc = new jsPDF({
@@ -121,49 +86,45 @@ async function generateTrainingManualPDF(trainingContent) {
       format: 'letter'
     });
 
-    console.log('jsPDF instance created successfully');
-
     const pageWidth = doc.internal.pageSize.width; // 612pt
     const pageHeight = doc.internal.pageSize.height; // 792pt
     const margin = 40;
     const contentWidth = pageWidth - (margin * 2);
 
-    console.log(`Page dimensions: ${pageWidth}x${pageHeight}, margin: ${margin}`);
+    console.log(`Page dimensions: ${pageWidth}x${pageHeight}`);
 
-  // ========== COVER PAGE ==========
-  generateCoverPage(doc, pageWidth, pageHeight, margin);
+    // ========== COVER PAGE ==========
+    generateCoverPage(doc, pageWidth, pageHeight, margin);
 
-  // ========== TABLE OF CONTENTS ==========
-  doc.addPage();
-  generateTableOfContents(doc, pageWidth, pageHeight, margin, contentWidth);
-
-  // ========== EACH MODULE ==========
-  for (const module of trainingContent.modules) {
+    // ========== TABLE OF CONTENTS ==========
     doc.addPage();
-    renderModuleContent(doc, module, pageWidth, pageHeight, margin, contentWidth);
-  }
+    generateTableOfContents(doc, pageWidth, pageHeight, margin, contentWidth);
 
-  // ========== SIGNATURE COCKTAILS ==========
-  if (trainingContent.cocktails) {
-    doc.addPage();
-    renderCocktailRecipes(doc, trainingContent.cocktails, pageWidth, pageHeight, margin, contentWidth);
-  }
+    // ========== ALL UNITS (GROUPED BY MODULE) ==========
+    let currentModule = 0;
 
-  // ========== REFLECTION WORKBOOKS ==========
-  for (const workbook of trainingContent.workbooks) {
-    doc.addPage();
-    renderWorkbookContent(doc, workbook, pageWidth, pageHeight, margin, contentWidth);
-  }
+    for (const unit of allUnits) {
+      // Add module separator page when starting new module
+      if (unit.module !== currentModule) {
+        doc.addPage();
+        renderModuleSeparator(doc, unit.module, pageWidth, pageHeight, margin);
+        currentModule = unit.module;
+      }
 
-  // ========== FOOTER ON ALL PAGES ==========
-  console.log('Adding footers to all pages...');
-  addFootersToAllPages(doc, pageWidth, pageHeight, margin);
+      // Render unit content
+      doc.addPage();
+      renderUnitContent(doc, unit, pageWidth, pageHeight, margin, contentWidth);
+    }
 
-  console.log('Converting PDF to buffer...');
-  const buffer = Buffer.from(doc.output('arraybuffer'));
-  console.log(`PDF buffer created, size: ${buffer.length} bytes`);
+    // ========== FOOTER ON ALL PAGES ==========
+    console.log('Adding footers...');
+    addFootersToAllPages(doc, pageWidth, pageHeight, margin);
 
-  return buffer;
+    console.log('Converting to buffer...');
+    const buffer = Buffer.from(doc.output('arraybuffer'));
+    console.log(`✅ PDF complete: ${buffer.length} bytes`);
+
+    return buffer;
 
   } catch (error) {
     console.error('Error in generateTrainingManualPDF:', error);
@@ -317,304 +278,179 @@ function generateTableOfContents(doc, pageWidth, pageHeight, margin, contentWidt
 }
 
 /**
- * Render module content from markdown
+ * Render module separator page
  */
-function renderModuleContent(doc, module, pageWidth, pageHeight, margin, contentWidth) {
-  const lines = module.content.split('\n');
-  let y = 80;
-
+function renderModuleSeparator(doc, moduleNum, pageWidth, pageHeight, margin) {
   // Blue header bar
   doc.setFillColor(0, 168, 225);
-  doc.rect(0, 0, pageWidth, 6, 'F');
+  doc.rect(0, 0, pageWidth, 80, 'F');
 
-  // Module title (first line)
-  doc.setFontSize(20);
+  // Module number
+  doc.setFontSize(48);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 168, 225);
-  const moduleTitleMatch = lines[0].match(/# MODULE \d+: (.+)/);
-  if (moduleTitleMatch) {
-    doc.text(`MODULE ${module.number}: ${moduleTitleMatch[1]}`, margin, y);
-    y += 30;
-  }
+  doc.setTextColor(255, 255, 255);
+  doc.text(`MODULE ${moduleNum}`, pageWidth / 2, 120, { align: 'center' });
 
-  // Process markdown line by line
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
+  // Module titles
+  const moduleTitles = {
+    1: 'FOUNDATION & CULTURE',
+    2: 'OPERATIONS MASTERY',
+    3: 'GUEST EXPERIENCE',
+    4: 'BAR PROGRAM',
+    5: 'LEADERSHIP'
+  };
 
-    // Check if we need a new page
-    if (y > pageHeight - 100) {
-      doc.addPage();
-      doc.setFillColor(0, 168, 225);
-      doc.rect(0, 0, pageWidth, 6, 'F');
-      y = 60;
-    }
+  doc.setFontSize(24);
+  doc.setTextColor(33, 33, 33);
+  doc.text(moduleTitles[moduleNum] || '', pageWidth / 2, 200, { align: 'center' });
 
-    if (!line) {
-      y += 10;
-      continue;
-    }
-
-    // Unit headings (# UNIT X.X:)
-    if (line.startsWith('# UNIT')) {
-      doc.addPage(); // New page for each unit
-      doc.setFillColor(0, 168, 225);
-      doc.rect(0, 0, pageWidth, 6, 'F');
-      y = 80;
-
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 168, 225);
-      const text = line.replace(/^# /, '');
-      doc.text(text, margin, y);
-      y += 30;
-      continue;
-    }
-
-    // Section headings (##)
-    if (line.startsWith('## ')) {
-      y += 10;
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(33, 33, 33);
-      doc.text(line.replace(/^## /, ''), margin, y);
-      y += 20;
-      continue;
-    }
-
-    // Subsection headings (###)
-    if (line.startsWith('### ')) {
-      y += 8;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(66, 66, 66);
-      doc.text(line.replace(/^### /, ''), margin, y);
-      y += 16;
-      continue;
-    }
-
-    // Bold text (**text**)
-    if (line.startsWith('**') && line.includes(':**')) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(33, 33, 33);
-      const cleanLine = line.replace(/\*\*/g, '');
-      const wrapped = doc.splitTextToSize(cleanLine, contentWidth);
-      wrapped.forEach(wrappedLine => {
-        if (y > pageHeight - 100) {
-          doc.addPage();
-          doc.setFillColor(0, 168, 225);
-          doc.rect(0, 0, pageWidth, 6, 'F');
-          y = 60;
-        }
-        doc.text(wrappedLine, margin, y);
-        y += 14;
-      });
-      continue;
-    }
-
-    // Bullet points
-    if (line.startsWith('- ') || line.startsWith('* ')) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(66, 66, 66);
-      const bulletText = line.substring(2);
-      const wrapped = doc.splitTextToSize(`• ${bulletText}`, contentWidth - 20);
-      wrapped.forEach(wrappedLine => {
-        if (y > pageHeight - 100) {
-          doc.addPage();
-          doc.setFillColor(0, 168, 225);
-          doc.rect(0, 0, pageWidth, 6, 'F');
-          y = 60;
-        }
-        doc.text(wrappedLine, margin + 10, y);
-        y += 13;
-      });
-      continue;
-    }
-
-    // Horizontal rules
-    if (line === '---') {
-      y += 8;
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(1);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 16;
-      continue;
-    }
-
-    // Regular paragraphs
-    if (line.length > 0) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(66, 66, 66);
-      const cleanLine = line.replace(/\*\*/g, ''); // Remove bold markers
-      const wrapped = doc.splitTextToSize(cleanLine, contentWidth);
-      wrapped.forEach(wrappedLine => {
-        if (y > pageHeight - 100) {
-          doc.addPage();
-          doc.setFillColor(0, 168, 225);
-          doc.rect(0, 0, pageWidth, 6, 'F');
-          y = 60;
-        }
-        doc.text(wrappedLine, margin, y);
-        y += 13;
-      });
-      y += 4;
-    }
-  }
+  // Decorative line
+  doc.setDrawColor(0, 168, 225);
+  doc.setLineWidth(2);
+  doc.line(margin + 100, 240, pageWidth - margin - 100, 240);
 }
 
 /**
- * Render cocktail recipes
+ * Render unit content from structured JSON
  */
-function renderCocktailRecipes(doc, cocktailContent, pageWidth, pageHeight, margin, contentWidth) {
-  const lines = cocktailContent.split('\n');
-  let y = 80;
+function renderUnitContent(doc, unit, pageWidth, pageHeight, margin, contentWidth) {
+  let y = 60;
 
   // Blue header bar
   doc.setFillColor(0, 168, 225);
   doc.rect(0, 0, pageWidth, 6, 'F');
 
-  // Title
-  doc.setFontSize(20);
+  // Unit title
+  doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0, 168, 225);
-  doc.text('SIGNATURE COCKTAIL RECIPES', margin, y);
-  y += 40;
+  doc.text(`UNIT ${unit.module}.${unit.unit}: ${unit.title}`, margin, y);
+  y += 25;
 
-  // Process like module content
-  for (const line of lines) {
-    if (y > pageHeight - 100) {
-      doc.addPage();
-      doc.setFillColor(0, 168, 225);
-      doc.rect(0, 0, pageWidth, 6, 'F');
-      y = 60;
-    }
+  // Metadata box
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(66, 66, 66);
 
-    const trimmed = line.trim();
-    if (!trimmed) {
-      y += 10;
-      continue;
-    }
+  if (unit.duration) {
+    doc.text(`Duration: ${unit.duration}`, margin, y);
+    y += 12;
+  }
+  if (unit.trainer) {
+    doc.text(`Trainer: ${unit.trainer}`, margin, y);
+    y += 12;
+  }
+  if (unit.location) {
+    doc.text(`Location: ${unit.location}`, margin, y);
+    y += 12;
+  }
 
-    // Cocktail names (# 🍹 NAME)
-    if (trimmed.startsWith('# 🍹')) {
-      if (y > 100) {
+  y += 8;
+
+  // Purpose
+  if (unit.purpose) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(33, 33, 33);
+    doc.text('PURPOSE', margin, y);
+    y += 14;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(66, 66, 66);
+    const purposeLines = doc.splitTextToSize(unit.purpose, contentWidth);
+    purposeLines.forEach(line => {
+      if (y > pageHeight - 80) {
         doc.addPage();
         doc.setFillColor(0, 168, 225);
         doc.rect(0, 0, pageWidth, 6, 'F');
-        y = 80;
+        y = 60;
       }
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 168, 225);
-      doc.text(trimmed.replace('# ', ''), margin, y);
-      y += 25;
-      continue;
-    }
-
-    // Section headings
-    if (trimmed.startsWith('### ')) {
-      y += 6;
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(33, 33, 33);
-      doc.text(trimmed.replace('### ', ''), margin, y);
-      y += 15;
-      continue;
-    }
-
-    // Table rows
-    if (trimmed.startsWith('|') && !trimmed.includes('Amount')) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(66, 66, 66);
-      const cells = trimmed.split('|').filter(c => c.trim());
-      if (cells.length === 2) {
-        doc.text(`${cells[0].trim()} — ${cells[1].trim()}`, margin + 10, y);
-        y += 12;
-      }
-      continue;
-    }
-
-    // Numbered lists
-    if (/^\d+\./.test(trimmed)) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(66, 66, 66);
-      const wrapped = doc.splitTextToSize(trimmed, contentWidth - 10);
-      wrapped.forEach(wrappedLine => {
-        doc.text(wrappedLine, margin + 10, y);
-        y += 11;
-      });
-      continue;
-    }
-
-    // Bold labels
-    if (trimmed.startsWith('**') && trimmed.includes(':**')) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(33, 33, 33);
-      doc.text(trimmed.replace(/\*\*/g, ''), margin, y);
+      doc.text(line, margin, y);
       y += 13;
-      continue;
-    }
+    });
+    y += 10;
+  }
 
-    // Bullet points
-    if (trimmed.startsWith('- ')) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(66, 66, 66);
-      doc.text(`• ${trimmed.substring(2)}`, margin + 10, y);
-      y += 12;
-      continue;
-    }
+  // Content sections
+  if (unit.contentSections && unit.contentSections.length > 0) {
+    for (const section of unit.contentSections) {
+      // Section heading
+      if (section.heading) {
+        if (y > pageHeight - 80) {
+          doc.addPage();
+          doc.setFillColor(0, 168, 225);
+          doc.rect(0, 0, pageWidth, 6, 'F');
+          y = 60;
+        }
 
-    // Horizontal rules
-    if (trimmed === '---') {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(33, 33, 33);
+        doc.text(section.heading, margin, y);
+        y += 18;
+      }
+
+      // Render section content
+      if (section.content && Array.isArray(section.content)) {
+        for (const item of section.content) {
+          if (y > pageHeight - 80) {
+            doc.addPage();
+            doc.setFillColor(0, 168, 225);
+            doc.rect(0, 0, pageWidth, 6, 'F');
+            y = 60;
+          }
+
+          if (item.type === 'heading') {
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(66, 66, 66);
+            doc.text(item.content, margin, y);
+            y += 16;
+          } else if (item.type === 'paragraph') {
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(66, 66, 66);
+            const lines = doc.splitTextToSize(item.content, contentWidth);
+            lines.forEach(line => {
+              if (y > pageHeight - 80) {
+                doc.addPage();
+                doc.setFillColor(0, 168, 225);
+                doc.rect(0, 0, pageWidth, 6, 'F');
+                y = 60;
+              }
+              doc.text(line, margin, y);
+              y += 13;
+            });
+            y += 6;
+          } else if (item.type === 'list' && item.items) {
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(66, 66, 66);
+            item.items.forEach(listItem => {
+              const lines = doc.splitTextToSize(`• ${listItem}`, contentWidth - 10);
+              lines.forEach(line => {
+                if (y > pageHeight - 80) {
+                  doc.addPage();
+                  doc.setFillColor(0, 168, 225);
+                  doc.rect(0, 0, pageWidth, 6, 'F');
+                  y = 60;
+                }
+                doc.text(line, margin + 10, y);
+                y += 13;
+              });
+            });
+            y += 6;
+          }
+        }
+      }
+
       y += 8;
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(1);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 12;
-      continue;
-    }
-
-    // Regular text
-    if (trimmed.length > 0 && !trimmed.startsWith('#')) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(66, 66, 66);
-      const wrapped = doc.splitTextToSize(trimmed, contentWidth);
-      wrapped.forEach(wrappedLine => {
-        doc.text(wrappedLine, margin, y);
-        y += 11;
-      });
-      y += 3;
     }
   }
-}
 
-/**
- * Render workbook content
- */
-function renderWorkbookContent(doc, workbook, pageWidth, pageHeight, margin, contentWidth) {
-  const lines = workbook.content.split('\n');
-  let y = 80;
-
-  // Blue header bar
-  doc.setFillColor(0, 168, 225);
-  doc.rect(0, 0, pageWidth, 6, 'F');
-
-  // Workbook title
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 168, 225);
-  doc.text(`MODULE ${workbook.number} REFLECTION WORKBOOK`, margin, y);
-  y += 35;
-
-  // Process markdown
-  for (const line of lines) {
+  // Activities
+  if (unit.activities && unit.activities.length > 0) {
     if (y > pageHeight - 100) {
       doc.addPage();
       doc.setFillColor(0, 168, 225);
@@ -622,76 +458,103 @@ function renderWorkbookContent(doc, workbook, pageWidth, pageHeight, margin, con
       y = 60;
     }
 
-    const trimmed = line.trim();
-    if (!trimmed) {
-      y += 10;
-      continue;
-    }
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 168, 225);
+    doc.text('ACTIVITIES', margin, y);
+    y += 20;
 
-    // Unit headings
-    if (trimmed.startsWith('# UNIT')) {
-      doc.addPage();
-      doc.setFillColor(0, 168, 225);
-      doc.rect(0, 0, pageWidth, 6, 'F');
-      y = 80;
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 168, 225);
-      doc.text(trimmed.replace('# ', ''), margin, y);
-      y += 25;
-      continue;
-    }
+    unit.activities.forEach(activity => {
+      if (y > pageHeight - 80) {
+        doc.addPage();
+        doc.setFillColor(0, 168, 225);
+        doc.rect(0, 0, pageWidth, 6, 'F');
+        y = 60;
+      }
 
-    // Section headings
-    if (trimmed.startsWith('### ')) {
-      y += 8;
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(33, 33, 33);
-      doc.text(trimmed.replace('### ', ''), margin, y);
+      doc.text(activity.title, margin, y);
       y += 16;
-      continue;
+
+      // Render activity content (similar to section content)
+      if (activity.content && Array.isArray(activity.content)) {
+        activity.content.forEach(item => {
+          if (y > pageHeight - 80) {
+            doc.addPage();
+            doc.setFillColor(0, 168, 225);
+            doc.rect(0, 0, pageWidth, 6, 'F');
+            y = 60;
+          }
+
+          if (item.type === 'paragraph') {
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(66, 66, 66);
+            const lines = doc.splitTextToSize(item.content, contentWidth);
+            lines.forEach(line => {
+              doc.text(line, margin, y);
+              y += 13;
+            });
+          } else if (item.type === 'list' && item.items) {
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            item.items.forEach(listItem => {
+              const lines = doc.splitTextToSize(`• ${listItem}`, contentWidth - 10);
+              lines.forEach(line => {
+                doc.text(line, margin + 10, y);
+                y += 13;
+              });
+            });
+          }
+        });
+      }
+
+      y += 10;
+    });
+  }
+
+  // Reflection questions
+  if (unit.reflection && unit.reflection.length > 0) {
+    if (y > pageHeight - 100) {
+      doc.addPage();
+      doc.setFillColor(0, 168, 225);
+      doc.rect(0, 0, pageWidth, 6, 'F');
+      y = 60;
     }
 
-    // Questions
-    if (trimmed.startsWith('**') && trimmed.includes(':**')) {
-      y += 4;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 168, 225);
+    doc.text('REFLECTION', margin, y);
+    y += 20;
+
+    unit.reflection.forEach(question => {
+      if (y > pageHeight - 100) {
+        doc.addPage();
+        doc.setFillColor(0, 168, 225);
+        doc.rect(0, 0, pageWidth, 6, 'F');
+        y = 60;
+      }
+
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(33, 33, 33);
-      doc.text(trimmed.replace(/\*\*/g, ''), margin, y);
-      y += 20;
+      const lines = doc.splitTextToSize(question, contentWidth);
+      lines.forEach(line => {
+        doc.text(line, margin, y);
+        y += 13;
+      });
 
-      // Add blank line for answers
+      y += 6;
+
+      // Add blank line for answer
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.5);
       doc.line(margin, y, pageWidth - margin, y);
-      y += 20;
-      continue;
-    }
-
-    // Horizontal rules
-    if (trimmed === '---') {
-      y += 8;
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(1);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 16;
-      continue;
-    }
-
-    // Regular text
-    if (trimmed.length > 0 && !trimmed.startsWith('#')) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(66, 66, 66);
-      const cleanLine = trimmed.replace(/\*\*/g, '');
-      const wrapped = doc.splitTextToSize(cleanLine, contentWidth);
-      wrapped.forEach(wrappedLine => {
-        doc.text(wrappedLine, margin, y);
-        y += 12;
-      });
-    }
+      y += 30;
+    });
   }
 }
 
