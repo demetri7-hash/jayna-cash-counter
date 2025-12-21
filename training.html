@@ -1283,10 +1283,11 @@
 
         // Download complete training manual PDF
         async function downloadCompleteManual() {
+            const downloadBtn = event.target;
+            const originalText = downloadBtn.textContent;
+
             try {
                 // Show loading state
-                const downloadBtn = event.target;
-                const originalText = downloadBtn.textContent;
                 downloadBtn.textContent = '⏳ GENERATING PDF...';
                 downloadBtn.disabled = true;
 
@@ -1296,11 +1297,22 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to generate PDF');
+                    // Try to parse error as JSON
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        console.error('API Error Details:', errorData);
+                        throw new Error(errorData.details || errorData.error || 'Failed to generate PDF');
+                    } else {
+                        const errorText = await response.text();
+                        console.error('API Error Response:', errorText);
+                        throw new Error(`Server error (${response.status})`);
+                    }
                 }
 
                 // Get PDF blob
                 const blob = await response.blob();
+                console.log(`Downloaded PDF blob, size: ${blob.size} bytes`);
 
                 // Download the file
                 const url = window.URL.createObjectURL(blob);
@@ -1312,16 +1324,19 @@
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
 
+                console.log('✅ PDF downloaded successfully');
+
                 // Reset button
                 downloadBtn.textContent = originalText;
                 downloadBtn.disabled = false;
 
             } catch (error) {
                 console.error('Download error:', error);
-                alert('Failed to download training manual. Please try again.');
+
+                // Show detailed error message
+                alert(`Failed to download training manual:\n\n${error.message}\n\nCheck browser console for details.`);
 
                 // Reset button
-                const downloadBtn = event.target;
                 downloadBtn.textContent = '📄 DOWNLOAD COMPLETE MANUAL (PDF)';
                 downloadBtn.disabled = false;
             }
