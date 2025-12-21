@@ -1039,11 +1039,14 @@
                     })
                 });
 
-                const data = await response.json();
-
+                // Check if response is OK before parsing
                 if (!response.ok) {
-                    throw new Error(data.error || 'Failed to load content');
+                    const text = await response.text();
+                    console.error('API Error Response:', text);
+                    throw new Error(`API returned ${response.status}: ${text.substring(0, 200)}`);
                 }
+
+                const data = await response.json();
 
                 // Render full content with tabs
                 renderUnitContent(modal, module, unit, data.unit, isCompleted);
