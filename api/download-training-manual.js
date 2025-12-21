@@ -14,10 +14,20 @@ const __dirname = path.dirname(__filename);
 
 export default async function handler(req, res) {
   try {
-    console.log('📚 Generating Complete Training Manual PDF...');
+    console.log('=== TRAINING MANUAL GENERATION START ===');
+    console.log('Current directory:', process.cwd());
 
     // Read all training modules and workbooks
     const modulesDir = path.join(process.cwd(), 'training', 'modules');
+    console.log('Modules directory:', modulesDir);
+
+    // Check if directory exists
+    if (!fs.existsSync(modulesDir)) {
+      throw new Error(`Modules directory not found: ${modulesDir}`);
+    }
+
+    const allFiles = fs.readdirSync(modulesDir);
+    console.log('Files in modules directory:', allFiles);
 
     const trainingContent = {
       modules: [],
@@ -27,21 +37,25 @@ export default async function handler(req, res) {
 
     // Load all 5 modules
     for (let i = 1; i <= 5; i++) {
-      const moduleFiles = fs.readdirSync(modulesDir);
+      console.log(`Loading module ${i}...`);
 
-      const mainFile = moduleFiles.find(f =>
+      const mainFile = allFiles.find(f =>
         f.startsWith(`MODULE_${i}_`) &&
         !f.includes('REFLECTION') &&
         !f.includes('WORKBOOK')
       );
 
-      const workbookFile = moduleFiles.find(f =>
+      const workbookFile = allFiles.find(f =>
         f.startsWith(`MODULE_${i}_`) &&
         (f.includes('REFLECTION') || f.includes('WORKBOOK'))
       );
 
+      console.log(`  Main file: ${mainFile}`);
+      console.log(`  Workbook file: ${workbookFile}`);
+
       if (mainFile) {
         const content = fs.readFileSync(path.join(modulesDir, mainFile), 'utf-8');
+        console.log(`  Main content length: ${content.length} chars`);
         trainingContent.modules.push({
           number: i,
           filename: mainFile,
@@ -51,6 +65,7 @@ export default async function handler(req, res) {
 
       if (workbookFile) {
         const content = fs.readFileSync(path.join(modulesDir, workbookFile), 'utf-8');
+        console.log(`  Workbook content length: ${content.length} chars`);
         trainingContent.workbooks.push({
           number: i,
           filename: workbookFile,
@@ -60,28 +75,36 @@ export default async function handler(req, res) {
     }
 
     // Load cocktail recipes
-    const cocktailFile = moduleFiles.find(f => f.includes('SIGNATURE_COCKTAIL'));
+    const cocktailFile = allFiles.find(f => f.includes('SIGNATURE_COCKTAIL'));
+    console.log('Cocktail file:', cocktailFile);
     if (cocktailFile) {
       trainingContent.cocktails = fs.readFileSync(path.join(modulesDir, cocktailFile), 'utf-8');
+      console.log(`Cocktail content length: ${trainingContent.cocktails.length} chars`);
     }
 
     console.log(`✅ Loaded ${trainingContent.modules.length} modules, ${trainingContent.workbooks.length} workbooks`);
 
     // Generate PDF
+    console.log('Starting PDF generation...');
     const pdfBuffer = await generateTrainingManualPDF(trainingContent);
+    console.log(`PDF generated, size: ${pdfBuffer.length} bytes`);
 
     // Return PDF as download
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="Jayna_Gyro_Training_Manual_Complete.pdf"');
     res.send(pdfBuffer);
 
-    console.log('✅ Training Manual PDF generated successfully');
+    console.log('=== TRAINING MANUAL GENERATION SUCCESS ===');
 
   } catch (error) {
-    console.error('❌ Error generating training manual:', error);
+    console.error('=== TRAINING MANUAL GENERATION ERROR ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     return res.status(500).json({
       error: 'Failed to generate training manual',
-      details: error.message
+      details: error.message,
+      stack: error.stack
     });
   }
 }
@@ -90,16 +113,22 @@ export default async function handler(req, res) {
  * Generate complete training manual PDF
  */
 async function generateTrainingManualPDF(trainingContent) {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'pt',
-    format: 'letter'
-  });
+  try {
+    console.log('Creating jsPDF instance...');
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'pt',
+      format: 'letter'
+    });
 
-  const pageWidth = doc.internal.pageSize.width; // 612pt
-  const pageHeight = doc.internal.pageSize.height; // 792pt
-  const margin = 40;
-  const contentWidth = pageWidth - (margin * 2);
+    console.log('jsPDF instance created successfully');
+
+    const pageWidth = doc.internal.pageSize.width; // 612pt
+    const pageHeight = doc.internal.pageSize.height; // 792pt
+    const margin = 40;
+    const contentWidth = pageWidth - (margin * 2);
+
+    console.log(`Page dimensions: ${pageWidth}x${pageHeight}, margin: ${margin}`);
 
   // ========== COVER PAGE ==========
   generateCoverPage(doc, pageWidth, pageHeight, margin);
@@ -127,9 +156,19 @@ async function generateTrainingManualPDF(trainingContent) {
   }
 
   // ========== FOOTER ON ALL PAGES ==========
+  console.log('Adding footers to all pages...');
   addFootersToAllPages(doc, pageWidth, pageHeight, margin);
 
-  return Buffer.from(doc.output('arraybuffer'));
+  console.log('Converting PDF to buffer...');
+  const buffer = Buffer.from(doc.output('arraybuffer'));
+  console.log(`PDF buffer created, size: ${buffer.length} bytes`);
+
+  return buffer;
+
+  } catch (error) {
+    console.error('Error in generateTrainingManualPDF:', error);
+    throw error;
+  }
 }
 
 /**
