@@ -526,13 +526,122 @@
       '#F44336', '#00BCD4', '#FF9800', '#4CAF50'
     ];
 
-    const LOCATIONS = [
-      'Not Assigned', 'Walk-in Cooler', 'Freezer', 'Dry Storage',
-      'Bar', 'Line Station', 'Prep Area', 'Back Office',
-      'Reach-in Cooler', 'Shelf - Top', 'Shelf - Middle', 'Shelf - Bottom'
-    ];
-
+    // Dynamic locations - will be loaded from custom_locations table
+    let customLocations = [];
     let inventoryItems = [];
+
+    // Title case transformation function
+    function toTitleCase(str) {
+      return str
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+
+    // Load custom locations from database
+    async function loadCustomLocations() {
+      try {
+        const { data, error } = await db
+          .from('custom_locations')
+          .select('location_name')
+          .eq('is_active', true)
+          .order('location_name', { ascending: true });
+
+        if (error) throw error;
+
+        customLocations = (data || []).map(loc => loc.location_name);
+        console.log(`✅ Loaded ${customLocations.length} custom locations`);
+
+      } catch (error) {
+        console.error('Error loading custom locations:', error);
+        // Fallback to default locations
+        customLocations = [
+          'Not Assigned', 'Walk-in Cooler', 'Freezer', 'Dry Storage',
+          'Bar', 'Line Station', 'Prep Area', 'Back Office',
+          'Reach-in Cooler', 'Shelf - Top', 'Shelf - Middle', 'Shelf - Bottom'
+        ];
+      }
+    }
+
+    // Save new custom location to database
+    async function saveCustomLocation(newLocationRaw, feedbackElement) {
+      try {
+        // Transform to title case
+        const newLocation = toTitleCase(newLocationRaw.trim());
+
+        if (!newLocation) {
+          console.error('Location name cannot be empty');
+          return false;
+        }
+
+        // Check if already exists
+        if (customLocations.includes(newLocation)) {
+          console.log('Location already exists:', newLocation);
+          return true;
+        }
+
+        // Save to database
+        const { error } = await db
+          .from('custom_locations')
+          .insert({
+            location_name: newLocation,
+            created_by: getActiveCounterName()
+          });
+
+        if (error) throw error;
+
+        // Add to local array and sort alphabetically
+        customLocations.push(newLocation);
+        customLocations.sort();
+
+        console.log(`✅ Saved new location: ${newLocation}`);
+
+        // Show inline green check feedback
+        if (feedbackElement) {
+          feedbackElement.style.borderColor = '#059669';
+          feedbackElement.style.background = '#d1fae5';
+
+          // Create check mark indicator
+          const checkMark = document.createElement('div');
+          checkMark.textContent = '✓ Saved';
+          checkMark.style.cssText = `
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #065f46;
+            font-weight: 700;
+            font-size: 12px;
+            pointer-events: none;
+          `;
+          feedbackElement.parentElement.style.position = 'relative';
+          feedbackElement.parentElement.appendChild(checkMark);
+
+          setTimeout(() => {
+            feedbackElement.style.borderColor = '';
+            feedbackElement.style.background = '';
+            if (checkMark.parentElement) {
+              checkMark.parentElement.removeChild(checkMark);
+            }
+          }, 5000);
+        }
+
+        return true;
+
+      } catch (error) {
+        console.error('Error saving custom location:', error);
+        if (feedbackElement) {
+          feedbackElement.style.borderColor = '#dc2626';
+          feedbackElement.style.background = '#fee2e2';
+          setTimeout(() => {
+            feedbackElement.style.borderColor = '';
+            feedbackElement.style.background = '';
+          }, 3000);
+        }
+        return false;
+      }
+    }
 
     function getUserColor(index) {
       return USER_COLORS[index % USER_COLORS.length];
@@ -764,12 +873,22 @@
                   <select
                     class="location-select"
                     id="location-${item.id}"
-                    onchange="saveLocation(${item.id}, this.value)"
+                    onchange="handleLocationChange(${item.id}, this)"
                   >
-                    ${LOCATIONS.map(loc =>
+                    <option value="__ADD_NEW__">+ Add New</option>
+                    ${customLocations.map(loc =>
                       `<option value="${loc}" ${item.physicalLocation === loc ? 'selected' : ''}>${loc}</option>`
                     ).join('')}
                   </select>
+                  <input
+                    type="text"
+                    class="location-input"
+                    id="location-input-${item.id}"
+                    placeholder="Enter location name..."
+                    style="display: none; margin-top: 8px; padding: 14px; border: 3px solid var(--gray-300); font-size: 14px; font-weight: 600; border-radius: 0; background: white; min-height: 56px;"
+                    onblur="handleNewLocationSave(${item.id}, this)"
+                    onkeypress="if(event.key === 'Enter') this.blur()"
+                  />
                 </div>
               </div>
               ${item.countedBy && item.lastCounted ? `
@@ -840,6 +959,86 @@
         }, 2000);
       }
     };
+
+    // Handle location dropdown change
+    window.handleLocationChange = function(itemId, selectEl) {
+      const value = selectEl.value;
+      const inputEl = document.getElementById(`location-input-${itemId}`);
+
+      if (value === '__ADD_NEW__') {
+        // Show input field
+        inputEl.style.display = 'block';
+        inputEl.focus();
+      } else {
+        // Hide input field
+        inputEl.style.display = 'none';
+        // Save selected location
+        saveLocation(itemId, value);
+      }
+    };
+
+    // Handle new location save
+    window.handleNewLocationSave = async function(itemId, inputEl) {
+      const newLocationRaw = inputEl.value.trim();
+
+      if (!newLocationRaw) {
+        // User didn't enter anything, hide input and reset dropdown
+        inputEl.style.display = 'none';
+        const selectEl = document.getElementById(`location-${itemId}`);
+        selectEl.value = inventoryItems.find(i => i.id === itemId)?.physicalLocation || '';
+        return;
+      }
+
+      // Save to custom_locations table
+      const success = await saveCustomLocation(newLocationRaw, inputEl);
+
+      if (success) {
+        const newLocation = toTitleCase(newLocationRaw);
+
+        // Save location to inventory item
+        await saveLocation(itemId, newLocation);
+
+        // Update all location dropdowns dynamically
+        updateAllLocationDropdowns();
+
+        // Hide input and reset
+        inputEl.value = '';
+        inputEl.style.display = 'none';
+
+        // Set the new location in the dropdown
+        const selectEl = document.getElementById(`location-${itemId}`);
+        if (selectEl) {
+          selectEl.value = newLocation;
+        }
+      }
+    };
+
+    // Update all location dropdowns on the page
+    function updateAllLocationDropdowns() {
+      inventoryItems.forEach(item => {
+        const selectEl = document.getElementById(`location-${item.id}`);
+        if (!selectEl) return;
+
+        const currentValue = selectEl.value;
+
+        // Rebuild dropdown options
+        selectEl.innerHTML = '<option value="__ADD_NEW__">+ Add New</option>';
+        customLocations.forEach(loc => {
+          const option = document.createElement('option');
+          option.value = loc;
+          option.textContent = loc;
+          if (loc === item.physicalLocation) {
+            option.selected = true;
+          }
+          selectEl.appendChild(option);
+        });
+
+        // Restore current value if it's not the new location
+        if (currentValue !== '__ADD_NEW__' && customLocations.includes(currentValue)) {
+          selectEl.value = currentValue;
+        }
+      });
+    }
 
     window.saveLocation = async function(itemId, location) {
       try {
@@ -963,6 +1162,7 @@
     // Initialize
     async function init() {
       await fetchClockedInStaff();
+      await loadCustomLocations(); // Load locations first
       await loadInventoryData();
       renderInventory();
       updateStats();
