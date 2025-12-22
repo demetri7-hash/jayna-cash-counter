@@ -370,10 +370,7 @@
       border-left: 3px solid var(--success);
       font-size: 12px;
       color: var(--gray-700);
-    }
-
-    .counted-info strong {
-      color: var(--success-border);
+      font-style: italic;
     }
 
     /* Loading */
@@ -892,8 +889,36 @@
                 </div>
               </div>
               ${item.countedBy && item.lastCounted ? `
-                <div class="counted-info">
-                  ✓ Counted by <strong>${item.countedBy}</strong> on ${formatDateTime(item.lastCounted)}
+                <div class="counted-info" style="display: flex; align-items: center; gap: 6px;">
+                  <!-- Color dot for user -->
+                  ${(() => {
+                    const userIndex = inventoryCountState.teamNames.findIndex(u => u.name === item.countedBy);
+                    const userColor = userIndex >= 0 ? inventoryCountState.teamNames[userIndex].color : getUserColor(0);
+                    return `<div style="width: 12px; height: 12px; border-radius: 50%; background: ${userColor}; flex-shrink: 0;"></div>`;
+                  })()}
+                  <!-- CLICKABLE NAME: Click to cycle through clocked-in users -->
+                  ${inventoryCountState.teamNames.length > 1 ? `
+                    <a href="javascript:void(0)"
+                       onclick="event.stopPropagation(); changeInventoryItemUser(${item.id})"
+                       style="
+                         color: var(--gray-700);
+                         font-size: 12px;
+                         text-decoration: none;
+                         cursor: pointer;
+                         font-style: italic;
+                         padding: 2px 4px;
+                         transition: all 0.15s ease;
+                       "
+                       onmouseover="this.style.color='var(--primary-blue)'"
+                       onmouseout="this.style.color='var(--gray-700)'"
+                       title="Click to cycle to next user">
+                      ✓ ${item.countedBy} • ${formatDateTime(item.lastCounted)}
+                    </a>
+                  ` : `
+                    <span style="font-size: 12px; color: var(--gray-700); font-style: italic;">
+                      ✓ ${item.countedBy} • ${formatDateTime(item.lastCounted)}
+                    </span>
+                  `}
                 </div>
               ` : ''}
             </div>
@@ -1058,6 +1083,64 @@
 
       } catch (error) {
         console.error('Error saving location:', error);
+      }
+    };
+
+    /**
+     * Change Inventory Item User - Cycle through team members for a counted item
+     * (Exact pattern from orders-prep.html changePrepItemUser function)
+     */
+    window.changeInventoryItemUser = async function(itemId) {
+      const item = inventoryItems.find(i => i.id === itemId);
+      if (!item || !item.countedBy) return;
+
+      // Ensure teamNames includes all clocked-in employees
+      if (inventoryCountState.clockedInEmployees.length > 0) {
+        if (inventoryCountState.teamNames.length < inventoryCountState.clockedInEmployees.length) {
+          inventoryCountState.teamNames = inventoryCountState.clockedInEmployees.map((name, index) => ({
+            name: name,
+            color: getUserColor(index)
+          }));
+        }
+      }
+
+      if (inventoryCountState.teamNames.length === 0) {
+        console.error('No team members available to cycle through');
+        return;
+      }
+
+      // Find current user index
+      const currentUserIndex = inventoryCountState.teamNames.findIndex(u => u.name === item.countedBy);
+
+      // Cycle to next user
+      const nextUserIndex = (currentUserIndex + 1) % inventoryCountState.teamNames.length;
+      const nextUser = inventoryCountState.teamNames[nextUserIndex];
+
+      try {
+        const newTimestamp = new Date().toISOString();
+
+        // Update item in database
+        const { error } = await db
+          .from('inventory_items')
+          .update({
+            counted_by: nextUser.name,
+            last_counted: newTimestamp
+          })
+          .eq('id', itemId);
+
+        if (error) throw error;
+
+        // Update local state
+        item.countedBy = nextUser.name;
+        item.lastCounted = newTimestamp;
+
+        console.log(`✅ Changed counter: ${item.itemName} → ${nextUser.name}`);
+
+        // Re-render to show updated name
+        renderInventory();
+
+      } catch (error) {
+        console.error('Error changing user:', error);
       }
     };
 
