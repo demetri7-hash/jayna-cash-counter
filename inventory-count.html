@@ -872,6 +872,7 @@
                     id="location-${item.id}"
                     onchange="handleLocationChange(${item.id}, this)"
                   >
+                    <option value="" ${!item.physicalLocation ? 'selected' : ''}>Choose Location...</option>
                     <option value="__ADD_NEW__">+ Add New</option>
                     ${customLocations.map(loc =>
                       `<option value="${loc}" ${item.physicalLocation === loc ? 'selected' : ''}>${loc}</option>`
@@ -991,13 +992,15 @@
       const inputEl = document.getElementById(`location-input-${itemId}`);
 
       if (value === '__ADD_NEW__') {
-        // Show input field
+        // Show input field for custom location
         inputEl.style.display = 'block';
         inputEl.focus();
-      } else {
-        // Hide input field
+      } else if (value === '') {
+        // User selected "Choose Location..." - do nothing
         inputEl.style.display = 'none';
-        // Save selected location
+      } else {
+        // Hide input field and save selected location
+        inputEl.style.display = 'none';
         saveLocation(itemId, value);
       }
     };
@@ -1046,8 +1049,8 @@
 
         const currentValue = selectEl.value;
 
-        // Rebuild dropdown options
-        selectEl.innerHTML = '<option value="__ADD_NEW__">+ Add New</option>';
+        // Rebuild dropdown options with "Choose Location..." at top
+        selectEl.innerHTML = '<option value="">Choose Location...</option><option value="__ADD_NEW__">+ Add New</option>';
         customLocations.forEach(loc => {
           const option = document.createElement('option');
           option.value = loc;
@@ -1059,7 +1062,7 @@
         });
 
         // Restore current value if it's not the new location
-        if (currentValue !== '__ADD_NEW__' && customLocations.includes(currentValue)) {
+        if (currentValue !== '__ADD_NEW__' && currentValue !== '' && customLocations.includes(currentValue)) {
           selectEl.value = currentValue;
         }
       });
