@@ -762,19 +762,19 @@
 
         if (error) throw error;
 
-        // Map to match orders-prep.html structure (use vendor, not vendor_name!)
+        // Map to match actual database schema
         inventoryItems = (data || []).map(item => ({
           id: item.id,
           itemName: item.item_name,
-          vendor: item.vendor, // CRITICAL: Use 'vendor', NOT 'vendor_name'
+          vendor: item.vendor,
           category: item.category,
           unit: item.unit,
           parLevel: item.par_level || 0,
-          currentOnHand: item.current_on_hand,
+          currentOnHand: item.current_stock, // Database has 'current_stock', not 'current_on_hand'
           physicalLocation: item.physical_location,
           countedBy: item.counted_by,
-          lastCounted: item.last_counted,
-          currentCost: item.current_cost
+          lastCounted: item.counted_at, // Database has 'counted_at', not 'last_counted'
+          currentCost: item.current_unit_cost // Database has 'current_unit_cost'
         }));
 
         console.log(`✅ Loaded ${inventoryItems.length} inventory items`);
@@ -947,12 +947,12 @@
         const timestamp = new Date().toISOString();
         const counterName = getActiveCounterName();
 
-        // Update database
+        // Update database (using correct column names: current_stock, counted_at)
         const { error } = await db
           .from('inventory_items')
           .update({
-            current_on_hand: countValue,
-            last_counted: timestamp,
+            current_stock: countValue,
+            counted_at: timestamp,
             counted_by: counterName
           })
           .eq('id', itemId);
@@ -1119,12 +1119,12 @@
       try {
         const newTimestamp = new Date().toISOString();
 
-        // Update item in database
+        // Update item in database (using correct column: counted_at)
         const { error } = await db
           .from('inventory_items')
           .update({
             counted_by: nextUser.name,
-            last_counted: newTimestamp
+            counted_at: newTimestamp
           })
           .eq('id', itemId);
 
