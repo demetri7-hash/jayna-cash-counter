@@ -12131,7 +12131,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const currentHour = getPacificHour(now);
       const baseDate = getPacificMidday(now);
       const prepDate = currentHour !== null && currentHour >= 20 ? addPacificDays(baseDate, 1) : baseDate;
-      const dateStr = formatPacificDateDisplay(prepDate, { month: '2-digit', day: '2-digit', year: 'numeric' });
+      const dateStr = formatPacificDateDisplay(prepDate, { weekday: 'long', month: '2-digit', day: '2-digit', year: 'numeric' }).toUpperCase();
       const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit' });
 
       // Filter items - separate bottles from to-go
@@ -12200,8 +12200,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.setTextColor(102, 102, 102);
       doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
 
-      // Delegation key (H, S, E)
-      let yPos = renderDelegationKey(doc, 1.05, scaleFactor);
+      // Start Y position
+      let yPos = 1.05;
 
       // MANDATORY NOTE (dark red box)
       yPos = renderMandatoryNote(doc, yPos, scaleFactor);
@@ -12474,7 +12474,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const currentHour = getPacificHour(now);
       const baseDate = getPacificMidday(now);
       const prepDate = currentHour !== null && currentHour >= 20 ? addPacificDays(baseDate, 1) : baseDate;
-      const dateStr = formatPacificDateDisplay(prepDate, { month: '2-digit', day: '2-digit', year: 'numeric' });
+      const dateStr = formatPacificDateDisplay(prepDate, { weekday: 'long', month: '2-digit', day: '2-digit', year: 'numeric' }).toUpperCase();
       const timeStr = formatPacificDateDisplay(now, { hour: '2-digit', minute: '2-digit' });
 
       // Filter items - separate bottles from to-go
@@ -12543,8 +12543,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.setTextColor(102, 102, 102);
       doc.text('Generated ' + timeStr, 4.25, 0.95, { align: 'center' });
 
-      // Delegation key (H, S, E)
-      let yPos = renderDelegationKey(doc, 1.05, scaleFactor);
+      // Start Y position
+      let yPos = 1.05;
 
       // MANDATORY NOTE (dark red box)
       yPos = renderMandatoryNote(doc, yPos, scaleFactor);
@@ -13568,7 +13568,6 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const recommendValue = item.recommendedAmount > 0 ? `${item.recommendedAmount} - ${item.unit}` : '—';
 
       return [
-        '',               // Delegation column (H S E)
         item.itemName,    // ITEM (timestamp drawn separately in didDrawCell)
         stockDisplay,     // CURRENT
         parDisplay,       // PAR (swapped with MAKE)
@@ -13580,7 +13579,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     // Render table (no borders, only horizontal lines)
     doc.autoTable({
       startY: startY,
-      head: [['ASSIGN', 'ITEM', 'CURRENT', 'PAR', 'MAKE', 'NOTES']],
+      head: [['ITEM', 'CURRENT', 'PAR', 'MAKE', 'NOTES']],
       body: tableData,
       theme: 'plain',
       margin: { left: 0.5, right: 0.5 },
@@ -13606,23 +13605,15 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         valign: 'middle'
       },
       columnStyles: {
-        0: { cellWidth: 0.35, halign: 'center' },                              // Checkbox
-        1: { cellWidth: 1.8, fontStyle: 'bold', fontSize: 5.8 * scaleFactor }, // ITEM
-        2: { cellWidth: 0.7, halign: 'center', fontSize: 5.8 * scaleFactor },  // CURRENT
-        3: { cellWidth: 0.7, halign: 'center', fontSize: 5.8 * scaleFactor },  // PAR
-        4: { cellWidth: 0.7, halign: 'center', fontSize: 5.8 * scaleFactor },  // MAKE
-        5: { cellWidth: 2.75, fontSize: 5.3 * scaleFactor }                     // NOTES (blank)
+        0: { cellWidth: 2.15, fontStyle: 'bold', fontSize: 5.8 * scaleFactor }, // ITEM
+        1: { cellWidth: 0.7, halign: 'center', fontSize: 5.8 * scaleFactor },  // CURRENT
+        2: { cellWidth: 0.7, halign: 'center', fontSize: 5.8 * scaleFactor },  // PAR
+        3: { cellWidth: 0.7, halign: 'center', fontSize: 5.8 * scaleFactor },  // MAKE
+        4: { cellWidth: 3.1, fontSize: 5.3 * scaleFactor }                     // NOTES (blank)
       },
       didDrawCell: function(data) {
-        // Draw delegation initials (H S E) in first column
+        // Draw timestamp in ITEM column
         if (data.column.index === 0 && data.section === 'body') {
-          const cellX = data.cell.x + (data.cell.width / 2);
-          const cellY = data.cell.y + (data.cell.height / 2);
-          renderDelegationInitials(doc, cellX, cellY, scaleFactor);
-        }
-
-        // Draw tiny timestamp in ITEM column (matches LOW PRIORITY style)
-        if (data.column.index === 1 && data.section === 'body') {
           const rowIndex = data.row.index;
           const item = items[rowIndex];
           const lastCountStr = item.lastCountedDate ? formatLastCountForPrepSheet(item.lastCountedDate, item.countedBy) : 'Never counted';
@@ -13638,7 +13629,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       },
       didParseCell: function(data) {
         // Apply priority color coding to item names
-        if (data.column.index === 1 && data.section === 'body') {
+        if (data.column.index === 0 && data.section === 'body') {
           const rowIndex = data.row.index;
           const item = items[rowIndex];
 
