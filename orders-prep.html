@@ -1726,6 +1726,57 @@
   }
 
   /**
+   * Format last count for prep sheet PDF
+   * Returns: "Last Counted 1 day, 3 hours, 14 minutes ago by Demetri Gregorakis on 1/7/26 at 10:45pm"
+   */
+  function formatLastCountForPrepSheet(dateStr, countedBy) {
+    if (!dateStr) return 'Never counted';
+
+    const date = parsePacificDate(dateStr) || new Date(dateStr);
+    const now = new Date();
+
+    const diffMs = now - date;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // Calculate remaining hours and minutes
+    const remainingHours = diffHours % 24;
+    const remainingMinutes = diffMinutes % 60;
+
+    // Build time elapsed string with all components
+    let timeElapsed = 'Last Counted ';
+    const parts = [];
+
+    if (diffDays > 0) {
+      parts.push(`${diffDays} day${diffDays === 1 ? '' : 's'}`);
+    }
+    if (remainingHours > 0 || diffDays > 0) { // Include hours if we have days
+      parts.push(`${remainingHours} hour${remainingHours === 1 ? '' : 's'}`);
+    }
+    parts.push(`${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}`);
+
+    timeElapsed += parts.join(', ') + ' ago';
+
+    // Format the date and time
+    const formattedDate = date.toLocaleDateString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: '2-digit'
+    });
+
+    const formattedTime = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).toLowerCase();
+
+    // Build final string
+    const counterName = countedBy || 'Unknown';
+    return `${timeElapsed} by ${counterName} on ${formattedDate} at ${formattedTime}`;
+  }
+
+  /**
    * Format price with date (e.g., "$12.50 (11/3/25)")
    */
   function formatPriceWithDate(price, dateStr) {
@@ -14155,8 +14206,8 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       letter-spacing: 0.3px;
     }
     .last-count {
-      font-size: 7pt;
-      color: #999;
+      font-size: 8pt;
+      color: #000;
       margin-top: 1pt;
     }
     .stock-value {
@@ -14257,7 +14308,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     // URGENT, HIGH, MEDIUM: use full table format
     const itemRows = items.map(item => {
-      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+      const lastCountStr = item.lastCountedDate
+        ? formatLastCountForPrepSheet(item.lastCountedDate, item.countedBy)
+        : 'Never counted';
       const isOut = item.currentStock === 0;
       const stockDisplay = isOut ? 'OUT' : `${item.currentStock} ${item.unit}`;
       const recommendValue = item.recommendedAmount > 0 ? item.recommendedAmount : '—';
@@ -14266,7 +14319,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         <tr>
           <td class="col-name">
             <div class="item-name">${item.itemName}</div>
-            <div class="last-count">Last count: ${lastCountStr}</div>
+            <div class="last-count">${lastCountStr}</div>
           </td>
           <td class="col-current">
             <div class="stock-value ${isOut ? 'out' : ''}">${stockDisplay}</div>
