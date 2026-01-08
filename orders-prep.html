@@ -1727,7 +1727,7 @@
 
   /**
    * Format last count for prep sheet PDF
-   * Returns: "Last Counted 1 day, 3 hours, 14 minutes ago by Demetri Gregorakis on 1/7/26 at 10:45pm"
+   * Returns: "Last Counted 1 day, 3 hours, 14 minutes ago on 1/7/26 at 10:45pm"
    */
   function formatLastCountForPrepSheet(dateStr, countedBy) {
     if (!dateStr) return 'Never counted';
@@ -1771,9 +1771,12 @@
       hour12: true
     }).toLowerCase();
 
-    // Build final string
-    const counterName = countedBy || 'Unknown';
-    return `${timeElapsed} by ${counterName} on ${formattedDate} at ${formattedTime}`;
+    // Build final string - only include counter name if it's valid (not Unknown)
+    if (countedBy && countedBy !== 'Unknown') {
+      return `${timeElapsed} by ${countedBy} on ${formattedDate} at ${formattedTime}`;
+    } else {
+      return `${timeElapsed} on ${formattedDate} at ${formattedTime}`;
+    }
   }
 
   /**
