@@ -13310,10 +13310,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.text(` ${qtyText}`, leftColumnX + 0.08 + nameDisplayWidth, y);
 
       // Last counted on second line
-      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
-      doc.setFontSize(3.5 * scaleFactor);
+      const lastCountStr = item.lastCountedDate ? formatLastCountForPrepSheet(item.lastCountedDate, item.countedBy) : 'Never counted';
+      doc.setFontSize(4.0 * scaleFactor);
       doc.setFont('helvetica', 'italic');
-      doc.setTextColor(179, 179, 179);
+      doc.setTextColor(0, 0, 0);
       doc.text(`  ${lastCountStr}`, leftColumnX + 0.08, y + (0.08 * scaleFactor));
 
       maxY = Math.max(maxY, y + (0.12 * scaleFactor));
@@ -13348,10 +13348,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.text(` ${qtyText}`, rightColumnX + 0.08 + nameDisplayWidth, y);
 
       // Last counted on second line
-      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
-      doc.setFontSize(3.5 * scaleFactor);
+      const lastCountStr = item.lastCountedDate ? formatLastCountForPrepSheet(item.lastCountedDate, item.countedBy) : 'Never counted';
+      doc.setFontSize(4.0 * scaleFactor);
       doc.setFont('helvetica', 'italic');
-      doc.setTextColor(179, 179, 179);
+      doc.setTextColor(0, 0, 0);
       doc.text(`  ${lastCountStr}`, rightColumnX + 0.08, y + (0.08 * scaleFactor));
 
       maxY = Math.max(maxY, y + (0.12 * scaleFactor));
@@ -13439,10 +13439,10 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       doc.text(` ${stockDisplay}`, x + nameDisplayWidth, y);
 
       // Last counted on second line
-      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
-      doc.setFontSize(3.2 * scaleFactor);
+      const lastCountStr = item.lastCountedDate ? formatLastCountForPrepSheet(item.lastCountedDate, item.countedBy) : 'Never counted';
+      doc.setFontSize(3.6 * scaleFactor);
       doc.setFont('helvetica', 'italic');
-      doc.setTextColor(179, 179, 179);
+      doc.setTextColor(0, 0, 0);
       doc.text(`  ${lastCountStr}`, x, y + (0.07 * scaleFactor));
 
       maxY = Math.max(maxY, y + (0.10 * scaleFactor));
@@ -13561,7 +13561,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
     // Build table data with item name + last counted together
     const tableData = items.map(item => {
-      const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+      const lastCountStr = item.lastCountedDate ? formatLastCountForPrepSheet(item.lastCountedDate, item.countedBy) : 'Never counted';
       const isOut = item.currentStock === 0;
       const stockDisplay = isOut ? 'OUT' : `${item.currentStock} - ${item.unit}`;
       const parDisplay = `${item.parLevel} - ${item.unit}`;
@@ -13625,12 +13625,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         if (data.column.index === 1 && data.section === 'body') {
           const rowIndex = data.row.index;
           const item = items[rowIndex];
-          const lastCountStr = item.lastCountedDate ? formatRelativeTime(item.lastCountedDate) : 'Never';
+          const lastCountStr = item.lastCountedDate ? formatLastCountForPrepSheet(item.lastCountedDate, item.countedBy) : 'Never counted';
 
-          // Draw timestamp below item name in tiny gray italic
-          doc.setFontSize(3.2 * scaleFactor); // Same as LOW PRIORITY
+          // Draw timestamp below item name in black italic
+          doc.setFontSize(3.6 * scaleFactor);
           doc.setFont('helvetica', 'italic');
-          doc.setTextColor(179, 179, 179); // 70% gray
+          doc.setTextColor(0, 0, 0);
           const timestampX = data.cell.x + 0.04 * scaleFactor;
           const timestampY = data.cell.y + data.cell.height - 0.04 * scaleFactor;
           doc.text(lastCountStr, timestampX, timestampY);
