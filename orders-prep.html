@@ -8828,44 +8828,56 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    * Toggle unified item editor section
    */
   function toggleItemEditor(itemId) {
-    console.log('toggleItemEditor called with itemId:', itemId);
+    console.log('✅ toggleItemEditor called with itemId:', itemId, 'type:', typeof itemId);
 
     const editorDiv = document.getElementById(`item-editor-${itemId}`);
     const arrow = document.getElementById(`edit-arrow-${itemId}`);
 
-    console.log('editorDiv:', editorDiv);
-    console.log('arrow:', arrow);
+    console.log('📦 editorDiv element:', editorDiv);
+    console.log('➡️  arrow element:', arrow);
 
     if (!editorDiv) {
-      console.error('Editor div not found for item:', itemId);
+      console.error('❌ Editor div not found! Looking for ID:', `item-editor-${itemId}`);
+      console.log('🔍 Checking if element exists in DOM...');
+      const allEditors = document.querySelectorAll('[id^="item-editor-"]');
+      console.log('📋 Found editor elements:', allEditors.length, Array.from(allEditors).map(e => e.id));
       return;
     }
 
     if (!arrow) {
-      console.error('Arrow element not found for item:', itemId);
+      console.error('❌ Arrow element not found! Looking for ID:', `edit-arrow-${itemId}`);
+      console.log('🔍 Checking if arrow exists in DOM...');
+      const allArrows = document.querySelectorAll('[id^="edit-arrow-"]');
+      console.log('📋 Found arrow elements:', allArrows.length, Array.from(allArrows).map(e => e.id));
       return;
     }
 
-    const currentDisplay = editorDiv.style.display;
-    console.log('Current display value:', currentDisplay);
+    const currentDisplay = window.getComputedStyle(editorDiv).display;
+    const inlineDisplay = editorDiv.style.display;
+    console.log('📊 Display values - computed:', currentDisplay, 'inline:', inlineDisplay);
 
     // Check if collapsed (display is 'none' or empty string)
-    const isCollapsed = currentDisplay === 'none' || currentDisplay === '';
+    const isCollapsed = currentDisplay === 'none' || inlineDisplay === 'none' || inlineDisplay === '';
 
     if (isCollapsed) {
       // Expand
-      console.log('Expanding editor section');
+      console.log('⬇️ EXPANDING editor section');
       editorDiv.style.display = 'block';
       arrow.style.transform = 'rotate(90deg)';
       arrow.textContent = '▼';
+      console.log('✅ Editor expanded successfully');
     } else {
       // Collapse
-      console.log('Collapsing editor section');
+      console.log('⬆️ COLLAPSING editor section');
       editorDiv.style.display = 'none';
       arrow.style.transform = 'rotate(0deg)';
       arrow.textContent = '▶';
+      console.log('✅ Editor collapsed successfully');
     }
   }
+
+  // Expose function to window scope for debugging
+  window.toggleItemEditor = toggleItemEditor;
 
   /**
    * Adjust PAR level in edit section (+ / - buttons)
