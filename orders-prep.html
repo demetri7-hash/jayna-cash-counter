@@ -8236,189 +8236,364 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                   ></div>
                 </div>
 
-                <!-- Par Level Editor (Collapsible) -->
-                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--gray-200);">
-                  <!-- EDIT PAR Toggle -->
+                <!-- Unified EDIT Section (Collapsible) -->
+                <div style="border-top: 1px solid var(--gray-200); margin-top: 12px; padding-top: 8px;">
+                  <!-- EDIT Toggle -->
                   <div
-                    onclick="toggleParEditor(${item.id})"
+                    id="edit-toggle-${item.id}"
+                    onclick="toggleItemEditor(${item.id})"
                     style="
                       color: #999;
                       font-size: 11px;
                       font-weight: 600;
+                      text-transform: uppercase;
                       cursor: pointer;
                       padding: 8px 0;
-                      user-select: none;
                       display: flex;
                       align-items: center;
                       gap: 6px;
+                      user-select: none;
                     "
                     onmouseover="this.style.color='#666'"
                     onmouseout="this.style.color='#999'"
                   >
-                    <span id="par-editor-arrow-${item.id}" style="transition: transform 0.2s;">▶</span>
-                    <span>EDIT PAR</span>
+                    <span id="edit-arrow-${item.id}" style="display: inline-block; transition: transform 0.3s;">▶</span>
+                    EDIT
                   </div>
 
-                  <!-- Collapsible Par Editor Section -->
-                  <div id="par-editor-${item.id}" style="display: none; padding: 12px; background: #f5f5f5; border: 1px solid #e0e0e0; margin-top: 8px;">
-                    <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Par Level
-                    </label>
-                    <p style="margin: 0 0 8px 0; font-size: 9px; color: var(--gray-500); font-style: italic;">
-                      ⚠️ Warning: Only edit par level if it is incorrect!
-                    </p>
-                    <div style="display: flex; gap: 4px; align-items: stretch; max-width: 200px;">
-                      <!-- Decrement Button -->
-                      <button
-                        type="button"
-                        onclick="quickAdjustParLevel(${item.id}, -0.25)"
-                        style="
-                          flex: 0 0 36px;
-                          padding: 0;
-                          font-size: 18px;
-                          font-weight: 700;
-                          background: var(--gray-100);
-                          border: 2px solid var(--gray-300);
-                          border-radius: 0;
-                          color: var(--gray-700);
-                          cursor: pointer;
-                          transition: all 0.2s;
-                          min-height: 40px;
-                          display: flex;
-                          align-items: center;
-                          justify-content: center;
-                        "
-                        onmousedown="this.style.background='var(--gray-300)'; this.style.transform='scale(0.95)';"
-                        onmouseup="this.style.background='var(--gray-100)'; this.style.transform='scale(1)';"
-                        onmouseleave="this.style.background='var(--gray-100)'; this.style.transform='scale(1)';"
-                      >−</button>
-
-                      <!-- Par Level Input Field -->
+                  <!-- Collapsible Editor Section -->
+                  <div
+                    id="item-editor-${item.id}"
+                    style="display: none; padding: 16px; background: #f5f5f5; border: 1px solid #e0e0e0; margin-top: 8px;"
+                  >
+                    <!-- ITEM NAME -->
+                    <div style="margin-bottom: 16px;">
+                      <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                        ITEM NAME
+                      </label>
                       <input
-                        type="number"
-                        inputmode="decimal"
-                        id="par-${item.id}"
-                        value="${item.parLevel}"
-                        min="0"
-                        step="0.25"
-                        onblur="autoSaveParLevel(${item.id}, this.value, this)"
-                        onchange="autoSaveParLevel(${item.id}, this.value, this)"
+                        type="text"
+                        id="edit-name-${item.id}"
+                        value="${item.itemName}"
                         style="
-                          flex: 1;
-                          padding: 10px 6px;
-                          font-size: 16px;
+                          width: 100%;
+                          padding: 10px 12px;
+                          font-size: 14px;
                           font-weight: 600;
-                          text-align: center;
-                          border: 2px solid var(--gray-400);
+                          border: 2px solid var(--gray-300);
                           border-radius: 0;
                           background: var(--white);
                           color: var(--gray-900);
                           box-sizing: border-box;
-                          -webkit-appearance: none;
-                          -moz-appearance: textfield;
-                          min-height: 40px;
-                          transition: all 0.2s;
+                          min-height: 44px;
                         "
-                        onfocus="this.style.borderColor='var(--gray-900)'; this.style.background='#f0f9ff'; this.select();"
-                        onblur="this.style.borderColor='var(--gray-400)'; this.style.background='var(--white)';"
+                        onfocus="this.style.borderColor='var(--gray-700)'"
+                        onblur="this.style.borderColor='var(--gray-300)'"
                       />
-
-                      <!-- Increment Button -->
-                      <button
-                        type="button"
-                        onclick="quickAdjustParLevel(${item.id}, 0.25)"
-                        style="
-                          flex: 0 0 36px;
-                          padding: 0;
-                          font-size: 18px;
-                          font-weight: 700;
-                          background: var(--gray-600);
-                          border: 2px solid var(--gray-600);
-                          border-radius: 0;
-                          color: var(--white);
-                          cursor: pointer;
-                          transition: all 0.2s;
-                          min-height: 40px;
-                          display: flex;
-                          align-items: center;
-                          justify-content: center;
-                        "
-                        onmousedown="this.style.background='var(--gray-800)'; this.style.transform='scale(0.95)';"
-                        onmouseup="this.style.background='var(--gray-600)'; this.style.transform='scale(1)';"
-                        onmouseleave="this.style.background='var(--gray-600)'; this.style.transform='scale(1)';"
-                      >+</button>
                     </div>
 
-                    <!-- Par Save Status Indicator -->
-                    <div
-                      id="par-save-status-${item.id}"
+                    <!-- PAR LEVEL -->
+                    <div style="margin-bottom: 16px;">
+                      <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                        PAR LEVEL
+                      </label>
+                      <p style="margin: 0 0 8px 0; font-size: 9px; color: var(--gray-500); font-style: italic;">
+                        ⚠️ Warning: Only edit if incorrect!
+                      </p>
+                      <div style="display: flex; gap: 5px;">
+                        <button
+                          type="button"
+                          onclick="adjustEditPar(${item.id}, -0.25)"
+                          style="
+                            flex: 0 0 44px;
+                            padding: 0;
+                            font-size: 20px;
+                            font-weight: 700;
+                            background: var(--gray-100);
+                            border: 2px solid var(--gray-300);
+                            border-radius: 0;
+                            color: var(--gray-700);
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            min-height: 44px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                          "
+                        >−</button>
+                        <input
+                          type="number"
+                          inputmode="decimal"
+                          id="edit-par-${item.id}"
+                          value="${item.parLevel}"
+                          min="0"
+                          step="0.25"
+                          style="
+                            flex: 1;
+                            padding: 10px 12px;
+                            font-size: 16px;
+                            font-weight: 700;
+                            text-align: center;
+                            border: 2px solid var(--gray-400);
+                            border-radius: 0;
+                            background: var(--white);
+                            color: var(--gray-900);
+                            box-sizing: border-box;
+                            min-height: 44px;
+                          "
+                          onfocus="this.style.borderColor='var(--gray-700)'; this.select();"
+                          onblur="this.style.borderColor='var(--gray-400)'"
+                        />
+                        <button
+                          type="button"
+                          onclick="adjustEditPar(${item.id}, 0.25)"
+                          style="
+                            flex: 0 0 44px;
+                            padding: 0;
+                            font-size: 20px;
+                            font-weight: 700;
+                            background: var(--gray-700);
+                            border: 2px solid var(--gray-700);
+                            border-radius: 0;
+                            color: var(--white);
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            min-height: 44px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                          "
+                        >+</button>
+                      </div>
+                    </div>
+
+                    <!-- UNIT -->
+                    <div style="margin-bottom: 16px;">
+                      <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                        UNIT
+                      </label>
+                      <select
+                        id="edit-unit-${item.id}"
+                        style="
+                          width: 100%;
+                          padding: 10px 12px;
+                          font-size: 14px;
+                          font-weight: 600;
+                          border: 2px solid var(--gray-300);
+                          border-radius: 0;
+                          background: var(--white);
+                          color: var(--gray-900);
+                          box-sizing: border-box;
+                          min-height: 44px;
+                        "
+                        onfocus="this.style.borderColor='var(--gray-700)'"
+                        onblur="this.style.borderColor='var(--gray-300)'"
+                      >
+                        ${['Containers', 'Batches', 'Portions', 'Pieces', 'Ounces', 'Pounds', 'Quarts', 'Gallons', 'Liters', 'Each', 'Box', 'Case'].map(unit =>
+                          `<option value="${unit}" ${item.unit === unit ? 'selected' : ''}>${unit}</option>`
+                        ).join('')}
+                      </select>
+                    </div>
+
+                    <!-- VENDOR -->
+                    <div style="margin-bottom: 16px;">
+                      <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                        VENDOR
+                      </label>
+                      <select
+                        id="edit-vendor-${item.id}"
+                        style="
+                          width: 100%;
+                          padding: 10px 12px;
+                          font-size: 14px;
+                          font-weight: 600;
+                          border: 2px solid var(--gray-300);
+                          border-radius: 0;
+                          background: var(--white);
+                          color: var(--gray-900);
+                          box-sizing: border-box;
+                          min-height: 44px;
+                        "
+                        onfocus="this.style.borderColor='var(--gray-700)'"
+                        onblur="this.style.borderColor='var(--gray-300)'"
+                      >
+                        ${(() => {
+                          const vendors = Array.from(new Set(orderingSystemState.items.map(i => i.vendor).filter(Boolean))).sort();
+                          return vendors.map(vendor =>
+                            `<option value="${vendor}" ${item.vendor === vendor ? 'selected' : ''}>${vendor}</option>`
+                          ).join('');
+                        })()}
+                      </select>
+                    </div>
+
+                    <!-- STORAGE LOCATION -->
+                    <div style="margin-bottom: 16px;">
+                      <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                        STORAGE LOCATION
+                      </label>
+                      <select
+                        id="edit-location-${item.id}"
+                        style="
+                          width: 100%;
+                          padding: 10px 12px;
+                          font-size: 14px;
+                          font-weight: 600;
+                          border: 2px solid var(--gray-300);
+                          border-radius: 0;
+                          background: var(--white);
+                          color: var(--gray-900);
+                          box-sizing: border-box;
+                          min-height: 44px;
+                        "
+                        onfocus="this.style.borderColor='var(--gray-700)'"
+                        onblur="this.style.borderColor='var(--gray-300)'"
+                      >
+                        ${(() => {
+                          const prepItems = orderingSystemState.items.filter(i => i.vendor === 'PREP' || i.itemType === 'prep');
+                          const locations = new Set();
+                          prepItems.forEach(i => {
+                            if (i.storageLocation && i.storageLocation.trim()) locations.add(i.storageLocation.trim());
+                            if (i.locationCounts) {
+                              Object.keys(i.locationCounts).forEach(loc => locations.add(loc));
+                            }
+                          });
+                          const sortedLocations = Array.from(locations).sort();
+                          return sortedLocations.map(loc =>
+                            `<option value="${loc}" ${item.storageLocation === loc ? 'selected' : ''}>${loc}</option>`
+                          ).join('');
+                        })()}
+                      </select>
+                    </div>
+
+                    <!-- BATCH LIFESPAN (if PREP item) -->
+                    ${item.vendor === 'PREP' || item.itemType === 'prep' ? `
+                    <div style="margin-bottom: 16px;">
+                      <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                        BATCH LIFESPAN (HOURS)
+                      </label>
+                      <input
+                        type="number"
+                        id="edit-lifespan-${item.id}"
+                        value="${item.batchLifespan || ''}"
+                        placeholder="e.g., 24"
+                        min="0"
+                        step="1"
+                        style="
+                          width: 100%;
+                          padding: 10px 12px;
+                          font-size: 14px;
+                          font-weight: 600;
+                          border: 2px solid var(--gray-300);
+                          border-radius: 0;
+                          background: var(--white);
+                          color: var(--gray-900);
+                          box-sizing: border-box;
+                          min-height: 44px;
+                        "
+                        onfocus="this.style.borderColor='var(--gray-700)'"
+                        onblur="this.style.borderColor='var(--gray-300)'"
+                      />
+                    </div>
+                    ` : ''}
+
+                    <!-- CHECKBOXES -->
+                    <div style="margin-bottom: 16px;">
+                      <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                        OPTIONS
+                      </label>
+                      <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Urgent -->
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--white); border: 1px solid var(--gray-300);">
+                          <input
+                            type="checkbox"
+                            id="edit-urgent-${item.id}"
+                            ${item.urgent ? 'checked' : ''}
+                            style="width: 18px; height: 18px; cursor: pointer;"
+                          />
+                          <span style="font-size: 12px; font-weight: 600; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.3px;">
+                            MAKE FIRST (URGENT)
+                          </span>
+                        </label>
+
+                        <!-- Line Cooks Prep -->
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--white); border: 1px solid var(--gray-300);">
+                          <input
+                            type="checkbox"
+                            id="edit-line-cooks-prep-${item.id}"
+                            ${item.lineCooksPrep ? 'checked' : ''}
+                            style="width: 18px; height: 18px; cursor: pointer;"
+                          />
+                          <span style="font-size: 12px; font-weight: 600; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.3px;">
+                            LINE COOKS PREP
+                          </span>
+                        </label>
+
+                        <!-- Not Made Daily -->
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--white); border: 1px solid var(--gray-300);">
+                          <input
+                            type="checkbox"
+                            id="edit-not-made-daily-${item.id}"
+                            ${item.notMadeDaily ? 'checked' : ''}
+                            style="width: 18px; height: 18px; cursor: pointer;"
+                          />
+                          <span style="font-size: 12px; font-weight: 600; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.3px;">
+                            NOT MADE DAILY
+                          </span>
+                        </label>
+
+                        <!-- Show in Bottle Count -->
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; background: var(--white); border: 1px solid var(--gray-300);">
+                          <input
+                            type="checkbox"
+                            id="edit-bottle-count-${item.id}"
+                            ${item.showInBottleCount ? 'checked' : ''}
+                            style="width: 18px; height: 18px; cursor: pointer;"
+                          />
+                          <span style="font-size: 12px; font-weight: 600; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.3px;">
+                            SHOW IN BOTTLE COUNT
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- SAVE BUTTON -->
+                    <button
+                      onclick="saveItemEdits(${item.id})"
                       style="
-                        margin-top: 6px;
-                        font-size: 10px;
-                        text-align: left;
-                        min-height: 14px;
+                        width: 100%;
+                        padding: 14px 24px;
+                        font-size: 13px;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        background: var(--gray-900);
+                        border: 2px solid var(--gray-900);
+                        border-radius: 0;
+                        color: var(--white);
+                        cursor: pointer;
+                        transition: all 0.15s ease;
+                        min-height: 48px;
+                      "
+                      onmouseover="this.style.background='var(--gray-700)'"
+                      onmouseout="this.style.background='var(--gray-900)'"
+                    >
+                      SAVE CHANGES
+                    </button>
+
+                    <!-- Save Status Indicator -->
+                    <div
+                      id="edit-save-status-${item.id}"
+                      style="
+                        margin-top: 10px;
+                        font-size: 12px;
+                        text-align: center;
+                        min-height: 18px;
                         font-weight: 600;
                         opacity: 0;
                         transition: opacity 0.2s;
                       "
                     ></div>
                   </div>
-                </div>
-
-                <!-- Urgent Checkbox -->
-                <div style="margin-top: 10px; padding-top: 10px; border-top: 2px solid var(--gray-200); display: flex; align-items: center; gap: 6px;">
-                  <input
-                    type="checkbox"
-                    id="urgent-${item.id}"
-                    ${item.urgent ? 'checked' : ''}
-                    onchange="toggleUrgent(${item.id}, this.checked)"
-                    style="width: 14px; height: 14px; cursor: pointer;"
-                  />
-                  <label for="urgent-${item.id}" style="font-size: 11px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer;">
-                    MAKE FIRST (URGENT)
-                  </label>
-                </div>
-
-                <!-- Line Cooks Prep Checkbox -->
-                <div style="margin-top: 6px; display: flex; align-items: center; gap: 6px;">
-                  <input
-                    type="checkbox"
-                    id="line-cooks-prep-${item.id}"
-                    ${item.lineCooksPrep ? 'checked' : ''}
-                    onchange="toggleLineCooksPrep(${item.id}, this.checked)"
-                    style="width: 14px; height: 14px; cursor: pointer;"
-                  />
-                  <label for="line-cooks-prep-${item.id}" style="font-size: 11px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer;">
-                    LINE COOKS PREP
-                  </label>
-                </div>
-
-                <!-- Not Made Daily Checkbox -->
-                <div style="margin-top: 6px; display: flex; align-items: center; gap: 6px;">
-                  <input
-                    type="checkbox"
-                    id="not-made-daily-${item.id}"
-                    ${item.notMadeDaily ? 'checked' : ''}
-                    onchange="toggleNotMadeDaily(${item.id}, this.checked)"
-                    style="width: 14px; height: 14px; cursor: pointer;"
-                  />
-                  <label for="not-made-daily-${item.id}" style="font-size: 11px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer;">
-                    NOT MADE DAILY
-                  </label>
-                </div>
-
-                <!-- Show in Bottle Count Checkbox -->
-                <div style="margin-top: 6px; display: flex; align-items: center; gap: 6px;">
-                  <input
-                    type="checkbox"
-                    id="bottle-count-${item.id}"
-                    ${item.showInBottleCount ? 'checked' : ''}
-                    onchange="toggleBottleCount(${item.id}, this.checked)"
-                    style="width: 14px; height: 14px; cursor: pointer;"
-                  />
-                  <label for="bottle-count-${item.id}" style="font-size: 11px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer;">
-                    SHOW IN BOTTLE COUNT
-                  </label>
                 </div>
               </div>
             `;
@@ -8646,6 +8821,160 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       editorSection.style.display = 'none';
       arrow.style.transform = 'rotate(0deg)';
       arrow.textContent = '▶';
+    }
+  }
+
+  /**
+   * Toggle unified item editor section
+   */
+  function toggleItemEditor(itemId) {
+    const editorDiv = document.getElementById(`item-editor-${itemId}`);
+    const arrow = document.getElementById(`edit-arrow-${itemId}`);
+
+    if (!editorDiv || !arrow) return;
+
+    if (editorDiv.style.display === 'none') {
+      // Expand
+      editorDiv.style.display = 'block';
+      arrow.style.transform = 'rotate(90deg)';
+      arrow.textContent = '▼';
+    } else {
+      // Collapse
+      editorDiv.style.display = 'none';
+      arrow.style.transform = 'rotate(0deg)';
+      arrow.textContent = '▶';
+    }
+  }
+
+  /**
+   * Adjust PAR level in edit section (+ / - buttons)
+   */
+  function adjustEditPar(itemId, adjustment) {
+    const inputElement = document.getElementById(`edit-par-${itemId}`);
+    if (!inputElement) return;
+
+    const currentValue = parseFloat(inputElement.value) || 0;
+    const newValue = Math.max(0, currentValue + adjustment); // Don't go below 0
+
+    // Round to 2 decimal places to avoid floating point errors
+    const roundedValue = Math.round(newValue * 100) / 100;
+
+    inputElement.value = roundedValue;
+  }
+
+  /**
+   * Save all item edits from unified EDIT section
+   */
+  async function saveItemEdits(itemId) {
+    const item = orderingSystemState.items.find(i => i.id === itemId);
+    if (!item) {
+      console.error('Item not found:', itemId);
+      return;
+    }
+
+    const statusDiv = document.getElementById(`edit-save-status-${itemId}`);
+
+    // Show saving status
+    if (statusDiv) {
+      statusDiv.textContent = '💾 Saving...';
+      statusDiv.style.color = '#ff9800';
+      statusDiv.style.opacity = '1';
+    }
+
+    try {
+      // Collect all edited values
+      const itemName = document.getElementById(`edit-name-${itemId}`)?.value?.trim();
+      const parLevel = parseFloat(document.getElementById(`edit-par-${itemId}`)?.value);
+      const unit = document.getElementById(`edit-unit-${itemId}`)?.value;
+      const vendor = document.getElementById(`edit-vendor-${itemId}`)?.value;
+      const storageLocation = document.getElementById(`edit-location-${itemId}`)?.value;
+      const batchLifespan = document.getElementById(`edit-lifespan-${itemId}`)?.value;
+      const urgent = document.getElementById(`edit-urgent-${itemId}`)?.checked;
+      const lineCooksPrep = document.getElementById(`edit-line-cooks-prep-${itemId}`)?.checked;
+      const notMadeDaily = document.getElementById(`edit-not-made-daily-${itemId}`)?.checked;
+      const showInBottleCount = document.getElementById(`edit-bottle-count-${itemId}`)?.checked;
+
+      // Build update object
+      const updates = {
+        item_name: itemName,
+        par_level: parLevel,
+        unit: unit,
+        vendor: vendor,
+        storage_location: storageLocation,
+        urgent: urgent,
+        line_cooks_prep: lineCooksPrep,
+        not_made_daily: notMadeDaily,
+        show_in_bottle_count: showInBottleCount
+      };
+
+      // Add batch lifespan if it exists (PREP items only)
+      if (batchLifespan !== undefined && batchLifespan !== null && batchLifespan !== '') {
+        updates.batch_lifespan_hours = parseInt(batchLifespan) || null;
+      }
+
+      // Validate required fields
+      if (!itemName || itemName.length === 0) {
+        throw new Error('Item name cannot be empty');
+      }
+      if (isNaN(parLevel) || parLevel < 0) {
+        throw new Error('PAR level must be a valid number >= 0');
+      }
+
+      // Save to Supabase
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .update(updates)
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      item.itemName = itemName;
+      item.parLevel = parLevel;
+      item.unit = unit;
+      item.vendor = vendor;
+      item.storageLocation = storageLocation;
+      item.urgent = urgent;
+      item.lineCooksPrep = lineCooksPrep;
+      item.notMadeDaily = notMadeDaily;
+      item.showInBottleCount = showInBottleCount;
+      if (updates.batch_lifespan_hours !== undefined) {
+        item.batchLifespan = updates.batch_lifespan_hours;
+      }
+
+      // Success feedback
+      if (statusDiv) {
+        statusDiv.textContent = '✓ Item updated successfully!';
+        statusDiv.style.color = '#4caf50';
+      }
+
+      // Re-render prep list to show updated values
+      setTimeout(() => {
+        renderPrepCountList();
+
+        // Show success message
+        showMessage('✓ Item updated successfully!', 'success');
+
+        // Hide status after delay
+        setTimeout(() => {
+          if (statusDiv) statusDiv.style.opacity = '0';
+        }, 2000);
+      }, 500);
+
+    } catch (error) {
+      console.error('Error saving item edits:', error);
+
+      // Error feedback
+      if (statusDiv) {
+        statusDiv.textContent = `✗ Error: ${error.message}`;
+        statusDiv.style.color = '#d32f2f';
+
+        setTimeout(() => {
+          statusDiv.style.opacity = '0';
+        }, 3000);
+      }
+
+      showMessage(`Failed to save changes: ${error.message}`, 'error');
     }
   }
 
