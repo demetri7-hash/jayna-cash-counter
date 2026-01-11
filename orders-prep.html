@@ -7749,7 +7749,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       if (diffMinutes < 60) {
         return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
       }
-      
+
       // Less than 24 hours: show hours and minutes
       if (diffHours < 24) {
         const remainingMinutes = diffMinutes % 60;
@@ -7758,7 +7758,7 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         }
         return `${diffHours} hour${diffHours === 1 ? '' : 's'} and ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'} ago`;
       }
-      
+
       // Less than 7 days: show days, hours, and minutes
       if (diffDays < 7) {
         const remainingHours = diffHours % 24;
@@ -7772,9 +7772,24 @@ async function refreshUpcomingOrdersUI(targetContainer) {
         }
         return result + ' ago';
       }
-      
+
       // 7+ days: show date
       return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+    }
+
+    /**
+     * Helper function to check if item was counted recently (within last 12 hours)
+     * Used for progress bar time-based reset logic
+     */
+    function isCountedRecently(item) {
+      if (!item.countedBy || !item.countedAt) return false;
+
+      const now = new Date();
+      const cutoffHours = 12; // 12-hour window to cover nightly counting cycle
+      const cutoffTime = new Date(now.getTime() - (cutoffHours * 60 * 60 * 1000));
+      const countedDate = new Date(item.countedAt);
+
+      return countedDate > cutoffTime;
     }
 
     let html = '';
@@ -7805,9 +7820,9 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
             return `
               <div
-                class="prep-item-card ${item.countedBy ? 'counted-item' : 'uncounted-item'}"
+                class="prep-item-card ${isCountedRecently(item) ? 'counted-item' : 'uncounted-item'}"
                 data-item-id="${item.id}"
-                data-item-counted="${item.countedBy ? 'true' : 'false'}"
+                data-item-counted="${isCountedRecently(item) ? 'true' : 'false'}"
                 data-stock-status="${status.label.toLowerCase()}"
                 style="
                   background: var(--white);
@@ -8401,6 +8416,12 @@ async function refreshUpcomingOrdersUI(targetContainer) {
 
   /**
    * FEATURE 1: Update Progress Bar
+   *
+   * CRITICAL FIX (Jan 11, 2026): Time-based reset logic
+   * - Progress bar only counts items as "counted" if counted within last 12 hours
+   * - This ensures progress bar shows 0% at start of new counting session
+   * - Input fields still show last known counts (for reference)
+   * - Covers nightly counting cycle (~10pm) with 12-hour window
    */
   function updatePrepCountProgressBar() {
     const prepItems = orderingSystemState.items.filter(item =>
@@ -8408,7 +8429,24 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     );
 
     const totalItems = prepItems.length;
-    const countedItems = prepItems.filter(item => item.countedBy !== null && item.countedBy !== undefined).length;
+
+    // TIME-BASED RESET LOGIC
+    // Only count as "counted" if within last 12 hours
+    const now = new Date();
+    const cutoffHours = 12; // 12-hour window to cover nightly counting cycle
+    const cutoffTime = new Date(now.getTime() - (cutoffHours * 60 * 60 * 1000));
+
+    const countedItems = prepItems.filter(item => {
+      // Must have countedBy and countedAt fields
+      if (!item.countedBy || !item.countedAt) return false;
+
+      // Parse countedAt timestamp (ISO 8601 format)
+      const countedDate = new Date(item.countedAt);
+
+      // Only count if within cutoff window (last 12 hours)
+      return countedDate > cutoffTime;
+    }).length;
+
     const remainingItems = totalItems - countedItems;
     const percentage = totalItems > 0 ? Math.round((countedItems / totalItems) * 100) : 0;
 
