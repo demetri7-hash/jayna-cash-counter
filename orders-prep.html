@@ -1335,11 +1335,14 @@
 
             <!-- FEATURE 1: Progress Bar -->
             <div id="prepCountProgressBar" style="
+              position: sticky;
+              top: 0;
+              z-index: 100;
               background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
               border: 3px solid #1565c0;
               padding: 16px 20px;
               margin-bottom: 20px;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+              box-shadow: 0 4px 8px rgba(0,0,0,0.15);
             ">
               <div style="margin-bottom: 8px;">
                 <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: rgba(255,255,255,0.85); margin-bottom: 6px;">
@@ -7807,13 +7810,13 @@ async function refreshUpcomingOrdersUI(targetContainer) {
             onmouseout="this.style.background='var(--gray-700)'"
           >
             <span>
-              <span id="location-arrow-${area.replace(/\s/g, '_')}" style="display: inline-block; transition: transform 0.3s;">▼</span>
+              <span id="location-arrow-${area.replace(/\s/g, '_')}" style="display: inline-block; transition: transform 0.3s;">▶</span>
               ${area.toUpperCase()} <span style="opacity: 0.85; font-weight: 400; font-size: 12px;">(${areaItems.length} items)</span>
             </span>
           </h4>
 
-          <!-- Single column layout for all screens -->
-          <div id="location-items-${area.replace(/\s/g, '_')}" class="location-items-container" style="display: flex; flex-direction: column; gap: ${isCompactMode ? '8px' : '10px'};">
+          <!-- Single column layout for all screens - DEFAULT COLLAPSED -->
+          <div id="location-items-${area.replace(/\s/g, '_')}" class="location-items-container" style="display: none; flex-direction: column; gap: ${isCompactMode ? '8px' : '10px'};">
             ${areaItems.map((item) => {
             const status = getStockStatus(item.currentStock, item.parLevel);
             const lastCounted = formatLastCounted(item.lastCountedDate);
@@ -8233,110 +8236,133 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                   ></div>
                 </div>
 
-                <!-- Par Level Editor -->
-                <div style="margin-top: 16px;">
-                  <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                    Par Level
-                  </label>
-                  <p style="margin: 0 0 6px 0; font-size: 9px; color: var(--gray-500); font-style: italic;">
-                    ⚠️ Warning: Only edit par level if it is incorrect!
-                  </p>
-                  <div style="display: flex; gap: 4px; align-items: stretch; max-width: 35%;">
-                    <!-- Decrement Button (Smaller) -->
-                    <button
-                      type="button"
-                      onclick="quickAdjustParLevel(${item.id}, -0.25)"
-                      style="
-                        flex: 0 0 28px;
-                        padding: 0;
-                        font-size: 16px;
-                        font-weight: 700;
-                        background: var(--gray-100);
-                        border: 2px solid var(--gray-300);
-                        border-radius: 0;
-                        color: var(--gray-700);
-                        cursor: pointer;
-                        transition: all 0.2s;
-                        min-height: 32px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                      "
-                      onmousedown="this.style.background='var(--gray-300)'; this.style.transform='scale(0.95)';"
-                      onmouseup="this.style.background='var(--gray-100)'; this.style.transform='scale(1)';"
-                      onmouseleave="this.style.background='var(--gray-100)'; this.style.transform='scale(1)';"
-                    >−</button>
-
-                    <!-- Par Level Input Field (Smaller) -->
-                    <input
-                      type="number"
-                      inputmode="decimal"
-                      id="par-${item.id}"
-                      value="${item.parLevel}"
-                      min="0"
-                      step="0.25"
-                      onblur="autoSaveParLevel(${item.id}, this.value, this)"
-                      onchange="autoSaveParLevel(${item.id}, this.value, this)"
-                      style="
-                        flex: 1;
-                        padding: 6px 4px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        text-align: center;
-                        border: 2px solid var(--gray-400);
-                        border-radius: 0;
-                        background: var(--white);
-                        color: var(--gray-900);
-                        box-sizing: border-box;
-                        -webkit-appearance: none;
-                        -moz-appearance: textfield;
-                        min-height: 32px;
-                        transition: all 0.2s;
-                      "
-                      onfocus="this.style.borderColor='var(--gray-900)'; this.style.background='#f0f9ff'; this.select();"
-                      onblur="this.style.borderColor='var(--gray-400)'; this.style.background='var(--white)';"
-                    />
-
-                    <!-- Increment Button (Smaller) -->
-                    <button
-                      type="button"
-                      onclick="quickAdjustParLevel(${item.id}, 0.25)"
-                      style="
-                        flex: 0 0 28px;
-                        padding: 0;
-                        font-size: 16px;
-                        font-weight: 700;
-                        background: var(--gray-600);
-                        border: 2px solid var(--gray-600);
-                        border-radius: 0;
-                        color: var(--white);
-                        cursor: pointer;
-                        transition: all 0.2s;
-                        min-height: 32px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                      "
-                      onmousedown="this.style.background='var(--gray-800)'; this.style.transform='scale(0.95)';"
-                      onmouseup="this.style.background='var(--gray-600)'; this.style.transform='scale(1)';"
-                      onmouseleave="this.style.background='var(--gray-600)'; this.style.transform='scale(1)';"
-                    >+</button>
+                <!-- Par Level Editor (Collapsible) -->
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--gray-200);">
+                  <!-- EDIT PAR Toggle -->
+                  <div
+                    onclick="toggleParEditor(${item.id})"
+                    style="
+                      color: #999;
+                      font-size: 11px;
+                      font-weight: 600;
+                      cursor: pointer;
+                      padding: 8px 0;
+                      user-select: none;
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
+                    "
+                    onmouseover="this.style.color='#666'"
+                    onmouseout="this.style.color='#999'"
+                  >
+                    <span id="par-editor-arrow-${item.id}" style="transition: transform 0.2s;">▶</span>
+                    <span>EDIT PAR</span>
                   </div>
 
-                  <!-- Par Save Status Indicator -->
-                  <div
-                    id="par-save-status-${item.id}"
-                    style="
-                      margin-top: 4px;
-                      font-size: 10px;
-                      text-align: left;
-                      min-height: 14px;
-                      font-weight: 600;
-                      opacity: 0;
-                      transition: opacity 0.2s;
-                      max-width: 35%;
-                    "
-                  ></div>
+                  <!-- Collapsible Par Editor Section -->
+                  <div id="par-editor-${item.id}" style="display: none; padding: 12px; background: #f5f5f5; border: 1px solid #e0e0e0; margin-top: 8px;">
+                    <label style="display: block; font-size: 11px; color: var(--gray-600); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Par Level
+                    </label>
+                    <p style="margin: 0 0 8px 0; font-size: 9px; color: var(--gray-500); font-style: italic;">
+                      ⚠️ Warning: Only edit par level if it is incorrect!
+                    </p>
+                    <div style="display: flex; gap: 4px; align-items: stretch; max-width: 200px;">
+                      <!-- Decrement Button -->
+                      <button
+                        type="button"
+                        onclick="quickAdjustParLevel(${item.id}, -0.25)"
+                        style="
+                          flex: 0 0 36px;
+                          padding: 0;
+                          font-size: 18px;
+                          font-weight: 700;
+                          background: var(--gray-100);
+                          border: 2px solid var(--gray-300);
+                          border-radius: 0;
+                          color: var(--gray-700);
+                          cursor: pointer;
+                          transition: all 0.2s;
+                          min-height: 40px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                        onmousedown="this.style.background='var(--gray-300)'; this.style.transform='scale(0.95)';"
+                        onmouseup="this.style.background='var(--gray-100)'; this.style.transform='scale(1)';"
+                        onmouseleave="this.style.background='var(--gray-100)'; this.style.transform='scale(1)';"
+                      >−</button>
+
+                      <!-- Par Level Input Field -->
+                      <input
+                        type="number"
+                        inputmode="decimal"
+                        id="par-${item.id}"
+                        value="${item.parLevel}"
+                        min="0"
+                        step="0.25"
+                        onblur="autoSaveParLevel(${item.id}, this.value, this)"
+                        onchange="autoSaveParLevel(${item.id}, this.value, this)"
+                        style="
+                          flex: 1;
+                          padding: 10px 6px;
+                          font-size: 16px;
+                          font-weight: 600;
+                          text-align: center;
+                          border: 2px solid var(--gray-400);
+                          border-radius: 0;
+                          background: var(--white);
+                          color: var(--gray-900);
+                          box-sizing: border-box;
+                          -webkit-appearance: none;
+                          -moz-appearance: textfield;
+                          min-height: 40px;
+                          transition: all 0.2s;
+                        "
+                        onfocus="this.style.borderColor='var(--gray-900)'; this.style.background='#f0f9ff'; this.select();"
+                        onblur="this.style.borderColor='var(--gray-400)'; this.style.background='var(--white)';"
+                      />
+
+                      <!-- Increment Button -->
+                      <button
+                        type="button"
+                        onclick="quickAdjustParLevel(${item.id}, 0.25)"
+                        style="
+                          flex: 0 0 36px;
+                          padding: 0;
+                          font-size: 18px;
+                          font-weight: 700;
+                          background: var(--gray-600);
+                          border: 2px solid var(--gray-600);
+                          border-radius: 0;
+                          color: var(--white);
+                          cursor: pointer;
+                          transition: all 0.2s;
+                          min-height: 40px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                        onmousedown="this.style.background='var(--gray-800)'; this.style.transform='scale(0.95)';"
+                        onmouseup="this.style.background='var(--gray-600)'; this.style.transform='scale(1)';"
+                        onmouseleave="this.style.background='var(--gray-600)'; this.style.transform='scale(1)';"
+                      >+</button>
+                    </div>
+
+                    <!-- Par Save Status Indicator -->
+                    <div
+                      id="par-save-status-${item.id}"
+                      style="
+                        margin-top: 6px;
+                        font-size: 10px;
+                        text-align: left;
+                        min-height: 14px;
+                        font-weight: 600;
+                        opacity: 0;
+                        transition: opacity 0.2s;
+                      "
+                    ></div>
+                  </div>
                 </div>
 
                 <!-- Urgent Checkbox -->
@@ -8572,28 +8598,55 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       arrow.textContent = '▶';
     }
 
-    // Save state to localStorage
-    const collapsedSections = JSON.parse(localStorage.getItem('prepCollapsedSections') || '{}');
-    collapsedSections[locationName] = !isCollapsed;
-    localStorage.setItem('prepCollapsedSections', JSON.stringify(collapsedSections));
+    // Save EXPANDED state to localStorage (sections are collapsed by default)
+    const expandedSections = JSON.parse(localStorage.getItem('prepExpandedSections') || '{}');
+    expandedSections[locationName] = !isCollapsed; // true if expanding, false if collapsing
+    localStorage.setItem('prepExpandedSections', JSON.stringify(expandedSections));
   }
 
   function restoreCollapsedSections() {
-    const collapsedSections = JSON.parse(localStorage.getItem('prepCollapsedSections') || '{}');
+    // Sections are collapsed by default
+    // This function restores EXPANDED sections from localStorage
+    const expandedSections = JSON.parse(localStorage.getItem('prepExpandedSections') || '{}');
 
-    Object.keys(collapsedSections).forEach(locationName => {
-      if (collapsedSections[locationName]) {
+    Object.keys(expandedSections).forEach(locationName => {
+      if (expandedSections[locationName]) {
         const safeLocation = locationName.replace(/\s/g, '_');
         const itemsContainer = document.getElementById(`location-items-${safeLocation}`);
         const arrow = document.getElementById(`location-arrow-${safeLocation}`);
 
         if (itemsContainer && arrow) {
-          itemsContainer.style.display = 'none';
-          arrow.style.transform = 'rotate(-90deg)';
-          arrow.textContent = '▶';
+          itemsContainer.style.display = 'flex';
+          arrow.style.transform = 'rotate(0deg)';
+          arrow.textContent = '▼';
         }
       }
     });
+  }
+
+  /**
+   * Toggle PAR Level Editor for individual item
+   * Collapsed by default - user clicks "EDIT PAR" to expand
+   */
+  function toggleParEditor(itemId) {
+    const editorSection = document.getElementById(`par-editor-${itemId}`);
+    const arrow = document.getElementById(`par-editor-arrow-${itemId}`);
+
+    if (!editorSection || !arrow) return;
+
+    const isCollapsed = editorSection.style.display === 'none';
+
+    if (isCollapsed) {
+      // Expand
+      editorSection.style.display = 'block';
+      arrow.style.transform = 'rotate(90deg)';
+      arrow.textContent = '▼';
+    } else {
+      // Collapse
+      editorSection.style.display = 'none';
+      arrow.style.transform = 'rotate(0deg)';
+      arrow.textContent = '▶';
+    }
   }
 
   /**
