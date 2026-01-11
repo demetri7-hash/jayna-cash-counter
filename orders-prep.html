@@ -1212,6 +1212,166 @@
               </div>
             </div>
 
+            <!-- FEATURE 5: Voice Input Mode & FEATURE 7: Copy Yesterday's Counts & FEATURE 8: Bulk Actions -->
+            <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+              <button
+                id="voiceModeButton"
+                onclick="toggleVoiceMode()"
+                style="
+                  flex: 1;
+                  min-width: 140px;
+                  padding: 12px 16px;
+                  font-size: 12px;
+                  font-weight: 700;
+                  background: #9c27b0;
+                  border: 2px solid #9c27b0;
+                  border-radius: 0;
+                  color: white;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  min-height: 48px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 8px;
+                "
+                onmouseover="this.style.background='#7b1fa2'"
+                onmouseout="if(!window.voiceModeActive) this.style.background='#9c27b0'"
+              >
+                <span id="voiceModeIcon">🎙️</span>
+                <span id="voiceModeText">VOICE MODE</span>
+              </button>
+              <button
+                onclick="copyYesterdayCounts()"
+                style="
+                  flex: 1;
+                  min-width: 140px;
+                  padding: 12px 16px;
+                  font-size: 12px;
+                  font-weight: 700;
+                  background: #00acc1;
+                  border: 2px solid #00acc1;
+                  border-radius: 0;
+                  color: white;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  min-height: 48px;
+                "
+                onmouseover="this.style.background='#00838f'"
+                onmouseout="this.style.background='#00acc1'"
+              >
+                📋 COPY YESTERDAY
+              </button>
+            </div>
+
+            <!-- FEATURE 8: Bulk Actions Bar (Hidden by default) -->
+            <div id="bulkActionsBar" style="display: none; background: var(--gray-100); border: 2px solid var(--gray-300); padding: 16px; margin-bottom: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div style="font-size: 13px; font-weight: 700; color: var(--gray-900);">
+                  <span id="bulkSelectedCount">0</span> items selected
+                </div>
+                <button onclick="clearBulkSelection()" style="font-size: 11px; padding: 6px 12px; background: var(--gray-300); border: 2px solid var(--gray-400); color: var(--gray-700); cursor: pointer; font-weight: 600; min-height: 36px;">
+                  CLEAR SELECTION
+                </button>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button onclick="bulkMarkAs('full')" style="
+                  flex: 1;
+                  min-width: 120px;
+                  padding: 10px 14px;
+                  font-size: 11px;
+                  font-weight: 700;
+                  background: #4caf50;
+                  border: 2px solid #4caf50;
+                  border-radius: 0;
+                  color: white;
+                  cursor: pointer;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  min-height: 44px;
+                " onmouseover="this.style.background='#45a049'" onmouseout="this.style.background='#4caf50'">
+                  MARK ALL AS FULL
+                </button>
+                <button onclick="bulkMarkAs('empty')" style="
+                  flex: 1;
+                  min-width: 120px;
+                  padding: 10px 14px;
+                  font-size: 11px;
+                  font-weight: 700;
+                  background: #f44336;
+                  border: 2px solid #f44336;
+                  border-radius: 0;
+                  color: white;
+                  cursor: pointer;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  min-height: 44px;
+                " onmouseover="this.style.background='#e53935'" onmouseout="this.style.background='#f44336'">
+                  MARK ALL AS EMPTY
+                </button>
+                <button onclick="bulkCopyYesterday()" style="
+                  flex: 1;
+                  min-width: 120px;
+                  padding: 10px 14px;
+                  font-size: 11px;
+                  font-weight: 700;
+                  background: #00acc1;
+                  border: 2px solid #00acc1;
+                  border-radius: 0;
+                  color: white;
+                  cursor: pointer;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  min-height: 44px;
+                " onmouseover="this.style.background='#00838f'" onmouseout="this.style.background='#00acc1'">
+                  COPY FROM YESTERDAY
+                </button>
+              </div>
+            </div>
+
+            <!-- FEATURE 1: Progress Bar -->
+            <div id="prepCountProgressBar" style="
+              background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+              border: 3px solid #1565c0;
+              padding: 16px 20px;
+              margin-bottom: 20px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            ">
+              <div style="margin-bottom: 8px;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: rgba(255,255,255,0.85); margin-bottom: 6px;">
+                  COUNTING PROGRESS
+                </div>
+                <div id="prepProgressText" style="font-size: 18px; font-weight: 700; color: white; margin-bottom: 10px;">
+                  0 / 0 items counted (0%)
+                </div>
+                <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.3); border-radius: 6px; overflow: hidden;">
+                  <div id="prepProgressBar" style="height: 100%; background: #4caf50; width: 0%; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+              <div id="prepProgressStats" style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; color: white; margin-top: 12px;">
+                <div><span style="opacity: 0.85;">✓ Counted:</span> <strong id="prepCountedCount">0</strong></div>
+                <div><span style="opacity: 0.85;">⏳ Remaining:</span> <strong id="prepRemainingCount">0</strong></div>
+                <div><span style="opacity: 0.85;">⚠️ Low Stock:</span> <strong id="prepLowStockCount">0</strong></div>
+              </div>
+            </div>
+
+            <!-- FEATURE 2: Show Only Uncounted Toggle -->
+            <div style="background: var(--gray-100); border: 2px solid var(--gray-300); padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
+              <input
+                type="checkbox"
+                id="hideCountedItemsToggle"
+                style="width: 20px; height: 20px; cursor: pointer;"
+                onchange="toggleHideCountedItems()"
+              />
+              <label for="hideCountedItemsToggle" style="font-size: 13px; font-weight: 600; color: var(--gray-900); cursor: pointer; user-select: none;">
+                ☑ Hide Counted Items
+              </label>
+            </div>
+
             <div id="prepCountList" style="width: 100%;">
               <p style="text-align: center; padding: 20px; color: var(--gray-500);">Loading prep items...</p>
             </div>
@@ -7624,28 +7784,55 @@ async function refreshUpcomingOrdersUI(targetContainer) {
       const areaItems = groupedItems[area];
 
       html += `
-        <div style="margin-bottom: ${areaIndex < sortedAreas.length - 1 ? '32px' : '20px'};">
-          <h4 style="background: var(--gray-700); color: var(--white); padding: 12px 16px; border-radius: 0; margin-bottom: 12px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-            ${area.toUpperCase()} <span style="opacity: 0.85; font-weight: 400; font-size: 12px;">(${areaItems.length})</span>
+        <div class="prep-location-section" style="margin-bottom: ${areaIndex < sortedAreas.length - 1 ? '32px' : '20px'};">
+          <h4
+            onclick="toggleLocationSection('${area.replace(/'/g, "\\'")}')"
+            style="background: var(--gray-700); color: var(--white); padding: 12px 16px; border-radius: 0; margin-bottom: 12px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;"
+            onmouseover="this.style.background='var(--gray-600)'"
+            onmouseout="this.style.background='var(--gray-700)'"
+          >
+            <span>
+              <span id="location-arrow-${area.replace(/\s/g, '_')}" style="display: inline-block; transition: transform 0.3s;">▼</span>
+              ${area.toUpperCase()} <span style="opacity: 0.85; font-weight: 400; font-size: 12px;">(${areaItems.length} items)</span>
+            </span>
           </h4>
 
           <!-- Single column layout for all screens -->
-          <div style="display: flex; flex-direction: column; gap: ${isCompactMode ? '8px' : '10px'};">
+          <div id="location-items-${area.replace(/\s/g, '_')}" class="location-items-container" style="display: flex; flex-direction: column; gap: ${isCompactMode ? '8px' : '10px'};">
             ${areaItems.map((item) => {
             const status = getStockStatus(item.currentStock, item.parLevel);
             const lastCounted = formatLastCounted(item.lastCountedDate);
 
             return `
-              <div style="
-                background: var(--white);
-                border: 2px solid var(--gray-300);
-                border-radius: 0;
-                padding: ${isCompactMode ? '10px' : '14px'};
-                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                transition: box-shadow 0.2s;
-              "
-              onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.12)'"
-              onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'">
+              <div
+                class="prep-item-card ${item.countedBy ? 'counted-item' : 'uncounted-item'}"
+                data-item-id="${item.id}"
+                data-item-counted="${item.countedBy ? 'true' : 'false'}"
+                data-stock-status="${status.label.toLowerCase()}"
+                style="
+                  background: var(--white);
+                  border: 2px solid var(--gray-300);
+                  border-radius: 0;
+                  padding: ${isCompactMode ? '10px' : '14px'};
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                  transition: box-shadow 0.2s;
+                "
+                onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.12)'"
+                onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'"
+              >
+                <!-- FEATURE 8: Bulk Selection Checkbox -->
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <input
+                    type="checkbox"
+                    class="bulk-select-checkbox"
+                    data-item-id="${item.id}"
+                    style="width: 18px; height: 18px; cursor: pointer;"
+                    onchange="updateBulkSelectionCount()"
+                  />
+                  <label style="font-size: 11px; color: var(--gray-500); cursor: pointer; user-select: none;" onclick="event.target.previousElementSibling.click()">
+                    Select for bulk action
+                  </label>
+                </div>
 
                 <!-- Header: Item Name + Status Badge -->
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: ${isCompactMode ? '4px' : '6px'}; gap: 8px;">
@@ -7747,6 +7934,98 @@ async function refreshUpcomingOrdersUI(targetContainer) {
                     `}
                   </div>
                 ` : ''}
+
+                <!-- FEATURE 3: Quick-Fill Buttons -->
+                <div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
+                  <button
+                    type="button"
+                    onclick="quickFillStock(${item.id}, 'full')"
+                    style="
+                      flex: 1;
+                      min-width: 60px;
+                      padding: 8px 12px;
+                      font-size: 11px;
+                      font-weight: 700;
+                      background: #4caf50;
+                      border: 2px solid #4caf50;
+                      border-radius: 0;
+                      color: white;
+                      cursor: pointer;
+                      transition: all 0.2s;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                      min-height: 44px;
+                    "
+                    onmouseover="this.style.background='#45a049'"
+                    onmouseout="this.style.background='#4caf50'"
+                  >FULL</button>
+                  <button
+                    type="button"
+                    onclick="quickFillStock(${item.id}, 'half')"
+                    style="
+                      flex: 1;
+                      min-width: 60px;
+                      padding: 8px 12px;
+                      font-size: 11px;
+                      font-weight: 700;
+                      background: #ff9800;
+                      border: 2px solid #ff9800;
+                      border-radius: 0;
+                      color: white;
+                      cursor: pointer;
+                      transition: all 0.2s;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                      min-height: 44px;
+                    "
+                    onmouseover="this.style.background='#fb8c00'"
+                    onmouseout="this.style.background='#ff9800'"
+                  >½</button>
+                  <button
+                    type="button"
+                    onclick="quickFillStock(${item.id}, 'empty')"
+                    style="
+                      flex: 1;
+                      min-width: 60px;
+                      padding: 8px 12px;
+                      font-size: 11px;
+                      font-weight: 700;
+                      background: #f44336;
+                      border: 2px solid #f44336;
+                      border-radius: 0;
+                      color: white;
+                      cursor: pointer;
+                      transition: all 0.2s;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                      min-height: 44px;
+                    "
+                    onmouseover="this.style.background='#e53935'"
+                    onmouseout="this.style.background='#f44336'"
+                  >EMPTY</button>
+                  <button
+                    type="button"
+                    onclick="quickFillStock(${item.id}, 'skip')"
+                    style="
+                      flex: 1;
+                      min-width: 60px;
+                      padding: 8px 12px;
+                      font-size: 11px;
+                      font-weight: 700;
+                      background: var(--gray-400);
+                      border: 2px solid var(--gray-400);
+                      border-radius: 0;
+                      color: white;
+                      cursor: pointer;
+                      transition: all 0.2s;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                      min-height: 44px;
+                    "
+                    onmouseover="this.style.background='var(--gray-500)'"
+                    onmouseout="this.style.background='var(--gray-400)'"
+                  >SKIP</button>
+                </div>
 
                 <!-- Stock Input with Quick Adjustments -->
                 <div>
@@ -8109,6 +8388,513 @@ async function refreshUpcomingOrdersUI(targetContainer) {
     });
 
     container.innerHTML = html;
+
+    // FEATURE 1: Update progress bar after rendering
+    updatePrepCountProgressBar();
+
+    // FEATURE 2: Apply hide counted items filter if enabled
+    applyHideCountedFilter();
+
+    // FEATURE 4: Restore collapsed state from localStorage
+    restoreCollapsedSections();
+  }
+
+  /**
+   * FEATURE 1: Update Progress Bar
+   */
+  function updatePrepCountProgressBar() {
+    const prepItems = orderingSystemState.items.filter(item =>
+      item.vendor === 'PREP' || item.itemType === 'prep'
+    );
+
+    const totalItems = prepItems.length;
+    const countedItems = prepItems.filter(item => item.countedBy !== null && item.countedBy !== undefined).length;
+    const remainingItems = totalItems - countedItems;
+    const percentage = totalItems > 0 ? Math.round((countedItems / totalItems) * 100) : 0;
+
+    // Count low stock items (< 30% of par)
+    const lowStockItems = prepItems.filter(item => {
+      const parLevel = item.parLevel || 0;
+      if (parLevel === 0) return false;
+      const stockPercentage = (item.currentStock / parLevel) * 100;
+      return stockPercentage < 30;
+    }).length;
+
+    // Update progress bar UI
+    const progressText = document.getElementById('prepProgressText');
+    const progressBar = document.getElementById('prepProgressBar');
+    const countedCount = document.getElementById('prepCountedCount');
+    const remainingCount = document.getElementById('prepRemainingCount');
+    const lowStockCount = document.getElementById('prepLowStockCount');
+
+    if (progressText) {
+      progressText.textContent = `${countedItems} / ${totalItems} items counted (${percentage}%)`;
+    }
+
+    if (progressBar) {
+      progressBar.style.width = `${percentage}%`;
+    }
+
+    if (countedCount) countedCount.textContent = countedItems;
+    if (remainingCount) remainingCount.textContent = remainingItems;
+    if (lowStockCount) lowStockCount.textContent = lowStockItems;
+  }
+
+  /**
+   * FEATURE 2: Toggle Hide Counted Items
+   */
+  function toggleHideCountedItems() {
+    const checkbox = document.getElementById('hideCountedItemsToggle');
+    const isChecked = checkbox ? checkbox.checked : false;
+
+    // Save to localStorage
+    localStorage.setItem('prepHideCountedItems', isChecked);
+
+    // Apply filter
+    applyHideCountedFilter();
+  }
+
+  function applyHideCountedFilter() {
+    const isHidden = localStorage.getItem('prepHideCountedItems') === 'true';
+    const checkbox = document.getElementById('hideCountedItemsToggle');
+
+    if (checkbox) {
+      checkbox.checked = isHidden;
+    }
+
+    // Hide/show counted items
+    const countedItems = document.querySelectorAll('.prep-item-card.counted-item');
+    countedItems.forEach(item => {
+      item.style.display = isHidden ? 'none' : '';
+    });
+  }
+
+  /**
+   * FEATURE 3: Quick-Fill Stock Buttons
+   */
+  async function quickFillStock(itemId, action) {
+    const item = orderingSystemState.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    let newValue = 0;
+
+    switch (action) {
+      case 'full':
+        newValue = item.parLevel || 0;
+        break;
+      case 'half':
+        newValue = Math.round((item.parLevel || 0) / 2 * 4) / 4; // Round to nearest 0.25
+        break;
+      case 'empty':
+        newValue = 0;
+        break;
+      case 'skip':
+        // Mark as skipped - we'll set count to current but mark as counted
+        newValue = item.currentStock || 0;
+        break;
+    }
+
+    // Update the input field
+    const stockInput = document.getElementById(`stock-${itemId}`);
+    if (stockInput) {
+      stockInput.value = newValue;
+
+      // Trigger save
+      await autoSaveStockCount(itemId, newValue, stockInput);
+
+      // Visual feedback
+      if (action === 'skip') {
+        stockInput.style.background = '#fafafa';
+        stockInput.style.borderColor = '#999';
+      }
+    }
+  }
+
+  /**
+   * FEATURE 4: Collapsible Location Sections
+   */
+  function toggleLocationSection(locationName) {
+    const safeLocation = locationName.replace(/\s/g, '_');
+    const itemsContainer = document.getElementById(`location-items-${safeLocation}`);
+    const arrow = document.getElementById(`location-arrow-${safeLocation}`);
+
+    if (!itemsContainer || !arrow) return;
+
+    const isCollapsed = itemsContainer.style.display === 'none';
+
+    if (isCollapsed) {
+      // Expand
+      itemsContainer.style.display = 'flex';
+      arrow.style.transform = 'rotate(0deg)';
+      arrow.textContent = '▼';
+    } else {
+      // Collapse
+      itemsContainer.style.display = 'none';
+      arrow.style.transform = 'rotate(-90deg)';
+      arrow.textContent = '▶';
+    }
+
+    // Save state to localStorage
+    const collapsedSections = JSON.parse(localStorage.getItem('prepCollapsedSections') || '{}');
+    collapsedSections[locationName] = !isCollapsed;
+    localStorage.setItem('prepCollapsedSections', JSON.stringify(collapsedSections));
+  }
+
+  function restoreCollapsedSections() {
+    const collapsedSections = JSON.parse(localStorage.getItem('prepCollapsedSections') || '{}');
+
+    Object.keys(collapsedSections).forEach(locationName => {
+      if (collapsedSections[locationName]) {
+        const safeLocation = locationName.replace(/\s/g, '_');
+        const itemsContainer = document.getElementById(`location-items-${safeLocation}`);
+        const arrow = document.getElementById(`location-arrow-${safeLocation}`);
+
+        if (itemsContainer && arrow) {
+          itemsContainer.style.display = 'none';
+          arrow.style.transform = 'rotate(-90deg)';
+          arrow.textContent = '▶';
+        }
+      }
+    });
+  }
+
+  /**
+   * FEATURE 5: Voice Input Mode
+   */
+  window.voiceModeActive = false;
+  window.voiceRecognition = null;
+
+  function toggleVoiceMode() {
+    if (!window.voiceModeActive) {
+      startVoiceMode();
+    } else {
+      stopVoiceMode();
+    }
+  }
+
+  function startVoiceMode() {
+    // Check for browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      showMessage('❌ Voice mode not supported in this browser. Please use Chrome or Edge.', 'error');
+      return;
+    }
+
+    window.voiceRecognition = new SpeechRecognition();
+    window.voiceRecognition.continuous = true;
+    window.voiceRecognition.interimResults = false;
+    window.voiceRecognition.lang = 'en-US';
+
+    window.voiceRecognition.onstart = () => {
+      window.voiceModeActive = true;
+      const button = document.getElementById('voiceModeButton');
+      const icon = document.getElementById('voiceModeIcon');
+      const text = document.getElementById('voiceModeText');
+
+      if (button) button.style.background = '#d32f2f';
+      if (icon) icon.textContent = '🔴';
+      if (text) text.textContent = 'LISTENING...';
+
+      showMessage('🎙️ Voice mode active! Say: "[number] [item name]"', 'success');
+    };
+
+    window.voiceRecognition.onresult = (event) => {
+      const result = event.results[event.results.length - 1];
+      if (result.isFinal) {
+        const transcript = result[0].transcript.trim().toLowerCase();
+        processVoiceCommand(transcript);
+      }
+    };
+
+    window.voiceRecognition.onerror = (event) => {
+      console.error('Voice recognition error:', event.error);
+      showMessage(`❌ Voice error: ${event.error}`, 'error');
+    };
+
+    window.voiceRecognition.onend = () => {
+      // Restart if still in voice mode
+      if (window.voiceModeActive) {
+        window.voiceRecognition.start();
+      }
+    };
+
+    window.voiceRecognition.start();
+  }
+
+  function stopVoiceMode() {
+    window.voiceModeActive = false;
+
+    if (window.voiceRecognition) {
+      window.voiceRecognition.stop();
+      window.voiceRecognition = null;
+    }
+
+    const button = document.getElementById('voiceModeButton');
+    const icon = document.getElementById('voiceModeIcon');
+    const text = document.getElementById('voiceModeText');
+
+    if (button) button.style.background = '#9c27b0';
+    if (icon) icon.textContent = '🎙️';
+    if (text) text.textContent = 'VOICE MODE';
+  }
+
+  function processVoiceCommand(transcript) {
+    // Parse: "[number] [unit?] [item name]"
+    // Examples: "twelve containers tzatziki", "5 gyro meat", "three hummus"
+
+    const words = transcript.split(' ');
+    if (words.length < 2) {
+      showMessage('❌ Could not understand. Say: "[number] [item name]"', 'error');
+      return;
+    }
+
+    // Extract number (first word)
+    const numberWord = words[0];
+    let count = parseNumberWord(numberWord);
+
+    if (isNaN(count)) {
+      // Try parsing as digit
+      count = parseFloat(numberWord);
+      if (isNaN(count)) {
+        showMessage('❌ Could not understand number. Try again.', 'error');
+        return;
+      }
+    }
+
+    // Extract item name (remaining words, skip "containers", "boxes", etc.)
+    const skipWords = ['containers', 'container', 'boxes', 'box', 'bags', 'bag', 'of'];
+    const itemWords = words.slice(1).filter(word => !skipWords.includes(word));
+    const itemName = itemWords.join(' ');
+
+    // Fuzzy match item name
+    const prepItems = orderingSystemState.items.filter(item => item.vendor === 'PREP' || item.itemType === 'prep');
+    const matchedItem = fuzzyMatchItem(itemName, prepItems);
+
+    if (!matchedItem) {
+      showMessage(`❌ Could not find item: "${itemName}"`, 'error');
+      return;
+    }
+
+    // Update count
+    const stockInput = document.getElementById(`stock-${matchedItem.id}`);
+    if (stockInput) {
+      stockInput.value = count;
+      autoSaveStockCount(matchedItem.id, count, stockInput);
+
+      // Success feedback
+      showMessage(`✓ ${matchedItem.itemName}: ${count} ${matchedItem.unit}`, 'success');
+
+      // Auto-advance to next uncounted item (optional)
+      // scrollToNextUncountedItem();
+    }
+  }
+
+  function parseNumberWord(word) {
+    const numberMap = {
+      'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+      'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+      'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15,
+      'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20
+    };
+
+    return numberMap[word] || NaN;
+  }
+
+  function fuzzyMatchItem(searchTerm, items) {
+    searchTerm = searchTerm.toLowerCase();
+
+    // Exact match first
+    let match = items.find(item => item.itemName.toLowerCase() === searchTerm);
+    if (match) return match;
+
+    // Contains match
+    match = items.find(item => item.itemName.toLowerCase().includes(searchTerm));
+    if (match) return match;
+
+    // Word match (any word in item name matches search term)
+    match = items.find(item => {
+      const itemWords = item.itemName.toLowerCase().split(' ');
+      return itemWords.some(word => word.includes(searchTerm) || searchTerm.includes(word));
+    });
+
+    return match || null;
+  }
+
+  /**
+   * FEATURE 7: Copy Yesterday's Counts
+   */
+  async function copyYesterdayCounts() {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayDate = yesterday.toISOString().split('T')[0];
+
+    showLoading('Loading Yesterday\'s Counts', 'Fetching data...');
+
+    try {
+      const prepItems = orderingSystemState.items.filter(item => item.vendor === 'PREP' || item.itemType === 'prep');
+      const itemIds = prepItems.map(item => item.id);
+
+      const { data, error } = await supabase
+        .from('prep_count_log')
+        .select('item_id, new_count, counted_at')
+        .in('item_id', itemIds)
+        .gte('counted_at', yesterdayDate)
+        .order('counted_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group by item_id and take most recent
+      const yesterdayCounts = {};
+      data.forEach(log => {
+        if (!yesterdayCounts[log.item_id]) {
+          yesterdayCounts[log.item_id] = log.new_count;
+        }
+      });
+
+      let prefilled = 0;
+
+      // Prefill inputs (don't auto-save)
+      prepItems.forEach(item => {
+        const yesterdayCount = yesterdayCounts[item.id];
+        if (yesterdayCount !== undefined) {
+          const stockInput = document.getElementById(`stock-${item.id}`);
+          if (stockInput) {
+            stockInput.value = yesterdayCount;
+            stockInput.style.background = '#e3f2fd';
+            stockInput.style.borderColor = '#2196f3';
+            prefilled++;
+          }
+        }
+      });
+
+      hideLoading();
+      showMessage(`✅ Prefilled ${prefilled} items from ${yesterday.toLocaleDateString()}. Review and adjust before counting completes.`, 'success');
+
+    } catch (error) {
+      hideLoading();
+      showMessage(`❌ Error loading yesterday's counts: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * FEATURE 8: Bulk Actions
+   */
+  function updateBulkSelectionCount() {
+    const checkboxes = document.querySelectorAll('.bulk-select-checkbox:checked');
+    const count = checkboxes.length;
+
+    const bulkBar = document.getElementById('bulkActionsBar');
+    const countDisplay = document.getElementById('bulkSelectedCount');
+
+    if (bulkBar) {
+      bulkBar.style.display = count > 0 ? 'block' : 'none';
+    }
+
+    if (countDisplay) {
+      countDisplay.textContent = count;
+    }
+  }
+
+  function clearBulkSelection() {
+    const checkboxes = document.querySelectorAll('.bulk-select-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+    updateBulkSelectionCount();
+  }
+
+  async function bulkMarkAs(action) {
+    const checkboxes = document.querySelectorAll('.bulk-select-checkbox:checked');
+    const itemIds = Array.from(checkboxes).map(cb => parseInt(cb.dataset.itemId));
+
+    if (itemIds.length === 0) return;
+
+    showLoading('Bulk Action', `Updating ${itemIds.length} items...`);
+
+    try {
+      for (const itemId of itemIds) {
+        const item = orderingSystemState.items.find(i => i.id === itemId);
+        if (!item) continue;
+
+        let newValue = 0;
+
+        switch (action) {
+          case 'full':
+            newValue = item.parLevel || 0;
+            break;
+          case 'empty':
+            newValue = 0;
+            break;
+        }
+
+        const stockInput = document.getElementById(`stock-${itemId}`);
+        if (stockInput) {
+          stockInput.value = newValue;
+          await autoSaveStockCount(itemId, newValue, stockInput);
+        }
+      }
+
+      hideLoading();
+      clearBulkSelection();
+      showMessage(`✅ Updated ${itemIds.length} items!`, 'success');
+
+    } catch (error) {
+      hideLoading();
+      showMessage(`❌ Error: ${error.message}`, 'error');
+    }
+  }
+
+  async function bulkCopyYesterday() {
+    const checkboxes = document.querySelectorAll('.bulk-select-checkbox:checked');
+    const itemIds = Array.from(checkboxes).map(cb => parseInt(cb.dataset.itemId));
+
+    if (itemIds.length === 0) return;
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayDate = yesterday.toISOString().split('T')[0];
+
+    showLoading('Bulk Copy', `Loading ${itemIds.length} items from yesterday...`);
+
+    try {
+      const { data, error } = await supabase
+        .from('prep_count_log')
+        .select('item_id, new_count, counted_at')
+        .in('item_id', itemIds)
+        .gte('counted_at', yesterdayDate)
+        .order('counted_at', { ascending: false });
+
+      if (error) throw error;
+
+      const yesterdayCounts = {};
+      data.forEach(log => {
+        if (!yesterdayCounts[log.item_id]) {
+          yesterdayCounts[log.item_id] = log.new_count;
+        }
+      });
+
+      let prefilled = 0;
+
+      itemIds.forEach(itemId => {
+        const yesterdayCount = yesterdayCounts[itemId];
+        if (yesterdayCount !== undefined) {
+          const stockInput = document.getElementById(`stock-${itemId}`);
+          if (stockInput) {
+            stockInput.value = yesterdayCount;
+            stockInput.style.background = '#e3f2fd';
+            stockInput.style.borderColor = '#2196f3';
+            prefilled++;
+          }
+        }
+      });
+
+      hideLoading();
+      clearBulkSelection();
+      showMessage(`✅ Prefilled ${prefilled} selected items from yesterday!`, 'success');
+
+    } catch (error) {
+      hideLoading();
+      showMessage(`❌ Error: ${error.message}`, 'error');
+    }
   }
 
   /**
