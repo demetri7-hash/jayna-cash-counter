@@ -8828,18 +8828,39 @@ async function refreshUpcomingOrdersUI(targetContainer) {
    * Toggle unified item editor section
    */
   function toggleItemEditor(itemId) {
+    console.log('toggleItemEditor called with itemId:', itemId);
+
     const editorDiv = document.getElementById(`item-editor-${itemId}`);
     const arrow = document.getElementById(`edit-arrow-${itemId}`);
 
-    if (!editorDiv || !arrow) return;
+    console.log('editorDiv:', editorDiv);
+    console.log('arrow:', arrow);
 
-    if (editorDiv.style.display === 'none') {
+    if (!editorDiv) {
+      console.error('Editor div not found for item:', itemId);
+      return;
+    }
+
+    if (!arrow) {
+      console.error('Arrow element not found for item:', itemId);
+      return;
+    }
+
+    const currentDisplay = editorDiv.style.display;
+    console.log('Current display value:', currentDisplay);
+
+    // Check if collapsed (display is 'none' or empty string)
+    const isCollapsed = currentDisplay === 'none' || currentDisplay === '';
+
+    if (isCollapsed) {
       // Expand
+      console.log('Expanding editor section');
       editorDiv.style.display = 'block';
       arrow.style.transform = 'rotate(90deg)';
       arrow.textContent = '▼';
     } else {
       // Collapse
+      console.log('Collapsing editor section');
       editorDiv.style.display = 'none';
       arrow.style.transform = 'rotate(0deg)';
       arrow.textContent = '▶';
