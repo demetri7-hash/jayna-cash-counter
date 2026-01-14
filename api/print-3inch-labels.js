@@ -232,8 +232,8 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
   const LABEL_WIDTH = 189; // 2.625 inches = 189pt
   const LABEL_HEIGHT = 72; // 1 inch = 72pt
 
-  // Page margins (top: 0.5" = 36pt)
-  const TOP_MARGIN = 36;
+  // Page margins - match the physical label sheet exactly
+  const TOP_MARGIN = 36; // 0.5 inch from top
   const LEFT_MARGIN = 0; // Will calculate to center the 3 columns
 
   // Calculate column positions (3 columns, centered on page)
@@ -283,31 +283,36 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
 
     if (isIngredient) {
       // ========== INGREDIENT LABEL ==========
+      // Layout: Tagline (4pt) -> INGREDIENTS (6pt) -> Sauce Name (9-11pt) -> Ingredients (5pt, 2 lines) -> Customer/Date (5pt)
 
-      // Tagline at top
+      let currentY = labelY + 2; // Start from top of label
+
+      // Tagline at very top
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(5);
+      doc.setFontSize(4);
       doc.setTextColor(100, 100, 100);
-      doc.text('💙 YOUR FRIENDS AT JAYNA', centerX, labelY + 6, { align: 'center' });
+      currentY += 5;
+      doc.text('💙 YOUR FRIENDS AT JAYNA', centerX, currentY, { align: 'center' });
 
       // "INGREDIENTS" header
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6);
       doc.setTextColor(100, 100, 100);
-      doc.text('INGREDIENTS', centerX, labelY + 12, { align: 'center' });
+      currentY += 7;
+      doc.text('INGREDIENTS', centerX, currentY, { align: 'center' });
 
       // Item name (sauce name) - BOLD, dynamic sizing
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
 
       const itemText = (label.item || '').toUpperCase();
-      const maxWidth = LABEL_WIDTH - 12; // 6pt margins each side
+      const maxWidth = LABEL_WIDTH - 16; // 8pt margins each side
 
-      // Dynamic font sizing for item name (start larger)
-      let fontSize = 12;
+      // Dynamic font sizing for item name - smaller range
+      let fontSize = 11;
       let wrappedLines = [];
 
-      while (fontSize >= 7) {
+      while (fontSize >= 8) {
         doc.setFontSize(fontSize);
         const words = itemText.split(' ');
         wrappedLines = [];
@@ -329,61 +334,65 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
 
         const maxLineWidth = Math.max(...wrappedLines.map(line => doc.getTextWidth(line)));
 
-        if (maxLineWidth <= maxWidth && wrappedLines.length <= 2) {
+        if (maxLineWidth <= maxWidth && wrappedLines.length <= 1) {
           break;
         }
 
         fontSize -= 1;
       }
 
-      let itemY = labelY + 20;
+      currentY += fontSize + 2;
       wrappedLines.forEach((line) => {
-        doc.text(line, centerX, itemY, { align: 'center' });
-        itemY += fontSize * 1.1;
+        doc.text(line, centerX, currentY, { align: 'center' });
+        currentY += fontSize * 1.1;
       });
 
-      // Ingredients list (smaller, normal weight)
+      // Ingredients list (smaller, normal weight, 2 lines max)
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(5);
       doc.setTextColor(60, 60, 60);
 
       const ingredientsText = (label.ingredients || '');
-      const wrappedIngredients = doc.splitTextToSize(ingredientsText, maxWidth);
+      // Wrap to 2 lines max with smaller width
+      const wrappedIngredients = doc.splitTextToSize(ingredientsText, maxWidth - 10);
 
-      let ingredientsY = itemY + 3;
-      wrappedIngredients.forEach((line) => {
-        if (ingredientsY < labelY + LABEL_HEIGHT - 10) {
-          doc.text(line, centerX, ingredientsY, { align: 'center' });
-          ingredientsY += 6;
-        }
-      });
+      currentY += 4;
+      const maxIngredientLines = 2; // Limit to 2 lines
+      for (let i = 0; i < Math.min(wrappedIngredients.length, maxIngredientLines); i++) {
+        doc.text(wrappedIngredients[i], centerX, currentY, { align: 'center' });
+        currentY += 6;
+      }
 
-      // Customer name and date at bottom
+      // Customer name and date at bottom (fixed position)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(5);
       doc.setTextColor(80, 80, 80);
       const customerName = (order.customer_name || '').toUpperCase();
       const dateStr = formatPacificDateShort(order.delivery_date);
-      doc.text(`${customerName} - ${dateStr}`, centerX, labelY + LABEL_HEIGHT - 4, { align: 'center' });
+      doc.text(`${customerName} - ${dateStr}`, centerX, labelY + LABEL_HEIGHT - 3, { align: 'center' });
 
     } else {
       // ========== REGULAR ITEM LABEL ==========
+      // Layout: Tagline (4pt) -> Item Name (8-13pt) -> Qty (6pt) -> Customer/Date (6pt)
 
-      // Tagline at top
+      let currentY = labelY + 2; // Start from top of label
+
+      // Tagline at very top
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(5);
+      doc.setFontSize(4);
       doc.setTextColor(100, 100, 100);
-      doc.text('💙 YOUR FRIENDS AT JAYNA', centerX, labelY + 6, { align: 'center' });
+      currentY += 5;
+      doc.text('💙 YOUR FRIENDS AT JAYNA', centerX, currentY, { align: 'center' });
 
       // Item name (BIG, dynamic sizing for maximum visibility)
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
 
       const itemText = (label.item || '').toUpperCase();
-      const maxWidth = LABEL_WIDTH - 12; // 6pt margins each side
+      const maxWidth = LABEL_WIDTH - 16; // 8pt margins each side
 
-      // Dynamic font sizing - start LARGE (priority: make item name as big as possible)
-      let fontSize = 14;
+      // Dynamic font sizing - prioritize readability
+      let fontSize = 13;
       let wrappedLines = [];
 
       while (fontSize >= 7) {
@@ -407,26 +416,24 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
         if (currentLine) wrappedLines.push(currentLine);
 
         const maxLineWidth = Math.max(...wrappedLines.map(line => doc.getTextWidth(line)));
-        const lineHeight = fontSize * 1.1;
+        const lineHeight = fontSize * 1.15;
         const totalHeight = wrappedLines.length * lineHeight;
 
-        // Must fit in available space (label height - tagline at top - qty/customer at bottom)
-        // Available: 72pt total - 10pt top (tagline) - 20pt bottom (qty + customer) = ~42pt
-        if (maxLineWidth <= maxWidth && totalHeight <= 42) {
+        // Must fit in middle section (leaving ~18pt for qty and ~10pt for customer)
+        if (maxLineWidth <= maxWidth && totalHeight <= 36) {
           break;
         }
 
         fontSize -= 1;
       }
 
-      // Position item name starting after tagline
-      const lineHeight = fontSize * 1.1;
-      const totalHeight = wrappedLines.length * lineHeight;
-      let itemY = labelY + 14;
+      // Position item name
+      const lineHeight = fontSize * 1.15;
+      currentY += fontSize + 2;
 
       wrappedLines.forEach((line) => {
-        doc.text(line, centerX, itemY, { align: 'center' });
-        itemY += lineHeight;
+        doc.text(line, centerX, currentY, { align: 'center' });
+        currentY += lineHeight;
       });
 
       // Quantity (below item name)
@@ -437,19 +444,19 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
 
       // Wrap quantity if needed
       const wrappedQty = doc.splitTextToSize(qtyText, maxWidth);
-      let qtyY = itemY + 3;
+      currentY += 4;
       wrappedQty.forEach((line) => {
-        doc.text(line, centerX, qtyY, { align: 'center' });
-        qtyY += 7;
+        doc.text(line, centerX, currentY, { align: 'center' });
+        currentY += 7;
       });
 
-      // Customer name and date (prominent at bottom)
+      // Customer name and date (fixed at bottom)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6);
       doc.setTextColor(0, 0, 0);
       const customerName = (order.customer_name || '').toUpperCase();
       const dateStr = formatPacificDateShort(order.delivery_date);
-      doc.text(`${customerName} - ${dateStr}`, centerX, labelY + LABEL_HEIGHT - 4, { align: 'center' });
+      doc.text(`${customerName} - ${dateStr}`, centerX, labelY + LABEL_HEIGHT - 3, { align: 'center' });
     }
 
     labelIndex++;
