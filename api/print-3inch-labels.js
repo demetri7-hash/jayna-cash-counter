@@ -283,20 +283,20 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
 
     if (isIngredient) {
       // ========== INGREDIENT LABEL ==========
-      // Layout: Sauce Name (11-13pt) -> INGREDIENTS (6pt) -> Ingredients (6pt, 2 lines) -> Customer/Date (7pt) -> Heart + Website (7pt)
+      // Layout: Sauce Name (10-12pt) -> INGREDIENTS (5pt) -> Ingredients (5pt, 2 lines) -> Customer/Date (6pt) -> Heart + Website (6pt)
 
-      let currentY = labelY + 8; // Start with better top margin
+      let currentY = labelY + 8; // Start with top margin
 
       const maxWidth = LABEL_WIDTH - 16; // 8pt margins each side
 
-      // Item name (sauce name) - BOLD, larger
+      // Item name (sauce name) - BOLD, limit wrapping
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
 
       const itemText = (label.item || '').toUpperCase();
 
-      // Dynamic font sizing for item name
-      let fontSize = 13;
+      // Dynamic font sizing - smaller to prevent overflow
+      let fontSize = 12;
       let wrappedLines = [];
 
       while (fontSize >= 9) {
@@ -320,78 +320,82 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
         if (currentLine) wrappedLines.push(currentLine);
 
         const maxLineWidth = Math.max(...wrappedLines.map(line => doc.getTextWidth(line)));
+        const lineHeight = fontSize * 0.95;
+        const totalHeight = wrappedLines.length * lineHeight;
 
-        if (maxLineWidth <= maxWidth && wrappedLines.length <= 1) {
+        // Ensure total item name height doesn't exceed limit
+        if (maxLineWidth <= maxWidth && totalHeight <= 20 && wrappedLines.length <= 2) {
           break;
         }
 
         fontSize -= 1;
       }
 
-      currentY += fontSize;
+      currentY += fontSize - 1;
+      const itemLineHeight = fontSize * 0.95;
       wrappedLines.forEach((line) => {
         doc.text(line, centerX, currentY, { align: 'center' });
-        currentY += fontSize * 1.05;
+        currentY += itemLineHeight;
       });
 
-      // "INGREDIENTS" header (NOW BELOW item name)
+      // "INGREDIENTS" header (BELOW item name)
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6);
+      doc.setFontSize(5);
       doc.setTextColor(100, 100, 100);
-      currentY += 3;
+      currentY += 2;
       doc.text('INGREDIENTS', centerX, currentY, { align: 'center' });
 
-      // Ingredients list (normal weight, 2 lines max)
+      // Ingredients list (2 lines max, tight spacing)
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6);
+      doc.setFontSize(5);
       doc.setTextColor(60, 60, 60);
 
       const ingredientsText = (label.ingredients || '');
       const wrappedIngredients = doc.splitTextToSize(ingredientsText, maxWidth - 10);
 
-      currentY += 8;
+      currentY += 6;
       const maxIngredientLines = 2;
       for (let i = 0; i < Math.min(wrappedIngredients.length, maxIngredientLines); i++) {
         doc.text(wrappedIngredients[i], centerX, currentY, { align: 'center' });
-        currentY += 7;
+        currentY += 6;
       }
 
-      // Customer name and date (larger, closer to bottom)
+      // Customer name and date (fixed position at bottom)
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
+      doc.setFontSize(6);
       doc.setTextColor(0, 0, 0);
       const customerName = (order.customer_name || '').toUpperCase();
       const dateStr = formatPacificDateShort(order.delivery_date);
-      const bottomY = labelY + LABEL_HEIGHT - 10;
+      const bottomY = labelY + LABEL_HEIGHT - 9;
       doc.text(`${customerName} - ${dateStr}`, centerX, bottomY, { align: 'center' });
 
       // Blue heart + jaynagyro.com at very bottom
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
+      doc.setFontSize(6);
       doc.setTextColor(80, 80, 80);
       const websiteText = 'jaynagyro.com';
       const websiteWidth = doc.getTextWidth(websiteText);
-      const heartSize = 4;
+      const heartSize = 3.5;
       const heartX = centerX - (websiteWidth / 2) - heartSize - 2;
-      drawBlueHeart(doc, heartX, bottomY + 6, heartSize);
-      doc.text(websiteText, centerX + heartSize, bottomY + 8, { align: 'center' });
+      drawBlueHeart(doc, heartX, bottomY + 5, heartSize);
+      doc.text(websiteText, centerX + heartSize, bottomY + 6.5, { align: 'center' });
 
     } else {
       // ========== REGULAR ITEM LABEL ==========
-      // Layout: Item Name (9-15pt) -> Qty (8pt) -> Customer/Date (7pt) -> Heart + Website (7pt)
+      // Layout: Item Name (9-14pt) -> Qty (7pt) -> Customer/Date (6pt) -> Heart + Website (6pt)
 
-      let currentY = labelY + 10; // Start with better top margin
+      let currentY = labelY + 9; // Start with top margin
 
       const maxWidth = LABEL_WIDTH - 16; // 8pt margins each side
 
-      // Item name (BIG, dynamic sizing for maximum visibility)
+      // Item name (BIG, dynamic sizing, limit wrapping)
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
 
       const itemText = (label.item || '').toUpperCase();
 
-      // Dynamic font sizing - larger range
-      let fontSize = 15;
+      // Dynamic font sizing - control total height strictly
+      let fontSize = 14;
       let wrappedLines = [];
 
       while (fontSize >= 8) {
@@ -415,59 +419,59 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
         if (currentLine) wrappedLines.push(currentLine);
 
         const maxLineWidth = Math.max(...wrappedLines.map(line => doc.getTextWidth(line)));
-        const lineHeight = fontSize * 1.05;
+        const lineHeight = fontSize * 0.95;
         const totalHeight = wrappedLines.length * lineHeight;
 
-        // Fit in available space (leaving room for qty + customer + website)
-        if (maxLineWidth <= maxWidth && totalHeight <= 34) {
+        // Strict limit: max 30pt total height for item name (to leave room for qty, customer, website)
+        if (maxLineWidth <= maxWidth && totalHeight <= 30 && wrappedLines.length <= 3) {
           break;
         }
 
         fontSize -= 1;
       }
 
-      // Position item name
-      const lineHeight = fontSize * 1.05;
-      currentY += fontSize;
+      // Position item name with tight spacing
+      const itemLineHeight = fontSize * 0.95;
+      currentY += fontSize - 1;
 
       wrappedLines.forEach((line) => {
         doc.text(line, centerX, currentY, { align: 'center' });
-        currentY += lineHeight;
+        currentY += itemLineHeight;
       });
 
-      // Quantity (below item name, larger)
+      // Quantity (below item name, tight spacing)
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.setTextColor(60, 60, 60);
       const qtyText = (label.qty || '').toUpperCase();
 
       // Wrap quantity if needed
       const wrappedQty = doc.splitTextToSize(qtyText, maxWidth);
-      currentY += 3;
+      currentY += 2;
       wrappedQty.forEach((line) => {
         doc.text(line, centerX, currentY, { align: 'center' });
-        currentY += 8;
+        currentY += 7;
       });
 
-      // Customer name and date (larger, fixed position near bottom)
+      // Customer name and date (fixed position at bottom)
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
+      doc.setFontSize(6);
       doc.setTextColor(0, 0, 0);
       const customerName = (order.customer_name || '').toUpperCase();
       const dateStr = formatPacificDateShort(order.delivery_date);
-      const bottomY = labelY + LABEL_HEIGHT - 10;
+      const bottomY = labelY + LABEL_HEIGHT - 9;
       doc.text(`${customerName} - ${dateStr}`, centerX, bottomY, { align: 'center' });
 
       // Blue heart + jaynagyro.com at very bottom
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
+      doc.setFontSize(6);
       doc.setTextColor(80, 80, 80);
       const websiteText = 'jaynagyro.com';
       const websiteWidth = doc.getTextWidth(websiteText);
-      const heartSize = 4;
+      const heartSize = 3.5;
       const heartX = centerX - (websiteWidth / 2) - heartSize - 2;
-      drawBlueHeart(doc, heartX, bottomY + 6, heartSize);
-      doc.text(websiteText, centerX + heartSize, bottomY + 8, { align: 'center' });
+      drawBlueHeart(doc, heartX, bottomY + 5, heartSize);
+      doc.text(websiteText, centerX + heartSize, bottomY + 6.5, { align: 'center' });
     }
 
     labelIndex++;
