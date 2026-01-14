@@ -1,6 +1,6 @@
 /**
- * Vercel Serverless Function: Print 3-Inch Round Labels to Epson Printer
- * Generates formatted 3" round labels PDF (6 per page: 2 columns x 3 rows)
+ * Vercel Serverless Function: Print 1" x 2-5/8" Rectangular Labels to Epson Printer
+ * Generates formatted 1" x 2.625" rectangular labels PDF (30 per page: 3 columns x 10 rows)
  * and sends via Gmail to Epson printer
  */
 
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`${downloadMode ? '📥' : '🖨️'} Generating 3" labels for order ${order_id}...`);
+    console.log(`${downloadMode ? '📥' : '🖨️'} Generating 1" x 2-5/8" labels for order ${order_id}...`);
 
     // Fetch order details
     const { data: order, error: orderError } = await supabase
@@ -112,19 +112,19 @@ export default async function handler(req, res) {
       });
     }
 
-    // Generate PDF with 3-inch round labels
+    // Generate PDF with 1" x 2-5/8" rectangular labels
     const pdfBase64 = generate3InchLabelsPDF(labels, ingredientLabels, order);
 
     // Filename
     const orderNum = order.order_number || order.id;
-    const filename = `3Inch_Labels_${order.source_system}_${orderNum}_${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `1x2.625_Labels_${order.source_system}_${orderNum}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     // DOWNLOAD MODE: Return PDF as blob for download
     if (downloadMode) {
       const totalLabels = labels.length + ingredientLabels.length;
-      const pageCount = Math.ceil(totalLabels / 6); // 6 labels per page
+      const pageCount = Math.ceil(totalLabels / 30); // 30 labels per page (3 columns x 10 rows)
 
-      console.log(`✅ 3" labels PDF generated for download (${labels.length} item labels + ${ingredientLabels.length} ingredient labels = ${totalLabels} total, ${pageCount} pages)`);
+      console.log(`✅ 1" x 2-5/8" labels PDF generated for download (${labels.length} item labels + ${ingredientLabels.length} ingredient labels = ${totalLabels} total, ${pageCount} pages)`);
 
       const pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
@@ -153,7 +153,7 @@ export default async function handler(req, res) {
     const mailOptions = {
       from: `Jayna Catering <${GMAIL_USER}>`,
       to: PRINTER_EMAIL,
-      subject: `Print: 3" Labels - Order #${orderNum}`,
+      subject: `Print: Catering Labels - Order #${orderNum}`,
       text: '',  // Empty text body - only print PDF attachment
       html: '',  // Empty HTML body - only print PDF attachment
       attachments: [{
@@ -164,20 +164,20 @@ export default async function handler(req, res) {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ 3" labels sent to printer:`, info.messageId);
+    console.log(`✅ Catering labels sent to printer:`, info.messageId);
 
     return res.status(200).json({
       success: true,
-      message: '3" labels sent to printer successfully',
+      message: 'Catering labels sent to printer successfully',
       messageId: info.messageId,
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('❌ Print 3" labels error:', error);
+    console.error('❌ Print catering labels error:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to print 3" labels',
+      error: 'Failed to print catering labels',
       details: error.message
     });
   }
@@ -219,45 +219,50 @@ function drawBlueHeart(doc, x, y, size = 5) {
 }
 
 /**
- * Generate 3-inch round labels PDF
- * Layout: 2 columns x 3 rows = 6 labels per page
+ * Generate 1" x 2-5/8" rectangular labels PDF
+ * Layout: 3 columns x 10 rows = 30 labels per page
  * Page: 8.5" x 11" (612pt x 792pt)
- * Label: 3" diameter (216pt)
- * Font: BOLD, ALL CAPS, IMPACT STYLE
+ * Label: 1" height x 2.625" width (72pt x 189pt)
+ * Font: BOLD, ALL CAPS, dynamic sizing
  */
 function generate3InchLabelsPDF(labels, ingredientLabels, order) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
-  // Label positioning constants
-  const LABEL_DIAMETER = 216; // 3 inches = 216pt
-  const LABEL_RADIUS = 108;
+  // Label dimensions (1" x 2.625")
+  const LABEL_WIDTH = 189; // 2.625 inches = 189pt
+  const LABEL_HEIGHT = 72; // 1 inch = 72pt
 
-  // Column centers (2 columns)
-  const COL_1_X = 154; // Left column center (adjusted 14pt right from 140)
-  const COL_2_X = 452; // Right column center (adjusted 6pt left from 458)
+  // Page margins (top: 0.5" = 36pt)
+  const TOP_MARGIN = 36;
+  const LEFT_MARGIN = 0; // Will calculate to center the 3 columns
 
-  // Row centers (3 rows)
-  const ROW_1_Y = 144; // Top row center
-  const ROW_2_Y = 396; // Middle row center
-  const ROW_3_Y = 648; // Bottom row center
+  // Calculate column positions (3 columns, centered on page)
+  // Page width = 612pt, 3 labels = 567pt total, margin = (612-567)/2 = 22.5pt each side
+  const totalLabelsWidth = LABEL_WIDTH * 3; // 567pt
+  const horizontalMargin = (612 - totalLabelsWidth) / 2; // ~22.5pt
 
-  // 6 label positions per page
-  const positions = [
-    { x: COL_1_X, y: ROW_1_Y }, // Top left
-    { x: COL_2_X, y: ROW_1_Y }, // Top right
-    { x: COL_1_X, y: ROW_2_Y }, // Middle left
-    { x: COL_2_X, y: ROW_2_Y }, // Middle right
-    { x: COL_1_X, y: ROW_3_Y }, // Bottom left
-    { x: COL_2_X, y: ROW_3_Y }  // Bottom right
-  ];
+  const COL_1_X = horizontalMargin;
+  const COL_2_X = horizontalMargin + LABEL_WIDTH;
+  const COL_3_X = horizontalMargin + (LABEL_WIDTH * 2);
+
+  // Generate 30 label positions (3 columns x 10 rows)
+  const positions = [];
+  const columnXs = [COL_1_X, COL_2_X, COL_3_X];
+
+  for (let row = 0; row < 10; row++) {
+    const y = TOP_MARGIN + (row * LABEL_HEIGHT);
+    for (let col = 0; col < 3; col++) {
+      positions.push({ x: columnXs[col], y: y });
+    }
+  }
 
   let labelIndex = 0;
   let pageStarted = false;
 
   // Helper: Add label to PDF
   const addLabel = (label, isIngredient = false) => {
-    // Start new page if needed
-    if (labelIndex > 0 && labelIndex % 6 === 0) {
+    // Start new page if needed (30 labels per page)
+    if (labelIndex > 0 && labelIndex % 30 === 0) {
       doc.addPage();
       pageStarted = false;
     }
@@ -266,54 +271,49 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       pageStarted = true;
     }
 
-    const pos = positions[labelIndex % 6];
-    const centerX = pos.x;
-    const centerY = pos.y;
+    const pos = positions[labelIndex % 30];
+    const labelX = pos.x;
+    const labelY = pos.y;
+    const centerX = labelX + (LABEL_WIDTH / 2);
+    const centerY = labelY + (LABEL_HEIGHT / 2);
 
-    // Circle outline removed per user request - no border needed
+    // Optional: Draw border for debugging (comment out for production)
+    // doc.setDrawColor(200, 200, 200);
+    // doc.rect(labelX, labelY, LABEL_WIDTH, LABEL_HEIGHT);
 
     if (isIngredient) {
       // ========== INGREDIENT LABEL ==========
-      // Top tagline (3 lines) - BOLD ALL CAPS
+
+      // Tagline at top
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
+      doc.setFontSize(5);
       doc.setTextColor(100, 100, 100);
-      doc.text('MADE WITH LOVE', centerX, centerY - 85, { align: 'center' });
-      doc.text('BY YOUR FRIENDS', centerX, centerY - 76, { align: 'center' });
-      doc.text('AT JAYNA GYRO', centerX, centerY - 67, { align: 'center' });
+      doc.text('💙 YOUR FRIENDS AT JAYNA', centerX, labelY + 6, { align: 'center' });
 
-      // Draw blue heart after "AT JAYNA GYRO"
-      const gyroText = 'AT JAYNA GYRO';
-      const gyroTextWidth = doc.getTextWidth(gyroText);
-      const heartX = centerX + (gyroTextWidth / 2) + 4; // 4pt spacing after text
-      const heartY = centerY - 67 - 3; // Align with text baseline
-      drawBlueHeart(doc, heartX, heartY, 5);
+      // "INGREDIENTS" header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(100, 100, 100);
+      doc.text('INGREDIENTS', centerX, labelY + 12, { align: 'center' });
 
-      // Website and phone (ingredient labels only, same style as tagline)
-      doc.text('www.jaynagyro.com', centerX, centerY - 58, { align: 'center' });
-      doc.text('(916) 898-2708', centerX, centerY - 49, { align: 'center' });
-
-      // Item name (big, center, BOLD ALL CAPS)
+      // Item name (sauce name) - BOLD, dynamic sizing
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
 
       const itemText = (label.item || '').toUpperCase();
-      const maxWidth = LABEL_DIAMETER - 40;
+      const maxWidth = LABEL_WIDTH - 12; // 6pt margins each side
 
-      // Dynamic font sizing - scale down to fit without breaking words
-      let fontSize = 20;
+      // Dynamic font sizing for item name (start larger)
+      let fontSize = 12;
       let wrappedLines = [];
 
-      // Keep reducing font size until text fits without breaking words mid-line
-      while (fontSize >= 12) {
+      while (fontSize >= 7) {
         doc.setFontSize(fontSize);
-
-        // Split ONLY on spaces (preserve whole words)
         const words = itemText.split(' ');
         wrappedLines = [];
         let currentLine = '';
 
-        words.forEach((word, idx) => {
+        words.forEach((word) => {
           const testLine = currentLine ? `${currentLine} ${word}` : word;
           const testWidth = doc.getTextWidth(testLine);
 
@@ -327,81 +327,72 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
 
         if (currentLine) wrappedLines.push(currentLine);
 
-        // Check if any single word is too wide
         const maxLineWidth = Math.max(...wrappedLines.map(line => doc.getTextWidth(line)));
 
-        if (maxLineWidth <= maxWidth && wrappedLines.length <= 3) {
-          break; // Found a font size that fits!
+        if (maxLineWidth <= maxWidth && wrappedLines.length <= 2) {
+          break;
         }
 
-        fontSize -= 2; // Reduce and try again
+        fontSize -= 1;
       }
 
-      // Calculate starting Y position for centered multiline text
-      const lineHeight = fontSize * 1.1;
-      const totalHeight = wrappedLines.length * lineHeight;
-      let itemY = centerY - (totalHeight / 2) + 10;
-
+      let itemY = labelY + 20;
       wrappedLines.forEach((line) => {
         doc.text(line, centerX, itemY, { align: 'center' });
-        itemY += lineHeight;
+        itemY += fontSize * 1.1;
       });
 
-      // Ingredients (smaller, below item name, NORMAL weight but still caps)
+      // Ingredients list (smaller, normal weight)
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
+      doc.setFontSize(5);
       doc.setTextColor(60, 60, 60);
 
-      const ingredientsText = (label.ingredients || '').toUpperCase();
+      const ingredientsText = (label.ingredients || '');
       const wrappedIngredients = doc.splitTextToSize(ingredientsText, maxWidth);
 
-      let ingredientsY = centerY + 35;
+      let ingredientsY = itemY + 3;
       wrappedIngredients.forEach((line) => {
-        if (ingredientsY < centerY + LABEL_RADIUS - 10) { // Stay within label bounds
+        if (ingredientsY < labelY + LABEL_HEIGHT - 10) {
           doc.text(line, centerX, ingredientsY, { align: 'center' });
-          ingredientsY += 9;
+          ingredientsY += 6;
         }
       });
+
+      // Customer name and date at bottom
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5);
+      doc.setTextColor(80, 80, 80);
+      const customerName = (order.customer_name || '').toUpperCase();
+      const dateStr = formatPacificDateShort(order.delivery_date);
+      doc.text(`${customerName} - ${dateStr}`, centerX, labelY + LABEL_HEIGHT - 4, { align: 'center' });
 
     } else {
       // ========== REGULAR ITEM LABEL ==========
-      // Top tagline (3 lines) - BOLD ALL CAPS
+
+      // Tagline at top
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
+      doc.setFontSize(5);
       doc.setTextColor(100, 100, 100);
-      doc.text('MADE WITH LOVE', centerX, centerY - 85, { align: 'center' });
-      doc.text('BY YOUR FRIENDS', centerX, centerY - 76, { align: 'center' });
-      doc.text('AT JAYNA GYRO', centerX, centerY - 67, { align: 'center' });
+      doc.text('💙 YOUR FRIENDS AT JAYNA', centerX, labelY + 6, { align: 'center' });
 
-      // Draw blue heart after "AT JAYNA GYRO"
-      const gyroText = 'AT JAYNA GYRO';
-      const gyroTextWidth = doc.getTextWidth(gyroText);
-      const heartX = centerX + (gyroTextWidth / 2) + 4; // 4pt spacing after text
-      const heartY = centerY - 67 - 3; // Align with text baseline
-      drawBlueHeart(doc, heartX, heartY, 5);
-
-      // Item name (big, center, BOLD ALL CAPS)
+      // Item name (BIG, dynamic sizing for maximum visibility)
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
 
       const itemText = (label.item || '').toUpperCase();
-      const maxWidth = LABEL_DIAMETER - 40;
+      const maxWidth = LABEL_WIDTH - 12; // 6pt margins each side
 
-      // Dynamic font sizing - scale down to fit without breaking words
-      let fontSize = 24;
-      let textWidth = 0;
+      // Dynamic font sizing - start LARGE (priority: make item name as big as possible)
+      let fontSize = 14;
       let wrappedLines = [];
 
-      // Keep reducing font size until text fits without breaking words mid-line
-      while (fontSize >= 12) {
+      while (fontSize >= 7) {
         doc.setFontSize(fontSize);
-
-        // Split ONLY on spaces (preserve whole words)
         const words = itemText.split(' ');
         wrappedLines = [];
         let currentLine = '';
 
-        words.forEach((word, idx) => {
+        words.forEach((word) => {
           const testLine = currentLine ? `${currentLine} ${word}` : word;
           const testWidth = doc.getTextWidth(testLine);
 
@@ -415,43 +406,50 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
 
         if (currentLine) wrappedLines.push(currentLine);
 
-        // Check if any single word is too wide
         const maxLineWidth = Math.max(...wrappedLines.map(line => doc.getTextWidth(line)));
+        const lineHeight = fontSize * 1.1;
+        const totalHeight = wrappedLines.length * lineHeight;
 
-        if (maxLineWidth <= maxWidth && wrappedLines.length <= 3) {
-          break; // Found a font size that fits!
+        // Must fit in available space (label height - tagline at top - qty/customer at bottom)
+        // Available: 72pt total - 10pt top (tagline) - 20pt bottom (qty + customer) = ~42pt
+        if (maxLineWidth <= maxWidth && totalHeight <= 42) {
+          break;
         }
 
-        fontSize -= 2; // Reduce and try again
+        fontSize -= 1;
       }
 
-      // Calculate starting Y position for centered multiline text
+      // Position item name starting after tagline
       const lineHeight = fontSize * 1.1;
       const totalHeight = wrappedLines.length * lineHeight;
-      let itemY = centerY - (totalHeight / 2) + (fontSize * 0.3);
+      let itemY = labelY + 14;
 
       wrappedLines.forEach((line) => {
         doc.text(line, centerX, itemY, { align: 'center' });
         itemY += lineHeight;
       });
 
-      // Quantity (smaller, below item name, BOLD ALL CAPS)
+      // Quantity (below item name)
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
+      doc.setFontSize(6);
       doc.setTextColor(60, 60, 60);
       const qtyText = (label.qty || '').toUpperCase();
-      doc.text(qtyText, centerX, centerY + 40, { align: 'center' });
 
-      // Customer name and date (bottom, small, BOLD ALL CAPS)
+      // Wrap quantity if needed
+      const wrappedQty = doc.splitTextToSize(qtyText, maxWidth);
+      let qtyY = itemY + 3;
+      wrappedQty.forEach((line) => {
+        doc.text(line, centerX, qtyY, { align: 'center' });
+        qtyY += 7;
+      });
+
+      // Customer name and date (prominent at bottom)
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
-      doc.setTextColor(80, 80, 80);
-
+      doc.setFontSize(6);
+      doc.setTextColor(0, 0, 0);
       const customerName = (order.customer_name || '').toUpperCase();
-      doc.text(customerName, centerX, centerY + 80, { align: 'center' });
-
       const dateStr = formatPacificDateShort(order.delivery_date);
-      doc.text(dateStr, centerX, centerY + 90, { align: 'center' });
+      doc.text(`${customerName} - ${dateStr}`, centerX, labelY + LABEL_HEIGHT - 4, { align: 'center' });
     }
 
     labelIndex++;
