@@ -279,12 +279,16 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
     const pos = positions[labelIndex % 30];
     const labelX = pos.x;
     const labelY = pos.y;
-    const centerX = labelX + (LABEL_WIDTH / 2);
-    const centerY = labelY + (LABEL_HEIGHT / 2);
+
+    // Calculate TRUE center using ACTUAL label dimensions (not safety margins)
+    // ACTUAL dimensions: 189pt x 72pt (the real label box on the sheet)
+    // Safety dimensions: 185pt x 70pt (printable area with margins)
+    const centerX = labelX + (ACTUAL_LABEL_WIDTH / 2);  // labelX + 94.5pt
+    const centerY = labelY + (ACTUAL_LABEL_HEIGHT / 2);  // labelY + 36pt
 
     // Optional: Draw border for debugging (comment out for production)
     // doc.setDrawColor(200, 200, 200);
-    // doc.rect(labelX, labelY, LABEL_WIDTH, LABEL_HEIGHT);
+    // doc.rect(labelX, labelY, ACTUAL_LABEL_WIDTH, ACTUAL_LABEL_HEIGHT);
 
     if (isIngredient) {
       // ========== INGREDIENT LABEL ==========
