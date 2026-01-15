@@ -149,7 +149,7 @@ export default async function handler(req, res) {
 
 /**
  * Generate PDF from receipts (similar to Combined Weekly Report format)
- * Now groups by payment type: AMEX CARD 1100, CASH, PERSONAL/REIMBURSE
+ * Groups by PERSON first (Demetri vs Aykut), then by payment type within each person
  */
 async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   const doc = new jsPDF({
@@ -158,15 +158,22 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
     format: 'letter'
   });
 
-  // Group receipts by payment type
-  const amexReceipts = receipts.filter(r => (r.payment_type || 'AMEX CARD 1100') === 'AMEX CARD 1100');
-  const cashReceipts = receipts.filter(r => r.payment_type === 'CASH');
-  const reimburseReceipts = receipts.filter(r => r.payment_type === 'PERSONAL/REIMBURSE');
+  // Group receipts by PERSON first
+  const demetriReceipts = receipts.filter(r => (r.person || 'DEMETRI GREGORAKIS') === 'DEMETRI GREGORAKIS');
+  const aykutReceipts = receipts.filter(r => r.person === 'AYKUT KIRAC');
 
-  // Calculate totals by payment type
-  const amexTotal = amexReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
-  const cashTotal = cashReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
-  const reimburseTotal = reimburseReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+  // Calculate person totals
+  const demetriTotal = demetriReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+  const aykutTotal = aykutReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+
+  // Within each person, group by payment type
+  const demetriAmex = demetriReceipts.filter(r => (r.payment_type || 'AMEX CARD 1100') === 'AMEX CARD 1100');
+  const demetriCash = demetriReceipts.filter(r => r.payment_type === 'CASH');
+  const demetriReimburse = demetriReceipts.filter(r => r.payment_type === 'PERSONAL/REIMBURSE');
+
+  const aykutAmex = aykutReceipts.filter(r => (r.payment_type || 'AMEX CARD 1100') === 'AMEX CARD 1100');
+  const aykutCash = aykutReceipts.filter(r => r.payment_type === 'CASH');
+  const aykutReimburse = aykutReceipts.filter(r => r.payment_type === 'PERSONAL/REIMBURSE');
 
   // Aptos-like font (use Helvetica in jsPDF)
   doc.setFont('helvetica');
@@ -225,7 +232,7 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.text(`ARCHIVED: ${archiveDateTime}`, 4.25, yPos, { align: 'center' });
   yPos += 0.35;
 
-  // Summary section (left-aligned) - NOW WITH 3 PAYMENT TYPE BREAKDOWNS
+  // Summary section (left-aligned) - NOW WITH PERSON BREAKDOWNS
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(33, 33, 33);
@@ -241,34 +248,42 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
   doc.text(`${receipts.length}`, 1.8, yPos);
   yPos += 0.25;
 
-  // AMEX CARD 1100 Breakdown
+  // DEMETRI GREGORAKIS Breakdown (Purple/Indigo)
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 64, 175); // Blue
-  doc.text(`AMEX CARD 1100:`, 0.7, yPos);
+  doc.setTextColor(55, 48, 163); // Indigo
+  doc.text(`DEMETRI GREGORAKIS:`, 0.7, yPos);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${amexReceipts.length} entries | $${amexTotal.toFixed(2)}`, 2.3, yPos);
-  yPos += 0.18;
+  doc.text(`${demetriReceipts.length} entries | $${demetriTotal.toFixed(2)}`, 3.0, yPos);
+  yPos += 0.15;
 
-  // CASH Breakdown
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(146, 64, 14); // Yellow/Orange
-  doc.text(`CASH:`, 0.7, yPos);
+  // Demetri sub-breakdown (payment types)
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${cashReceipts.length} entries | $${cashTotal.toFixed(2)}`, 2.3, yPos);
-  yPos += 0.18;
+  doc.setTextColor(100, 100, 100);
+  doc.text(`AMEX: ${demetriAmex.length} ($${demetriAmex.reduce((s,r) => s + parseFloat(r.amount), 0).toFixed(2)}) | CASH: ${demetriCash.length} ($${demetriCash.reduce((s,r) => s + parseFloat(r.amount), 0).toFixed(2)}) | REIMBURSE: ${demetriReimburse.length} ($${demetriReimburse.reduce((s,r) => s + parseFloat(r.amount), 0).toFixed(2)})`, 0.9, yPos);
+  doc.setFontSize(10);
+  yPos += 0.23;
 
-  // PERSONAL/REIMBURSE Breakdown
+  // AYKUT KIRAC Breakdown (Green)
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(153, 27, 27); // Red
-  doc.text(`PERSONAL/REIMBURSE:`, 0.7, yPos);
+  doc.setTextColor(6, 95, 70); // Green
+  doc.text(`AYKUT KIRAC:`, 0.7, yPos);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${reimburseReceipts.length} entries | $${reimburseTotal.toFixed(2)}`, 3.2, yPos);
+  doc.text(`${aykutReceipts.length} entries | $${aykutTotal.toFixed(2)}`, 3.0, yPos);
+  yPos += 0.15;
+
+  // Aykut sub-breakdown (payment types)
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text(`AMEX: ${aykutAmex.length} ($${aykutAmex.reduce((s,r) => s + parseFloat(r.amount), 0).toFixed(2)}) | CASH: ${aykutCash.length} ($${aykutCash.reduce((s,r) => s + parseFloat(r.amount), 0).toFixed(2)}) | REIMBURSE: ${aykutReimburse.length} ($${aykutReimburse.reduce((s,r) => s + parseFloat(r.amount), 0).toFixed(2)})`, 0.9, yPos);
+  doc.setFontSize(10);
   yPos += 0.25;
 
-  // Grand Total Amount (bold, darker)
+  // Grand Total Amount (bold, darker) - SHARED CARD
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(26, 26, 26);
-  doc.text(`GRAND TOTAL: $${totalAmount.toFixed(2)}`, 0.5, yPos);
+  doc.text(`GRAND TOTAL (SHARED CARD): $${totalAmount.toFixed(2)}`, 0.5, yPos);
   yPos += 0.35;
 
   // Track receipts with images and their future page numbers (calculate once for all sections)
@@ -388,10 +403,15 @@ async function generateReceiptsPDF(receipts, totalAmount, supabase) {
     yPos += 0.3;
   };
 
-  // Render 3 separate sections
-  renderReceiptSection(amexReceipts, 'AMEX CARD 1100 RECEIPTS', [30, 64, 175]); // Blue
-  renderReceiptSection(cashReceipts, 'CASH RECEIPTS', [146, 64, 14]); // Yellow/Orange
-  renderReceiptSection(reimburseReceipts, 'PERSONAL/REIMBURSE RECEIPTS', [153, 27, 27]); // Red
+  // Render DEMETRI GREGORAKIS sections (Indigo color)
+  renderReceiptSection(demetriAmex, 'DEMETRI GREGORAKIS - AMEX CARD 1100', [55, 48, 163]);
+  renderReceiptSection(demetriCash, 'DEMETRI GREGORAKIS - CASH', [55, 48, 163]);
+  renderReceiptSection(demetriReimburse, 'DEMETRI GREGORAKIS - PERSONAL/REIMBURSE', [55, 48, 163]);
+
+  // Render AYKUT KIRAC sections (Green color)
+  renderReceiptSection(aykutAmex, 'AYKUT KIRAC - AMEX CARD 1100', [6, 95, 70]);
+  renderReceiptSection(aykutCash, 'AYKUT KIRAC - CASH', [6, 95, 70]);
+  renderReceiptSection(aykutReimburse, 'AYKUT KIRAC - PERSONAL/REIMBURSE', [6, 95, 70]);
 
   // Add image appendix pages
   for (const receipt of receipts) {
