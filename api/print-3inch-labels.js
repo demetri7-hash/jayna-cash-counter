@@ -228,29 +228,34 @@ function drawBlueHeart(doc, x, y, size = 5) {
 function generate3InchLabelsPDF(labels, ingredientLabels, order) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
-  // Label dimensions (1" x 2.625")
-  const LABEL_WIDTH = 189; // 2.625 inches = 189pt
-  const LABEL_HEIGHT = 72; // 1 inch = 72pt
+  // Label dimensions (1" x 2.625") with SAFE MARGINS
+  const LABEL_WIDTH = 185; // 2.625 inches = 189pt, using 185pt for safety (2pt margin each side)
+  const LABEL_HEIGHT = 70; // 1 inch = 72pt, using 70pt for safety (1pt top/bottom margin)
 
-  // Page margins - match the physical label sheet exactly
-  const TOP_MARGIN = 36; // 0.5 inch from top
+  // Page margins - EXTRA SAFE to prevent cutoff
+  const TOP_MARGIN = 38; // 0.53 inch from top (extra 2pt safety)
   const LEFT_MARGIN = 0; // Will calculate to center the 3 columns
 
-  // Calculate column positions (3 columns, centered on page)
-  // Page width = 612pt, 3 labels = 567pt total, margin = (612-567)/2 = 22.5pt each side
-  const totalLabelsWidth = LABEL_WIDTH * 3; // 567pt
-  const horizontalMargin = (612 - totalLabelsWidth) / 2; // ~22.5pt
+  // Calculate column positions (3 columns, centered on page with safety margins)
+  // Page width = 612pt, 3 labels = 189pt each = 567pt total
+  // Add 4pt gap between columns for safety
+  const ACTUAL_LABEL_WIDTH = 189; // Actual label width on sheet
+  const COL_GAP = 4; // Gap between columns for safety
+  const totalLabelsWidth = (ACTUAL_LABEL_WIDTH * 3) + (COL_GAP * 2);
+  const horizontalMargin = (612 - totalLabelsWidth) / 2;
 
   const COL_1_X = horizontalMargin;
-  const COL_2_X = horizontalMargin + LABEL_WIDTH;
-  const COL_3_X = horizontalMargin + (LABEL_WIDTH * 2);
+  const COL_2_X = horizontalMargin + ACTUAL_LABEL_WIDTH + COL_GAP;
+  const COL_3_X = horizontalMargin + (ACTUAL_LABEL_WIDTH * 2) + (COL_GAP * 2);
 
-  // Generate 30 label positions (3 columns x 10 rows)
+  // Generate 30 label positions (3 columns x 10 rows) with row gaps for safety
   const positions = [];
   const columnXs = [COL_1_X, COL_2_X, COL_3_X];
+  const ACTUAL_LABEL_HEIGHT = 72; // Actual label height on sheet
+  const ROW_GAP = 0; // No gap between rows (they're tightly spaced on the sheet)
 
   for (let row = 0; row < 10; row++) {
-    const y = TOP_MARGIN + (row * LABEL_HEIGHT);
+    const y = TOP_MARGIN + (row * ACTUAL_LABEL_HEIGHT);
     for (let col = 0; col < 3; col++) {
       positions.push({ x: columnXs[col], y: y });
     }

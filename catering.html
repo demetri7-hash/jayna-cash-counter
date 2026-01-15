@@ -5097,17 +5097,55 @@
         background: var(--blue-bg);
         border: 2px solid #3b82f6;
         padding: 16px;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
       `;
       instructions.innerHTML = `
         <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #1e40af;">
-          LOAD LABEL SHEETS INTO PRINTER
+          LOADING INSTRUCTIONS:
         </p>
-        <p style="margin: 0; font-size: 16px; font-weight: 700; color: #1e40af;">
-          📄 ${pageCount} ${pageCount === 1 ? 'SHEET' : 'SHEETS'} REQUIRED
-        </p>
+        <ol style="margin: 0; padding-left: 20px; font-size: 13px; font-weight: 600; color: #1e40af; line-height: 1.6;">
+          <li>Load <strong>${pageCount} ${pageCount === 1 ? 'SHEET' : 'SHEETS'}</strong> of labels</li>
+          <li><strong>FACE DOWN</strong> in the <strong>LOWER PAPER TRAY (TRAY 2)</strong></li>
+          <li>On the printer in the <strong>OFFICE</strong></li>
+        </ol>
       `;
       modal.appendChild(instructions);
+
+      // 2-Minute Delay Checkbox
+      const delayCheckboxContainer = document.createElement('div');
+      delayCheckboxContainer.style.cssText = `
+        background: #fef3c7;
+        border: 2px solid #f59e0b;
+        padding: 12px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      `;
+
+      const delayCheckbox = document.createElement('input');
+      delayCheckbox.type = 'checkbox';
+      delayCheckbox.id = 'printDelayCheckbox';
+      delayCheckbox.style.cssText = `
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      `;
+
+      const delayLabel = document.createElement('label');
+      delayLabel.htmlFor = 'printDelayCheckbox';
+      delayLabel.style.cssText = `
+        font-size: 13px;
+        font-weight: 700;
+        color: #92400e;
+        cursor: pointer;
+        margin: 0;
+      `;
+      delayLabel.textContent = '⏱️ Wait 2 minutes before sending to printer (gives time to load paper)';
+
+      delayCheckboxContainer.appendChild(delayCheckbox);
+      delayCheckboxContainer.appendChild(delayLabel);
+      modal.appendChild(delayCheckboxContainer);
 
       // Button group
       const buttonGroup = document.createElement('div');
@@ -5231,10 +5269,34 @@
         letter-spacing: 0.5px;
       `;
       printBtn.onclick = async () => {
+        // Check if delay is enabled
+        const delayEnabled = delayCheckbox.checked;
+        const delaySeconds = delayEnabled ? 120 : 0; // 2 minutes = 120 seconds
+
         // Disable button and show loading state
         printBtn.disabled = true;
         printBtn.style.opacity = '0.6';
         printBtn.style.cursor = 'not-allowed';
+
+        if (delayEnabled) {
+          // Show countdown
+          let remainingSeconds = delaySeconds;
+
+          const countdownInterval = setInterval(() => {
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            printBtn.textContent = `⏱️ SENDING IN ${minutes}:${seconds.toString().padStart(2, '0')}...`;
+            remainingSeconds--;
+
+            if (remainingSeconds < 0) {
+              clearInterval(countdownInterval);
+            }
+          }, 1000);
+
+          // Wait for the delay
+          await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+        }
+
         printBtn.textContent = 'SENDING TO PRINTER...';
 
         try {
