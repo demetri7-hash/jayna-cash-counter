@@ -369,25 +369,31 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
         currentY += 6;
       }
 
-      // Customer name and date (fixed position at bottom)
+      // Customer name and date (fixed position at bottom, with safe margins)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6);
       doc.setTextColor(0, 0, 0);
       const customerName = (order.customer_name || '').toUpperCase();
       const dateStr = formatPacificDateShort(order.delivery_date);
-      const bottomY = labelY + LABEL_HEIGHT - 9;
-      doc.text(`${customerName} - ${dateStr}`, centerX, bottomY, { align: 'center' });
+      const customerY = labelY + LABEL_HEIGHT - 13; // 13pt from bottom for safety
+      doc.text(`${customerName} - ${dateStr}`, centerX, customerY, { align: 'center' });
 
-      // Blue heart + jaynagyro.com at very bottom
+      // Blue heart + jaynagyro.com at very bottom (centered together)
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
       doc.setTextColor(80, 80, 80);
       const websiteText = 'jaynagyro.com';
       const websiteWidth = doc.getTextWidth(websiteText);
       const heartSize = 3.5;
-      const heartX = centerX - (websiteWidth / 2) - heartSize - 2;
-      drawBlueHeart(doc, heartX, bottomY + 5, heartSize);
-      doc.text(websiteText, centerX + heartSize, bottomY + 6.5, { align: 'center' });
+      const spacing = 2;
+
+      // Calculate total width of heart + spacing + text, then center it
+      const totalWidth = heartSize + spacing + websiteWidth;
+      const startX = centerX - (totalWidth / 2);
+
+      const websiteY = labelY + LABEL_HEIGHT - 6; // 6pt from bottom for safety
+      drawBlueHeart(doc, startX + (heartSize / 2), websiteY - 2, heartSize);
+      doc.text(websiteText, startX + heartSize + spacing, websiteY, { align: 'left' });
 
     } else {
       // ========== REGULAR ITEM LABEL ==========
@@ -462,25 +468,31 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
         currentY += 7;
       });
 
-      // Customer name and date (fixed position at bottom)
+      // Customer name and date (fixed position at bottom, with safe margins)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6);
       doc.setTextColor(0, 0, 0);
       const customerName = (order.customer_name || '').toUpperCase();
       const dateStr = formatPacificDateShort(order.delivery_date);
-      const bottomY = labelY + LABEL_HEIGHT - 9;
-      doc.text(`${customerName} - ${dateStr}`, centerX, bottomY, { align: 'center' });
+      const customerY = labelY + LABEL_HEIGHT - 13; // 13pt from bottom for safety
+      doc.text(`${customerName} - ${dateStr}`, centerX, customerY, { align: 'center' });
 
-      // Blue heart + jaynagyro.com at very bottom
+      // Blue heart + jaynagyro.com at very bottom (centered together)
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
       doc.setTextColor(80, 80, 80);
       const websiteText = 'jaynagyro.com';
       const websiteWidth = doc.getTextWidth(websiteText);
       const heartSize = 3.5;
-      const heartX = centerX - (websiteWidth / 2) - heartSize - 2;
-      drawBlueHeart(doc, heartX, bottomY + 5, heartSize);
-      doc.text(websiteText, centerX + heartSize, bottomY + 6.5, { align: 'center' });
+      const spacing = 2;
+
+      // Calculate total width of heart + spacing + text, then center it
+      const totalWidth = heartSize + spacing + websiteWidth;
+      const startX = centerX - (totalWidth / 2);
+
+      const websiteY = labelY + LABEL_HEIGHT - 6; // 6pt from bottom for safety
+      drawBlueHeart(doc, startX + (heartSize / 2), websiteY - 2, heartSize);
+      doc.text(websiteText, startX + heartSize + spacing, websiteY, { align: 'left' });
     }
 
     labelIndex++;
