@@ -5284,39 +5284,25 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
       `;
-      printBtn.onclick = async () => {
-        // Check if delay is enabled
-        const delayEnabled = delayCheckbox.checked;
-        const delaySeconds = delayEnabled ? 120 : 0; // 2 minutes = 120 seconds
+      // Variables to track countdown state
+      let countdownInterval = null;
+      let countdownTimeout = null;
+      let isCountingDown = false;
 
-        // Disable button and show loading state
+      const sendToPrinter = async () => {
+        // Clear any active countdown
+        if (countdownInterval) clearInterval(countdownInterval);
+        if (countdownTimeout) clearTimeout(countdownTimeout);
+        isCountingDown = false;
+
+        // Disable button and show sending state
         printBtn.disabled = true;
         printBtn.style.opacity = '0.6';
         printBtn.style.cursor = 'not-allowed';
-
-        if (delayEnabled) {
-          // Show countdown
-          let remainingSeconds = delaySeconds;
-
-          const countdownInterval = setInterval(() => {
-            const minutes = Math.floor(remainingSeconds / 60);
-            const seconds = remainingSeconds % 60;
-            printBtn.textContent = `SENDING IN ${minutes}:${seconds.toString().padStart(2, '0')}...`;
-            remainingSeconds--;
-
-            if (remainingSeconds < 0) {
-              clearInterval(countdownInterval);
-            }
-          }, 1000);
-
-          // Wait for the delay
-          await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
-        }
-
         printBtn.textContent = 'SENDING TO PRINTER...';
 
         try {
-          // Call API in PRINT mode (download=false)
+          // Call API in PRINT mode
           const response = await fetch(`/api/print-3inch-labels`, {
             method: 'POST',
             headers: {
@@ -5329,10 +5315,10 @@
             throw new Error('Failed to send to printer');
           }
 
-          // Success feedback - turn button green
+          // Success feedback
           printBtn.style.background = '#059669';
           printBtn.style.borderColor = '#059669';
-          printBtn.textContent = '✅ SENT TO PRINTER!';
+          printBtn.textContent = 'SENT TO PRINTER!';
 
           // Close popup after 1.5 seconds
           setTimeout(() => {
@@ -5340,12 +5326,12 @@
           }, 1500);
 
         } catch (error) {
-          console.error('❌ Print error:', error);
+          console.error('Print error:', error);
 
-          // Error feedback - turn button red
+          // Error feedback
           printBtn.style.background = '#dc2626';
           printBtn.style.borderColor = '#dc2626';
-          printBtn.textContent = '❌ FAILED';
+          printBtn.textContent = 'FAILED';
 
           // Re-enable after 2 seconds
           setTimeout(() => {
@@ -5354,8 +5340,53 @@
             printBtn.style.cursor = 'pointer';
             printBtn.style.background = 'var(--gray-900)';
             printBtn.style.borderColor = 'var(--gray-900)';
-            printBtn.textContent = '🖨️ PRINT NOW';
+            printBtn.textContent = 'PRINT NOW';
           }, 2000);
+        }
+      };
+
+      printBtn.onclick = async () => {
+        // If countdown is active, clicking sends immediately
+        if (isCountingDown) {
+          await sendToPrinter();
+          return;
+        }
+
+        // Check if delay is enabled
+        const delayEnabled = delayCheckbox.checked;
+
+        if (delayEnabled) {
+          // Start countdown
+          isCountingDown = true;
+          let remainingSeconds = 120; // 2 minutes
+
+          // Keep button enabled during countdown so user can click to send now
+          printBtn.disabled = false;
+          printBtn.style.opacity = '1';
+          printBtn.style.cursor = 'pointer';
+          printBtn.style.background = '#f59e0b'; // Orange during countdown
+          printBtn.style.borderColor = '#f59e0b';
+
+          // Update countdown display
+          countdownInterval = setInterval(() => {
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            printBtn.textContent = `${minutes}:${seconds.toString().padStart(2, '0')} - CLICK TO SEND NOW`;
+            remainingSeconds--;
+
+            if (remainingSeconds < 0) {
+              clearInterval(countdownInterval);
+            }
+          }, 1000);
+
+          // Auto-send after 2 minutes
+          countdownTimeout = setTimeout(async () => {
+            await sendToPrinter();
+          }, 120000);
+
+        } else {
+          // No delay, send immediately
+          await sendToPrinter();
         }
       };
       buttonGroup.appendChild(printBtn);
