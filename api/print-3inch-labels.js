@@ -376,19 +376,19 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
         currentY += 6;
       }
 
-      // Customer name and date (fixed position at bottom, with safe margins)
+      // Customer name and date (right after ingredients, tight spacing)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6);
       doc.setTextColor(0, 0, 0);
       const customerName = (order.customer_name || '').toUpperCase();
       const dateStr = formatPacificDateShort(order.delivery_date);
-      const customerY = labelY + LABEL_HEIGHT - 13; // 13pt from bottom for safety
+      currentY += 2; // Small gap after ingredients
       const customerText = `${customerName} - ${dateStr}`;
       const customerTextWidth = doc.getTextWidth(customerText);
       const customerTextX = centerX - (customerTextWidth / 2);
-      doc.text(customerText, customerTextX, customerY);
+      doc.text(customerText, customerTextX, currentY);
 
-      // Blue heart + jaynagyro.com at very bottom (centered together)
+      // Blue heart + jaynagyro.com (right after customer/date)
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
       doc.setTextColor(80, 80, 80);
@@ -401,9 +401,9 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       const totalWidth = heartSize + spacing + websiteWidth;
       const startX = centerX - (totalWidth / 2);
 
-      const websiteY = labelY + LABEL_HEIGHT - 6; // 6pt from bottom for safety
-      drawBlueHeart(doc, startX + (heartSize / 2), websiteY - 2, heartSize);
-      doc.text(websiteText, startX + heartSize + spacing, websiteY);
+      currentY += 5.5; // Small gap after customer/date
+      drawBlueHeart(doc, startX + (heartSize / 2), currentY - 1, heartSize);
+      doc.text(websiteText, startX + heartSize + spacing, currentY);
 
     } else {
       // ========== REGULAR ITEM LABEL ==========
@@ -483,19 +483,19 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
         currentY += 7;
       });
 
-      // Customer name and date (fixed position at bottom, with safe margins)
+      // Customer name and date (right after qty, tight spacing)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6);
       doc.setTextColor(0, 0, 0);
       const customerName = (order.customer_name || '').toUpperCase();
       const dateStr = formatPacificDateShort(order.delivery_date);
-      const customerY = labelY + LABEL_HEIGHT - 13; // 13pt from bottom for safety
+      currentY += 2; // Small gap after qty
       const customerText = `${customerName} - ${dateStr}`;
       const customerTextWidth = doc.getTextWidth(customerText);
       const customerTextX = centerX - (customerTextWidth / 2);
-      doc.text(customerText, customerTextX, customerY);
+      doc.text(customerText, customerTextX, currentY);
 
-      // Blue heart + jaynagyro.com at very bottom (centered together)
+      // Blue heart + jaynagyro.com (right after customer/date)
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
       doc.setTextColor(80, 80, 80);
@@ -508,9 +508,9 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       const totalWidth = heartSize + spacing + websiteWidth;
       const startX = centerX - (totalWidth / 2);
 
-      const websiteY = labelY + LABEL_HEIGHT - 6; // 6pt from bottom for safety
-      drawBlueHeart(doc, startX + (heartSize / 2), websiteY - 2, heartSize);
-      doc.text(websiteText, startX + heartSize + spacing, websiteY);
+      currentY += 5.5; // Small gap after customer/date
+      drawBlueHeart(doc, startX + (heartSize / 2), currentY - 1, heartSize);
+      doc.text(websiteText, startX + heartSize + spacing, currentY);
     }
 
     labelIndex++;
