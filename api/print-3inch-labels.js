@@ -343,7 +343,10 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       currentY += fontSize - 1;
       const itemLineHeight = fontSize * 0.95;
       wrappedLines.forEach((line) => {
-        doc.text(line, centerX, currentY, { align: 'center' });
+        // Manual centering - calculate X position to center the text
+        const lineWidth = doc.getTextWidth(line);
+        const lineX = centerX - (lineWidth / 2);
+        doc.text(line, lineX, currentY);
         currentY += itemLineHeight;
       });
 
@@ -352,7 +355,9 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       doc.setFontSize(5);
       doc.setTextColor(100, 100, 100);
       currentY += 2;
-      doc.text('INGREDIENTS', centerX, currentY, { align: 'center' });
+      const ingredientsHeaderWidth = doc.getTextWidth('INGREDIENTS');
+      const ingredientsHeaderX = centerX - (ingredientsHeaderWidth / 2);
+      doc.text('INGREDIENTS', ingredientsHeaderX, currentY);
 
       // Ingredients list (2 lines max, tight spacing)
       doc.setFont('helvetica', 'normal');
@@ -365,7 +370,9 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       currentY += 6;
       const maxIngredientLines = 2;
       for (let i = 0; i < Math.min(wrappedIngredients.length, maxIngredientLines); i++) {
-        doc.text(wrappedIngredients[i], centerX, currentY, { align: 'center' });
+        const ingredientLineWidth = doc.getTextWidth(wrappedIngredients[i]);
+        const ingredientLineX = centerX - (ingredientLineWidth / 2);
+        doc.text(wrappedIngredients[i], ingredientLineX, currentY);
         currentY += 6;
       }
 
@@ -376,7 +383,10 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       const customerName = (order.customer_name || '').toUpperCase();
       const dateStr = formatPacificDateShort(order.delivery_date);
       const customerY = labelY + LABEL_HEIGHT - 13; // 13pt from bottom for safety
-      doc.text(`${customerName} - ${dateStr}`, centerX, customerY, { align: 'center' });
+      const customerText = `${customerName} - ${dateStr}`;
+      const customerTextWidth = doc.getTextWidth(customerText);
+      const customerTextX = centerX - (customerTextWidth / 2);
+      doc.text(customerText, customerTextX, customerY);
 
       // Blue heart + jaynagyro.com at very bottom (centered together)
       doc.setFont('helvetica', 'normal');
@@ -393,7 +403,7 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
 
       const websiteY = labelY + LABEL_HEIGHT - 6; // 6pt from bottom for safety
       drawBlueHeart(doc, startX + (heartSize / 2), websiteY - 2, heartSize);
-      doc.text(websiteText, startX + heartSize + spacing, websiteY, { align: 'left' });
+      doc.text(websiteText, startX + heartSize + spacing, websiteY);
 
     } else {
       // ========== REGULAR ITEM LABEL ==========
@@ -450,7 +460,10 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       currentY += fontSize - 1;
 
       wrappedLines.forEach((line) => {
-        doc.text(line, centerX, currentY, { align: 'center' });
+        // Manual centering - calculate X position to center the text
+        const lineWidth = doc.getTextWidth(line);
+        const lineX = centerX - (lineWidth / 2);
+        doc.text(line, lineX, currentY);
         currentY += itemLineHeight;
       });
 
@@ -464,7 +477,9 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       const wrappedQty = doc.splitTextToSize(qtyText, maxWidth);
       currentY += 2;
       wrappedQty.forEach((line) => {
-        doc.text(line, centerX, currentY, { align: 'center' });
+        const qtyLineWidth = doc.getTextWidth(line);
+        const qtyLineX = centerX - (qtyLineWidth / 2);
+        doc.text(line, qtyLineX, currentY);
         currentY += 7;
       });
 
@@ -475,7 +490,10 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
       const customerName = (order.customer_name || '').toUpperCase();
       const dateStr = formatPacificDateShort(order.delivery_date);
       const customerY = labelY + LABEL_HEIGHT - 13; // 13pt from bottom for safety
-      doc.text(`${customerName} - ${dateStr}`, centerX, customerY, { align: 'center' });
+      const customerText = `${customerName} - ${dateStr}`;
+      const customerTextWidth = doc.getTextWidth(customerText);
+      const customerTextX = centerX - (customerTextWidth / 2);
+      doc.text(customerText, customerTextX, customerY);
 
       // Blue heart + jaynagyro.com at very bottom (centered together)
       doc.setFont('helvetica', 'normal');
@@ -492,7 +510,7 @@ function generate3InchLabelsPDF(labels, ingredientLabels, order) {
 
       const websiteY = labelY + LABEL_HEIGHT - 6; // 6pt from bottom for safety
       drawBlueHeart(doc, startX + (heartSize / 2), websiteY - 2, heartSize);
-      doc.text(websiteText, startX + heartSize + spacing, websiteY, { align: 'left' });
+      doc.text(websiteText, startX + heartSize + spacing, websiteY);
     }
 
     labelIndex++;
