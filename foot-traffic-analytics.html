@@ -466,6 +466,8 @@
       });
 
       const ordersUrl = `/api/toast-orders-flexible?${queryParams.toString()}`;
+      console.log('🍞 Fetching orders from:', ordersUrl.replace(/accessToken=[^&]*/, 'accessToken=***'));
+      console.log('📅 Business date:', businessDate);
 
       const ordersResponse = await fetch(ordersUrl, {
         method: 'GET',
@@ -475,13 +477,17 @@
       });
 
       if (!ordersResponse.ok) {
-        throw new Error('Failed to fetch orders from Toast API');
+        // Get the actual error message from backend
+        const errorData = await ordersResponse.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Toast orders API error:', ordersResponse.status, errorData);
+        throw new Error(`Toast API error ${ordersResponse.status}: ${errorData.error || 'Unknown error'}`);
       }
 
       const ordersResult = await ordersResponse.json();
 
       if (!ordersResult.success || !ordersResult.data) {
-        throw new Error('Invalid response from Toast API');
+        console.error('Invalid Toast API response:', ordersResult);
+        throw new Error(`Invalid response: ${ordersResult.error || 'No data returned'}`);
       }
 
       const allOrders = ordersResult.data;
