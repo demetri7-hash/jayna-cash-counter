@@ -457,37 +457,22 @@
       // STEP 2: Fetch orders for the selected date
       const businessDate = date.replace(/-/g, ''); // YYYYMMDD format
 
-      let allOrders = [];
-      let page = 1;
-      let hasMorePages = true;
+      // Use toast-orders-flexible which handles pagination automatically
+      const ordersUrl = `/api/toast-orders-flexible?accessToken=${encodeURIComponent(accessToken)}&startDate=${businessDate}&endDate=${businessDate}`;
 
-      while (hasMorePages) {
-        const ordersUrl = `/api/toast-orders?businessDate=${businessDate}&page=${page}&pageSize=100&token=${encodeURIComponent(accessToken)}`;
+      const ordersResponse = await fetch(ordersUrl);
 
-        const response = await fetch(ordersUrl);
-
-        if (!response.ok) {
-          console.warn(`Failed to fetch orders page ${page}`);
-          break;
-        }
-
-        const pageOrders = await response.json();
-
-        if (Array.isArray(pageOrders) && pageOrders.length > 0) {
-          allOrders = allOrders.concat(pageOrders);
-
-          if (pageOrders.length === 100) {
-            page++;
-            await new Promise(r => setTimeout(r, 300)); // Rate limit
-          } else {
-            hasMorePages = false;
-          }
-        } else {
-          hasMorePages = false;
-        }
-
-        if (page > 50) break; // Safety limit
+      if (!ordersResponse.ok) {
+        throw new Error('Failed to fetch orders from Toast API');
       }
+
+      const ordersResult = await ordersResponse.json();
+
+      if (!ordersResult.success || !ordersResult.data) {
+        throw new Error('Invalid response from Toast API');
+      }
+
+      const allOrders = ordersResult.data;
 
       // STEP 3: Group orders by hour and calculate sales
       const hourlyData = {};
