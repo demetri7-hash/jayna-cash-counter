@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foot Traffic Analytics | Jayna Gyro</title>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+
+  <style>
+    :root {
+      --gray-900: #1a1a1a;
+      --gray-700: #4a4a4a;
+      --gray-600: #6b6b6b;
+      --gray-500: #9ca3af;
+      --gray-400: #d1d5db;
+      --gray-300: #e5e7eb;
+      --gray-200: #f3f4f6;
+      --gray-100: #f9fafb;
+      --white: #ffffff;
+
+      --jayna-blue: #00A8E1;
+      --jayna-blue-dark: #0094D6;
+      --turquoise: #20B2AA;
+      --turquoise-dark: #008B8B;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      font-size: 13px;
+      color: var(--gray-600);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .controls {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 20px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-group label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-700);
+    }
+
+    .control-group input[type="date"] {
+      padding: 12px;
+      border: 2px solid var(--gray-300);
+      font-size: 14px;
+      font-weight: 600;
+      min-width: 200px;
+    }
+
+    .control-group input[type="date"]:focus {
+      outline: none;
+      border-color: var(--jayna-blue);
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 60px;
+      height: 30px;
+      background: var(--gray-300);
+      border-radius: 15px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .toggle-switch.active {
+      background: var(--jayna-blue);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 24px;
+      height: 24px;
+      background: var(--white);
+      border-radius: 50%;
+      transition: transform 0.3s;
+    }
+
+    .toggle-switch.active::after {
+      transform: translateX(30px);
+    }
+
+    .disclaimer {
+      font-size: 10px;
+      color: var(--gray-500);
+      font-style: italic;
+      max-width: 300px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 16px;
+    }
+
+    .stat-card h3 {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-600);
+      margin-bottom: 8px;
+    }
+
+    .stat-card .value {
+      font-size: 32px;
+      font-weight: 900;
+      color: var(--gray-900);
+      margin-bottom: 4px;
+    }
+
+    .stat-card .subtitle {
+      font-size: 11px;
+      color: var(--gray-500);
+    }
+
+    .chart-container {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .chart-container h2 {
+      font-size: 16px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 20px;
+      color: var(--gray-900);
+    }
+
+    #loadingOverlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 99999;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    #loadingOverlay.active {
+      display: flex;
+    }
+
+    .loading-logo {
+      width: 200px;
+      height: auto;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .loading-text {
+      color: var(--white);
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-top: 20px;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 0.6;
+        transform: scale(0.95);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.05);
+      }
+    }
+
+    .back-button {
+      display: inline-block;
+      padding: 12px 24px;
+      background: var(--gray-700);
+      color: var(--white);
+      border: 2px solid var(--gray-700);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-bottom: 20px;
+    }
+
+    .back-button:hover {
+      background: var(--gray-900);
+      border-color: var(--gray-900);
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay">
+    <img src="jayna-logo-new.png" alt="Jayna Gyro" class="loading-logo">
+    <div class="loading-text">Loading Analytics...</div>
+  </div>
+
+  <a href="index.html" class="back-button">← BACK TO MAIN MENU</a>
+
+  <div class="header">
+    <h1>🚶 Foot Traffic Analytics</h1>
+    <p>Sales & Visitor Correlation Analysis</p>
+  </div>
+
+  <!-- Date Selector & Controls -->
+  <div class="controls">
+    <div class="control-group">
+      <label for="dateSelector">SELECT DATE</label>
+      <input type="date" id="dateSelector">
+    </div>
+
+    <div class="control-group">
+      <label>ADJUST FOR STAFF TRAFFIC</label>
+      <div class="toggle-container">
+        <div id="staffToggle" class="toggle-switch" onclick="toggleStaffReduction()"></div>
+        <span id="staffToggleLabel" style="font-size: 13px; font-weight: 600;">OFF</span>
+      </div>
+      <div class="disclaimer">
+        * Estimates staff reduction based on ~9 employees walking past camera during business hours. Not 100% accurate.
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Summary -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <h3>📊 Total Sales</h3>
+      <div class="value" id="totalSales">--</div>
+      <div class="subtitle">For Selected Date</div>
+    </div>
+
+    <div class="stat-card">
+      <h3>🚶 Total Visitors</h3>
+      <div class="value" id="totalVisitors">--</div>
+      <div class="subtitle" id="visitorSubtitle">Raw Count</div>
+    </div>
+
+    <div class="stat-card">
+      <h3>💰 Sales Per Visitor</h3>
+      <div class="value" id="salesPerVisitor">--</div>
+      <div class="subtitle">Conversion Metric</div>
+    </div>
+
+    <div class="stat-card">
+      <h3>⏰ Peak Hour</h3>
+      <div class="value" id="peakHour">--</div>
+      <div class="subtitle">Highest Traffic</div>
+    </div>
+  </div>
+
+  <!-- Line Chart -->
+  <div class="chart-container">
+    <h2>📈 Hourly Sales vs Foot Traffic</h2>
+    <canvas id="analyticsChart"></canvas>
+  </div>
+
+  <script>
+    // Initialize Supabase clients
+    const supabase = window.supabase.createClient(
+      'https://zjgzrfzmmjfljjlxznln.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqZ3pyZnptbWpmbGpqbHh6bmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjc4ODQ2NDEsImV4cCI6MjA0MzQ2MDY0MX0.K40HoaXA3KXGZhyTQj65fCCFcRJ8WIWQGubRhYwZB3k'
+    );
+
+    const footTrafficSupabase = window.supabase.createClient(
+      'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+    );
+
+    let chartInstance = null;
+    let staffReductionEnabled = false;
+    let rawFootTrafficData = [];
+
+    // Initialize date selector to today
+    function getTodayPacific() {
+      const today = new Date();
+      const pacificDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      const year = pacificDate.getFullYear();
+      const month = String(pacificDate.getMonth() + 1).padStart(2, '0');
+      const day = String(pacificDate.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    document.getElementById('dateSelector').value = getTodayPacific();
+
+    // Date change handler
+    document.getElementById('dateSelector').addEventListener('change', function() {
+      loadAnalytics();
+    });
+
+    // Toggle staff reduction
+    function toggleStaffReduction() {
+      staffReductionEnabled = !staffReductionEnabled;
+      const toggle = document.getElementById('staffToggle');
+      const label = document.getElementById('staffToggleLabel');
+
+      if (staffReductionEnabled) {
+        toggle.classList.add('active');
+        label.textContent = 'ON';
+        label.style.color = 'var(--jayna-blue)';
+      } else {
+        toggle.classList.remove('active');
+        label.textContent = 'OFF';
+        label.style.color = '';
+      }
+
+      // Update subtitle
+      const subtitle = document.getElementById('visitorSubtitle');
+      subtitle.textContent = staffReductionEnabled ? 'Adjusted for Staff' : 'Raw Count';
+
+      // Re-render with adjusted data
+      updateStatsAndChart();
+    }
+
+    // Show/hide loading
+    function showLoading() {
+      document.getElementById('loadingOverlay').classList.add('active');
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.remove('active');
+    }
+
+    // Main analytics loader
+    async function loadAnalytics() {
+      showLoading();
+
+      const selectedDate = document.getElementById('dateSelector').value;
+
+      try {
+        // Fetch both datasets in parallel
+        const [footTrafficData, salesData] = await Promise.all([
+          fetchFootTrafficData(selectedDate),
+          fetchSalesData(selectedDate)
+        ]);
+
+        rawFootTrafficData = footTrafficData;
+
+        // Render
+        renderAnalytics(footTrafficData, salesData, selectedDate);
+
+      } catch (error) {
+        console.error('Error loading analytics:', error);
+        alert('Failed to load analytics: ' + error.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    // Fetch foot traffic data from Supabase
+    async function fetchFootTrafficData(date) {
+      const { data, error } = await footTrafficSupabase
+        .from('foot_traffic')
+        .select('hour, entries')
+        .eq('date', date)
+        .order('hour', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching foot traffic:', error);
+        return [];
+      }
+
+      return data || [];
+    }
+
+    // Fetch sales data from Toast API
+    async function fetchSalesData(date) {
+      // STEP 1: Authenticate
+      const authResponse = await fetch('/api/toast-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!authResponse.ok) {
+        throw new Error('Toast authentication failed');
+      }
+
+      const authData = await authResponse.json();
+      if (!authData.success || !authData.data?.accessToken) {
+        throw new Error('Invalid authentication response');
+      }
+
+      const accessToken = authData.data.accessToken;
+
+      // STEP 2: Fetch orders for the selected date
+      const businessDate = date.replace(/-/g, ''); // YYYYMMDD format
+
+      let allOrders = [];
+      let page = 1;
+      let hasMorePages = true;
+
+      while (hasMorePages) {
+        const ordersUrl = `/api/toast-orders?businessDate=${businessDate}&page=${page}&pageSize=100&token=${encodeURIComponent(accessToken)}`;
+
+        const response = await fetch(ordersUrl);
+
+        if (!response.ok) {
+          console.warn(`Failed to fetch orders page ${page}`);
+          break;
+        }
+
+        const pageOrders = await response.json();
+
+        if (Array.isArray(pageOrders) && pageOrders.length > 0) {
+          allOrders = allOrders.concat(pageOrders);
+
+          if (pageOrders.length === 100) {
+            page++;
+            await new Promise(r => setTimeout(r, 300)); // Rate limit
+          } else {
+            hasMorePages = false;
+          }
+        } else {
+          hasMorePages = false;
+        }
+
+        if (page > 50) break; // Safety limit
+      }
+
+      // STEP 3: Group orders by hour and calculate sales
+      const hourlyData = {};
+
+      allOrders.forEach(order => {
+        // Skip voided/deleted orders
+        if (order.voided || order.deleted) return;
+
+        // Use closedDate to determine hour
+        if (!order.closedDate) return;
+
+        const closedDate = new Date(order.closedDate);
+        const hour = closedDate.getHours();
+
+        if (!hourlyData[hour]) {
+          hourlyData[hour] = { sales: 0, orders: 0 };
+        }
+
+        // Calculate order total from checks
+        if (order.checks && Array.isArray(order.checks)) {
+          order.checks.forEach(check => {
+            if (!check.voided && !check.deleted) {
+              hourlyData[hour].sales += check.amount || 0;
+              hourlyData[hour].orders++;
+            }
+          });
+        }
+      });
+
+      return hourlyData;
+    }
+
+    // Calculate staff reduction
+    function calculateStaffReduction(rawCount) {
+      // 9 staff members, each passing camera ~4-6 times during their shift
+      // Spread across 11.5 hours (10:30am - 10pm)
+      // Estimate: 9 staff * 5 passes = 45 total staff entries per day
+      // Distributed across hours: ~4 per hour average
+
+      const STAFF_REDUCTION_PER_HOUR = 4;
+      return Math.max(0, rawCount - STAFF_REDUCTION_PER_HOUR);
+    }
+
+    // Update stats and chart
+    function updateStatsAndChart() {
+      const selectedDate = document.getElementById('dateSelector').value;
+      const footTrafficData = rawFootTrafficData;
+
+      // Apply staff reduction if enabled
+      const adjustedFootTrafficData = footTrafficData.map(entry => ({
+        ...entry,
+        entries: staffReductionEnabled ? calculateStaffReduction(entry.entries) : entry.entries
+      }));
+
+      // Re-render stats (sales data stays the same)
+      const totalVisitors = adjustedFootTrafficData.reduce((sum, d) => sum + d.entries, 0);
+      document.getElementById('totalVisitors').textContent = totalVisitors.toLocaleString();
+
+      // Update chart
+      if (chartInstance) {
+        const labels = chartInstance.data.labels;
+        const salesData = chartInstance.data.datasets[0].data;
+
+        const adjustedTrafficByHour = adjustedFootTrafficData.reduce((acc, entry) => {
+          acc[entry.hour] = entry.entries;
+          return acc;
+        }, {});
+
+        const trafficData = labels.map(label => {
+          const hour = parseInt(label.split(':')[0]);
+          return adjustedTrafficByHour[hour] || 0;
+        });
+
+        chartInstance.data.datasets[1].data = trafficData;
+        chartInstance.update();
+      }
+    }
+
+    // Render analytics
+    function renderAnalytics(footTrafficData, salesData, selectedDate) {
+      // Apply staff reduction if enabled
+      const adjustedFootTrafficData = footTrafficData.map(entry => ({
+        ...entry,
+        entries: staffReductionEnabled ? calculateStaffReduction(entry.entries) : entry.entries
+      }));
+
+      // Calculate stats
+      const totalSales = Object.values(salesData).reduce((sum, d) => sum + d.sales, 0);
+      const totalVisitors = adjustedFootTrafficData.reduce((sum, d) => sum + d.entries, 0);
+      const salesPerVisitor = totalVisitors > 0 ? totalSales / totalVisitors : 0;
+
+      // Find peak hour
+      const peakEntry = adjustedFootTrafficData.reduce((max, entry) =>
+        entry.entries > (max?.entries || 0) ? entry : max
+      , null);
+      const peakHourTime = peakEntry ? `${peakEntry.hour}:00` : '--';
+
+      // Update stats display
+      document.getElementById('totalSales').textContent = `$${totalSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      document.getElementById('totalVisitors').textContent = totalVisitors.toLocaleString();
+      document.getElementById('salesPerVisitor').textContent = `$${salesPerVisitor.toFixed(2)}`;
+      document.getElementById('peakHour').textContent = peakHourTime;
+
+      // Render chart
+      renderChart(adjustedFootTrafficData, salesData, selectedDate);
+    }
+
+    // Render line chart
+    function renderChart(footTrafficData, salesData, selectedDate) {
+      // Determine closing time (9:30pm on Sunday, 10pm otherwise)
+      const date = new Date(selectedDate);
+      const dayOfWeek = date.getDay();
+      const isSunday = dayOfWeek === 0;
+      const closingHour = isSunday ? 21.5 : 22; // 9:30pm = 21.5, 10pm = 22
+
+      // Generate hourly labels from 10:30am to closing
+      const labels = [];
+      const startHour = 10.5; // 10:30am
+
+      for (let h = startHour; h <= closingHour; h += 0.5) {
+        const hour = Math.floor(h);
+        const minute = h % 1 === 0.5 ? '30' : '00';
+        labels.push(`${hour}:${minute}`);
+      }
+
+      // Map foot traffic to labels
+      const footTrafficByHour = footTrafficData.reduce((acc, entry) => {
+        acc[entry.hour] = entry.entries;
+        return acc;
+      }, {});
+
+      const trafficData = labels.map(label => {
+        const hour = parseInt(label.split(':')[0]);
+        return footTrafficByHour[hour] || 0;
+      });
+
+      // Map sales to labels
+      const salesDataMapped = labels.map(label => {
+        const hour = parseInt(label.split(':')[0]);
+        return salesData[hour]?.sales || 0;
+      });
+
+      // Destroy previous chart
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      // Create chart
+      const ctx = document.getElementById('analyticsChart').getContext('2d');
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Sales ($)',
+              data: salesDataMapped,
+              borderColor: '#00A8E1',
+              backgroundColor: 'rgba(0, 168, 225, 0.1)',
+              borderWidth: 3,
+              tension: 0.4,
+              yAxisID: 'y-sales',
+              pointRadius: 4,
+              pointHoverRadius: 6
+            },
+            {
+              label: 'Foot Traffic',
+              data: trafficData,
+              borderColor: '#20B2AA',
+              backgroundColor: 'rgba(32, 178, 170, 0.1)',
+              borderWidth: 3,
+              tension: 0.4,
+              yAxisID: 'y-traffic',
+              pointRadius: 4,
+              pointHoverRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.5,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+              labels: {
+                font: {
+                  size: 13,
+                  weight: '700'
+                },
+                padding: 15,
+                usePointStyle: true
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
+              titleFont: {
+                size: 13,
+                weight: '700'
+              },
+              bodyFont: {
+                size: 12
+              },
+              padding: 12,
+              displayColors: true,
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  if (context.dataset.yAxisID === 'y-sales') {
+                    label += '$' + context.parsed.y.toFixed(2);
+                  } else {
+                    label += context.parsed.y + ' visitors';
+                  }
+                  return label;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                display: true,
+                color: 'rgba(0, 0, 0, 0.05)'
+              },
+              ticks: {
+                font: {
+                  size: 11,
+                  weight: '600'
+                }
+              }
+            },
+            'y-sales': {
+              type: 'linear',
+              position: 'left',
+              title: {
+                display: true,
+                text: 'SALES ($)',
+                font: {
+                  size: 12,
+                  weight: '700'
+                },
+                color: '#00A8E1'
+              },
+              ticks: {
+                callback: function(value) {
+                  return '$' + value.toFixed(0);
+                },
+                font: {
+                  size: 11,
+                  weight: '600'
+                },
+                color: '#00A8E1'
+              },
+              grid: {
+                display: true,
+                color: 'rgba(0, 168, 225, 0.1)'
+              }
+            },
+            'y-traffic': {
+              type: 'linear',
+              position: 'right',
+              title: {
+                display: true,
+                text: 'FOOT TRAFFIC',
+                font: {
+                  size: 12,
+                  weight: '700'
+                },
+                color: '#20B2AA'
+              },
+              ticks: {
+                font: {
+                  size: 11,
+                  weight: '600'
+                },
+                color: '#20B2AA'
+              },
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Auto-load on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      loadAnalytics();
+    });
+  </script>
+</body>
+</html>
