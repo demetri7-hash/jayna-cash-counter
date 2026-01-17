@@ -458,9 +458,21 @@
       const businessDate = date.replace(/-/g, ''); // YYYYMMDD format
 
       // Use toast-orders-flexible which handles pagination automatically
-      const ordersUrl = `/api/toast-orders-flexible?accessToken=${encodeURIComponent(accessToken)}&startDate=${businessDate}&endDate=${businessDate}`;
+      // Copy EXACT pattern from manager.html
+      const queryParams = new URLSearchParams({
+        accessToken: accessToken,
+        startDate: businessDate,
+        endDate: businessDate
+      });
 
-      const ordersResponse = await fetch(ordersUrl);
+      const ordersUrl = `/api/toast-orders-flexible?${queryParams.toString()}`;
+
+      const ordersResponse = await fetch(ordersUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
       if (!ordersResponse.ok) {
         throw new Error('Failed to fetch orders from Toast API');
