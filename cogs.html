@@ -281,7 +281,7 @@
     <div id="appHeader"></div>
 
       <!-- COMBINED TIPS/HR & LEADER DISPLAY (JAYNA BLUE GRADIENT) -->
-        <div id="tipsPerHourCard" style="margin-top: 12px; padding: 8px 12px; background: linear-gradient(135deg, #00A8E1 0%, #0094D6 100%); border: 2px solid #00A8E1; border-radius: 0; position: relative; box-shadow: 0 3px 5px rgba(0,0,0,0.1); transition: all 0.3s ease; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center;">
+        <div id="tipsPerHourCard" style="margin-top: 12px; padding: 8px 12px; background: linear-gradient(135deg, #00A8E1 0%, #0094D6 100%); border: 2px solid #00A8E1; border-radius: 0; position: relative; box-shadow: 0 3px 5px rgba(0,0,0,0.1); transition: all 0.3s ease; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: center;">
 
           <!-- LIVE Badge -->
           <div style="position: absolute; top: -6px; right: 8px; background: #dc2626; color: white; padding: 2px 6px; font-size: 8px; font-weight: 700; letter-spacing: 0.6px; display: flex; align-items: center; gap: 3px; z-index: 10;">
@@ -299,6 +299,25 @@
             </div>
             <div style="font-size: 7px; color: rgba(255,255,255,0.6); font-style: italic;">
               Does not include Cash Tips.
+            </div>
+          </div>
+
+          <!-- CENTER COLUMN: FOOT TRAFFIC -->
+          <div style="text-align: center; padding: 4px; border-left: 1px solid rgba(255,255,255,0.3); border-right: 1px solid rgba(255,255,255,0.3);">
+            <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.85); margin-bottom: 3px;">
+              🚶 FOOT TRAFFIC
+            </div>
+            <div id="footTrafficLatestHour" style="font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 2px;">
+              --
+            </div>
+            <div style="font-size: 7px; color: rgba(255,255,255,0.6); margin-bottom: 3px;">
+              Latest Hour
+            </div>
+            <div id="footTrafficDailyTotal" style="font-size: 15px; font-weight: 900; color: #fff;">
+              --
+            </div>
+            <div style="font-size: 7px; color: rgba(255,255,255,0.6);">
+              Today's Total
             </div>
           </div>
 
@@ -3841,9 +3860,87 @@
     }
 
     // Fetch on page load
+    // ==================== FOOT TRAFFIC DISPLAY ====================
+
+    // Initialize Supabase for foot traffic (separate from main Supabase client)
+    const footTrafficSupabase = window.supabase.createClient(
+      'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+    );
+
+    // Get today's date in YYYY-MM-DD format (Pacific timezone)
+    function getTodayDatePacific() {
+      const today = new Date();
+      const pacificDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      const year = pacificDate.getFullYear();
+      const month = String(pacificDate.getMonth() + 1).padStart(2, '0');
+      const day = String(pacificDate.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Get current hour in Pacific timezone
+    function getCurrentHourPacific() {
+      const now = new Date();
+      const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      return pacificTime.getHours();
+    }
+
+    async function fetchFootTraffic() {
+      try {
+        const today = getTodayDatePacific();
+        const currentHour = getCurrentHourPacific();
+
+        // Query foot_traffic table for today's entries
+        const { data, error } = await footTrafficSupabase
+          .from('foot_traffic')
+          .select('hour, entries')
+          .eq('date', today)
+          .order('hour', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching foot traffic:', error);
+          updateFootTrafficDisplay(null, null);
+          return;
+        }
+
+        // Calculate daily total (sum all entries)
+        const dailyTotal = data.reduce((sum, row) => sum + (row.entries || 0), 0);
+
+        // Get latest hour (most recent entry)
+        const latestHourData = data.length > 0 ? data[0] : null;
+        const latestHourCount = latestHourData ? latestHourData.entries : 0;
+
+        updateFootTrafficDisplay(latestHourCount, dailyTotal);
+
+      } catch (err) {
+        console.error('Error updating foot traffic:', err);
+        updateFootTrafficDisplay(null, null);
+      }
+    }
+
+    function updateFootTrafficDisplay(latestHour, dailyTotal) {
+      const latestHourDiv = document.getElementById('footTrafficLatestHour');
+      const dailyTotalDiv = document.getElementById('footTrafficDailyTotal');
+
+      if (!latestHourDiv || !dailyTotalDiv) return;
+
+      if (latestHour === null || dailyTotal === null) {
+        latestHourDiv.textContent = '--';
+        dailyTotalDiv.textContent = '--';
+        return;
+      }
+
+      latestHourDiv.textContent = latestHour.toLocaleString();
+      dailyTotalDiv.textContent = dailyTotal.toLocaleString();
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
-      fetchClockedInEmployees();      // Auto-refresh every 5 minutes
+      fetchClockedInEmployees();
       setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
+
+      // Fetch foot traffic initially and every 30 seconds
+      fetchFootTraffic();
+      setInterval(fetchFootTraffic, 30000);
     });
 
     // ==================== END CLOCKED IN DISPLAY ====================
