@@ -2207,61 +2207,41 @@
       const selectedIds = getSelectedReceiptIds();
 
       if (selectedIds.length === 0) {
-        showStatus('Please select receipts to delete', 'error');
+        showMessage('Please select receipts to delete', 'error');
         return;
       }
 
-      // Show password modal first
-      document.getElementById('passwordModal').classList.add('active');
-      document.getElementById('passwordInput').value = '';
-      document.getElementById('passwordError').style.display = 'none';
+      console.log('🗑️ Delete button clicked, selectedIds:', selectedIds);
 
-      // Override checkPassword for delete action
-      const originalCheckPassword = window.checkPassword;
-      window.checkPassword = async function() {
-        const password = document.getElementById('passwordInput').value;
-        if (password !== ADMIN_PASSWORD) {
-          document.getElementById('passwordError').style.display = 'block';
-          document.getElementById('passwordInput').select();
-          return;
-        }
+      // Use simpler showConfirm pattern (like deleteReceipt)
+      showConfirm(
+        `Delete ${selectedIds.length} selected receipt(s)? This action cannot be undone.`,
+        async () => {
+          console.log('✅ User confirmed deletion');
 
-        closePasswordModal();
+          try {
+            const { error } = await supabase
+              .from('amex_receipts')
+              .delete()
+              .in('id', selectedIds);
 
-        // Now show confirm modal
-        showConfirmModal(
-          `Delete ${selectedIds.length} selected receipt(s)? This action cannot be undone.`,
-          async () => {
-            console.log('Deleting receipts:', selectedIds);
-
-            try {
-              const { error } = await supabase
-                .from('amex_receipts')
-                .delete()
-                .in('id', selectedIds);
-
-              if (error) {
-                console.error('Error deleting receipts:', error);
-                showMessage(`Error deleting receipts: ${error.message}`, 'error');
-                return;
-              }
-
-              console.log(`Deleted ${selectedIds.length} receipt(s) successfully`);
-
-              // Reload list immediately
-              loadReceipts();
-            } catch (error) {
-              console.error('Delete error:', error);
-              showMessage(`Error: ${error.message}`, 'error');
+            if (error) {
+              console.error('❌ Delete error:', error);
+              showMessage(`Error deleting receipts: ${error.message}`, 'error');
+              return;
             }
+
+            console.log(`✅ Deleted ${selectedIds.length} receipt(s) successfully`);
+            showMessage(`Deleted ${selectedIds.length} receipt(s) successfully`, 'success');
+
+            // Reload list immediately
+            loadReceipts();
+          } catch (error) {
+            console.error('❌ Delete catch error:', error);
+            showMessage(`Error: ${error.message}`, 'error');
           }
-        );
-
-        // Restore original checkPassword
-        window.checkPassword = originalCheckPassword;
-      };
-
-      setTimeout(() => document.getElementById('passwordInput').focus(), 100);
+        }
+      );
     }
 
     // Archive
