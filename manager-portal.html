@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>Manager Portal | Jayna Gyro</title>
+
+  <link rel="apple-touch-icon" href="https://static.spotapps.co/website_images/ab_websites/229800_website_v1/logo.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#00A8E1">
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+
+  <style>
+    /* Jayna Brand Design - Standardized Colors */
+    :root {
+      --primary-blue: #00A8E1;
+      --secondary-blue: #0094D6;
+      --light-blue: #E3F4FC;
+      --accent-blue: #0081C6;
+      --gray-900: #212121;
+      --gray-700: #424242;
+      --gray-600: #616161;
+      --gray-500: #757575;
+      --gray-400: #BDBDBD;
+      --gray-300: #E0E0E0;
+      --gray-100: #F5F5F5;
+      --success: #00C853;
+      --warning: #FFB300;
+      --error: #D32F2F;
+      --white: #FFFFFF;
+
+      --jayna-blue: #00A8E1;
+      --turquoise: #20B2AA;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      font-family: 'Aptos', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--white);
+      min-height: 100vh;
+      padding: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: var(--white);
+      padding: 0;
+    }
+
+    .header {
+      background: var(--white);
+      color: var(--gray-900);
+      text-align: center;
+      padding: 12px;
+      border-radius: 0;
+      border-bottom: 1px solid var(--gray-300);
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 2px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .header p {
+      opacity: 0.7;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .logo {
+      max-width: 576px;
+      width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .content {
+      padding: 20px;
+    }
+
+    .manager-section {
+      background: var(--white);
+      border: 2px solid var(--gray-300);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .manager-section h2 {
+      font-size: 18px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 20px;
+      color: var(--gray-900);
+      text-align: center;
+    }
+
+    .manager-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .manager-btn {
+      text-decoration: none;
+      display: block;
+      padding: 24px;
+      background: var(--gray-900);
+      color: white;
+      border: 2px solid var(--gray-900);
+      text-align: center;
+      font-size: 15px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border-radius: 0;
+    }
+
+    .manager-btn:hover {
+      background: var(--gray-700);
+      border-color: var(--gray-700);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+
+    @keyframes pulseRing {
+      0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 1;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(1.4);
+        opacity: 0;
+      }
+    }
+
+    @keyframes logoFloat {
+      0%, 100% {
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.1) rotate(5deg);
+      }
+    }
+
+    @keyframes logoGlow {
+      0%, 100% {
+        filter: drop-shadow(0 0 20px rgba(0, 123, 255, 0.8)) brightness(1);
+      }
+      50% {
+        filter: drop-shadow(0 0 40px rgba(0, 200, 255, 1)) brightness(1.2);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header" style="padding-top: 20px;">
+      <img src="jayna-logo-new.png" alt="Jayna Gyro Logo" class="logo">
+      <h1>JAYNA GYRO</h1>
+      <p>FOR AUTHORIZED USE ONLY</p>
+
+      <!-- CURRENTLY CLOCKED IN -->
+      <div id="clockedInContainer" style="margin: 8px 0; text-align: center;">
+        <div id="clockedInList" style="color: #2e7d32; font-size: 12px; font-weight: 500;">
+          Loading...
+        </div>
+
+        <!-- COMBINED TIPS/HR & LEADER DISPLAY (JAYNA BLUE GRADIENT) -->
+        <div id="tipsPerHourCard" style="margin-top: 12px; padding: 8px 12px; background: linear-gradient(135deg, #00A8E1 0%, #0094D6 100%); border: 2px solid #00A8E1; border-radius: 0; position: relative; box-shadow: 0 3px 5px rgba(0,0,0,0.1); transition: all 0.3s ease; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: center;">
+
+          <!-- LIVE Badge -->
+          <div style="position: absolute; top: -6px; right: 8px; background: #dc2626; color: white; padding: 2px 6px; font-size: 8px; font-weight: 700; letter-spacing: 0.6px; display: flex; align-items: center; gap: 3px; z-index: 10;">
+            <span style="display: inline-block; width: 5px; height: 5px; background: #fff; border-radius: 50%; animation: pulse 1.5s ease-in-out infinite;"></span>
+            LIVE
+          </div>
+
+          <!-- LEFT COLUMN: TIPS PER HOUR -->
+          <div style="text-align: left;">
+            <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.85); margin-bottom: 3px;">
+              💵 TIPS/HR
+            </div>
+            <div id="tipsPerHourText" style="font-size: 17px; font-weight: 900; color: #fff; line-height: 1; margin-bottom: 2px;">
+              Loading...
+            </div>
+            <div style="font-size: 7px; color: rgba(255,255,255,0.6); font-style: italic;">
+              Does not include Cash Tips.
+            </div>
+          </div>
+
+          <!-- CENTER COLUMN: FOOT TRAFFIC (CLICKABLE) -->
+          <div onclick="window.location.href='foot-traffic-analytics.html'" style="text-align: center; padding: 4px; border-left: 1px solid rgba(255,255,255,0.3); border-right: 1px solid rgba(255,255,255,0.3); cursor: pointer; transition: all 0.15s ease;">
+            <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.85); margin-bottom: 3px;">
+              🚶 FOOT TRAFFIC
+            </div>
+            <div id="footTrafficLatestHour" style="font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 2px;">
+              --
+            </div>
+            <div style="font-size: 7px; color: rgba(255,255,255,0.6); margin-bottom: 3px;">
+              Latest Hour
+            </div>
+            <div id="footTrafficDailyTotal" style="font-size: 15px; font-weight: 900; color: #fff;">
+              --
+            </div>
+            <div style="font-size: 7px; color: rgba(255,255,255,0.6); font-style: italic;">
+              Click for Analytics →
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: TODAY'S LEADER (CLICKABLE) -->
+          <div id="topLeaderDisplay" onclick="window.location.href='teamupdates.html'" style="text-align: right; cursor: pointer; transition: all 0.15s ease; padding: 4px; border-left: 1px solid rgba(255,255,255,0.3);">
+            <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.85); margin-bottom: 3px;">
+              🏆 TODAY'S LEADER
+            </div>
+            <div id="topLeaderText" style="font-size: 13px; font-weight: 700; color: #fff;">
+              Loading...
+            </div>
+            <div style="font-size: 7px; color: rgba(255,255,255,0.6); margin-top: 2px; font-style: italic;">
+              Click for Team Updates →
+            </div>
+          </div>
+        </div>
+
+        <style>
+          #topLeaderDisplay:hover {
+            background: rgba(255,255,255,0.1);
+          }
+        </style>
+      </div>
+
+      <!-- VOID & DISCOUNT TRACKING DISPLAY -->
+      <div id="voidDiscountDisplay" style="margin-top: 12px; padding: 8px 12px; background: var(--gray-100); border: 2px solid var(--gray-300); text-align: center; font-size: 10px; font-weight: 600; color: var(--gray-700); letter-spacing: 0.5px;">
+        Loading today's data...
+      </div>
+
+      <!-- MAIN MENU NAVIGATION -->
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; margin-bottom: 20px;">
+        <a href="cash.html" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CASH</a>
+        <a href="orders-prep.html" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">ORDERS & PREP</a>
+        <a href="foh-checklists.html" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">FOH</a>
+        <a href="boh.html" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">BOH</a>
+        <a href="catering.html" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-900); color: white; border: 2px solid var(--gray-900); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">CATERING</a>
+        <a href="foot-traffic-analytics.html" style="text-decoration: none; display: block; padding: 14px; background: var(--gray-700); color: white; border: 2px solid var(--gray-700); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease;">ANALYTICS</a>
+        <a href="manager-portal.html" style="text-decoration: none; display: block; padding: 14px; background: var(--primary-blue); color: white; border: 2px solid var(--primary-blue); text-align: center; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s ease; grid-column: 1 / -1;">✓ MANAGER (CURRENT)</a>
+      </div>
+
+      <p style="opacity: 0.7; margin-top: 12px;">APP CREATED BY DEMETRI GREGORAKIS</p>
+    </div>
+
+    <div class="content">
+      <!-- Manager Tools Section -->
+      <div class="manager-section">
+        <h2>📊 MANAGER TOOLS</h2>
+        <p style="text-align: center; color: var(--gray-600); margin-bottom: 20px; font-size: 13px;">
+          Access manager-only tools and reports
+        </p>
+
+        <div class="manager-buttons">
+          <a href="amex-receipts.html" class="manager-btn">
+            💳 AMEX RECEIPTS
+          </a>
+          <a href="tip-pool.html" class="manager-btn">
+            💵 TIP CALCULATOR
+          </a>
+          <a href="incidents.html" class="manager-btn">
+            🚨 INCIDENTS
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize Supabase
+    const supabase = window.supabase.createClient(
+      'https://zjgzrfzmmjfljjlxznln.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqZ3pyZnptbWpmbGpqbHh6bmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjc4ODQ2NDEsImV4cCI6MjA0MzQ2MDY0MX0.K40HoaXA3KXGZhyTQj65fCCFcRJ8WIWQGubRhYwZB3k'
+    );
+
+    const footTrafficSupabase = window.supabase.createClient(
+      'https://gaawtbqpnnbbnsyswqwv.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhYXd0YnFwbm5iYm5zeXN3cXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDE1NTAsImV4cCI6MjA3MjA3NzU1MH0.F-y7AIQTWaUe7DRT4OnIZVn94mhXxfhpBbng2aJ8nXg'
+    );
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', function() {
+      initializeHeaderStats();
+    });
+
+    function initializeHeaderStats() {
+      console.log('🔄 Initializing header live stats...');
+      fetchClockedInEmployees();
+      fetchTipsPerHour();
+      fetchTopLeader();
+      fetchVoidDiscountTracking();
+      fetchHeaderFootTraffic();
+
+      // Refresh intervals
+      setInterval(fetchClockedInEmployees, 5 * 60 * 1000);
+      setInterval(fetchTipsPerHour, 30 * 1000);
+      setInterval(fetchTopLeader, 2 * 60 * 1000);
+      setInterval(fetchVoidDiscountTracking, 5 * 60 * 1000);
+      setInterval(fetchHeaderFootTraffic, 30 * 1000);
+    }
+
+    function getTodayPacific() {
+      const today = new Date();
+      const pacificDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      const year = pacificDate.getFullYear();
+      const month = String(pacificDate.getMonth() + 1).padStart(2, '0');
+      const day = String(pacificDate.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Clocked In Employees
+    async function fetchClockedInEmployees() {
+      try {
+        const todayPacific = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' });
+        const [month, day, year] = todayPacific.split(', ')[0].split('/');
+        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+        const authResponse = await fetch('/api/toast-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        if (!authResponse.ok) { updateClockedInDisplay([]); return; }
+
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) { updateClockedInDisplay([]); return; }
+
+        const token = authData.data.accessToken;
+        const response = await fetch(`/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`);
+        if (!response.ok) { updateClockedInDisplay([]); return; }
+
+        const result = await response.json();
+        if (!result.success) { updateClockedInDisplay([]); return; }
+
+        const employees = result.clockedIn.map(emp => emp.fullName);
+        updateClockedInDisplay(employees);
+      } catch (error) {
+        console.error('Error fetching clocked in:', error);
+        updateClockedInDisplay([]);
+      }
+    }
+
+    function updateClockedInDisplay(employees) {
+      const listDiv = document.getElementById('clockedInList');
+      if (!listDiv) return;
+      if (employees.length === 0) {
+        listDiv.innerHTML = '<span style="color: #999; font-size: 11px; font-style: italic;">No one clocked in</span>';
+        return;
+      }
+      const namesText = employees.join(' | ');
+      listDiv.innerHTML = `
+        <div style="color: #2e7d32; font-size: 12px; font-weight: 500;">${namesText}</div>
+        <div style="color: #666; font-size: 9px; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px;">Clocked In</div>
+      `;
+    }
+
+    // Tips Per Hour
+    async function fetchTipsPerHour() {
+      try {
+        const response = await fetch('/api/toast-tips-per-hour-today', { method: 'POST' });
+        if (!response.ok) { updateTipsPerHourDisplay(null); return; }
+        const result = await response.json();
+        if (result.success && result.data) {
+          updateTipsPerHourDisplay(result.data);
+        } else {
+          updateTipsPerHourDisplay(null);
+        }
+      } catch (error) {
+        console.error('Error fetching tips/hr:', error);
+        updateTipsPerHourDisplay(null);
+      }
+    }
+
+    function updateTipsPerHourDisplay(data) {
+      const displayDiv = document.getElementById('tipsPerHourText');
+      if (!displayDiv) return;
+      if (!data) {
+        displayDiv.innerHTML = '<div style="font-size: 14px;">-</div>';
+        return;
+      }
+      const arrow = data.trendingUp ? '↑' : '↓';
+      displayDiv.innerHTML = `<div style="font-size: 17px; font-weight: 900; color: #fff; line-height: 1;">${arrow} $${data.tipsPerHour.toFixed(2)}/hr</div>`;
+    }
+
+    // Top Leader
+    async function fetchTopLeader() {
+      try {
+        const nowPacific = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+        const currentHour = nowPacific.getHours();
+        const todayStart = new Date(nowPacific);
+        if (currentHour < 5) {
+          todayStart.setDate(todayStart.getDate() - 1);
+          todayStart.setHours(5, 0, 0, 0);
+        } else {
+          todayStart.setHours(5, 0, 0, 0);
+        }
+        const todayEnd = new Date(todayStart);
+        todayEnd.setDate(todayEnd.getDate() + 1);
+        todayEnd.setHours(4, 59, 59, 999);
+
+        const startISO = todayStart.toISOString();
+        const endISO = todayEnd.toISOString();
+
+        const { data: tasks } = await supabase.from('foh_checklist_tasks').select('completed_by, completed_at, is_completed').eq('is_completed', true).gte('completed_at', startISO).lte('completed_at', endISO);
+        const { data: prepCounts } = await supabase.from('prep_count_log').select('counted_by, counted_at').gte('counted_at', startISO).lte('counted_at', endISO);
+
+        const leaderboard = {};
+        if (tasks && tasks.length > 0) {
+          tasks.forEach(task => {
+            const name = task.completed_by || 'Unknown';
+            if (!leaderboard[name]) leaderboard[name] = { name, count: 0, lastActivity: null };
+            leaderboard[name].count++;
+            const activityTime = new Date(task.completed_at);
+            if (!leaderboard[name].lastActivity || activityTime > leaderboard[name].lastActivity) {
+              leaderboard[name].lastActivity = activityTime;
+            }
+          });
+        }
+        if (prepCounts && prepCounts.length > 0) {
+          prepCounts.forEach(prep => {
+            const name = prep.counted_by || 'Unknown';
+            if (!leaderboard[name]) leaderboard[name] = { name, count: 0, lastActivity: null };
+            leaderboard[name].count++;
+            const activityTime = new Date(prep.counted_at);
+            if (!leaderboard[name].lastActivity || activityTime > leaderboard[name].lastActivity) {
+              leaderboard[name].lastActivity = activityTime;
+            }
+          });
+        }
+
+        if (Object.keys(leaderboard).length === 0) { updateTopLeaderDisplay(null); return; }
+
+        const sortedLeaderboard = Object.values(leaderboard).sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          return b.lastActivity - a.lastActivity;
+        });
+
+        updateTopLeaderDisplay(sortedLeaderboard[0]);
+      } catch (error) {
+        console.error('Error fetching leader:', error);
+        updateTopLeaderDisplay(null);
+      }
+    }
+
+    function updateTopLeaderDisplay(leader) {
+      const displayDiv = document.getElementById('topLeaderText');
+      if (!displayDiv) return;
+      if (!leader) {
+        displayDiv.textContent = 'No activity yet! 🎯';
+        return;
+      }
+      displayDiv.textContent = `${leader.name} (${leader.count} action${leader.count !== 1 ? 's' : ''}) 🔥`;
+    }
+
+    // Void & Discount Tracking
+    async function fetchVoidDiscountTracking() {
+      try {
+        const todayPacific = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' });
+        const [month, day, year] = todayPacific.split(', ')[0].split('/');
+        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+        const authResponse = await fetch('/api/toast-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        if (!authResponse.ok) { updateVoidDiscountDisplay(null); return; }
+
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) { updateVoidDiscountDisplay(null); return; }
+
+        const token = authData.data.accessToken;
+        const response = await fetch(`/api/toast-void-discount-tracking?startDate=${today}&endDate=${today}&token=${encodeURIComponent(token)}`);
+        if (!response.ok) { updateVoidDiscountDisplay(null); return; }
+
+        const result = await response.json();
+        if (result.success) {
+          updateVoidDiscountDisplay(result);
+        } else {
+          updateVoidDiscountDisplay(null);
+        }
+      } catch (error) {
+        console.error('Error fetching void/discount:', error);
+        updateVoidDiscountDisplay(null);
+      }
+    }
+
+    function updateVoidDiscountDisplay(data) {
+      const displayDiv = document.getElementById('voidDiscountDisplay');
+      if (!displayDiv) return;
+      if (!data) {
+        displayDiv.innerHTML = '<span style="color: var(--gray-500); font-style: italic;">Unable to load data</span>';
+        return;
+      }
+      const voidCount = data.voidedOrders?.count || 0;
+      const discountCount = data.discounts?.count || 0;
+      const refundCount = data.refunds?.count || 0;
+      const voidedPaymentCount = data.voidedPayments?.count || 0;
+      displayDiv.textContent = `VOIDED ORDERS: ${voidCount} | DISCOUNTS: ${discountCount} | REFUNDS: ${refundCount} | VOIDED PAYMENTS: ${voidedPaymentCount}`;
+    }
+
+    // Header Foot Traffic
+    async function fetchHeaderFootTraffic() {
+      try {
+        const today = getTodayPacific();
+        const { data, error } = await footTrafficSupabase.from('foot_traffic').select('hour, entries').eq('date', today).order('hour', { ascending: false });
+        if (error) { updateHeaderFootTrafficDisplay(null, null); return; }
+
+        const dailyTotal = data.reduce((sum, row) => sum + (row.entries || 0), 0);
+        const latestHourData = data.length > 0 ? data[0] : null;
+        const latestHourCount = latestHourData ? latestHourData.entries : 0;
+
+        updateHeaderFootTrafficDisplay(latestHourCount, dailyTotal);
+      } catch (err) {
+        console.error('Error fetching header foot traffic:', err);
+        updateHeaderFootTrafficDisplay(null, null);
+      }
+    }
+
+    function updateHeaderFootTrafficDisplay(latestHour, dailyTotal) {
+      const latestHourDiv = document.getElementById('footTrafficLatestHour');
+      const dailyTotalDiv = document.getElementById('footTrafficDailyTotal');
+      if (!latestHourDiv || !dailyTotalDiv) return;
+
+      if (latestHour === null || dailyTotal === null) {
+        latestHourDiv.textContent = '--';
+        dailyTotalDiv.textContent = '--';
+        return;
+      }
+      latestHourDiv.textContent = latestHour.toLocaleString();
+      dailyTotalDiv.textContent = dailyTotal.toLocaleString();
+    }
+  </script>
+</body>
+</html>
