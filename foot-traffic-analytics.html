@@ -904,7 +904,249 @@
     // Auto-load on page load
     window.addEventListener('DOMContentLoaded', function() {
       loadAnalytics();
+      // Initialize header live stats
+      initializeHeaderStats();
     });
+
+    // ============================================
+    // HEADER LIVE STATS (from app-header.js)
+    // ============================================
+
+    function initializeHeaderStats() {
+      console.log('🔄 Initializing header live stats...');
+      fetchClockedInEmployees();
+      fetchTipsPerHour();
+      fetchTopLeader();
+      fetchVoidDiscountTracking();
+      fetchHeaderFootTraffic();
+
+      // Refresh intervals
+      setInterval(fetchClockedInEmployees, 5 * 60 * 1000); // Every 5 minutes
+      setInterval(fetchTipsPerHour, 30 * 1000); // Every 30 seconds
+      setInterval(fetchTopLeader, 2 * 60 * 1000); // Every 2 minutes
+      setInterval(fetchVoidDiscountTracking, 5 * 60 * 1000); // Every 5 minutes
+      setInterval(fetchHeaderFootTraffic, 30 * 1000); // Every 30 seconds
+    }
+
+    // Clocked In Employees
+    async function fetchClockedInEmployees() {
+      try {
+        const todayPacific = new Date().toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+        const [month, day, year] = todayPacific.split(', ')[0].split('/');
+        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+        const authResponse = await fetch('/api/toast-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        if (!authResponse.ok) { updateClockedInDisplay([]); return; }
+
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) { updateClockedInDisplay([]); return; }
+
+        const token = authData.data.accessToken;
+        const response = await fetch(`/api/toast-clocked-in?date=${today}&token=${encodeURIComponent(token)}`);
+        if (!response.ok) { updateClockedInDisplay([]); return; }
+
+        const result = await response.json();
+        if (!result.success) { updateClockedInDisplay([]); return; }
+
+        const employees = result.clockedIn.map(emp => emp.fullName);
+        updateClockedInDisplay(employees);
+      } catch (error) {
+        console.error('Error fetching clocked in:', error);
+        updateClockedInDisplay([]);
+      }
+    }
+
+    function updateClockedInDisplay(employees) {
+      const listDiv = document.getElementById('clockedInList');
+      if (!listDiv) return;
+      if (employees.length === 0) {
+        listDiv.innerHTML = '<span style="color: #999; font-size: 11px; font-style: italic;">No one clocked in</span>';
+        return;
+      }
+      const namesText = employees.join(' | ');
+      listDiv.innerHTML = `
+        <div style="color: #2e7d32; font-size: 12px; font-weight: 500;">${namesText}</div>
+        <div style="color: #666; font-size: 9px; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px;">Clocked In</div>
+      `;
+    }
+
+    // Tips Per Hour
+    async function fetchTipsPerHour() {
+      try {
+        const response = await fetch('/api/toast-tips-per-hour-today', { method: 'POST' });
+        if (!response.ok) { updateTipsPerHourDisplay(null); return; }
+        const result = await response.json();
+        if (result.success && result.data) {
+          updateTipsPerHourDisplay(result.data);
+        } else {
+          updateTipsPerHourDisplay(null);
+        }
+      } catch (error) {
+        console.error('Error fetching tips/hr:', error);
+        updateTipsPerHourDisplay(null);
+      }
+    }
+
+    function updateTipsPerHourDisplay(data) {
+      const displayDiv = document.getElementById('tipsPerHourText');
+      if (!displayDiv) return;
+      if (!data) {
+        displayDiv.innerHTML = '<div style="font-size: 14px;">-</div>';
+        return;
+      }
+      const arrow = data.trendingUp ? '↑' : '↓';
+      displayDiv.innerHTML = `<div style="font-size: 17px; font-weight: 900; color: #fff; line-height: 1;">${arrow} $${data.tipsPerHour.toFixed(2)}/hr</div>`;
+    }
+
+    // Top Leader
+    async function fetchTopLeader() {
+      try {
+        const nowPacific = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+        const currentHour = nowPacific.getHours();
+        const todayStart = new Date(nowPacific);
+        if (currentHour < 5) {
+          todayStart.setDate(todayStart.getDate() - 1);
+          todayStart.setHours(5, 0, 0, 0);
+        } else {
+          todayStart.setHours(5, 0, 0, 0);
+        }
+        const todayEnd = new Date(todayStart);
+        todayEnd.setDate(todayEnd.getDate() + 1);
+        todayEnd.setHours(4, 59, 59, 999);
+
+        const startISO = todayStart.toISOString();
+        const endISO = todayEnd.toISOString();
+
+        const { data: tasks } = await supabase.from('foh_checklist_tasks').select('completed_by, completed_at, is_completed').eq('is_completed', true).gte('completed_at', startISO).lte('completed_at', endISO);
+        const { data: prepCounts } = await supabase.from('prep_count_log').select('counted_by, counted_at').gte('counted_at', startISO).lte('counted_at', endISO);
+
+        const leaderboard = {};
+        if (tasks && tasks.length > 0) {
+          tasks.forEach(task => {
+            const name = task.completed_by || 'Unknown';
+            if (!leaderboard[name]) leaderboard[name] = { name, count: 0, lastActivity: null };
+            leaderboard[name].count++;
+            const activityTime = new Date(task.completed_at);
+            if (!leaderboard[name].lastActivity || activityTime > leaderboard[name].lastActivity) {
+              leaderboard[name].lastActivity = activityTime;
+            }
+          });
+        }
+        if (prepCounts && prepCounts.length > 0) {
+          prepCounts.forEach(prep => {
+            const name = prep.counted_by || 'Unknown';
+            if (!leaderboard[name]) leaderboard[name] = { name, count: 0, lastActivity: null };
+            leaderboard[name].count++;
+            const activityTime = new Date(prep.counted_at);
+            if (!leaderboard[name].lastActivity || activityTime > leaderboard[name].lastActivity) {
+              leaderboard[name].lastActivity = activityTime;
+            }
+          });
+        }
+
+        if (Object.keys(leaderboard).length === 0) { updateTopLeaderDisplay(null); return; }
+
+        const sortedLeaderboard = Object.values(leaderboard).sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          return b.lastActivity - a.lastActivity;
+        });
+
+        updateTopLeaderDisplay(sortedLeaderboard[0]);
+      } catch (error) {
+        console.error('Error fetching leader:', error);
+        updateTopLeaderDisplay(null);
+      }
+    }
+
+    function updateTopLeaderDisplay(leader) {
+      const displayDiv = document.getElementById('topLeaderText');
+      if (!displayDiv) return;
+      if (!leader) {
+        displayDiv.textContent = 'No activity yet! 🎯';
+        return;
+      }
+      displayDiv.textContent = `${leader.name} (${leader.count} action${leader.count !== 1 ? 's' : ''}) 🔥`;
+    }
+
+    // Void & Discount Tracking
+    async function fetchVoidDiscountTracking() {
+      try {
+        const todayPacific = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' });
+        const [month, day, year] = todayPacific.split(', ')[0].split('/');
+        const today = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+        const authResponse = await fetch('/api/toast-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        if (!authResponse.ok) { updateVoidDiscountDisplay(null); return; }
+
+        const authData = await authResponse.json();
+        if (!authData.success || !authData.data?.accessToken) { updateVoidDiscountDisplay(null); return; }
+
+        const token = authData.data.accessToken;
+        const response = await fetch(`/api/toast-void-discount-tracking?startDate=${today}&endDate=${today}&token=${encodeURIComponent(token)}`);
+        if (!response.ok) { updateVoidDiscountDisplay(null); return; }
+
+        const result = await response.json();
+        if (result.success) {
+          updateVoidDiscountDisplay(result);
+        } else {
+          updateVoidDiscountDisplay(null);
+        }
+      } catch (error) {
+        console.error('Error fetching void/discount:', error);
+        updateVoidDiscountDisplay(null);
+      }
+    }
+
+    function updateVoidDiscountDisplay(data) {
+      const displayDiv = document.getElementById('voidDiscountDisplay');
+      if (!displayDiv) return;
+      if (!data) {
+        displayDiv.innerHTML = '<span style="color: var(--gray-500); font-style: italic;">Unable to load data</span>';
+        return;
+      }
+      const voidCount = data.voidedOrders?.count || 0;
+      const discountCount = data.discounts?.count || 0;
+      const refundCount = data.refunds?.count || 0;
+      const voidedPaymentCount = data.voidedPayments?.count || 0;
+      displayDiv.textContent = `VOIDED ORDERS: ${voidCount} | DISCOUNTS: ${discountCount} | REFUNDS: ${refundCount} | VOIDED PAYMENTS: ${voidedPaymentCount}`;
+    }
+
+    // Header Foot Traffic (blue card)
+    async function fetchHeaderFootTraffic() {
+      try {
+        const today = getTodayPacific();
+        const { data, error } = await footTrafficSupabase.from('foot_traffic').select('hour, entries').eq('date', today).order('hour', { ascending: false });
+        if (error) { updateHeaderFootTrafficDisplay(null, null); return; }
+
+        const dailyTotal = data.reduce((sum, row) => sum + (row.entries || 0), 0);
+        const latestHourData = data.length > 0 ? data[0] : null;
+        const latestHourCount = latestHourData ? latestHourData.entries : 0;
+
+        updateHeaderFootTrafficDisplay(latestHourCount, dailyTotal);
+      } catch (err) {
+        console.error('Error fetching header foot traffic:', err);
+        updateHeaderFootTrafficDisplay(null, null);
+      }
+    }
+
+    function updateHeaderFootTrafficDisplay(latestHour, dailyTotal) {
+      const latestHourDiv = document.getElementById('footTrafficLatestHour');
+      const dailyTotalDiv = document.getElementById('footTrafficDailyTotal');
+      if (!latestHourDiv || !dailyTotalDiv) return;
+
+      if (latestHour === null || dailyTotal === null) {
+        latestHourDiv.textContent = '--';
+        dailyTotalDiv.textContent = '--';
+        return;
+      }
+      latestHourDiv.textContent = latestHour.toLocaleString();
+      dailyTotalDiv.textContent = dailyTotal.toLocaleString();
+    }
   </script>
 </body>
 </html>
