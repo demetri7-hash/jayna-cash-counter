@@ -90,6 +90,8 @@ export default async function handler(req, res) {
           const pageUrl = `${TOAST_CONFIG.baseUrl}/orders/v2/ordersBulk?businessDate=${businessDate}&pageSize=${validatedPageSize}&page=${currentPage}`;
           console.log(`🍞 Fetching page ${currentPage} from: ${pageUrl}`);
 
+          let pageData; // Declare outside try block for scoping
+
           try {
             const response = await fetch(pageUrl, {
               method: 'GET',
@@ -110,9 +112,9 @@ export default async function handler(req, res) {
               });
             }
 
-            const pageData = await response.json();
+            pageData = await response.json();
             console.log(`✅ Page ${currentPage} response:`, typeof pageData, Array.isArray(pageData) ? `${pageData.length} orders` : 'non-array response');
-            
+
             if (!Array.isArray(pageData) || pageData.length === 0) {
               // No more data
               console.log(`📄 No more data on page ${currentPage}, stopping pagination`);
@@ -131,7 +133,7 @@ export default async function handler(req, res) {
           }
 
           // If we got less than pageSize, this was the last page
-          if (pageData.length < validatedPageSize) {
+          if (pageData && pageData.length < validatedPageSize) {
             break;
           }
 
