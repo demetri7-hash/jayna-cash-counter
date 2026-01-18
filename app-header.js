@@ -60,8 +60,8 @@ function renderSharedHeader() {
             </div>
           </div>
 
-          <!-- CENTER COLUMN: FOOT TRAFFIC -->
-          <div style="text-align: center; padding: 4px; border-left: 1px solid rgba(255,255,255,0.3); border-right: 1px solid rgba(255,255,255,0.3);">
+          <!-- CENTER COLUMN: FOOT TRAFFIC (CLICKABLE) -->
+          <div onclick="window.location.href='foot-traffic-analytics.html'" style="text-align: center; padding: 4px; border-left: 1px solid rgba(255,255,255,0.3); border-right: 1px solid rgba(255,255,255,0.3); cursor: pointer; transition: all 0.15s ease;">
             <div style="font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.85); margin-bottom: 3px;">
               🚶 FOOT TRAFFIC
             </div>
@@ -74,8 +74,8 @@ function renderSharedHeader() {
             <div id="footTrafficDailyTotal" style="font-size: 15px; font-weight: 900; color: #fff;">
               --
             </div>
-            <div style="font-size: 7px; color: rgba(255,255,255,0.6);">
-              Today's Total
+            <div style="font-size: 7px; color: rgba(255,255,255,0.6); font-style: italic;">
+              Click for Analytics →
             </div>
           </div>
 
