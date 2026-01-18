@@ -920,7 +920,19 @@
       const ctx = document.getElementById('analyticsChart').getContext('2d');
 
       if (isMobile) {
-        // MOBILE: Horizontal bar chart (scrollable)
+        // MOBILE: Normalize data for visual correlation
+        const maxSales = Math.max(...salesDataMapped);
+        const maxTraffic = Math.max(...trafficData);
+
+        // Normalize to 0-100 scale (keep originals for tooltip)
+        const normalizedSales = salesDataMapped.map(val => maxSales > 0 ? (val / maxSales) * 100 : 0);
+        const normalizedTraffic = trafficData.map(val => maxTraffic > 0 ? (val / maxTraffic) * 100 : 0);
+
+        // Store original values for tooltips
+        const originalSalesData = salesDataMapped;
+        const originalTrafficData = trafficData;
+
+        // MOBILE: Horizontal bar chart (scrollable, normalized)
         chartInstance = new Chart(ctx, {
           type: 'bar',
           data: {
@@ -928,17 +940,19 @@
             datasets: [
               {
                 label: 'Sales ($)',
-                data: salesDataMapped,
+                data: normalizedSales,
                 backgroundColor: 'rgba(0, 168, 225, 0.8)',
                 borderColor: '#00A8E1',
-                borderWidth: 2
+                borderWidth: 2,
+                originalData: originalSalesData // Store for tooltip
               },
               {
                 label: 'Foot Traffic',
-                data: trafficData,
+                data: normalizedTraffic,
                 backgroundColor: 'rgba(32, 178, 170, 0.8)',
                 borderColor: '#20B2AA',
-                borderWidth: 2
+                borderWidth: 2,
+                originalData: originalTrafficData // Store for tooltip
               }
             ]
           },
@@ -956,7 +970,17 @@
                     weight: '700'
                   },
                   padding: 12,
-                  usePointStyle: true
+                  usePointStyle: true,
+                  generateLabels: function(chart) {
+                    const datasets = chart.data.datasets;
+                    return datasets.map((dataset, i) => ({
+                      text: dataset.label + ' (normalized)',
+                      fillStyle: dataset.backgroundColor,
+                      hidden: false,
+                      lineWidth: 0,
+                      datasetIndex: i
+                    }));
+                  }
                 }
               },
               tooltip: {
@@ -972,15 +996,24 @@
                 displayColors: true,
                 callbacks: {
                   label: function(context) {
+                    const datasetIndex = context.datasetIndex;
+                    const dataIndex = context.dataIndex;
+                    const originalValue = context.dataset.originalData[dataIndex];
+
                     let label = context.dataset.label || '';
                     if (label) {
                       label += ': ';
                     }
-                    if (context.dataset.label === 'Sales ($)') {
-                      label += '$' + context.parsed.x.toFixed(2);
+
+                    if (datasetIndex === 0) {
+                      // Sales
+                      label += '$' + originalValue.toFixed(2);
                     } else {
-                      label += context.parsed.x + ' visitors';
+                      // Traffic
+                      label += originalValue + ' visitors';
                     }
+
+                    label += ` (${context.parsed.x.toFixed(0)}%)`;
                     return label;
                   }
                 }
@@ -988,15 +1021,28 @@
             },
             scales: {
               x: {
+                max: 100,
                 grid: {
                   display: true,
                   color: 'rgba(0, 0, 0, 0.1)'
                 },
                 ticks: {
+                  callback: function(value) {
+                    return value + '%';
+                  },
                   font: {
-                    size: 12,
+                    size: 11,
                     weight: '600'
                   }
+                },
+                title: {
+                  display: true,
+                  text: 'RELATIVE INTENSITY (Normalized to Max)',
+                  font: {
+                    size: 10,
+                    weight: '700'
+                  },
+                  color: '#666'
                 }
               },
               y: {
