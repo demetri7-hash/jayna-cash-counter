@@ -226,6 +226,20 @@
       color: var(--gray-900);
     }
 
+    /* Mobile: Scrollable chart container */
+    @media (max-width: 768px) {
+      .chart-wrapper {
+        max-height: 600px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      #analyticsChart {
+        min-height: 800px !important; /* Tall chart for scrolling */
+      }
+    }
+
     #loadingOverlay {
       display: none;
       position: fixed;
@@ -577,10 +591,12 @@
         </div>
       </div>
 
-      <!-- Line Chart -->
+      <!-- Chart (Line on Desktop, Horizontal Bar on Mobile) -->
       <div class="chart-container">
         <h2>📈 Hourly Sales vs Foot Traffic</h2>
-        <canvas id="analyticsChart"></canvas>
+        <div class="chart-wrapper">
+          <canvas id="analyticsChart"></canvas>
+        </div>
       </div>
 
     </div> <!-- /content -->
@@ -857,7 +873,7 @@
       renderChart(adjustedFootTrafficData, salesData, selectedDate);
     }
 
-    // Render line chart
+    // Render chart (line on desktop, horizontal bar on mobile)
     function renderChart(footTrafficData, salesData, selectedDate) {
       // Determine closing time (9:30pm on Sunday, 10pm otherwise)
       const date = new Date(selectedDate);
@@ -897,152 +913,253 @@
         chartInstance.destroy();
       }
 
+      // Detect mobile
+      const isMobile = window.innerWidth <= 768;
+
       // Create chart
       const ctx = document.getElementById('analyticsChart').getContext('2d');
 
-      chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: 'Sales ($)',
-              data: salesDataMapped,
-              borderColor: '#00A8E1',
-              backgroundColor: 'rgba(0, 168, 225, 0.1)',
-              borderWidth: 3,
-              tension: 0.4,
-              yAxisID: 'y-sales',
-              pointRadius: 4,
-              pointHoverRadius: 6
-            },
-            {
-              label: 'Foot Traffic',
-              data: trafficData,
-              borderColor: '#20B2AA',
-              backgroundColor: 'rgba(32, 178, 170, 0.1)',
-              borderWidth: 3,
-              tension: 0.4,
-              yAxisID: 'y-traffic',
-              pointRadius: 4,
-              pointHoverRadius: 6
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          aspectRatio: 2.5,
-          interaction: {
-            mode: 'index',
-            intersect: false
+      if (isMobile) {
+        // MOBILE: Horizontal bar chart (scrollable)
+        chartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Sales ($)',
+                data: salesDataMapped,
+                backgroundColor: 'rgba(0, 168, 225, 0.8)',
+                borderColor: '#00A8E1',
+                borderWidth: 2
+              },
+              {
+                label: 'Foot Traffic',
+                data: trafficData,
+                backgroundColor: 'rgba(32, 178, 170, 0.8)',
+                borderColor: '#20B2AA',
+                borderWidth: 2
+              }
+            ]
           },
-          plugins: {
-            legend: {
-              display: true,
-              position: 'top',
-              labels: {
-                font: {
-                  size: 13,
+          options: {
+            indexAxis: 'y', // Horizontal bars
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                  font: {
+                    size: 14,
+                    weight: '700'
+                  },
+                  padding: 12,
+                  usePointStyle: true
+                }
+              },
+              tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                titleFont: {
+                  size: 14,
                   weight: '700'
                 },
-                padding: 15,
-                usePointStyle: true
-              }
-            },
-            tooltip: {
-              backgroundColor: 'rgba(0, 0, 0, 0.9)',
-              titleFont: {
-                size: 13,
-                weight: '700'
-              },
-              bodyFont: {
-                size: 12
-              },
-              padding: 12,
-              displayColors: true,
-              callbacks: {
-                label: function(context) {
-                  let label = context.dataset.label || '';
-                  if (label) {
-                    label += ': ';
+                bodyFont: {
+                  size: 13
+                },
+                padding: 12,
+                displayColors: true,
+                callbacks: {
+                  label: function(context) {
+                    let label = context.dataset.label || '';
+                    if (label) {
+                      label += ': ';
+                    }
+                    if (context.dataset.label === 'Sales ($)') {
+                      label += '$' + context.parsed.x.toFixed(2);
+                    } else {
+                      label += context.parsed.x + ' visitors';
+                    }
+                    return label;
                   }
-                  if (context.dataset.yAxisID === 'y-sales') {
-                    label += '$' + context.parsed.y.toFixed(2);
-                  } else {
-                    label += context.parsed.y + ' visitors';
-                  }
-                  return label;
-                }
-              }
-            }
-          },
-          scales: {
-            x: {
-              grid: {
-                display: true,
-                color: 'rgba(0, 0, 0, 0.05)'
-              },
-              ticks: {
-                font: {
-                  size: 11,
-                  weight: '600'
                 }
               }
             },
-            'y-sales': {
-              type: 'linear',
-              position: 'left',
-              title: {
-                display: true,
-                text: 'SALES ($)',
-                font: {
-                  size: 12,
-                  weight: '700'
+            scales: {
+              x: {
+                grid: {
+                  display: true,
+                  color: 'rgba(0, 0, 0, 0.1)'
                 },
-                color: '#00A8E1'
+                ticks: {
+                  font: {
+                    size: 12,
+                    weight: '600'
+                  }
+                }
               },
-              ticks: {
-                callback: function(value) {
-                  return '$' + value.toFixed(0);
+              y: {
+                grid: {
+                  display: false
                 },
-                font: {
-                  size: 11,
-                  weight: '600'
-                },
-                color: '#00A8E1'
-              },
-              grid: {
-                display: true,
-                color: 'rgba(0, 168, 225, 0.1)'
-              }
-            },
-            'y-traffic': {
-              type: 'linear',
-              position: 'right',
-              title: {
-                display: true,
-                text: 'FOOT TRAFFIC',
-                font: {
-                  size: 12,
-                  weight: '700'
-                },
-                color: '#20B2AA'
-              },
-              ticks: {
-                font: {
-                  size: 11,
-                  weight: '600'
-                },
-                color: '#20B2AA'
-              },
-              grid: {
-                display: false
+                ticks: {
+                  font: {
+                    size: 13,
+                    weight: '700'
+                  },
+                  color: '#424242'
+                }
               }
             }
           }
-        }
-      });
+        });
+      } else {
+        // DESKTOP: Line chart (original)
+        chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Sales ($)',
+                data: salesDataMapped,
+                borderColor: '#00A8E1',
+                backgroundColor: 'rgba(0, 168, 225, 0.1)',
+                borderWidth: 3,
+                tension: 0.4,
+                yAxisID: 'y-sales',
+                pointRadius: 4,
+                pointHoverRadius: 6
+              },
+              {
+                label: 'Foot Traffic',
+                data: trafficData,
+                borderColor: '#20B2AA',
+                backgroundColor: 'rgba(32, 178, 170, 0.1)',
+                borderWidth: 3,
+                tension: 0.4,
+                yAxisID: 'y-traffic',
+                pointRadius: 4,
+                pointHoverRadius: 6
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.5,
+            interaction: {
+              mode: 'index',
+              intersect: false
+            },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                  font: {
+                    size: 13,
+                    weight: '700'
+                  },
+                  padding: 15,
+                  usePointStyle: true
+                }
+              },
+              tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                titleFont: {
+                  size: 13,
+                  weight: '700'
+                },
+                bodyFont: {
+                  size: 12
+                },
+                padding: 12,
+                displayColors: true,
+                callbacks: {
+                  label: function(context) {
+                    let label = context.dataset.label || '';
+                    if (label) {
+                      label += ': ';
+                    }
+                    if (context.dataset.yAxisID === 'y-sales') {
+                      label += '$' + context.parsed.y.toFixed(2);
+                    } else {
+                      label += context.parsed.y + ' visitors';
+                    }
+                    return label;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: {
+                  display: true,
+                  color: 'rgba(0, 0, 0, 0.05)'
+                },
+                ticks: {
+                  font: {
+                    size: 11,
+                    weight: '600'
+                  }
+                }
+              },
+              'y-sales': {
+                type: 'linear',
+                position: 'left',
+                title: {
+                  display: true,
+                  text: 'SALES ($)',
+                  font: {
+                    size: 12,
+                    weight: '700'
+                  },
+                  color: '#00A8E1'
+                },
+                ticks: {
+                  callback: function(value) {
+                    return '$' + value.toFixed(0);
+                  },
+                  font: {
+                    size: 11,
+                    weight: '600'
+                  },
+                  color: '#00A8E1'
+                },
+                grid: {
+                  display: true,
+                  color: 'rgba(0, 168, 225, 0.1)'
+                }
+              },
+              'y-traffic': {
+                type: 'linear',
+                position: 'right',
+                title: {
+                  display: true,
+                  text: 'FOOT TRAFFIC',
+                  font: {
+                    size: 12,
+                    weight: '700'
+                  },
+                  color: '#20B2AA'
+                },
+                ticks: {
+                  font: {
+                    size: 11,
+                    weight: '600'
+                  },
+                  color: '#20B2AA'
+                },
+                grid: {
+                  display: false
+                }
+              }
+            }
+          }
+        });
+      }
     }
 
     // Auto-load on page load
