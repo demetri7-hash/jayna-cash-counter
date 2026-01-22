@@ -1196,6 +1196,21 @@
       const container = document.getElementById('upcomingContent');
 
       try {
+        // AUTOMATED DELIVERY TRACKING: Update delivery statuses before loading
+        console.log('🤖 Running automated delivery status updates...');
+        try {
+          const autoUpdateResponse = await fetch('/api/auto-update-delivery-status', {
+            method: 'POST'
+          });
+          const autoUpdateData = await autoUpdateResponse.json();
+          if (autoUpdateData.success && autoUpdateData.updated > 0) {
+            console.log(`✅ Auto-updated ${autoUpdateData.updated} delivery statuses`);
+          }
+        } catch (autoError) {
+          console.warn('⚠️ Auto-update delivery status failed (non-critical):', autoError);
+          // Continue loading orders even if auto-update fails
+        }
+
         if (showLoadingSpinner) {
           showLoading('LOADING ORDERS', 'Loading catering orders from database...');
         }
@@ -2973,30 +2988,224 @@
       return phone;
     }
 
-    function viewOrderDetails(orderId) {
-      // TODO: Open modal with full order details for editing
-      console.log('View order:', orderId);
+    async function viewOrderDetails(orderId) {
+      console.log('📋 Viewing order details:', orderId);
 
-      // Create info modal
+      try {
+        // Fetch order from database
+        const response = await fetch(`/api/get-catering-order-by-id?id=${orderId}`);
+        const data = await response.json();
+
+        if (!data.success || !data.data) {
+          throw new Error('Order not found');
+        }
+
+        const order = data.data;
+        showOrderDetailModal(order);
+
+      } catch (error) {
+        console.error('Error loading order details:', error);
+        showMessage('Error loading order details: ' + error.message, 'error');
+      }
+    }
+
+    function showOrderDetailModal(order) {
+      // Parse tracking events
+      let trackingEvents = [];
+      try {
+        trackingEvents = typeof order.delivery_tracking_events === 'string'
+          ? JSON.parse(order.delivery_tracking_events)
+          : (order.delivery_tracking_events || []);
+      } catch (e) {
+        trackingEvents = [];
+      }
+
+      // Sort events by timestamp (newest first)
+      trackingEvents.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      // Build tracking events HTML
+      const trackingHTML = trackingEvents.length > 0
+        ? trackingEvents.map(event => {
+            const time = new Date(event.timestamp).toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            });
+            const autoLabel = event.auto ? ' (Auto)' : '';
+            const statusEmoji = {
+              'pending': '⏳',
+              'assigned': '👤',
+              'picked_up': '📦',
+              'in_transit': '🚗',
+              'delivered': '✅'
+            }[event.status] || '•';
+            return `<div style="padding: 8px 0; border-bottom: 1px solid var(--gray-200);">
+              <strong>${statusEmoji} ${time}</strong> - ${event.status}${autoLabel}
+              ${event.note ? `<br><span style="font-size:12px;color:var(--gray-600);">${event.note}</span>` : ''}
+            </div>`;
+          }).join('')
+        : '<div style="color:var(--gray-500);font-size:13px;">No tracking events yet</div>';
+
+      // Delivery status badge
+      const statusColors = {
+        'pending': 'background:#fef3c7;color:#92400e;',
+        'assigned': 'background:#dbeafe;color:#1e40af;',
+        'picked_up': 'background:#fed7aa;color:#9a3412;',
+        'in_transit': 'background:#bfdbfe;color:#1e3a8a;',
+        'delivered': 'background:#d1fae5;color:#065f46;'
+      };
+      const statusStyle = statusColors[order.delivery_status] || statusColors['pending'];
+
+      // Create modal
       const overlay = document.createElement('div');
-      overlay.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100000;padding:20px;`;
-      const box = document.createElement('div');
-      box.style.cssText = `background:white;padding:24px;max-width:500px;width:100%;border:3px solid #2563eb;`;
-      const title = document.createElement('div');
-      title.textContent = 'Coming Soon';
-      title.style.cssText = `font-size:18px;font-weight:700;color:#1e40af;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;`;
-      const msg = document.createElement('div');
-      msg.innerHTML = `Order editing modal coming soon!<br><br><strong>Order ID:</strong> ${orderId}<br><br>This will allow you to edit all fields.`;
-      msg.style.cssText = `font-size:14px;color:#4a4a4a;margin-bottom:20px;line-height:1.5;`;
-      const btn = document.createElement('button');
-      btn.textContent = 'OK';
-      btn.style.cssText = `width:100%;padding:12px;background:#1a1a1a;color:white;border:none;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;`;
-      btn.onclick = () => overlay.remove();
-      box.appendChild(title);
-      box.appendChild(msg);
-      box.appendChild(btn);
-      overlay.appendChild(box);
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100000;padding:20px;overflow-y:auto;';
+
+      const modal = document.createElement('div');
+      modal.style.cssText = 'background:white;padding:24px;max-width:700px;width:100%;max-height:90vh;overflow-y:auto;border:3px solid var(--gray-700);';
+
+      modal.innerHTML = `
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:20px;text-transform:uppercase;letter-spacing:1px;">
+          ORDER DETAILS
+        </h2>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--gray-700);text-transform:uppercase;margin-bottom:4px;">Order #</div>
+            <div style="font-size:14px;">${order.order_number || 'N/A'}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--gray-700);text-transform:uppercase;margin-bottom:4px;">Customer</div>
+            <div style="font-size:14px;">${order.customer_name || 'N/A'}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--gray-700);text-transform:uppercase;margin-bottom:4px;">Delivery Date</div>
+            <div style="font-size:14px;">${order.delivery_date || 'N/A'}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--gray-700);text-transform:uppercase;margin-bottom:4px;">Delivery Time</div>
+            <div style="font-size:14px;">${order.delivery_time ? new Date(order.delivery_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A'}</div>
+          </div>
+        </div>
+
+        ${order.delivery_address ? `
+        <div style="margin-bottom:20px;">
+          <div style="font-size:11px;font-weight:700;color:var(--gray-700);text-transform:uppercase;margin-bottom:4px;">Delivery Address</div>
+          <div style="font-size:14px;">${order.delivery_address}</div>
+        </div>
+        ` : ''}
+
+        ${order.delivery_id ? `
+        <div style="border:2px solid var(--gray-300);padding:16px;margin-bottom:20px;background:var(--gray-100);">
+          <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;">🚚 DELIVERY TRACKING</h3>
+
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:700;color:var(--gray-700);text-transform:uppercase;margin-bottom:4px;">Status</div>
+            <div style="display:inline-block;padding:4px 10px;border-radius:0;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;${statusStyle}">
+              ${order.delivery_status || 'PENDING'}
+            </div>
+          </div>
+
+          ${order.courier_name ? `
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:700;color:var(--gray-700);text-transform:uppercase;margin-bottom:4px;">Courier</div>
+            <div style="font-size:14px;">${order.courier_name}${order.courier_phone ? ` • ${order.courier_phone}` : ''}</div>
+          </div>
+          ` : ''}
+
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:700;color:var(--gray-700);text-transform:uppercase;margin-bottom:8px;">Auto-Tracking</div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" id="autoTrackingToggle" ${order.auto_tracking_enabled ? 'checked' : ''} style="width:18px;height:18px;">
+              <span style="font-size:13px;">Enable automated status updates</span>
+            </label>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:700;color:var(--gray-700);text-transform:uppercase;margin-bottom:8px;">Tracking History</div>
+            <div style="max-height:200px;overflow-y:auto;border:1px solid var(--gray-300);padding:8px;background:white;">
+              ${trackingHTML}
+            </div>
+          </div>
+
+          <div style="margin-top:16px;">
+            <button onclick="refreshDeliveryStatus('${order.id}')" style="width:100%;padding:12px;background:var(--gray-900);color:white;border:none;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">
+              🔄 REFRESH STATUS
+            </button>
+          </div>
+        </div>
+        ` : '<div style="padding:16px;background:var(--gray-100);border:2px solid var(--gray-300);margin-bottom:20px;font-size:13px;color:var(--gray-600);">⚠️ No delivery tracking available (order missing deliveryId)</div>'}
+
+        <div style="display:flex;gap:12px;justify-content:flex-end;">
+          <button onclick="this.closest('[style*=\\'position:fixed\\']').remove()" style="padding:12px 24px;background:var(--gray-100);border:2px solid var(--gray-300);color:var(--gray-900);font-size:13px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;">
+            CLOSE
+          </button>
+        </div>
+      `;
+
+      overlay.appendChild(modal);
       document.body.appendChild(overlay);
+
+      // Add event listener for auto-tracking toggle
+      if (order.delivery_id) {
+        const toggle = document.getElementById('autoTrackingToggle');
+        if (toggle) {
+          toggle.addEventListener('change', async (e) => {
+            await toggleAutoTracking(order.id, e.target.checked);
+          });
+        }
+      }
+    }
+
+    async function toggleAutoTracking(orderId, enabled) {
+      try {
+        const response = await fetch('/api/update-auto-tracking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId, enabled })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          console.log(`✅ Auto-tracking ${enabled ? 'enabled' : 'disabled'} for order ${orderId}`);
+          showMessage(`Auto-tracking ${enabled ? 'enabled' : 'disabled'}`, 'success');
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        console.error('Error toggling auto-tracking:', error);
+        showMessage('Error updating auto-tracking: ' + error.message, 'error');
+      }
+    }
+
+    async function refreshDeliveryStatus(orderId) {
+      try {
+        showLoading('REFRESHING STATUS', 'Updating delivery status...');
+
+        // Trigger auto-update for this specific order
+        const response = await fetch('/api/auto-update-delivery-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId })
+        });
+
+        const data = await response.json();
+
+        hideLoading();
+
+        if (data.success) {
+          // Close modal and reload orders
+          document.querySelector('[style*="position:fixed"]')?.remove();
+          loadOrdersFromDatabase();
+          showMessage('Delivery status refreshed!', 'success');
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        hideLoading();
+        console.error('Error refreshing delivery status:', error);
+        showMessage('Error refreshing status: ' + error.message, 'error');
+      }
     }
 
     // ============================================

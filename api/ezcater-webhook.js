@@ -105,7 +105,18 @@ export default async function handler(req, res) {
         business_date: orderData.delivery_date ? parseInt(orderData.delivery_date.replace(/-/g, '')) : null,
         status: orderData.status.toUpperCase(),
         order_data: orderDetails,
-        last_synced_at: new Date().toISOString()
+        last_synced_at: new Date().toISOString(),
+
+        // Delivery tracking fields (new)
+        delivery_id: orderData.delivery_id,
+        delivery_status: 'pending',  // Initial status
+        auto_tracking_enabled: true,  // Enable auto-tracking by default
+        delivery_tracking_events: JSON.stringify([{
+          timestamp: new Date().toISOString(),
+          status: 'pending',
+          auto: false,
+          note: 'Order received via webhook'
+        }])
       }, {
         onConflict: 'source_system,external_order_id'
       })
@@ -369,7 +380,8 @@ function parseOrderData(order) {
     tax: tax,
     tip: tip,
     total: total,
-    status: status
+    status: status,
+    delivery_id: order.deliveryId || null  // For ezCater Delivery API tracking
   };
 }
 
