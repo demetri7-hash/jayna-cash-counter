@@ -4843,29 +4843,50 @@
         smallSpoons += prep.spanakopita.length; // 1 small spoon per spanakopita type for tzatziki
       }
 
-      // SIDES - UPDATED: Rice in half pan with SPOON only, Greek Fries single sides show aioli
+      // SIDES - UPDATED: Rice in half pan with SPOON only, Greek Fries single sides aggregated with total aioli
       if (prep.sides.length > 0) {
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">SIDES</h4>`;
         html += `<div style="margin-left: 16px;">`;
+
+        // Aggregate Greek Fries single sides
+        let totalGreekFriesSides = 0;
+        let totalAioli = 0;
+        const nonGreekFriesSides = [];
+
         prep.sides.forEach(side => {
           const sideName = (side.name || '').toUpperCase();
-          const isRice = sideName.includes('RICE');
           const isGreekFries = sideName.includes('GREEK FRIES');
           const isSingleSide = isGreekFries && (side.price || 0) < 10;
+
+          if (isSingleSide) {
+            totalGreekFriesSides += side.qty;
+            totalAioli += side.qty; // 1 aioli per side
+          } else {
+            nonGreekFriesSides.push(side);
+          }
+        });
+
+        // Show aggregated Greek Fries first (if any)
+        if (totalGreekFriesSides > 0) {
+          html += `<div>□ ${totalGreekFriesSides}x Greek Fries (side) – <em>Packer must decide: 1 TONG or 1 SPOON per portion</em></div>`;
+          html += `<div style="margin-left: 16px;">→ TOTAL: ${totalAioli}x 2oz ramekins Spicy Aioli</div>`;
+          tongs += totalGreekFriesSides; // Count for utensils
+        }
+
+        // Show other sides
+        nonGreekFriesSides.forEach(side => {
+          const sideName = (side.name || '').toUpperCase();
+          const isRice = sideName.includes('RICE');
 
           if (isRice) {
             html += `<div>□ ${side.qty}x ${side.name} (Half Pan) – 1 LARGE SERVING SPOON</div>`;
             largeServingSpoons += 1; // 1 large serving spoon for rice
-          } else if (isSingleSide) {
-            // Greek Fries single side: Include aioli in prep sheet (but no label)
-            html += `<div>□ ${side.qty}x ${side.name} – <em>Packer must decide: 1 TONG or 1 SPOON</em></div>`;
-            html += `<div style="margin-left: 16px;">→ Each side includes 1x 2oz ramekin Spicy Aioli</div>`;
-            tongs += 1; // Default to tong for count, packer will decide
           } else {
             html += `<div>□ ${side.qty}x ${side.name} – <em>Packer must decide: 1 TONG or 1 SPOON</em></div>`;
             tongs += 1; // Default to tong for count, packer will decide
           }
         });
+
         html += `</div>`;
       }
 
