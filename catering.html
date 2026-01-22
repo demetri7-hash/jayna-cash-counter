@@ -4275,7 +4275,7 @@
         }
         // GREEK FRIES BAR
         else if (itemName.includes('GREEK FRIES BAR')) {
-          prep.greekFries.push({ name: item.item_name, qty, modifiers });
+          prep.greekFries.push({ name: item.item_name, qty, modifiers, price: item.total_price || item.unit_price || 0 });
         }
         // DOLMAS (separate because needs tzatziki + tong)
         else if (itemName.includes('DOLMAS')) {
@@ -4287,7 +4287,9 @@
         }
         // SIDES (everything else)
         else if (itemName.includes('GREEK FRIES') || itemName.includes('CHICKPEA') || itemName.includes('GRILLED PITA') || itemName.includes('VEGETABLE STICKS') || itemName.includes('MARINATED OLIVES') || itemName.includes('RICE')) {
-          prep.sides.push({ name: item.item_name, qty, modifiers });
+          // Store price for Greek Fries to detect single sides (< $10)
+          const price = itemName.includes('GREEK FRIES') ? (item.total_price || item.unit_price || 0) : 0;
+          prep.sides.push({ name: item.item_name, qty, modifiers, price });
         }
         // DESSERTS
         else if (itemName.includes('BAKLAVA') || itemName.includes('RICE PUDDING')) {
@@ -4841,16 +4843,24 @@
         smallSpoons += prep.spanakopita.length; // 1 small spoon per spanakopita type for tzatziki
       }
 
-      // SIDES - UPDATED: Rice in half pan with SPOON only
+      // SIDES - UPDATED: Rice in half pan with SPOON only, Greek Fries single sides show aioli
       if (prep.sides.length > 0) {
         html += `<h4 style="margin: 16px 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--gray-900);">SIDES</h4>`;
         html += `<div style="margin-left: 16px;">`;
         prep.sides.forEach(side => {
           const sideName = (side.name || '').toUpperCase();
           const isRice = sideName.includes('RICE');
+          const isGreekFries = sideName.includes('GREEK FRIES');
+          const isSingleSide = isGreekFries && (side.price || 0) < 10;
+
           if (isRice) {
             html += `<div>□ ${side.qty}x ${side.name} (Half Pan) – 1 LARGE SERVING SPOON</div>`;
             largeServingSpoons += 1; // 1 large serving spoon for rice
+          } else if (isSingleSide) {
+            // Greek Fries single side: Include aioli in prep sheet (but no label)
+            html += `<div>□ ${side.qty}x ${side.name} – <em>Packer must decide: 1 TONG or 1 SPOON</em></div>`;
+            html += `<div style="margin-left: 16px;">→ Each side includes 1x 2oz ramekin Spicy Aioli</div>`;
+            tongs += 1; // Default to tong for count, packer will decide
           } else {
             html += `<div>□ ${side.qty}x ${side.name} – <em>Packer must decide: 1 TONG or 1 SPOON</em></div>`;
             tongs += 1; // Default to tong for count, packer will decide
@@ -6199,6 +6209,9 @@
         const friesName = (fries.name || '').toUpperCase();
         const isByoBar = friesName.includes('BYO') || friesName.includes('BAR');
 
+        // Detect if this is a SINGLE SIDE (price < $10)
+        const isSingleSide = (fries.price || 0) < 10;
+
         // Detect protein type from fries.name (e.g., "Greek Fries + Chicken Gyro" → "CHICKEN GYRO")
         let itemName = 'GREEK FRIES + PROTEIN';
         if (fries.name && fries.name.includes('+')) {
@@ -6206,8 +6219,23 @@
           itemName = `GREEK FRIES + ${protein}`;
         }
 
-        // NEW PAN LOGIC: Combine 2 orders into 1 full pan
-        if (fries.qty < 2) {
+        // SINGLE SIDE LOGIC (< $10): Use "# of # SINGLE SIDE" format
+        if (isSingleSide) {
+          for (let i = 1; i <= fries.qty; i++) {
+            labels.push({
+              item: itemName,
+              qty: fries.qty > 1 ? `${i} OF ${fries.qty} SINGLE SIDE` : `1 OF 1 SINGLE SIDE`,
+              pan: '',
+              category: 'Greek Fries',
+              orderNum,
+              customerLastName,
+              phoneNumber,
+              packDate
+            });
+          }
+        }
+        // REGULAR GREEK FRIES LOGIC: Combine 2 orders into 1 full pan
+        else if (fries.qty < 2) {
           // Less than 2 orders: use half pans
           for (let i = 1; i <= fries.qty; i++) {
             labels.push({
@@ -6255,14 +6283,16 @@
           }
         }
 
-        // Sauces: BYO Bar gets all 3, regular gets Aioli only
+        // Sauces: BYO Bar gets all 3, regular gets Aioli only, SINGLE SIDES get NO labels (aioli shown in prep sheet only)
         if (isByoBar) {
           labels.push({ item: getLabelName('Greek Fries - Spicy Aioli'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
           labels.push({ item: getLabelName('Greek Fries - Tzatziki'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
           labels.push({ item: getLabelName('Greek Fries - Crumbled Feta'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
-        } else {
+        } else if (!isSingleSide) {
+          // Regular Greek Fries (NOT single side): add aioli label
           labels.push({ item: getLabelName('Greek Fries - Spicy Aioli'), qty: '16OZ DELI - 1 OF 1', pan: '', category: 'Greek Fries', orderNum, customerLastName, phoneNumber, packDate });
         }
+        // Single sides (< $10): NO aioli labels (will be on prep sheet only)
       });
 
       // DOLMAS
