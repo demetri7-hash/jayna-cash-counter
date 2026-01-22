@@ -1381,7 +1381,8 @@ function generatePrepListPDF(prep, order, lineItems) {
       if (y < 720) {
         renderTextWithBold(doc, `[ ] ${totalGreekFriesSingleSides}x Greek Fries - **1 tong**`, margin + 10, y); y += ss(9);
         doc.setTextColor(...darkGray);
-        renderTextWithBold(doc, `    → TOTAL: **${totalAioli}x 2oz ramekins Spicy Aioli**`, margin + 10, y, false);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`    → TOTAL: ${totalAioli}x 2oz ramekins Spicy Aioli`, margin + 10, y);
         doc.setTextColor(...black);
         y += ss(12);
       }
