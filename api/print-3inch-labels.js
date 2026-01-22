@@ -592,9 +592,10 @@ function calculatePrepList(lineItems, order) {
     else if (itemName.includes('SPANAKOPITA')) {
       prep.spanakopita.push({ name: item.item_name, qty, modifiers });
     }
-    // SIDES
+    // SIDES (track price for Greek Fries to detect single sides < $10)
     else if (itemName.includes('GREEK FRIES') || itemName.includes('CHICKPEA') || itemName.includes('GRILLED PITA') || itemName.includes('VEGETABLE STICKS') || itemName.includes('MARINATED OLIVES')) {
-      prep.sides.push({ name: item.item_name, qty, modifiers });
+      const price = itemName.includes('GREEK FRIES') ? (item.total_price || item.unit_price || 0) : 0;
+      prep.sides.push({ name: item.item_name, qty, modifiers, price });
     }
     // DESSERTS
     else if (itemName.includes('BAKLAVA') || itemName.includes('RICE PUDDING')) {
@@ -1059,12 +1060,16 @@ function generateLabelsFromPrep(prep, order) {
   prep.sides.forEach(side => {
     const sideName = side.name.toUpperCase();
     const qty = side.qty;
+    const price = side.price || 0;
 
     // Check if this is Greek Fries or Rice (items that come in half pans when "feeds 5 to 7")
     const isGreekFries = sideName.includes('GREEK FRIES') && !sideName.includes('BAR');
     const isRice = sideName.includes('RICE');
 
-    if ((isGreekFries || isRice) && qty >= 2) {
+    // CRITICAL: Detect single sides (under $10) - NO aioli labels for these!
+    const isSingleSide = isGreekFries && price < 10;
+
+    if ((isGreekFries || isRice) && qty >= 2 && !isSingleSide) {
       // Multiple items - convert to full/half pans (2 items = 1 full pan)
       const pans = convertHalfPansToFullPans(qty);
       pans.forEach(pan => {
@@ -1074,7 +1079,7 @@ function generateLabelsFromPrep(prep, order) {
         });
       });
 
-      // For Greek Fries, ALSO add aioli labels (2 aioli per order as each comes with spicy aioli)
+      // For Greek Fries (CATERING SIZE >= $10), add aioli labels
       if (isGreekFries) {
         for (let i = 0; i < qty; i++) {
           labels.push({
@@ -1082,6 +1087,14 @@ function generateLabelsFromPrep(prep, order) {
             qty: `16OZ DELI - FOR GREEK FRIES`
           });
         }
+      }
+    } else if (isSingleSide) {
+      // SINGLE SIDE (< $10): Generate individual "# OF #" labels, NO aioli
+      for (let i = 1; i <= qty; i++) {
+        labels.push({
+          item: sideName,
+          qty: qty > 1 ? `${i} OF ${qty} SINGLE SIDE` : `1 OF 1 SINGLE SIDE`
+        });
       }
     } else {
       // Single item or non-pannable item
