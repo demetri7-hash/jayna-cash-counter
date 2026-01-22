@@ -6328,8 +6328,38 @@
         labels.push({ item: getLabelName(`${span.name} - Tzatziki Sauce`), qty: `${span.qty} portions`, pan: '', category: 'Spanakopita', orderNum, customerLastName, phoneNumber, packDate });
       });
 
-      // SIDES
+      // SIDES - Aggregate Greek Fries single sides
+      let totalGreekFriesSidesForLabels = 0;
+      const nonGreekFriesSidesForLabels = [];
+
       prep.sides.forEach(side => {
+        const sideName = (side.name || '').toUpperCase();
+        const isGreekFries = sideName.includes('GREEK FRIES');
+        const isSingleSide = isGreekFries && (side.price || 0) < 10;
+
+        if (isSingleSide) {
+          totalGreekFriesSidesForLabels += side.qty;
+        } else {
+          nonGreekFriesSidesForLabels.push(side);
+        }
+      });
+
+      // Add aggregated Greek Fries line
+      if (totalGreekFriesSidesForLabels > 0) {
+        labels.push({
+          item: getLabelName('Greek Fries (side)'),
+          qty: `${totalGreekFriesSidesForLabels} portions (+ ${totalGreekFriesSidesForLabels}x 2oz Spicy Aioli)`,
+          pan: '',
+          category: 'Side',
+          orderNum,
+          customerLastName,
+          phoneNumber,
+          packDate
+        });
+      }
+
+      // Add other sides
+      nonGreekFriesSidesForLabels.forEach(side => {
         labels.push({ item: getLabelName(side.name), qty: `${side.qty} portions`, pan: '', category: 'Side', orderNum, customerLastName, phoneNumber, packDate });
       });
 
@@ -7976,8 +8006,37 @@
         spanakopitaLabels.push({ orderNum, customer, date, container: '16oz Deli', item: 'Tzatziki (dill stripe)', qty: span.qty, category: 'Spanakopita - Sauce' });
       });
 
-      // Sides
+      // Sides - Aggregate Greek Fries single sides
+      let totalGreekFriesSidesForPDF = 0;
+      const nonGreekFriesSidesForPDF = [];
+
       prep.sides.forEach(side => {
+        const sideName = (side.name || '').toUpperCase();
+        const isGreekFries = sideName.includes('GREEK FRIES');
+        const isSingleSide = isGreekFries && (side.price || 0) < 10;
+
+        if (isSingleSide) {
+          totalGreekFriesSidesForPDF += side.qty;
+        } else {
+          nonGreekFriesSidesForPDF.push(side);
+        }
+      });
+
+      // Add aggregated Greek Fries line
+      if (totalGreekFriesSidesForPDF > 0) {
+        sideLabels.push({
+          orderNum,
+          customer,
+          date,
+          container: 'Brown Bowl',
+          item: `Greek Fries (side) + ${totalGreekFriesSidesForPDF}x 2oz Spicy Aioli`,
+          qty: totalGreekFriesSidesForPDF,
+          category: 'Side'
+        });
+      }
+
+      // Add other sides
+      nonGreekFriesSidesForPDF.forEach(side => {
         sideLabels.push({ orderNum, customer, date, container: '½ Pan', item: getLabelName(side.name), qty: side.qty, category: 'Side' });
       });
 
