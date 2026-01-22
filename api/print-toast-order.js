@@ -399,8 +399,40 @@ async function generateOrderReceiptPDF(order, lineItems) {
     doc.text('No line items available', margin.left, y);
     y += 15;
   } else {
-    const tableData = [];
+    // AGGREGATE Greek Fries single sides (< $10) into one line
+    let totalGreekFriesSingleSides = 0;
+    let totalGreekFriesPrice = 0;
+    let unitPriceGreekFries = 0;
+    const nonGreekFriesItems = [];
+
     lineItems.forEach(item => {
+      const itemName = (item.item_name || 'Unknown Item').toUpperCase();
+      const isGreekFries = itemName.includes('GREEK FRIES');
+      const price = parseFloat(item.total_price || item.unit_price || 0);
+      const isSingleSide = isGreekFries && price < 10;
+
+      if (isSingleSide) {
+        totalGreekFriesSingleSides += parseFloat(item.quantity || 1);
+        totalGreekFriesPrice += price;
+        unitPriceGreekFries = parseFloat(item.unit_price || 0); // Save unit price
+      } else {
+        nonGreekFriesItems.push(item);
+      }
+    });
+
+    const tableData = [];
+
+    // Add aggregated Greek Fries first (if any)
+    if (totalGreekFriesSingleSides > 0) {
+      tableData.push([
+        `${totalGreekFriesSingleSides}x Greek Fries`,
+        `$${unitPriceGreekFries.toFixed(2)}`,
+        `$${totalGreekFriesPrice.toFixed(2)}`
+      ]);
+    }
+
+    // Add other items
+    nonGreekFriesItems.forEach(item => {
       const itemName = item.item_name || 'Unknown Item';
       const quantity = parseFloat(item.quantity || 1);
       const unitPrice = parseFloat(item.unit_price || 0).toFixed(2);

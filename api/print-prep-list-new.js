@@ -284,9 +284,10 @@ function calculatePrepList(lineItems, order) {
     else if (itemName.includes('SPANAKOPITA')) {
       prep.spanakopita.push({ name: item.item_name, qty, modifiers });
     }
-    // SIDES (everything else)
+    // SIDES (track price for Greek Fries to detect single sides < $10)
     else if (itemName.includes('GREEK FRIES') || itemName.includes('CHICKPEA') || itemName.includes('GRILLED PITA') || itemName.includes('VEGETABLE STICKS') || itemName.includes('MARINATED OLIVES') || itemName.includes('RICE')) {
-      prep.sides.push({ name: item.item_name, qty, modifiers });
+      const price = itemName.includes('GREEK FRIES') ? (item.total_price || item.unit_price || 0) : 0;
+      prep.sides.push({ name: item.item_name, qty, modifiers, price });
     }
     // DESSERTS
     else if (itemName.includes('BAKLAVA') || itemName.includes('RICE PUDDING')) {
@@ -1336,9 +1337,29 @@ function generatePrepListPDF(prep, order, lineItems) {
     y += ss(6);
   }
 
-  // SIDES
+  // SIDES - Aggregate Greek Fries single sides (< $10) and show total aioli
   if (prep.sides.length > 0 && y < 700) {
-    const sidesBoxHeight = 40 + (prep.sides.length * 13);
+    // Separate Greek Fries single sides from other sides
+    let totalGreekFriesSingleSides = 0;
+    let totalAioli = 0;
+    const nonGreekFriesSides = [];
+
+    prep.sides.forEach(side => {
+      const sideName = (side.name || '').toUpperCase();
+      const isGreekFries = sideName.includes('GREEK FRIES');
+      const isSingleSide = isGreekFries && (side.price || 0) < 10;
+
+      if (isSingleSide) {
+        totalGreekFriesSingleSides += side.qty;
+        totalAioli += side.qty; // 1 aioli per side
+      } else {
+        nonGreekFriesSides.push(side);
+      }
+    });
+
+    // Calculate box height (include extra lines for Greek Fries aggregate + aioli note)
+    const greekFriesLines = totalGreekFriesSingleSides > 0 ? 2 : 0; // 1 for item + 1 for aioli note
+    const sidesBoxHeight = 40 + ((nonGreekFriesSides.length + greekFriesLines) * 13);
     doc.setFillColor(250, 250, 250);
     doc.rect(margin, y, contentWidth, sidesBoxHeight, 'F');
     doc.setDrawColor(...lightGray);
@@ -1354,7 +1375,20 @@ function generatePrepListPDF(prep, order, lineItems) {
 
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    prep.sides.forEach(side => {
+
+    // Show aggregated Greek Fries first (if any)
+    if (totalGreekFriesSingleSides > 0) {
+      if (y < 720) {
+        renderTextWithBold(doc, `[ ] ${totalGreekFriesSingleSides}x Greek Fries - **1 tong**`, margin + 10, y); y += ss(9);
+        doc.setTextColor(...darkGray);
+        renderTextWithBold(doc, `    → TOTAL: **${totalAioli}x 2oz ramekins Spicy Aioli**`, margin + 10, y, false);
+        doc.setTextColor(...black);
+        y += ss(12);
+      }
+    }
+
+    // Show other sides
+    nonGreekFriesSides.forEach(side => {
       if (y < 720) {
         const sideName = (side.name || '');
         const isRice = sideName.toUpperCase().includes('RICE');
