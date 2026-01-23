@@ -3208,6 +3208,49 @@
       }
     }
 
+    // Modal-specific wrapper functions
+    async function toggleAutoTrackingInModal(orderId, enabled) {
+      await toggleAutoTracking(orderId, enabled);
+      // Reload modal to show updated status
+      setTimeout(() => {
+        const modal = document.getElementById('toastOrderModal');
+        if (modal) {
+          closeToastOrderModal();
+          renderToastOrderModal(orderId);
+        }
+      }, 500);
+    }
+
+    async function refreshDeliveryStatusInModal(orderId) {
+      try {
+        showLoading('REFRESHING STATUS', 'Updating delivery status...');
+
+        // Trigger auto-update for this specific order
+        const response = await fetch('/api/auto-update-delivery-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId })
+        });
+
+        const data = await response.json();
+
+        hideLoading();
+
+        if (data.success) {
+          // Reload modal to show updated status
+          closeToastOrderModal();
+          renderToastOrderModal(orderId);
+          showMessage('Delivery status refreshed!', 'success');
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        hideLoading();
+        console.error('Error refreshing delivery status:', error);
+        showMessage('Error refreshing status: ' + error.message, 'error');
+      }
+    }
+
     // ============================================
     // BACKGROUND AUTO-SYNC WITH UPDATE CONFIRMATION
     // ============================================
@@ -3865,6 +3908,88 @@
                 ${order.delivery_date ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Date:</strong> ${formatPacificDate(order.delivery_date, true)}</div>` : ''}
                 ${order.delivery_time ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Time:</strong> ${formatPacificTime(order.delivery_time)}</div>` : ''}
                 ${order.delivery_notes ? `<div style="margin-bottom: 8px; font-size: 13px;"><strong>Notes:</strong> ${order.delivery_notes}</div>` : ''}
+              </div>
+              ` : ''}
+
+              <!-- DELIVERY TRACKING (EZCATER ONLY) -->
+              ${order.source_system === 'EZCATER' && order.delivery_id ? `
+              <div style="margin-bottom: 24px; padding: 16px; background: var(--gray-100); border: 2px solid var(--gray-300);">
+                <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-900);">🚚 DELIVERY TRACKING</h3>
+
+                <div style="margin-bottom: 12px;">
+                  <div style="font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; margin-bottom: 4px;">Status</div>
+                  <div style="display: inline-block; padding: 4px 10px; border-radius: 0; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; background: ${
+                    order.delivery_status === 'delivered' ? '#d1fae5' :
+                    order.delivery_status === 'in_transit' ? '#bfdbfe' :
+                    order.delivery_status === 'picked_up' ? '#fed7aa' :
+                    order.delivery_status === 'assigned' ? '#dbeafe' : '#fef3c7'
+                  }; color: ${
+                    order.delivery_status === 'delivered' ? '#065f46' :
+                    order.delivery_status === 'in_transit' ? '#1e3a8a' :
+                    order.delivery_status === 'picked_up' ? '#9a3412' :
+                    order.delivery_status === 'assigned' ? '#1e40af' : '#92400e'
+                  };">
+                    ${(order.delivery_status || 'PENDING').toUpperCase()}
+                  </div>
+                </div>
+
+                ${order.courier_name ? `
+                <div style="margin-bottom: 12px;">
+                  <div style="font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; margin-bottom: 4px;">Courier</div>
+                  <div style="font-size: 14px;">${order.courier_name}${order.courier_phone ? ` • ${order.courier_phone}` : ''}</div>
+                </div>
+                ` : ''}
+
+                <div style="margin-bottom: 12px;">
+                  <div style="font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; margin-bottom: 8px;">Auto-Tracking</div>
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="autoTrackingToggle-${order.id}" ${order.auto_tracking_enabled ? 'checked' : ''} onchange="toggleAutoTrackingInModal(${order.id}, this.checked)" style="width: 18px; height: 18px;">
+                    <span style="font-size: 13px;">Enable automated status updates</span>
+                  </label>
+                  <div style="font-size: 11px; color: var(--gray-600); margin-top: 4px; margin-left: 26px;">
+                    Automatically updates delivery status based on order time
+                  </div>
+                </div>
+
+                ${(() => {
+                  // Parse tracking events
+                  let trackingEvents = [];
+                  try {
+                    trackingEvents = typeof order.delivery_tracking_events === 'string'
+                      ? JSON.parse(order.delivery_tracking_events)
+                      : (order.delivery_tracking_events || []);
+                  } catch (e) {
+                    trackingEvents = [];
+                  }
+                  trackingEvents.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                  const trackingHTML = trackingEvents.length > 0
+                    ? trackingEvents.map(event => {
+                        const time = new Date(event.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                        const autoLabel = event.auto ? ' (Auto)' : '';
+                        const statusEmoji = {
+                          'pending': '⏳', 'assigned': '👤', 'picked_up': '📦', 'in_transit': '🚗', 'delivered': '✅'
+                        }[event.status] || '•';
+                        return \`<div style="padding: 8px 0; border-bottom: 1px solid var(--gray-200);">
+                          <strong>\${statusEmoji} \${time}</strong> - \${event.status}\${autoLabel}
+                          \${event.note ? \`<br><span style="font-size:12px;color:var(--gray-600);">\${event.note}</span>\` : ''}
+                        </div>\`;
+                      }).join('')
+                    : '<div style="color:var(--gray-500);font-size:13px;">No tracking events yet</div>';
+
+                  return \`
+                    <div style="margin-bottom: 12px;">
+                      <div style="font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; margin-bottom: 8px;">Tracking History</div>
+                      <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--gray-300); padding: 8px; background: white;">
+                        \${trackingHTML}
+                      </div>
+                    </div>
+                  \`;
+                })()}
+
+                <button onclick="refreshDeliveryStatusInModal(${order.id})" style="width: 100%; padding: 12px; background: var(--gray-900); color: white; border: none; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">
+                  🔄 REFRESH STATUS
+                </button>
               </div>
               ` : ''}
 
