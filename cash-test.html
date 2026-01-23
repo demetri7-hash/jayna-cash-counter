@@ -3331,13 +3331,15 @@
   function updateSessionStatus() {
     const statusElement = document.getElementById('sessionStatus');
     const logoutBtn = document.getElementById('logoutBtn');
-    
+
+    if (!statusElement || !logoutBtn) return; // Safety check: elements not ready yet
+
     if (isManagerSessionValid()) {
       const sessionExpiry = localStorage.getItem('managerSession');
       const expiryTime = parseInt(sessionExpiry);
       const now = new Date().getTime();
       const remainingMinutes = Math.ceil((expiryTime - now) / (60 * 1000));
-      
+
       statusElement.textContent = `Manager access: ${remainingMinutes} min remaining`;
       statusElement.style.color = '#28a745';
       logoutBtn.style.display = 'inline-block';
@@ -3347,10 +3349,10 @@
       logoutBtn.style.display = 'none';
     }
   }
-  
+
   // Update session status every minute
   setInterval(updateSessionStatus, 60000);
-  
+
   // Update session status on page load
   document.addEventListener('DOMContentLoaded', updateSessionStatus);
 
