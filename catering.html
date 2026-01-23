@@ -3251,6 +3251,42 @@
       }
     }
 
+    async function assignDriver(orderId, value) {
+      try {
+        showLoading('ASSIGNING DRIVER', 'Updating courier assignment...');
+
+        // Parse driver selection (format: "Name|(Phone)")
+        const [courierName, courierPhone] = value.split('|');
+
+        const response = await fetch('/api/update-courier', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId,
+            courierName,
+            courierPhone
+          })
+        });
+
+        const data = await response.json();
+
+        hideLoading();
+
+        if (data.success) {
+          // Reload modal to show updated driver
+          closeToastOrderModal();
+          renderToastOrderModal(orderId);
+          showMessage(`Driver assigned: ${courierName}`, 'success');
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        hideLoading();
+        console.error('Error assigning driver:', error);
+        showMessage('Error assigning driver: ' + error.message, 'error');
+      }
+    }
+
     // ============================================
     // BACKGROUND AUTO-SYNC WITH UPDATE CONFIRMATION
     // ============================================
@@ -3933,12 +3969,16 @@
                   </div>
                 </div>
 
-                ${order.courier_name ? `
                 <div style="margin-bottom: 12px;">
-                  <div style="font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; margin-bottom: 4px;">Courier</div>
-                  <div style="font-size: 14px;">${order.courier_name}${order.courier_phone ? ` • ${order.courier_phone}` : ''}</div>
+                  <div style="font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; margin-bottom: 4px;">Assigned Driver</div>
+                  <select id="driverSelect-${order.id}" onchange="assignDriver(${order.id}, this.value)" style="width: 100%; padding: 12px; border: 2px solid var(--gray-300); border-radius: 0; font-size: 14px; background: white; box-sizing: border-box; cursor: pointer;">
+                    <option value="Aykut Kirac|(916) 509-2075" ${!order.courier_name || order.courier_name === 'Aykut Kirac' ? 'selected' : ''}>Aykut Kirac (Default Driver)</option>
+                    <option value="Demetri Gregorakis|(916) 513-3192" ${order.courier_name === 'Demetri Gregorakis' ? 'selected' : ''}>Demetri Gregorakis</option>
+                  </select>
+                  <div style="font-size: 11px; color: var(--gray-600); margin-top: 4px;">
+                    Driver assignment will auto-sync with ezCater 45 minutes before delivery
+                  </div>
                 </div>
-                ` : ''}
 
                 <div style="margin-bottom: 12px;">
                   <div style="font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; margin-bottom: 8px;">Auto-Tracking</div>

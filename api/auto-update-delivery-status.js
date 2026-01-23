@@ -204,9 +204,9 @@ async function autoAssignCourier(order, supabase) {
   try {
     console.log(`👤 Auto-assigning courier for order ${order.order_number}...`);
 
-    // Use a default courier name (you can customize this)
-    const courierName = 'Jayna Gyro Driver';
-    const courierPhone = order.customer_phone || '916-xxx-xxxx';  // Fallback phone
+    // Default to Aykut Kirac unless manually overridden
+    const courierName = order.courier_name || 'Aykut Kirac';
+    const courierPhone = order.courier_phone || '(916) 509-2075';
 
     // Call ezCater API to assign courier
     const apiUrl = process.env.EZCATER_DELIVERY_PROXY_URL || 'https://jayna-cash-counter.vercel.app/api/ezcater-delivery-proxy';
