@@ -56,6 +56,7 @@ export default async function handler(req, res) {
     const { data: orders, error } = await supabase
       .from('catering_orders')
       .select('*')
+      .eq('source_system', 'EZCATER')  // ONLY ezCater orders
       .eq('auto_tracking_enabled', true)
       .not('delivery_id', 'is', null)  // Must have deliveryId for ezCater API
       .gte('delivery_date', todayStr)
