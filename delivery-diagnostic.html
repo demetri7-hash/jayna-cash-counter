@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🚚 Delivery Tracking Diagnostic</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f9fafb;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      color: #1a1a1a;
+    }
+
+    .timestamp {
+      font-size: 14px;
+      color: #6b6b6b;
+      margin-bottom: 24px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: white;
+      border: 2px solid #e5e7eb;
+      padding: 20px;
+    }
+
+    .stat-card h3 {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6b6b6b;
+      margin-bottom: 8px;
+    }
+
+    .stat-card .value {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .order-card {
+      background: white;
+      border: 2px solid #e5e7eb;
+      padding: 20px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .order-card.auto-enabled {
+      border-left: 4px solid #059669;
+    }
+
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    .order-number {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-assigned { background: #dbeafe; color: #1e40af; }
+    .status-picked_up { background: #fed7aa; color: #9a3412; }
+    .status-in_transit { background: #bfdbfe; color: #1e3a8a; }
+    .status-delivered { background: #d1fae5; color: #065f46; }
+
+    .order-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .detail-item {
+      font-size: 13px;
+    }
+
+    .detail-label {
+      font-weight: 700;
+      color: #4a4a4a;
+      margin-right: 4px;
+    }
+
+    .detail-value {
+      color: #1a1a1a;
+    }
+
+    .next-action {
+      background: #f0fdf4;
+      border: 2px solid #059669;
+      padding: 12px 16px;
+      margin-top: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #065f46;
+    }
+
+    .next-action.warning {
+      background: #fef3c7;
+      border-color: #f59e0b;
+      color: #92400e;
+    }
+
+    .next-action.danger {
+      background: #fee2e2;
+      border-color: #dc2626;
+      color: #991b1b;
+    }
+
+    .auto-disabled {
+      background: #fef3c7;
+      border: 2px solid #f59e0b;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #92400e;
+      margin-top: 8px;
+    }
+
+    .refresh-btn {
+      background: #1a1a1a;
+      color: white;
+      border: 2px solid #1a1a1a;
+      padding: 12px 24px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      margin-bottom: 24px;
+    }
+
+    .refresh-btn:hover {
+      background: #4a4a4a;
+      border-color: #4a4a4a;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      font-size: 16px;
+      color: #6b6b6b;
+    }
+
+    .error {
+      background: #fee2e2;
+      border: 2px solid #dc2626;
+      color: #991b1b;
+      padding: 16px;
+      margin-bottom: 24px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚚 Delivery Tracking Diagnostic</h1>
+    <div class="timestamp" id="timestamp">Loading...</div>
+
+    <button class="refresh-btn" onclick="fetchDiagnostic()">🔄 REFRESH DATA</button>
+
+    <div id="stats" class="stats"></div>
+    <div id="error" style="display: none;" class="error"></div>
+    <div id="loading" class="loading">Loading diagnostic data...</div>
+    <div id="orders"></div>
+  </div>
+
+  <script>
+    async function fetchDiagnostic() {
+      const loadingEl = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const statsEl = document.getElementById('stats');
+      const ordersEl = document.getElementById('orders');
+      const timestampEl = document.getElementById('timestamp');
+
+      loadingEl.style.display = 'block';
+      errorEl.style.display = 'none';
+      statsEl.innerHTML = '';
+      ordersEl.innerHTML = '';
+
+      try {
+        const response = await fetch('/api/delivery-diagnostic');
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch diagnostic data');
+        }
+
+        loadingEl.style.display = 'none';
+
+        // Update timestamp
+        timestampEl.textContent = `Current Pacific Time: ${data.current_pacific_time}`;
+
+        // Render stats
+        statsEl.innerHTML = `
+          <div class="stat-card">
+            <h3>Total Orders Today/Tomorrow</h3>
+            <div class="value">${data.total_orders}</div>
+          </div>
+          <div class="stat-card">
+            <h3>Auto-Tracking Enabled</h3>
+            <div class="value">${data.orders_with_auto_tracking}</div>
+          </div>
+        `;
+
+        // Render orders
+        if (data.orders.length === 0) {
+          ordersEl.innerHTML = '<div class="loading">No ezCater orders found for today/tomorrow</div>';
+          return;
+        }
+
+        data.orders.forEach(order => {
+          const hasNextAction = order.next_status && order.auto_tracking_enabled;
+          const isPastDue = order.minutes_until_delivery !== null && order.minutes_until_delivery < 0;
+
+          ordersEl.innerHTML += `
+            <div class="order-card ${order.auto_tracking_enabled ? 'auto-enabled' : ''}">
+              <div class="order-header">
+                <div class="order-number">Order #${order.order_number}</div>
+                <div class="status-badge status-${order.current_status}">${order.current_status || 'PENDING'}</div>
+              </div>
+
+              <div class="order-details">
+                <div class="detail-item">
+                  <span class="detail-label">Customer:</span>
+                  <span class="detail-value">${order.customer_name || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Delivery Time:</span>
+                  <span class="detail-value">${order.delivery_time || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Minutes Until:</span>
+                  <span class="detail-value">${order.minutes_until_delivery !== null ? order.minutes_until_delivery : 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Driver:</span>
+                  <span class="detail-value">${order.courier_name || 'Not assigned'}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Tracking Events:</span>
+                  <span class="detail-value">${order.tracking_events_count}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Last Auto-Update:</span>
+                  <span class="detail-value">${order.last_auto_update_at ? new Date(order.last_auto_update_at).toLocaleTimeString() : 'Never'}</span>
+                </div>
+              </div>
+
+              ${hasNextAction ? `
+                <div class="next-action ${isPastDue ? 'danger' : ''}">
+                  ⏰ Next Action: Update to <strong>${order.next_status.toUpperCase()}</strong> ${order.next_status_time}
+                </div>
+              ` : ''}
+
+              ${!order.auto_tracking_enabled ? `
+                <div class="auto-disabled">
+                  ⚠️ Auto-tracking is DISABLED for this order. Enable it in the order modal.
+                </div>
+              ` : ''}
+            </div>
+          `;
+        });
+
+      } catch (error) {
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'block';
+        errorEl.textContent = `Error: ${error.message}`;
+        console.error('Diagnostic error:', error);
+      }
+    }
+
+    // Auto-refresh every 30 seconds
+    fetchDiagnostic();
+    setInterval(fetchDiagnostic, 30000);
+  </script>
+</body>
+</html>
