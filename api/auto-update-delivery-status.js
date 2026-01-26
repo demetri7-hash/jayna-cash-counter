@@ -129,7 +129,11 @@ async function processOrder(order, currentTime, supabase) {
     );
 
     if (!newStatus) {
-      // No update needed
+      // No update needed, but record that we checked
+      await supabase
+        .from('catering_orders')
+        .update({ last_auto_update_at: new Date().toISOString() })
+        .eq('id', order.id);
       return null;
     }
 
