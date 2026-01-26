@@ -3,13 +3,14 @@
  * Automatically updates delivery statuses based on order due time
  *
  * Timeline:
- * - 45 min before due: Auto-assign courier → status: assigned
+ * - IMMEDIATELY on order receipt: Auto-assign courier → status: assigned
  * - 30 min before due: Picked up from restaurant → status: picked_up
  * - 15 min before due: In transit to customer → status: in_transit
  * - At due time: Delivered → status: delivered
  *
  * Called by:
  * - Catering page (on load/refresh)
+ * - ezCater webhook (when order received)
  * - Vercel Cron (every 5 minutes) - optional
  */
 
@@ -177,8 +178,7 @@ function determineStatusUpdate(currentStatus, minutesUntilDelivery) {
   }
 
   // Timeline logic:
-  // - 45+ min before: pending
-  // - 45 min before: assigned
+  // - IMMEDIATELY: assign courier (pending → assigned)
   // - 30 min before: picked_up
   // - 15 min before: in_transit
   // - 0 min (at/past due time): delivered
@@ -195,7 +195,8 @@ function determineStatusUpdate(currentStatus, minutesUntilDelivery) {
     return { newStatus: 'picked_up', eventType: 'picked_up' };
   }
 
-  if (minutesUntilDelivery <= 45 && currentStatus === 'pending') {
+  // IMMEDIATELY assign driver if order is still pending (no time delay)
+  if (currentStatus === 'pending') {
     return { newStatus: 'assigned', eventType: null };  // Assignment doesn't use courier event
   }
 
