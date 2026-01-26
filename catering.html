@@ -3992,6 +3992,75 @@
                 </div>
 
                 ${(() => {
+                  // Check for auto-tracking issues and show warnings
+                  const warnings = [];
+                  const now = new Date();
+                  const deliveryTime = order.delivery_time ? new Date(order.delivery_time) : null;
+                  const lastUpdate = order.last_auto_update_at ? new Date(order.last_auto_update_at) : null;
+                  const minutesUntilDelivery = deliveryTime ? Math.floor((deliveryTime - now) / (1000 * 60)) : null;
+                  const minutesSinceUpdate = lastUpdate ? Math.floor((now - lastUpdate) / (1000 * 60)) : null;
+
+                  // Warning 1: Auto-tracking enabled but not running
+                  if (order.auto_tracking_enabled && (!lastUpdate || minutesSinceUpdate > 15)) {
+                    warnings.push({
+                      type: 'error',
+                      icon: '🔴',
+                      message: lastUpdate
+                        ? `Auto-tracking hasn't run in ${minutesSinceUpdate} minutes! Last check: ${lastUpdate.toLocaleTimeString()}`
+                        : 'Auto-tracking has never run! System may not be checking this order.'
+                    });
+                  }
+
+                  // Warning 2: No driver assigned and delivery is soon
+                  if (order.auto_tracking_enabled && !order.courier_name && minutesUntilDelivery !== null && minutesUntilDelivery <= 45 && minutesUntilDelivery > 0) {
+                    warnings.push({
+                      type: 'warning',
+                      icon: '⚠️',
+                      message: `Driver should be assigned! Delivery in ${minutesUntilDelivery} minutes but no driver set.`
+                    });
+                  }
+
+                  // Warning 3: Order is past due but not marked delivered
+                  if (order.auto_tracking_enabled && minutesUntilDelivery !== null && minutesUntilDelivery < -15 && order.delivery_status !== 'delivered') {
+                    warnings.push({
+                      type: 'error',
+                      icon: '🔴',
+                      message: `Order is ${Math.abs(minutesUntilDelivery)} minutes past due time but still showing as "${order.delivery_status}"!`
+                    });
+                  }
+
+                  // Warning 4: Auto-tracking disabled
+                  if (!order.auto_tracking_enabled && deliveryTime && minutesUntilDelivery > 0) {
+                    warnings.push({
+                      type: 'info',
+                      icon: 'ℹ️',
+                      message: 'Auto-tracking is disabled. You must manually update delivery status.'
+                    });
+                  }
+
+                  if (warnings.length === 0) return '';
+
+                  return `
+                    <div style="margin-bottom: 12px;">
+                      ${warnings.map(w => `
+                        <div style="padding: 12px 16px; margin-bottom: 8px; border: 2px solid ${
+                          w.type === 'error' ? '#dc2626' :
+                          w.type === 'warning' ? '#f59e0b' : '#3b82f6'
+                        }; background: ${
+                          w.type === 'error' ? '#fee2e2' :
+                          w.type === 'warning' ? '#fef3c7' : '#dbeafe'
+                        }; color: ${
+                          w.type === 'error' ? '#991b1b' :
+                          w.type === 'warning' ? '#92400e' : '#1e40af'
+                        }; font-size: 12px; font-weight: 600;">
+                          ${w.icon} ${w.message}
+                        </div>
+                      `).join('')}
+                    </div>
+                  `;
+                })()}
+
+                ${(() => {
                   // Parse tracking events
                   let trackingEvents = [];
                   try {
