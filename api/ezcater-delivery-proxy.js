@@ -8,6 +8,7 @@
  * - courierEvent: Update delivery lifecycle (picked_up, in_transit, delivered)
  * - trackingEvent: Send location updates
  * - uploadImage: Upload proof of delivery photo
+ * - reconfirmOrder: Reconfirm order 24 hours before delivery
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -67,6 +68,9 @@ export default async function handler(req, res) {
       case 'uploadImage':
         result = await uploadProofOfDelivery(apiUrl, apiToken, deliveryId, data);
         break;
+      case 'reconfirmOrder':
+        result = await reconfirmOrder(apiUrl, apiToken, data);
+        break;
       default:
         return res.status(400).json({
           error: 'Invalid operation',
@@ -109,10 +113,10 @@ async function assignCourier(apiUrl, apiToken, deliveryId, courierData) {
   const { name, phone } = courierData;
 
   const query = `
-    mutation AssignCourier($deliveryId: ID!, $courier: CourierInput!) {
-      courierAssign(deliveryId: $deliveryId, courier: $courier) {
+    mutation AssignCourier($id: ID!, $courier: CourierInput!) {
+      courierAssign(id: $id, courier: $courier) {
         delivery {
-          deliveryId
+          id
           courier {
             name
             phone
@@ -134,7 +138,7 @@ async function assignCourier(apiUrl, apiToken, deliveryId, courierData) {
       body: JSON.stringify({
         query,
         variables: {
-          deliveryId,
+          id: deliveryId,
           courier: { name, phone }
         }
       })
@@ -168,10 +172,10 @@ async function assignCourier(apiUrl, apiToken, deliveryId, courierData) {
  */
 async function unassignCourier(apiUrl, apiToken, deliveryId) {
   const query = `
-    mutation UnassignCourier($deliveryId: ID!) {
-      courierUnassign(deliveryId: $deliveryId) {
+    mutation UnassignCourier($id: ID!) {
+      courierUnassign(id: $id) {
         delivery {
-          deliveryId
+          id
           courier {
             name
           }
@@ -191,7 +195,7 @@ async function unassignCourier(apiUrl, apiToken, deliveryId) {
       },
       body: JSON.stringify({
         query,
-        variables: { deliveryId }
+        variables: { id: deliveryId }
       })
     });
 
@@ -224,10 +228,10 @@ async function createCourierEvent(apiUrl, apiToken, deliveryId, eventData) {
   const { eventType, timestamp, note } = eventData;
 
   const query = `
-    mutation CreateCourierEvent($deliveryId: ID!, $event: CourierEventInput!) {
-      courierEventCreate(deliveryId: $deliveryId, event: $event) {
+    mutation CreateCourierEvent($id: ID!, $event: CourierEventInput!) {
+      courierEventCreate(id: $id, event: $event) {
         delivery {
-          deliveryId
+          id
           status
         }
       }
@@ -246,7 +250,7 @@ async function createCourierEvent(apiUrl, apiToken, deliveryId, eventData) {
       body: JSON.stringify({
         query,
         variables: {
-          deliveryId,
+          id: deliveryId,
           event: {
             type: eventType,  // 'picked_up', 'in_transit', 'delivered'
             timestamp: timestamp || new Date().toISOString(),
@@ -289,10 +293,10 @@ async function createTrackingEvent(apiUrl, apiToken, deliveryId, eventData) {
   const { latitude, longitude, timestamp } = eventData;
 
   const query = `
-    mutation CreateTrackingEvent($deliveryId: ID!, $event: TrackingEventInput!) {
-      courierTrackingEventCreate(deliveryId: $deliveryId, event: $event) {
+    mutation CreateTrackingEvent($id: ID!, $event: TrackingEventInput!) {
+      courierTrackingEventCreate(id: $id, event: $event) {
         delivery {
-          deliveryId
+          id
           lastKnownLocation {
             latitude
             longitude
@@ -314,7 +318,7 @@ async function createTrackingEvent(apiUrl, apiToken, deliveryId, eventData) {
       body: JSON.stringify({
         query,
         variables: {
-          deliveryId,
+          id: deliveryId,
           event: {
             latitude,
             longitude,
@@ -353,10 +357,10 @@ async function uploadProofOfDelivery(apiUrl, apiToken, deliveryId, imageData) {
   const { imageBase64 } = imageData;
 
   const query = `
-    mutation UploadProofOfDelivery($deliveryId: ID!, $imageData: String!) {
-      courierImageCreate(deliveryId: $deliveryId, imageData: $imageData) {
+    mutation UploadProofOfDelivery($id: ID!, $imageData: String!) {
+      courierImageCreate(id: $id, imageData: $imageData) {
         delivery {
-          deliveryId
+          id
           proofOfDeliveryUrl
         }
       }
@@ -375,7 +379,7 @@ async function uploadProofOfDelivery(apiUrl, apiToken, deliveryId, imageData) {
       body: JSON.stringify({
         query,
         variables: {
-          deliveryId,
+          id: deliveryId,
           imageData: imageBase64
         }
       })
@@ -393,6 +397,61 @@ async function uploadProofOfDelivery(apiUrl, apiToken, deliveryId, imageData) {
     return {
       success: true,
       data: result.data?.courierImageCreate?.delivery
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Reconfirm order (required 24 hours before delivery)
+ */
+async function reconfirmOrder(apiUrl, apiToken, orderData) {
+  const { orderId } = orderData;
+
+  const query = `
+    mutation AcceptOrder($orderId: ID!) {
+      acceptOrder(orderId: $orderId) {
+        order {
+          id
+          status
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': apiToken,
+        'Apollographql-client-name': 'jayna-catering-system',
+        'Apollographql-client-version': '1.0.0'
+      },
+      body: JSON.stringify({
+        query,
+        variables: { orderId }
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.errors) {
+      console.error('❌ GraphQL errors:', result.errors);
+      return {
+        success: false,
+        error: result.errors[0]?.message || 'GraphQL error'
+      };
+    }
+
+    return {
+      success: true,
+      data: result.data?.acceptOrder?.order
     };
 
   } catch (error) {
