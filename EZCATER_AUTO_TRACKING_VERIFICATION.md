@@ -63,16 +63,37 @@ mutation CreateCourierEvent($deliveryId: ID!, $event: CourierEventInput!) {
 
 ---
 
+#### 3. **acceptOrder** (Reconfirmation at 24 hours before delivery)
+```graphql
+mutation AcceptOrder($orderId: ID!) {
+  acceptOrder(orderId: $orderId) {
+    order {
+      id
+      status
+    }
+  }
+}
+```
+
+**Sends:**
+- `orderId`: ezCater order number (e.g., "XGERG7")
+
+**When:** 24 hours before delivery (23-25 hour window)
+**Purpose:** Prevents ezCater from calling restaurant to reconfirm orders
+
+---
+
 ## Automated Timeline
 
-### Example: Order due at 11:30 AM
+### Example: Order due at 11:30 AM tomorrow (Jan 27)
 
 | Time | Action | ezCater API Call | Status Change |
 |------|--------|------------------|---------------|
-| **10:45 AM** (45 min before) | Auto-assign driver | `courierAssign` with Aykut's info | `pending` → `assigned` |
-| **11:00 AM** (30 min before) | Mark picked up | `courierEventCreate` type: `picked_up` | `assigned` → `picked_up` |
-| **11:15 AM** (15 min before) | Mark in transit | `courierEventCreate` type: `in_transit` | `picked_up` → `in_transit` |
-| **11:30 AM** (delivery time) | Mark delivered | `courierEventCreate` type: `delivered` | `in_transit` → `delivered` |
+| **IMMEDIATELY on receipt** | Auto-assign driver | `courierAssign` with Aykut's info | `pending` → `assigned` |
+| **11:30 AM today** (24 hrs before) | Auto-reconfirm order | `acceptOrder` mutation | No status change |
+| **11:00 AM tomorrow** (30 min before) | Mark picked up | `courierEventCreate` type: `picked_up` | `assigned` → `picked_up` |
+| **11:15 AM tomorrow** (15 min before) | Mark in transit | `courierEventCreate` type: `in_transit` | `picked_up` → `in_transit` |
+| **11:30 AM tomorrow** (delivery time) | Mark delivered | `courierEventCreate` type: `delivered` | `in_transit` → `delivered` |
 
 **All timestamps sent to ezCater match the actual time the event occurs (Pacific timezone).**
 
@@ -160,6 +181,7 @@ Open any ezCater order and look for **🚚 DELIVERY TRACKING** section:
 | `courier_name` | TEXT | Driver name (Aykut Kirac or Demetri Gregorakis) |
 | `courier_phone` | TEXT | Driver phone |
 | `delivery_time` | TIMESTAMPTZ | When order is due (Pacific timezone) |
+| `reconfirmed_at` | TIMESTAMPTZ | When order was reconfirmed with ezCater |
 | `last_auto_update_at` | TIMESTAMPTZ | When auto-tracking last checked this order |
 | `delivery_tracking_events` | JSONB | Full event history with timestamps |
 
@@ -176,7 +198,7 @@ Open any ezCater order and look for **🚚 DELIVERY TRACKING** section:
 
 **`/api/ezcater-delivery-proxy`**
 - Proxies GraphQL mutations to ezCater API
-- Operations: assignCourier, courierEvent
+- Operations: assignCourier, unassignCourier, courierEvent, trackingEvent, uploadImage, reconfirmOrder
 - Updates local database after successful API calls
 
 **`/api/delivery-diagnostic`**
@@ -213,16 +235,17 @@ Open any ezCater order and look for **🚚 DELIVERY TRACKING** section:
 ### Test Order #XGERG7 (Tomorrow 11:30 AM):
 
 **Current State (Jan 26, 3:33 PM):**
-- Status: PENDING ✅ (correct - too early for assignment)
-- Driver: Aykut Kirac (default) ✅
+- Status: ASSIGNED ✅ (driver already auto-assigned)
+- Driver: Aykut Kirac ✅
 - Auto-tracking: Enabled ✅
-- Minutes until delivery: ~1,678 minutes
+- Minutes until delivery: ~1,300 minutes
 
-**Expected Timeline (Jan 27):**
-- **10:45 AM** → Status changes to ASSIGNED, driver assigned in ezCater
-- **11:00 AM** → Status changes to PICKED_UP, ezCater shows "picked up"
-- **11:15 AM** → Status changes to IN_TRANSIT, ezCater shows "on the way"
-- **11:30 AM** → Status changes to DELIVERED, ezCater shows "delivered"
+**Expected Timeline:**
+- **DONE** → Driver auto-assigned immediately (Aykut Kirac)
+- **~11:30 AM today** (24 hrs before) → Order auto-reconfirmed with ezCater
+- **11:00 AM tomorrow** → Status changes to PICKED_UP, ezCater shows "picked up"
+- **11:15 AM tomorrow** → Status changes to IN_TRANSIT, ezCater shows "on the way"
+- **11:30 AM tomorrow** → Status changes to DELIVERED, ezCater shows "delivered"
 
 **How to verify:**
 1. Check diagnostic page throughout the morning tomorrow

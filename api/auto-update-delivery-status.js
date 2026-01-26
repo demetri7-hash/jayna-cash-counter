@@ -4,6 +4,7 @@
  *
  * Timeline:
  * - IMMEDIATELY on order receipt: Auto-assign courier → status: assigned
+ * - 24 hours before due: Auto-reconfirm order with ezCater
  * - 30 min before due: Picked up from restaurant → status: picked_up
  * - 15 min before due: In transit to customer → status: in_transit
  * - At due time: Delivered → status: delivered
@@ -123,6 +124,14 @@ async function processOrder(order, currentTime, supabase) {
     const minutesUntilDelivery = Math.floor((deliveryTime - currentTime) / (1000 * 60));
 
     console.log(`📅 Order ${order.order_number}: ${minutesUntilDelivery} min until delivery (${order.delivery_status})`);
+
+    // Check if reconfirmation needed (24 hours before delivery = 1440 minutes)
+    // Check between 23-25 hours (1380-1500 minutes) to have a window
+    const hoursUntilDelivery = minutesUntilDelivery / 60;
+    if (hoursUntilDelivery >= 23 && hoursUntilDelivery <= 25 && !order.reconfirmed_at) {
+      console.log(`📋 Order ${order.order_number}: Reconfirmation needed (~24 hours before delivery)`);
+      await reconfirmOrderWithEzCater(order, supabase);
+    }
 
     // Determine what status update is needed
     const { newStatus, eventType } = determineStatusUpdate(
@@ -278,6 +287,52 @@ async function sendCourierEvent(deliveryId, eventType) {
 
   } catch (error) {
     console.error(`❌ Error sending courier event:`, error);
+  }
+}
+
+/**
+ * Reconfirm order with ezCater (24 hours before delivery)
+ */
+async function reconfirmOrderWithEzCater(order, supabase) {
+  try {
+    console.log(`📋 Reconfirming order ${order.order_number} with ezCater...`);
+
+    // Call ezCater API to reconfirm order
+    const apiUrl = process.env.EZCATER_DELIVERY_PROXY_URL || 'https://jayna-cash-counter.vercel.app/api/ezcater-delivery-proxy';
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        operation: 'reconfirmOrder',
+        deliveryId: order.delivery_id,
+        data: {
+          orderId: order.order_number  // ezCater order number
+        }
+      })
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      console.error(`❌ Failed to reconfirm order ${order.order_number}:`, result.error);
+    } else {
+      console.log(`✅ Order ${order.order_number} reconfirmed with ezCater`);
+
+      // Update database to record reconfirmation
+      await supabase
+        .from('catering_orders')
+        .update({
+          reconfirmed_at: new Date().toISOString(),
+          last_auto_update_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+    }
+
+  } catch (error) {
+    console.error(`❌ Error reconfirming order:`, error);
   }
 }
 
