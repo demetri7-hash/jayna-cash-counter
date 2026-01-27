@@ -113,8 +113,8 @@ async function assignCourier(apiUrl, apiToken, deliveryId, courierData) {
   const { name, phone } = courierData;
 
   const query = `
-    mutation AssignCourier($deliveryId: ID!, $input: CourierAssignInput!) {
-      courierAssign(deliveryId: $deliveryId, input: $input) {
+    mutation AssignCourier($input: CourierAssignInput!) {
+      courierAssign(input: $input) {
         delivery {
           id
           courier {
@@ -138,8 +138,11 @@ async function assignCourier(apiUrl, apiToken, deliveryId, courierData) {
       body: JSON.stringify({
         query,
         variables: {
-          deliveryId: deliveryId,
-          input: { name, phone }
+          input: {
+            deliveryId: deliveryId,
+            name: name,
+            phone: phone
+          }
         }
       })
     });
