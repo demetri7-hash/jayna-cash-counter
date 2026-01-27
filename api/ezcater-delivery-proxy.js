@@ -113,8 +113,8 @@ async function assignCourier(apiUrl, apiToken, deliveryId, courierData) {
   const { name, phone } = courierData;
 
   const query = `
-    mutation AssignCourier($id: ID!, $courier: CourierInput!) {
-      courierAssign(id: $id, courier: $courier) {
+    mutation AssignCourier($deliveryId: ID!, $input: CourierAssignInput!) {
+      courierAssign(deliveryId: $deliveryId, input: $input) {
         delivery {
           id
           courier {
@@ -138,8 +138,8 @@ async function assignCourier(apiUrl, apiToken, deliveryId, courierData) {
       body: JSON.stringify({
         query,
         variables: {
-          id: deliveryId,
-          courier: { name, phone }
+          deliveryId: deliveryId,
+          input: { name, phone }
         }
       })
     });
@@ -172,8 +172,8 @@ async function assignCourier(apiUrl, apiToken, deliveryId, courierData) {
  */
 async function unassignCourier(apiUrl, apiToken, deliveryId) {
   const query = `
-    mutation UnassignCourier($id: ID!) {
-      courierUnassign(id: $id) {
+    mutation UnassignCourier($deliveryId: ID!) {
+      courierUnassign(deliveryId: $deliveryId) {
         delivery {
           id
           courier {
@@ -195,7 +195,7 @@ async function unassignCourier(apiUrl, apiToken, deliveryId) {
       },
       body: JSON.stringify({
         query,
-        variables: { id: deliveryId }
+        variables: { deliveryId: deliveryId }
       })
     });
 
@@ -228,8 +228,8 @@ async function createCourierEvent(apiUrl, apiToken, deliveryId, eventData) {
   const { eventType, timestamp, note } = eventData;
 
   const query = `
-    mutation CreateCourierEvent($id: ID!, $event: CourierEventInput!) {
-      courierEventCreate(id: $id, event: $event) {
+    mutation CreateCourierEvent($deliveryId: ID!, $input: CourierEventCreateInput!) {
+      courierEventCreate(deliveryId: $deliveryId, input: $input) {
         delivery {
           id
           status
@@ -250,8 +250,8 @@ async function createCourierEvent(apiUrl, apiToken, deliveryId, eventData) {
       body: JSON.stringify({
         query,
         variables: {
-          id: deliveryId,
-          event: {
+          deliveryId: deliveryId,
+          input: {
             type: eventType,  // 'picked_up', 'in_transit', 'delivered'
             timestamp: timestamp || new Date().toISOString(),
             note: note || ''
@@ -293,8 +293,8 @@ async function createTrackingEvent(apiUrl, apiToken, deliveryId, eventData) {
   const { latitude, longitude, timestamp } = eventData;
 
   const query = `
-    mutation CreateTrackingEvent($id: ID!, $event: TrackingEventInput!) {
-      courierTrackingEventCreate(id: $id, event: $event) {
+    mutation CreateTrackingEvent($deliveryId: ID!, $input: TrackingEventInput!) {
+      courierTrackingEventCreate(deliveryId: $deliveryId, input: $input) {
         delivery {
           id
           lastKnownLocation {
@@ -318,8 +318,8 @@ async function createTrackingEvent(apiUrl, apiToken, deliveryId, eventData) {
       body: JSON.stringify({
         query,
         variables: {
-          id: deliveryId,
-          event: {
+          deliveryId: deliveryId,
+          input: {
             latitude,
             longitude,
             timestamp: timestamp || new Date().toISOString()
@@ -357,8 +357,8 @@ async function uploadProofOfDelivery(apiUrl, apiToken, deliveryId, imageData) {
   const { imageBase64 } = imageData;
 
   const query = `
-    mutation UploadProofOfDelivery($id: ID!, $imageData: String!) {
-      courierImageCreate(id: $id, imageData: $imageData) {
+    mutation UploadProofOfDelivery($deliveryId: ID!, $imageData: String!) {
+      courierImageCreate(deliveryId: $deliveryId, imageData: $imageData) {
         delivery {
           id
           proofOfDeliveryUrl
@@ -379,7 +379,7 @@ async function uploadProofOfDelivery(apiUrl, apiToken, deliveryId, imageData) {
       body: JSON.stringify({
         query,
         variables: {
-          id: deliveryId,
+          deliveryId: deliveryId,
           imageData: imageBase64
         }
       })
