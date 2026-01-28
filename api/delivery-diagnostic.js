@@ -28,13 +28,12 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get current time in Pacific timezone
+    // Get current time (UTC) for accurate comparisons
     const now = new Date();
-    const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
 
-    // Fetch all orders with delivery tracking data
-    const today = new Date(pacificTime);
-    today.setHours(0, 0, 0, 0);
+    // Calculate Pacific timezone dates for filtering
+    const pacificNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    const today = new Date(pacificNow.getFullYear(), pacificNow.getMonth(), pacificNow.getDate());
     const todayStr = today.toISOString().split('T')[0];
 
     const tomorrow = new Date(today);
@@ -57,7 +56,7 @@ export default async function handler(req, res) {
     // Process each order to calculate status
     const diagnosticData = orders.map(order => {
       const deliveryTime = order.delivery_time ? new Date(order.delivery_time) : null;
-      const minutesUntilDelivery = deliveryTime ? Math.floor((deliveryTime - pacificTime) / (1000 * 60)) : null;
+      const minutesUntilDelivery = deliveryTime ? Math.floor((deliveryTime - now) / (1000 * 60)) : null;
 
       // Determine what the next status should be
       let nextStatus = null;
@@ -113,7 +112,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      current_pacific_time: pacificTime.toLocaleString('en-US', {
+      current_pacific_time: now.toLocaleString('en-US', {
         timeZone: 'America/Los_Angeles',
         dateStyle: 'full',
         timeStyle: 'long'

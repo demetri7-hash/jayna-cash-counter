@@ -40,15 +40,21 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get current time in Pacific timezone
+    // Get current time (UTC) - compare directly with database timestamps
     const now = new Date();
-    const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
 
-    console.log(`⏰ Current Pacific Time: ${pacificTime.toISOString()}`);
+    // For logging: show actual Pacific time (display only)
+    const pacificTimeStr = now.toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      dateStyle: 'full',
+      timeStyle: 'long'
+    });
+    console.log(`⏰ Current Pacific Time: ${pacificTimeStr}`);
 
-    // Fetch all orders with auto-tracking enabled and delivery times in the future
-    const today = new Date(pacificTime);
-    today.setHours(0, 0, 0, 0);
+    // Fetch all orders with auto-tracking enabled and delivery times today/tomorrow
+    // Calculate Pacific timezone dates for filtering
+    const pacificNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    const today = new Date(pacificNow.getFullYear(), pacificNow.getMonth(), pacificNow.getDate());
     const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
 
     const tomorrow = new Date(today);
@@ -80,10 +86,10 @@ export default async function handler(req, res) {
 
     console.log(`📦 Found ${orders.length} orders with auto-tracking enabled`);
 
-    // Process each order
+    // Process each order (pass UTC time for accurate calculations)
     const updates = [];
     for (const order of orders) {
-      const update = await processOrder(order, pacificTime, supabase);
+      const update = await processOrder(order, now, supabase);
       if (update) {
         updates.push(update);
       }
